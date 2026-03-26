@@ -1,14 +1,35 @@
+import Header from "@/components/layout/Header";
+import Footer from "@/components/layout/Footer";
+import WhatsAppButton from "@/components/layout/WhatsAppButton";
+import SocialProofNotification from "@/components/SocialProofNotification";
+import HeroSection from "@/components/sections/HeroSection";
+import BenefitsSection from "@/components/sections/BenefitsSection";
+import HowItWorksSection from "@/components/sections/HowItWorksSection";
+import PricingSection from "@/components/sections/PricingSection";
+import BlockchainBanner from "@/components/sections/BlockchainBanner";
+import TestimonialsSection from "@/components/sections/TestimonialsSection";
+import FAQSection from "@/components/sections/FAQSection";
+import CTASection from "@/components/sections/CTASection";
+import BlogPreviewSection from "@/components/sections/BlogPreviewSection";
+
 const Index = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-foreground mb-4" style={{ fontFamily: 'Space Grotesk' }}>
-          WebMarcas
-        </h1>
-        <p className="text-muted-foreground text-lg">
-          Projeto conectado ao Supabase com sucesso ✓
-        </p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <Header />
+      <main className="mobile-compact">
+        <HeroSection />
+        <BenefitsSection />
+        <HowItWorksSection />
+        <PricingSection />
+        <BlockchainBanner />
+        <TestimonialsSection />
+        <BlogPreviewSection />
+        <FAQSection />
+        <CTASection />
+      </main>
+      <Footer />
+      <WhatsAppButton />
+      <SocialProofNotification />
     </div>
   );
 };

@@ -1,0 +1,1 @@
+UPDATE public.profiles SET assigned_to = '1ca389a4-bb64-4ff5-97ab-0a214ccab4b8' WHERE assigned_to = '8b5a4fc0-1fc4-402d-8ee9-c7cae2c0e39a';

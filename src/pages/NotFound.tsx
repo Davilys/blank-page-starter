@@ -1,14 +1,17 @@
-import { Link } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 const NotFound = () => {
+  const location = useLocation();
+
+  // Silently handle 404 - no URL logging for security
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="flex min-h-screen items-center justify-center bg-muted">
       <div className="text-center">
-        <h1 className="text-6xl font-bold text-primary mb-4">404</h1>
-        <p className="text-muted-foreground mb-6">Página não encontrada</p>
-        <Link to="/" className="text-primary hover:underline">
-          Voltar ao início
-        </Link>
+        <h1 className="mb-4 text-4xl font-bold">404</h1>
+        <p className="mb-4 text-xl text-muted-foreground">Oops! Página não encontrada</p>
+        <a href="/" className="text-primary underline hover:text-primary/90">
+          Voltar para o Início
+        </a>
       </div>
     </div>
   );

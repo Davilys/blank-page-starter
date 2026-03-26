@@ -1,0 +1,5 @@
+/* App.css — reset do root para layouts fullscreen funcionarem corretamente */
+#root {
+  width: 100%;
+  height: 100%;
+}

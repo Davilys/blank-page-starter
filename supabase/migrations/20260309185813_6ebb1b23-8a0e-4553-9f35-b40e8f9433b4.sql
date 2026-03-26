@@ -1,0 +1,3 @@
+
+ALTER TABLE public.brand_processes DROP CONSTRAINT IF EXISTS brand_processes_status_check;
+ALTER TABLE public.brand_processes ADD CONSTRAINT brand_processes_status_check CHECK (pipeline_stage IS NULL OR pipeline_stage IN ('protocolado', '003', 'oposicao', 'exigencia_merito', 'exigencia_de_mrito', 'indeferimento', 'notificacao', 'deferimento', 'certificados', 'certificado', 'renovacao', 'distrato', 'assinou_contrato', 'pagamento_ok', 'pagou_taxa', 'taxa_inpi_paga', 'em_andamento', 'depositada', 'arquivado'));
