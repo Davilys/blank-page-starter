@@ -7,17 +7,20 @@ import { SettingsCard } from './SettingsCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { 
   HardDrive, Download, FileJson, FileSpreadsheet, History, 
-  Trash2, Loader2, CheckCircle2, AlertCircle 
+  Loader2, CheckCircle2, AlertCircle, Database
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BackupImportSection } from './BackupImportSection';
+import { ALL_BACKUP_TABLES, fetchAllFromTable } from '@/lib/backupTables';
 
 export function BackupSettings() {
   const [exporting, setExporting] = useState<string | null>(null);
+  const [exportProgress, setExportProgress] = useState({ current: 0, total: 0, tableName: '' });
 
   const { data: importLogs, isLoading } = useQuery({
     queryKey: ['import-logs'],
@@ -32,74 +35,97 @@ export function BackupSettings() {
     },
   });
 
-  const exportData = async (type: 'leads' | 'clients' | 'contracts' | 'all', format: 'json' | 'csv') => {
-    setExporting(`${type}-${format}`);
+  const exportSingleTable = async (tableName: string, typeLabel: string, fmt: 'json' | 'csv') => {
+    const key = `${tableName}-${fmt}`;
+    setExporting(key);
     try {
-      let data: Record<string, unknown>[] = [];
-      
-      if (type === 'leads' || type === 'all') {
-        const { data: leads } = await supabase.from('leads').select('*');
-        if (type === 'leads') data = leads || [];
-        else if (type === 'all' && leads) data.push(...leads.map(l => ({ ...l, _type: 'lead' })));
+      const data = await fetchAllFromTable(supabase, tableName);
+      if (data.length === 0) {
+        toast.error('Nenhum dado para exportar');
+        return;
       }
-      
-      if (type === 'clients' || type === 'all') {
-        const { data: profiles } = await supabase.from('profiles').select('*');
-        if (type === 'clients') data = profiles || [];
-        else if (type === 'all' && profiles) data.push(...profiles.map(p => ({ ...p, _type: 'client' })));
-      }
-      
-      if (type === 'contracts' || type === 'all') {
-        const { data: contracts } = await supabase.from('contracts').select('*');
-        if (type === 'contracts') data = contracts || [];
-        else if (type === 'all' && contracts) data.push(...contracts.map(c => ({ ...c, _type: 'contract' })));
-      }
-
-      let content: string;
-      let mimeType: string;
-      let extension: string;
-
-      if (format === 'json') {
-        content = JSON.stringify(data, null, 2);
-        mimeType = 'application/json';
-        extension = 'json';
-      } else {
-        // CSV
-        if (data.length === 0) {
-          toast.error('Nenhum dado para exportar');
-          return;
-        }
-        const headers = Object.keys(data[0]);
-        const csvRows = [headers.join(',')];
-        data.forEach(row => {
-          const values = headers.map(h => {
-            const val = row[h];
-            if (val === null || val === undefined) return '';
-            const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
-            return `"${str.replace(/"/g, '""')}"`;
-          });
-          csvRows.push(values.join(','));
-        });
-        content = csvRows.join('\n');
-        mimeType = 'text/csv';
-        extension = 'csv';
-      }
-
-      const blob = new Blob([content], { type: mimeType });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `webmarcas_${type}_${format}_${Date.now()}.${extension}`;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      toast.success('Dados exportados com sucesso!');
-    } catch (error) {
+      downloadData(data, `webmarcas_${tableName}_${Date.now()}`, fmt);
+      toast.success(`${data.length} registros de ${typeLabel} exportados!`);
+    } catch {
       toast.error('Erro ao exportar dados');
     } finally {
       setExporting(null);
     }
   };
+
+  const exportAll = async (fmt: 'json' | 'csv') => {
+    setExporting(`all-${fmt}`);
+    const tables = ALL_BACKUP_TABLES;
+    const allData: Record<string, unknown>[] = [];
+    let totalRecords = 0;
+
+    try {
+      for (let i = 0; i < tables.length; i++) {
+        const t = tables[i];
+        setExportProgress({ current: i + 1, total: tables.length, tableName: t.label });
+
+        try {
+          const rows = await fetchAllFromTable(supabase, t.name);
+          if (rows.length > 0) {
+            rows.forEach(r => allData.push({ ...r, _type: t.name }));
+            totalRecords += rows.length;
+          }
+        } catch {
+          console.warn(`Skipping table ${t.name}`);
+        }
+      }
+
+      if (allData.length === 0) {
+        toast.error('Nenhum dado para exportar');
+        return;
+      }
+
+      downloadData(allData, `webmarcas_backup_completo_${Date.now()}`, fmt);
+      toast.success(`Backup completo: ${totalRecords} registros de ${tables.length} tabelas exportados!`);
+    } catch {
+      toast.error('Erro ao exportar dados');
+    } finally {
+      setExporting(null);
+      setExportProgress({ current: 0, total: 0, tableName: '' });
+    }
+  };
+
+  const downloadData = (data: Record<string, unknown>[], filename: string, fmt: 'json' | 'csv') => {
+    let content: string;
+    let mimeType: string;
+    let extension: string;
+
+    if (fmt === 'json') {
+      content = JSON.stringify(data, null, 2);
+      mimeType = 'application/json';
+      extension = 'json';
+    } else {
+      const headers = Object.keys(data[0]);
+      const csvRows = [headers.join(',')];
+      data.forEach(row => {
+        const values = headers.map(h => {
+          const val = row[h];
+          if (val === null || val === undefined) return '';
+          const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
+          return `"${str.replace(/"/g, '""')}"`;
+        });
+        csvRows.push(values.join(','));
+      });
+      content = '\ufeff' + csvRows.join('\n');
+      mimeType = 'text/csv;charset=utf-8;';
+      extension = 'csv';
+    }
+
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.${extension}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const isExporting = exporting !== null;
 
   return (
     <motion.div
@@ -112,100 +138,80 @@ export function BackupSettings() {
         icon={Download}
         iconColor="text-blue-500"
         title="Exportar Dados"
-        description="Faça backup dos dados do sistema"
+        description="Faça backup completo de todas as tabelas do sistema (~60 tabelas com paginação)"
       >
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="p-4 rounded-xl border bg-muted/30 space-y-3">
-            <div className="flex items-center gap-2">
-              <FileJson className="h-5 w-5 text-orange-500" />
-              <span className="font-medium">Formato JSON</span>
+        <div className="space-y-4">
+          {/* Progress bar during full export */}
+          {exporting?.startsWith('all-') && exportProgress.total > 0 && (
+            <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2">
+                  <Database className="h-4 w-4 text-blue-500 animate-pulse" />
+                  <span className="font-medium">Exportando: {exportProgress.tableName}</span>
+                </span>
+                <span className="text-muted-foreground">
+                  {exportProgress.current} de {exportProgress.total} tabelas
+                </span>
+              </div>
+              <Progress value={(exportProgress.current / exportProgress.total) * 100} className="h-2" />
             </div>
-            <p className="text-sm text-muted-foreground">
-              Ideal para backup completo e restauração
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={() => exportData('leads', 'json')}
-                disabled={exporting !== null}
-              >
-                {exporting === 'leads-json' && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-                Leads
-              </Button>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={() => exportData('clients', 'json')}
-                disabled={exporting !== null}
-              >
-                {exporting === 'clients-json' && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-                Clientes
-              </Button>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={() => exportData('contracts', 'json')}
-                disabled={exporting !== null}
-              >
-                {exporting === 'contracts-json' && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-                Contratos
-              </Button>
-              <Button 
-                size="sm" 
-                onClick={() => exportData('all', 'json')}
-                disabled={exporting !== null}
-              >
-                {exporting === 'all-json' && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-                Tudo
-              </Button>
-            </div>
-          </div>
+          )}
 
-          <div className="p-4 rounded-xl border bg-muted/30 space-y-3">
-            <div className="flex items-center gap-2">
-              <FileSpreadsheet className="h-5 w-5 text-green-500" />
-              <span className="font-medium">Formato CSV</span>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="p-4 rounded-xl border bg-muted/30 space-y-3">
+              <div className="flex items-center gap-2">
+                <FileJson className="h-5 w-5 text-orange-500" />
+                <span className="font-medium">Formato JSON</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Ideal para backup completo e restauração
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => exportSingleTable('leads', 'Leads', 'json')} disabled={isExporting}>
+                  {exporting === 'leads-json' && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                  Leads
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => exportSingleTable('profiles', 'Clientes', 'json')} disabled={isExporting}>
+                  {exporting === 'profiles-json' && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                  Clientes
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => exportSingleTable('contracts', 'Contratos', 'json')} disabled={isExporting}>
+                  {exporting === 'contracts-json' && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                  Contratos
+                </Button>
+                <Button size="sm" onClick={() => exportAll('json')} disabled={isExporting}>
+                  {exporting === 'all-json' && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                  <Database className="h-3 w-3 mr-1" /> Tudo ({ALL_BACKUP_TABLES.length} tabelas)
+                </Button>
+              </div>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Para uso em Excel ou Google Sheets
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={() => exportData('leads', 'csv')}
-                disabled={exporting !== null}
-              >
-                {exporting === 'leads-csv' && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-                Leads
-              </Button>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={() => exportData('clients', 'csv')}
-                disabled={exporting !== null}
-              >
-                {exporting === 'clients-csv' && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-                Clientes
-              </Button>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={() => exportData('contracts', 'csv')}
-                disabled={exporting !== null}
-              >
-                {exporting === 'contracts-csv' && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-                Contratos
-              </Button>
-              <Button 
-                size="sm" 
-                onClick={() => exportData('all', 'csv')}
-                disabled={exporting !== null}
-              >
-                {exporting === 'all-csv' && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-                Tudo
-              </Button>
+
+            <div className="p-4 rounded-xl border bg-muted/30 space-y-3">
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet className="h-5 w-5 text-green-500" />
+                <span className="font-medium">Formato CSV</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Para uso em Excel ou Google Sheets
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => exportSingleTable('leads', 'Leads', 'csv')} disabled={isExporting}>
+                  {exporting === 'leads-csv' && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                  Leads
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => exportSingleTable('profiles', 'Clientes', 'csv')} disabled={isExporting}>
+                  {exporting === 'profiles-csv' && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                  Clientes
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => exportSingleTable('contracts', 'Contratos', 'csv')} disabled={isExporting}>
+                  {exporting === 'contracts-csv' && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                  Contratos
+                </Button>
+                <Button size="sm" onClick={() => exportAll('csv')} disabled={isExporting}>
+                  {exporting === 'all-csv' && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                  <Database className="h-3 w-3 mr-1" /> Tudo ({ALL_BACKUP_TABLES.length} tabelas)
+                </Button>
+              </div>
             </div>
           </div>
         </div>

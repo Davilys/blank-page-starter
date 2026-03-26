@@ -4,14 +4,16 @@ import { toast } from 'sonner';
 import { SettingsCard } from './SettingsCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ImportDropzone } from '@/components/admin/clients/ImportDropzone';
 import { 
-  Upload, Loader2, AlertTriangle, CheckCircle2, FileJson, FileSpreadsheet 
+  Upload, Loader2, AlertTriangle, CheckCircle2, FileJson, FileSpreadsheet, Database
 } from 'lucide-react';
+import { ALL_BACKUP_TABLES, TYPE_TO_TABLE } from '@/lib/backupTables';
 
-type ImportTarget = 'leads' | 'clients' | 'contracts' | 'auto';
+type ImportTarget = 'auto' | string; // 'auto' or any table name
 
 interface ImportResult {
   total: number;
@@ -20,64 +22,71 @@ interface ImportResult {
   errors: string[];
 }
 
+// Group tables by category for the select
+const groupedTables = ALL_BACKUP_TABLES.reduce((acc, t) => {
+  if (!acc[t.category]) acc[t.category] = [];
+  acc[t.category].push(t);
+  return acc;
+}, {} as Record<string, typeof ALL_BACKUP_TABLES>);
+
 export function BackupImportSection() {
   const [importing, setImporting] = useState(false);
   const [target, setTarget] = useState<ImportTarget>('auto');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<Record<string, unknown>[] | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0, tableName: '' });
+
+  const parseFile = async (file: File): Promise<Record<string, unknown>[]> => {
+    const text = await file.text();
+    const ext = file.name.split('.').pop()?.toLowerCase();
+
+    if (ext === 'json') {
+      const json = JSON.parse(text);
+      return Array.isArray(json) ? json : [json];
+    } else if (ext === 'csv') {
+      const lines = text.split('\n').filter(l => l.trim());
+      if (lines.length < 2) throw new Error('CSV vazio');
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+      return lines.slice(1).map(line => {
+        const values = line.match(/(".*?"|[^,]+)/g) || [];
+        const obj: Record<string, unknown> = {};
+        headers.forEach((h, i) => {
+          let val = (values[i] || '').trim().replace(/^"|"$/g, '');
+          obj[h] = val === '' ? null : val;
+        });
+        return obj;
+      });
+    }
+    throw new Error('Formato não suportado. Use JSON ou CSV.');
+  };
 
   const handleFileSelect = useCallback(async (file: File) => {
     setSelectedFile(file);
     setResult(null);
 
     try {
-      const text = await file.text();
-      const ext = file.name.split('.').pop()?.toLowerCase();
-
-      let parsed: Record<string, unknown>[] = [];
-
-      if (ext === 'json') {
-        const json = JSON.parse(text);
-        parsed = Array.isArray(json) ? json : [json];
-      } else if (ext === 'csv') {
-        const lines = text.split('\n').filter(l => l.trim());
-        if (lines.length < 2) {
-          toast.error('Arquivo CSV vazio ou sem dados');
-          return;
-        }
-        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-        parsed = lines.slice(1).map(line => {
-          const values = line.match(/(".*?"|[^,]+)/g) || [];
-          const obj: Record<string, unknown> = {};
-          headers.forEach((h, i) => {
-            let val = (values[i] || '').trim().replace(/^"|"$/g, '');
-            obj[h] = val === '' ? null : val;
-          });
-          return obj;
-        });
-      } else {
-        toast.error('Formato não suportado. Use JSON ou CSV.');
-        return;
-      }
-
+      const parsed = await parseFile(file);
       setPreview(parsed.slice(0, 5));
 
       // Auto-detect target
       if (target === 'auto' && parsed.length > 0) {
-        const keys = Object.keys(parsed[0]);
-        if (keys.includes('_type')) {
-          // Mixed export - keep auto
-        } else if (keys.includes('brand_name') || keys.includes('phone') || keys.includes('source')) {
-          setTarget('leads');
-        } else if (keys.includes('full_name') || keys.includes('cpf') || keys.includes('cnpj')) {
-          setTarget('clients');
-        } else if (keys.includes('contract_html') || keys.includes('signature_status') || keys.includes('contract_type')) {
-          setTarget('contracts');
+        const first = parsed[0];
+        if (first._type && typeof first._type === 'string') {
+          // Mixed backup file - keep auto
+        } else {
+          const keys = Object.keys(first);
+          if (keys.includes('brand_name') && keys.includes('phone') && keys.includes('source')) {
+            setTarget('leads');
+          } else if (keys.includes('full_name') && (keys.includes('cpf') || keys.includes('cnpj'))) {
+            setTarget('profiles');
+          } else if (keys.includes('contract_html') || keys.includes('signature_status')) {
+            setTarget('contracts');
+          }
         }
       }
-    } catch (err) {
-      toast.error('Erro ao ler arquivo');
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao ler arquivo');
     }
   }, [target]);
 
@@ -87,66 +96,54 @@ export function BackupImportSection() {
     setResult(null);
 
     try {
-      const text = await selectedFile.text();
-      const ext = selectedFile.name.split('.').pop()?.toLowerCase();
-
-      let records: Record<string, unknown>[] = [];
-
-      if (ext === 'json') {
-        const json = JSON.parse(text);
-        records = Array.isArray(json) ? json : [json];
-      } else if (ext === 'csv') {
-        const lines = text.split('\n').filter(l => l.trim());
-        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-        records = lines.slice(1).map(line => {
-          const values = line.match(/(".*?"|[^,]+)/g) || [];
-          const obj: Record<string, unknown> = {};
-          headers.forEach((h, i) => {
-            let val = (values[i] || '').trim().replace(/^"|"$/g, '');
-            obj[h] = val === '' ? null : val;
-          });
-          return obj;
-        });
-      }
-
+      const records = await parseFile(selectedFile);
       let imported = 0;
       let failed = 0;
       const errors: string[] = [];
 
-      // Group by type if mixed export
+      // Group records by destination table
       const grouped: Record<string, Record<string, unknown>[]> = {};
 
       for (const record of records) {
-        const recordType = (record._type as string) || target;
-        // Remove internal fields
+        let tableName: string;
+
+        if (target !== 'auto') {
+          // Direct target selected
+          tableName = target;
+        } else if (record._type && typeof record._type === 'string') {
+          // Mixed backup with _type field
+          const resolved = TYPE_TO_TABLE[record._type as string];
+          if (!resolved) {
+            errors.push(`Tipo desconhecido: ${record._type}`);
+            failed++;
+            continue;
+          }
+          tableName = resolved;
+        } else {
+          errors.push('Registro sem _type e sem destino selecionado');
+          failed++;
+          continue;
+        }
+
         const clean = { ...record };
         delete clean._type;
         delete clean.id; // Let DB generate new IDs
 
-        if (!grouped[recordType]) grouped[recordType] = [];
-        grouped[recordType].push(clean);
+        if (!grouped[tableName]) grouped[tableName] = [];
+        grouped[tableName].push(clean);
       }
 
-      for (const [type, items] of Object.entries(grouped)) {
-        let tableName: string;
-        switch (type) {
-          case 'lead':
-          case 'leads':
-            tableName = 'leads';
-            break;
-          case 'client':
-          case 'clients':
-            tableName = 'profiles';
-            break;
-          case 'contract':
-          case 'contracts':
-            tableName = 'contracts';
-            break;
-          default:
-            errors.push(`Tipo desconhecido: ${type}`);
-            failed += items.length;
-            continue;
-        }
+      const tableNames = Object.keys(grouped);
+      let tableIndex = 0;
+
+      for (const [tableName, items] of Object.entries(grouped)) {
+        tableIndex++;
+        const tableInfo = ALL_BACKUP_TABLES.find(t => t.name === tableName);
+        setImportProgress({
+          current: tableIndex,
+          total: tableNames.length,
+          tableName: tableInfo?.label || tableName,
+        });
 
         // Insert in batches of 50
         for (let i = 0; i < items.length; i += 50) {
@@ -156,7 +153,7 @@ export function BackupImportSection() {
             .upsert(batch, { onConflict: 'id', ignoreDuplicates: true });
 
           if (error) {
-            errors.push(`Erro em ${tableName} (lote ${Math.floor(i/50)+1}): ${error.message}`);
+            errors.push(`Erro em ${tableInfo?.label || tableName} (lote ${Math.floor(i / 50) + 1}): ${error.message}`);
             failed += batch.length;
           } else {
             imported += batch.length;
@@ -167,7 +164,7 @@ export function BackupImportSection() {
       // Log import
       const { data: userData } = await supabase.auth.getUser();
       await supabase.from('import_logs').insert({
-        import_type: target === 'auto' ? 'backup_restore' : `backup_${target}`,
+        import_type: target === 'auto' ? 'backup_restore_completo' : `backup_${target}`,
         file_name: selectedFile.name,
         total_records: records.length,
         imported_records: imported,
@@ -187,6 +184,7 @@ export function BackupImportSection() {
       toast.error(`Erro na importação: ${err.message}`);
     } finally {
       setImporting(false);
+      setImportProgress({ current: 0, total: 0, tableName: '' });
     }
   };
 
@@ -195,23 +193,32 @@ export function BackupImportSection() {
       icon={Upload}
       iconColor="text-emerald-500"
       title="Importar / Restaurar Backup"
-      description="Restaure dados a partir de um arquivo JSON ou CSV exportado"
+      description="Restaure dados a partir de um arquivo JSON ou CSV exportado (suporta todas as tabelas)"
     >
       <div className="space-y-4">
         <div className="flex items-center gap-4">
           <div className="flex-1">
             <label className="text-sm font-medium mb-1.5 block">Destino da importação</label>
-            <Select value={target} onValueChange={(v) => setTarget(v as ImportTarget)}>
+            <Select value={target} onValueChange={(v) => setTarget(v)}>
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="Selecione o destino" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-[300px]">
                 <SelectItem value="auto">
-                  <span className="flex items-center gap-2">Auto-detectar</span>
+                  <span className="flex items-center gap-2">
+                    <Database className="h-3 w-3" /> Auto-detectar (via campo _type)
+                  </span>
                 </SelectItem>
-                <SelectItem value="leads">Leads</SelectItem>
-                <SelectItem value="clients">Clientes (Profiles)</SelectItem>
-                <SelectItem value="contracts">Contratos</SelectItem>
+                {Object.entries(groupedTables).map(([category, tables]) => (
+                  <SelectGroup key={category}>
+                    <SelectLabel className="text-xs font-semibold text-muted-foreground">{category}</SelectLabel>
+                    {tables.map(t => (
+                      <SelectItem key={t.name} value={t.name}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -222,6 +229,22 @@ export function BackupImportSection() {
           isLoading={importing}
           accept=".json,.csv"
         />
+
+        {/* Import progress */}
+        {importing && importProgress.total > 0 && (
+          <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-2">
+                <Database className="h-4 w-4 text-emerald-500 animate-pulse" />
+                <span className="font-medium">Importando: {importProgress.tableName}</span>
+              </span>
+              <span className="text-muted-foreground">
+                {importProgress.current} de {importProgress.total} tabelas
+              </span>
+            </div>
+            <Progress value={(importProgress.current / importProgress.total) * 100} className="h-2" />
+          </div>
+        )}
 
         {preview && preview.length > 0 && (
           <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
@@ -264,6 +287,9 @@ export function BackupImportSection() {
                   {result.errors.slice(0, 5).map((e, i) => (
                     <li key={i}>• {e}</li>
                   ))}
+                  {result.errors.length > 5 && (
+                    <li className="text-muted-foreground">... e mais {result.errors.length - 5} erros</li>
+                  )}
                 </ul>
               )}
             </AlertDescription>
@@ -286,6 +312,7 @@ export function BackupImportSection() {
 
         <p className="text-xs text-muted-foreground">
           ⚠️ Registros com IDs existentes serão ignorados. Novos registros receberão IDs automáticos.
+          Suporta backup completo com campo <code>_type</code> para distribuição automática entre tabelas.
         </p>
       </div>
     </SettingsCard>

@@ -1,73 +1,71 @@
 
 
-## Auditoria Completa de Estabilidade do Painel Admin
+## Plano: Exportar e Importar TODOS os Dados do Sistema
 
-### Problemas Identificados
+### Problema Atual
+A exportação/importação só cobre 3 tabelas (leads, profiles, contracts). O sistema tem **~50 tabelas** com dados importantes que ficam de fora.
 
-1. **QueryClient sem configuração global de resiliência** — `App.tsx` linha 85 cria `new QueryClient()` sem `defaultOptions`. Cada query decide isoladamente retry/staleTime, e muitas não definem nada, causando refetches agressivos e falhas em cascata.
+### Solução
 
-2. **AdminLayout recria `checkAdmin` a cada render** — A função `checkAdmin` (linha 408) não é memoizada e usa `cachedAdmin`/`cachedUserId` capturados no escopo do componente (linha 390-391), que são lidos uma vez no render inicial. Isso pode causar verificações redundantes.
+Expandir ambos os componentes (BackupSettings e BackupImportSection) para cobrir todas as tabelas do sistema, organizadas por categoria, com paginação para superar o limite de 1000 registros.
 
-3. **`onAuthStateChange` não trata `TOKEN_REFRESHED`** — Quando o token é renovado automaticamente (visível nos auth logs), o listener (linha 481) só reage a `SIGNED_OUT`. Não atualiza o cache de sessão, podendo causar estado stale após refresh de token.
+### Tabelas que serão incluídas
 
-4. **Cada página admin cria `<AdminLayout>` independentemente** — Não há rota wrapper. Cada navegação entre `/admin/*` desmonta e remonta `AdminLayout`, re-executando `checkAdmin` e todas as queries de permissão.
+**Dados Principais (já existentes):**
+- leads, profiles, contracts
 
-5. **Badge sem forwardRef** — Erro no console: `Function components cannot be given refs` em `AdminContratos`. Indica que `Badge` está sendo usado como child de tooltip ou similar sem suporte a ref.
+**Dados de Negócio (novos):**
+- brand_processes, invoices, documents, inpi_resources, process_events, publicacoes_marcas
 
-### Plano de Correção
+**Contratos (detalhes):**
+- contract_attachments, contract_comments, contract_notes, contract_tasks, contract_templates, contract_types, contract_renewal_history
 
-#### 1. Configurar QueryClient com defaults resilientes
-**Arquivo:** `src/App.tsx`
+**Comunicação:**
+- chat_messages, notifications, notification_templates, email_templates, email_logs, email_inbox, email_accounts
 
-Adicionar `defaultOptions` ao QueryClient com:
-- `staleTime: 5 * 60 * 1000` (5min)
-- `gcTime: 10 * 60 * 1000` (10min)  
-- `retry`: usar `connectivityRetry` do networkResilience
-- `retryDelay`: usar `connectivityRetryDelay`
-- `refetchOnWindowFocus: false` (elimina refetch ao trocar abas)
+**Marketing:**
+- marketing_campaigns, marketing_ads, marketing_conversions, marketing_attribution, marketing_config, marketing_ab_tests, marketing_ab_variants, marketing_ad_performance, marketing_audience_suggestions, marketing_budget_alerts, marketing_generated_ads
 
-#### 2. Wrapping de rotas admin com layout compartilhado
-**Arquivo:** `src/App.tsx`
+**Remarketing:**
+- client_remarketing_campaigns, client_remarketing_queue, lead_remarketing_campaigns, lead_remarketing_queue
 
-Criar um componente `AdminRouteWrapper` que renderiza `<AdminLayout>` uma única vez e usa `<Outlet>` para as sub-rotas. Isso evita desmontar/remontar o layout a cada navegação, eliminando o flash "Verificando permissões...".
+**CRM/Atividades:**
+- client_activities, client_notes, client_appointments, lead_activities
 
-```text
-Antes:  /admin/dashboard → <AdminDashboard> → <AdminLayout> (mount)
-        /admin/clientes  → <AdminClientes>  → <AdminLayout> (mount again)
+**INPI/RPI:**
+- rpi_uploads, rpi_entries, inpi_knowledge_base, inpi_sync_logs, publicacao_logs
 
-Depois: /admin/* → <AdminRouteWrapper> → <AdminLayout> (mount once)
-                                        └ <Outlet> → page content
-```
+**Sistema/Config:**
+- system_settings, admin_permissions, user_roles, notification_logs, notification_dispatch_logs, channel_notification_templates, ai_providers, ai_usage_logs, login_history, signature_audit_log, import_logs
 
-#### 3. Estabilizar auth listener no AdminLayout
-**Arquivo:** `src/components/admin/AdminLayout.tsx`
+**Outros:**
+- award_entries, meetings, meeting_participants, conversations, conversation_messages, conversation_participants, call_signals, upsell_engine_config, upsell_engine_weights, upsell_monetization_logs, intelligence_process_history, promotion_expiration_logs
 
-- Tratar `TOKEN_REFRESHED` no `onAuthStateChange` para atualizar `adminUserId` no sessionStorage
-- Memoizar `checkAdmin` com `useCallback`
-- Se `sessionStorage` já tem admin verificado para o mesmo user, pular verificação completamente (fast path)
+### Alterações Técnicas
 
-#### 4. Corrigir Badge sem forwardRef
-**Arquivo:** `src/components/ui/badge.tsx`
+#### 1. BackupSettings.tsx - Exportação Completa
+- Criar lista completa de todas as tabelas com seus nomes amigáveis e `_type`
+- Implementar função `fetchAllFromTable()` com paginação (busca em lotes de 1000 até esgotar)
+- Reorganizar botões de exportação: manter os individuais (Leads, Clientes, Contratos) + adicionar botão "Tudo" que realmente exporta TUDO
+- Cada registro no JSON receberá `_type` com o nome da tabela
+- Mostrar progresso durante exportação completa (ex: "Exportando tabela 5 de 50...")
 
-Verificar e garantir que o componente `Badge` use `React.forwardRef` para suportar refs de tooltips e dropdowns.
+#### 2. BackupImportSection.tsx - Importação Completa
+- Expandir o `ImportTarget` type para incluir todas as tabelas
+- Expandir o mapeamento no `switch/case` do `importData` para reconhecer todos os `_type` e direcionar para a tabela correta
+- Melhorar auto-detecção para mais tipos de dados
+- Adicionar todas as tabelas no Select de destino, organizadas por categoria
 
-#### 5. Hardening do login
-**Arquivo:** `src/pages/admin/Login.tsx`
-
-- Ao fazer login com sucesso, já gravar `admin_verified` e `admin_user_id` no sessionStorage ANTES de navegar para o dashboard
-- Isso elimina a tela "Verificando..." após login bem-sucedido
-
-### Resultado Esperado
-- Zero "Verificando permissões..." ao navegar entre abas
-- Zero "Verificando..." após login
-- Sem refetch ao trocar de aba do navegador
-- Sessão persistente por horas sem pedir senha novamente
-- Console limpo sem warnings de ref
+#### 3. Paginação na Exportação
+- Função helper que faz queries em loop com `.range(from, to)` até não retornar mais dados
+- Garante que tabelas com mais de 1000 registros sejam exportadas completamente
 
 ### Arquivos Modificados
-1. `src/App.tsx` — QueryClient defaults + rotas admin com Outlet
-2. `src/components/admin/AdminLayout.tsx` — Auth listener robusto, fast path, useCallback
-3. `src/pages/admin/Login.tsx` — Pre-cache admin status no login
-4. `src/components/ui/badge.tsx` — forwardRef fix
-5. Cada página admin (`Dashboard.tsx`, `Contratos.tsx`, etc.) — remover `<AdminLayout>` wrapper interno (será fornecido pelo route wrapper)
+- `src/components/admin/settings/BackupSettings.tsx`
+- `src/components/admin/settings/BackupImportSection.tsx`
+
+### Sem Impacto
+- Nenhuma tabela existente será alterada (sem migrations)
+- Nenhuma lógica de negócio existente será modificada
+- Apenas a UI de exportação/importação será expandida
 
