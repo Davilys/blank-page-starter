@@ -1,7 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { Resend } from "npm:resend@2.0.0";
-import { createTransport } from "npm:nodemailer@6.9.8";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,6 +22,58 @@ interface EmailRequest {
   from?: string;
   attachments?: EmailAttachment[];
   account_id?: string; // When provided, send via user's SMTP
+}
+
+interface ResendAttachment {
+  filename: string;
+  path: string;
+}
+
+async function sendWithResendApi(payload: {
+  from: string;
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  html: string;
+  attachments?: ResendAttachment[];
+  reply_to?: string[];
+}) {
+  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+  if (!resendApiKey) {
+    throw new Error("Email service not configured");
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const rawBody = await response.text();
+  let parsedBody: Record<string, unknown> | null = null;
+
+  if (rawBody) {
+    try {
+      parsedBody = JSON.parse(rawBody);
+    } catch {
+      parsedBody = null;
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      (parsedBody?.message as string | undefined) ||
+      (parsedBody?.error as string | undefined) ||
+      rawBody ||
+      "Failed to send email"
+    );
+  }
+
+  return parsedBody;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -51,88 +101,26 @@ const handler = async (req: Request): Promise<Response> => {
 </body>
 </html>`;
 
-    // ===== PATH 1: Send via user's SMTP (appears in their Outlook/Sent) =====
-    if (account_id) {
-      const { data: emailAccount, error: accError } = await supabase
-        .from("email_accounts")
-        .select("*")
-        .eq("id", account_id)
-        .single();
+    const accountQuery = account_id
+      ? supabase
+          .from("email_accounts")
+          .select("email_address, display_name")
+          .eq("id", account_id)
+          .maybeSingle()
+      : supabase
+          .from("email_accounts")
+          .select("email_address, display_name")
+          .eq("is_default", true)
+          .maybeSingle();
 
-      if (accError || !emailAccount) {
-        console.error("Email account not found:", accError);
-        return new Response(
-          JSON.stringify({ error: "Conta de email não encontrada" }),
-          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
+    const { data: emailAccount, error: emailAccountError } = await accountQuery;
 
-      if (!emailAccount.smtp_host || !emailAccount.smtp_user || !emailAccount.smtp_password) {
-        return new Response(
-          JSON.stringify({ error: "SMTP não configurado para esta conta" }),
-          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
-
-      console.log("Sending via SMTP:", emailAccount.smtp_host, emailAccount.smtp_port);
-
-      const smtpPort = emailAccount.smtp_port || 587;
-      const transporter = createTransport({
-        host: emailAccount.smtp_host,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: {
-          user: emailAccount.smtp_user,
-          pass: emailAccount.smtp_password,
-        },
-        connectionTimeout: 15000,
-        greetingTimeout: 15000,
-      });
-
-      const displayName = emailAccount.display_name || emailAccount.email_address;
-      const fromAddress = `${displayName} <${emailAccount.email_address}>`;
-
-      const smtpAttachments = attachments?.map(att => ({
-        filename: att.filename,
-        path: att.url,
-      }));
-
-      const info = await transporter.sendMail({
-        from: fromAddress,
-        to: to.join(", "),
-        cc: cc?.join(", "),
-        bcc: bcc?.join(", "),
-        subject: subject,
-        html: htmlContent,
-        attachments: smtpAttachments,
-      });
-
-      console.log("Email sent via SMTP:", info.messageId);
-
+    if (account_id && (emailAccountError || !emailAccount)) {
       return new Response(
-        JSON.stringify({ success: true, message: "Email enviado via SMTP", id: info.messageId }),
-        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        JSON.stringify({ error: "Conta de email não encontrada" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
-
-    // ===== PATH 2: Send via Resend (system/automated emails) =====
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    if (!resendApiKey) {
-      console.error("RESEND_API_KEY not configured");
-      return new Response(
-        JSON.stringify({ error: "Email service not configured" }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-
-    const resend = new Resend(resendApiKey);
-
-    // Fetch default email account for display name only
-    const { data: emailAccount } = await supabase
-      .from("email_accounts")
-      .select("email_address, display_name")
-      .eq("is_default", true)
-      .single();
 
     const VERIFIED_FROM_DOMAIN = 'webmarcas.net';
     const VERIFIED_FROM_EMAIL = `noreply@${VERIFIED_FROM_DOMAIN}`;
@@ -149,28 +137,21 @@ const handler = async (req: Request): Promise<Response> => {
         }))
       : undefined;
 
-    const { data, error } = await resend.emails.send({
+    const data = await sendWithResendApi({
       from: fromAddress,
       to: to,
       cc: cc,
       bcc: bcc,
       subject: subject,
       html: htmlContent,
+      ...(emailAccount?.email_address ? { reply_to: [emailAccount.email_address] } : {}),
       ...(resendAttachments && resendAttachments.length > 0 ? { attachments: resendAttachments } : {}),
     });
-
-    if (error) {
-      console.error("Resend API error:", error);
-      return new Response(
-        JSON.stringify({ error: error.message }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
 
     console.log("Email sent successfully via Resend:", data);
 
     return new Response(
-      JSON.stringify({ success: true, message: "Email sent successfully", id: data?.id }),
+      JSON.stringify({ success: true, message: "Email sent successfully", id: data?.id ?? data?.data?.id ?? null }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   } catch (error: any) {
