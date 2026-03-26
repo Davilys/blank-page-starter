@@ -44,8 +44,13 @@ export function BackupSettings() {
         toast.error('Nenhum dado para exportar');
         return;
       }
+<<<<<<< HEAD
       const data = rawData.map(r => ({ ...r, _type: tableName }));
       downloadData(data, `webmarcas_${tableName}_${Date.now()}`, fmt);
+=======
+      const dataWithType = data.map(r => ({ ...r, _type: tableName }));
+      downloadData(dataWithType, `webmarcas_${tableName}_${Date.now()}`, fmt);
+>>>>>>> 7ac15ff7900ed90e0b657575adeb1da7ceeca162
       toast.success(`${data.length} registros de ${typeLabel} exportados!`);
     } catch {
       toast.error('Erro ao exportar dados');
