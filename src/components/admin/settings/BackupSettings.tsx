@@ -11,7 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { 
   HardDrive, Download, FileJson, FileSpreadsheet, History, 
-  Loader2, CheckCircle2, AlertCircle, Database
+  Loader2, CheckCircle2, AlertCircle, Database, FileCode2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -39,11 +39,12 @@ export function BackupSettings() {
     const key = `${tableName}-${fmt}`;
     setExporting(key);
     try {
-      const data = await fetchAllFromTable(supabase, tableName);
-      if (data.length === 0) {
+      const rawData = await fetchAllFromTable(supabase, tableName);
+      if (rawData.length === 0) {
         toast.error('Nenhum dado para exportar');
         return;
       }
+      const data = rawData.map(r => ({ ...r, _type: tableName }));
       downloadData(data, `webmarcas_${tableName}_${Date.now()}`, fmt);
       toast.success(`${data.length} registros de ${typeLabel} exportados!`);
     } catch {
@@ -123,6 +124,72 @@ export function BackupSettings() {
     a.download = `${filename}.${extension}`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportSQL = async () => {
+    setExporting('sql');
+    const tables = ALL_BACKUP_TABLES;
+    const sqlLines: string[] = [];
+    let totalRecords = 0;
+
+    sqlLines.push('-- WebMarcas SQL Dump');
+    sqlLines.push(`-- Gerado em: ${new Date().toISOString()}`);
+    sqlLines.push('-- Formato: INSERT statements para migração');
+    sqlLines.push('BEGIN;');
+    sqlLines.push('');
+
+    try {
+      for (let i = 0; i < tables.length; i++) {
+        const t = tables[i];
+        setExportProgress({ current: i + 1, total: tables.length, tableName: t.label });
+
+        try {
+          const rows = await fetchAllFromTable(supabase, t.name);
+          if (rows.length === 0) continue;
+
+          sqlLines.push(`-- Tabela: ${t.name} (${rows.length} registros)`);
+
+          const columns = Object.keys(rows[0]);
+          const colList = columns.map(c => `"${c}"`).join(', ');
+
+          for (const row of rows) {
+            const values = columns.map(col => {
+              const val = row[col];
+              if (val === null || val === undefined) return 'NULL';
+              if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
+              if (typeof val === 'number') return String(val);
+              if (typeof val === 'object') {
+                return `'${JSON.stringify(val).replace(/'/g, "''")}'::jsonb`;
+              }
+              return `'${String(val).replace(/'/g, "''")}'`;
+            });
+            sqlLines.push(`INSERT INTO public."${t.name}" (${colList}) VALUES (${values.join(', ')}) ON CONFLICT (id) DO NOTHING;`);
+          }
+          sqlLines.push('');
+          totalRecords += rows.length;
+        } catch {
+          sqlLines.push(`-- ERRO ao exportar tabela: ${t.name} (pulada)`);
+        }
+      }
+
+      sqlLines.push('COMMIT;');
+
+      const content = sqlLines.join('\n');
+      const blob = new Blob([content], { type: 'application/sql' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `webmarcas_dump_${Date.now()}.sql`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      toast.success(`SQL exportado: ${totalRecords} registros de ${tables.length} tabelas!`);
+    } catch {
+      toast.error('Erro ao gerar SQL');
+    } finally {
+      setExporting(null);
+      setExportProgress({ current: 0, total: 0, tableName: '' });
+    }
   };
 
   const isExporting = exporting !== null;
@@ -213,7 +280,23 @@ export function BackupSettings() {
                 </Button>
               </div>
             </div>
+
+          {/* SQL Export */}
+          <div className="p-4 rounded-xl border bg-muted/30 space-y-3 md:col-span-2">
+            <div className="flex items-center gap-2">
+              <FileCode2 className="h-5 w-5 text-violet-500" />
+              <span className="font-medium">Formato SQL (Migração)</span>
+              <Badge variant="outline" className="text-xs">Completo</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Gera INSERT statements para todas as tabelas — ideal para migrar dados entre projetos Supabase
+            </p>
+            <Button size="sm" onClick={exportSQL} disabled={isExporting}>
+              {exporting === 'sql' && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+              <Database className="h-3 w-3 mr-1" /> Exportar SQL ({ALL_BACKUP_TABLES.length} tabelas)
+            </Button>
           </div>
+        </div>
         </div>
       </SettingsCard>
 

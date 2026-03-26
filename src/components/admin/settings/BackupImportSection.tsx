@@ -43,7 +43,25 @@ export function BackupImportSection() {
 
     if (ext === 'json') {
       const json = JSON.parse(text);
-      return Array.isArray(json) ? json : [json];
+      if (Array.isArray(json)) {
+        return json;
+      }
+      // Handle grouped format: { "leads": [...], "profiles": [...], ... }
+      // or { "data": { "leads": [...] }, ... } or { "tables": { ... } }
+      const source = json.data ?? json.tables ?? json;
+      if (typeof source === 'object' && source !== null) {
+        const keys = Object.keys(source);
+        const hasArrayValues = keys.some(k => Array.isArray(source[k]));
+        if (hasArrayValues) {
+          return keys.flatMap(tableName => {
+            const rows = source[tableName];
+            if (!Array.isArray(rows)) return [];
+            return rows.map((r: any) => ({ ...r, _type: r._type ?? tableName }));
+          });
+        }
+      }
+      // Single object fallback
+      return [json];
     } else if (ext === 'csv') {
       const lines = text.split('\n').filter(l => l.trim());
       if (lines.length < 2) throw new Error('CSV vazio');
@@ -127,7 +145,6 @@ export function BackupImportSection() {
 
         const clean = { ...record };
         delete clean._type;
-        delete clean.id; // Let DB generate new IDs
 
         if (!grouped[tableName]) grouped[tableName] = [];
         grouped[tableName].push(clean);
@@ -148,9 +165,22 @@ export function BackupImportSection() {
         // Insert in batches of 50
         for (let i = 0; i < items.length; i += 50) {
           const batch = items.slice(i, i + 50);
-          const { error } = await (supabase as any)
-            .from(tableName)
-            .upsert(batch, { onConflict: 'id', ignoreDuplicates: true });
+          // Try upsert with id if records have id, otherwise plain insert
+          const hasIds = batch.every(r => r.id);
+          let error: any;
+          if (hasIds) {
+            const res = await (supabase as any)
+              .from(tableName)
+              .upsert(batch, { onConflict: 'id', ignoreDuplicates: true });
+            error = res.error;
+          } else {
+            // Remove id fields and do plain insert
+            const cleanBatch = batch.map(r => { const { id, ...rest } = r as any; return rest; });
+            const res = await (supabase as any)
+              .from(tableName)
+              .insert(cleanBatch);
+            error = res.error;
+          }
 
           if (error) {
             errors.push(`Erro em ${tableInfo?.label || tableName} (lote ${Math.floor(i / 50) + 1}): ${error.message}`);
