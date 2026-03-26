@@ -77,7 +77,7 @@ const handler = async (req: Request): Promise<Response> => {
       console.log("Sending via SMTP:", emailAccount.smtp_host, emailAccount.smtp_port);
 
       const smtpPort = emailAccount.smtp_port || 587;
-      const transporter = createTransport({
+      const transporter = nodemailer.createTransport({
         host: emailAccount.smtp_host,
         port: smtpPort,
         secure: smtpPort === 465,
