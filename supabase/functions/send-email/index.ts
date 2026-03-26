@@ -180,13 +180,6 @@ const handler = async (req: Request): Promise<Response> => {
 
     const data = resendBody;
 
-    if (error) {
-      console.error("Resend API error:", error);
-      return new Response(
-        JSON.stringify({ error: error.message }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
 
     console.log("Email sent successfully via Resend:", data);
 
