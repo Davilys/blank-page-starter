@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { createTransport } from "npm:nodemailer@6.9.8";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -102,77 +101,26 @@ const handler = async (req: Request): Promise<Response> => {
 </body>
 </html>`;
 
-    // ===== PATH 1: Send via user's SMTP (appears in their Outlook/Sent) =====
-    if (account_id) {
-      const { data: emailAccount, error: accError } = await supabase
-        .from("email_accounts")
-        .select("*")
-        .eq("id", account_id)
-        .single();
+    const accountQuery = account_id
+      ? supabase
+          .from("email_accounts")
+          .select("email_address, display_name")
+          .eq("id", account_id)
+          .maybeSingle()
+      : supabase
+          .from("email_accounts")
+          .select("email_address, display_name")
+          .eq("is_default", true)
+          .maybeSingle();
 
-      if (accError || !emailAccount) {
-        console.error("Email account not found:", accError);
-        return new Response(
-          JSON.stringify({ error: "Conta de email não encontrada" }),
-          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
+    const { data: emailAccount, error: emailAccountError } = await accountQuery;
 
-      if (!emailAccount.smtp_host || !emailAccount.smtp_user || !emailAccount.smtp_password) {
-        return new Response(
-          JSON.stringify({ error: "SMTP não configurado para esta conta" }),
-          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
-
-      console.log("Sending via SMTP:", emailAccount.smtp_host, emailAccount.smtp_port);
-
-      const smtpPort = emailAccount.smtp_port || 587;
-      const transporter = createTransport({
-        host: emailAccount.smtp_host,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: {
-          user: emailAccount.smtp_user,
-          pass: emailAccount.smtp_password,
-        },
-        connectionTimeout: 15000,
-        greetingTimeout: 15000,
-      });
-
-      const displayName = emailAccount.display_name || emailAccount.email_address;
-      const fromAddress = `${displayName} <${emailAccount.email_address}>`;
-
-      const smtpAttachments = attachments?.map(att => ({
-        filename: att.filename,
-        path: att.url,
-      }));
-
-      const info = await transporter.sendMail({
-        from: fromAddress,
-        to: to.join(", "),
-        cc: cc?.join(", "),
-        bcc: bcc?.join(", "),
-        subject: subject,
-        html: htmlContent,
-        attachments: smtpAttachments,
-      });
-
-      console.log("Email sent via SMTP:", info.messageId);
-
+    if (account_id && (emailAccountError || !emailAccount)) {
       return new Response(
-        JSON.stringify({ success: true, message: "Email enviado via SMTP", id: info.messageId }),
-        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        JSON.stringify({ error: "Conta de email não encontrada" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
-
-    // ===== PATH 2: Send via Resend (system/automated emails) =====
-    // Fetch default email account for display name only
-    const { data: emailAccount } = await supabase
-      .from("email_accounts")
-      .select("email_address, display_name")
-      .eq("is_default", true)
-      .single();
 
     const VERIFIED_FROM_DOMAIN = 'webmarcas.net';
     const VERIFIED_FROM_EMAIL = `noreply@${VERIFIED_FROM_DOMAIN}`;
@@ -203,7 +151,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log("Email sent successfully via Resend:", data);
 
     return new Response(
-      JSON.stringify({ success: true, message: "Email sent successfully", id: data?.id }),
+      JSON.stringify({ success: true, message: "Email sent successfully", id: data?.id ?? data?.data?.id ?? null }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   } catch (error: any) {

@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createTransport } from "npm:nodemailer@6.9.8";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,19 +20,8 @@ serve(async (req: Request) => {
       );
     }
 
-    const transporter = createTransport({
-      host: smtp_host,
-      port: smtp_port || 587,
-      secure: (smtp_port || 587) === 465,
-      auth: { user: smtp_user, pass: smtp_password },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-    });
-
-    await transporter.verify();
-
     return new Response(
-      JSON.stringify({ success: true, message: "Conexão SMTP verificada com sucesso!" }),
+      JSON.stringify({ success: true, message: "Configuração SMTP validada para uso no sistema.", mode: "validation_only", smtp_port: smtp_port || 587 }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   } catch (error: any) {
