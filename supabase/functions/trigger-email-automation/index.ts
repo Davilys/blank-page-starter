@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { Resend } from "npm:resend@2.0.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,6 +27,50 @@ interface TriggerRequest {
   };
 }
 
+async function sendWithResendApi(payload: {
+  from: string;
+  to: string[];
+  subject: string;
+  html: string;
+  reply_to?: string[];
+}) {
+  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+  if (!resendApiKey) {
+    throw new Error("Email service not configured");
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const rawBody = await response.text();
+  let parsedBody: Record<string, unknown> | null = null;
+
+  if (rawBody) {
+    try {
+      parsedBody = JSON.parse(rawBody);
+    } catch {
+      parsedBody = null;
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      (parsedBody?.message as string | undefined) ||
+      (parsedBody?.error as string | undefined) ||
+      rawBody ||
+      "Failed to send email"
+    );
+  }
+
+  return parsedBody;
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -38,18 +81,6 @@ const handler = async (req: Request): Promise<Response> => {
     
     console.log(`Processing email automation for trigger: ${trigger_event}`);
     console.log('Data received:', JSON.stringify(data, null, 2));
-
-    // Initialize Resend client
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    if (!resendApiKey) {
-      console.error("RESEND_API_KEY not configured");
-      return new Response(
-        JSON.stringify({ error: "Email service not configured" }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const resend = new Resend(resendApiKey);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -172,9 +203,10 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Determine from address
-    const fromAddress = emailAccount?.display_name 
-      ? `${emailAccount.display_name} <${emailAccount.email_address}>`
-      : emailAccount?.email_address || "WebMarcas <noreply@webmarcas.net>";
+    const VERIFIED_FROM_DOMAIN = 'webmarcas.net';
+    const VERIFIED_FROM_EMAIL = `noreply@${VERIFIED_FROM_DOMAIN}`;
+    const displayName = emailAccount?.display_name || 'WebMarcas';
+    const fromAddress = `${displayName} <${VERIFIED_FROM_EMAIL}>`;
 
     // Wrap body in professional HTML template
     const htmlContent = `
@@ -192,21 +224,13 @@ const handler = async (req: Request): Promise<Response> => {
     console.log("Sending email via Resend to:", data.email);
     console.log("From:", fromAddress);
 
-    // Send email via Resend API
-    const { data: emailData, error: emailError } = await resend.emails.send({
+    const emailData = await sendWithResendApi({
       from: fromAddress,
       to: [data.email],
       subject: subject,
       html: htmlContent,
+      ...(emailAccount?.email_address ? { reply_to: [emailAccount.email_address] } : {}),
     });
-
-    if (emailError) {
-      console.error("Resend API error:", emailError);
-      return new Response(
-        JSON.stringify({ error: emailError.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
 
     console.log(`Email sent successfully to ${data.email}`, emailData);
 

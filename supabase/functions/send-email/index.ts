@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { Resend } from "npm:resend@2.0.0";
 import { createTransport } from "npm:nodemailer@6.9.8";
 
 const corsHeaders = {
@@ -24,6 +23,58 @@ interface EmailRequest {
   from?: string;
   attachments?: EmailAttachment[];
   account_id?: string; // When provided, send via user's SMTP
+}
+
+interface ResendAttachment {
+  filename: string;
+  path: string;
+}
+
+async function sendWithResendApi(payload: {
+  from: string;
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  html: string;
+  attachments?: ResendAttachment[];
+  reply_to?: string[];
+}) {
+  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+  if (!resendApiKey) {
+    throw new Error("Email service not configured");
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const rawBody = await response.text();
+  let parsedBody: Record<string, unknown> | null = null;
+
+  if (rawBody) {
+    try {
+      parsedBody = JSON.parse(rawBody);
+    } catch {
+      parsedBody = null;
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      (parsedBody?.message as string | undefined) ||
+      (parsedBody?.error as string | undefined) ||
+      rawBody ||
+      "Failed to send email"
+    );
+  }
+
+  return parsedBody;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -116,17 +167,6 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // ===== PATH 2: Send via Resend (system/automated emails) =====
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    if (!resendApiKey) {
-      console.error("RESEND_API_KEY not configured");
-      return new Response(
-        JSON.stringify({ error: "Email service not configured" }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-
-    const resend = new Resend(resendApiKey);
-
     // Fetch default email account for display name only
     const { data: emailAccount } = await supabase
       .from("email_accounts")
@@ -149,23 +189,16 @@ const handler = async (req: Request): Promise<Response> => {
         }))
       : undefined;
 
-    const { data, error } = await resend.emails.send({
+    const data = await sendWithResendApi({
       from: fromAddress,
       to: to,
       cc: cc,
       bcc: bcc,
       subject: subject,
       html: htmlContent,
+      ...(emailAccount?.email_address ? { reply_to: [emailAccount.email_address] } : {}),
       ...(resendAttachments && resendAttachments.length > 0 ? { attachments: resendAttachments } : {}),
     });
-
-    if (error) {
-      console.error("Resend API error:", error);
-      return new Response(
-        JSON.stringify({ error: error.message }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
 
     console.log("Email sent successfully via Resend:", data);
 
