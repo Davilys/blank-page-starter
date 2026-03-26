@@ -1,1 +1,100 @@
-project_id = "scpbqsvwojhbxihyqbdz"
+project_id = "afuqrzecokubogopgfgt"
+
+[functions.send-multichannel-notification]
+verify_jwt = false
+
+[functions.process-rpi]
+verify_jwt = false
+
+[functions.process-inpi-resource]
+verify_jwt = false
+
+[functions.adjust-inpi-resource]
+verify_jwt = false
+
+[functions.chat-support]
+verify_jwt = false
+
+[functions.create-admin-user]
+verify_jwt = false
+
+[functions.inpi-viability-check]
+verify_jwt = false
+
+[functions.process-inpi-document]
+verify_jwt = false
+
+[functions.create-asaas-payment]
+verify_jwt = false
+
+[functions.sign-contract-blockchain]
+verify_jwt = false
+
+[functions.confirm-payment]
+verify_jwt = false
+
+[functions.asaas-webhook]
+verify_jwt = false
+
+[functions.trigger-email-automation]
+verify_jwt = false
+
+[functions.check-abandoned-forms]
+verify_jwt = false
+
+[functions.get-contract-by-token]
+verify_jwt = false
+
+[functions.generate-signature-link]
+verify_jwt = false
+
+[functions.send-signature-request]
+verify_jwt = false
+
+[functions.check-signature-expiration]
+verify_jwt = false
+
+[functions.chat-inpi-legal]
+verify_jwt = false
+
+[functions.transcribe-audio]
+verify_jwt = false
+
+[functions.expire-promotion-price]
+verify_jwt = false
+
+[functions.email-ai-assistant]
+verify_jwt = false
+
+[functions.ai-engine]
+verify_jwt = false
+
+[functions.recalculate-upsell-weights]
+verify_jwt = false
+
+[functions.check-rpi-reminders]
+verify_jwt = false
+
+[functions.check-publicacao-deadlines]
+verify_jwt = false
+
+[functions.create-google-meet]
+verify_jwt = false
+
+[functions.create-monitoring-subscription]
+verify_jwt = false
+
+[functions.create-admin-invoice]
+verify_jwt = false
+
+[functions.sync-meta-campaigns]
+verify_jwt = false
+
+[functions.send-meta-conversion]
+verify_jwt = false
+
+[functions.marketing-ai-agent]
+verify_jwt = false
+
+[functions.firecrawl-scrape]
+verify_jwt = false
