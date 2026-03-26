@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "npm:resend@2.0.0";
-import { createTransport } from "npm:nodemailer@6.9.8";
+import nodemailer from "npm:nodemailer@6.9.8";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,7 +77,7 @@ const handler = async (req: Request): Promise<Response> => {
       console.log("Sending via SMTP:", emailAccount.smtp_host, emailAccount.smtp_port);
 
       const smtpPort = emailAccount.smtp_port || 587;
-      const transporter = createTransport({
+      const transporter = nodemailer.createTransport({
         host: emailAccount.smtp_host,
         port: smtpPort,
         secure: smtpPort === 465,
