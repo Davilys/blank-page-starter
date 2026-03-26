@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { Resend } from "npm:resend@2.0.0";
-import { createTransport } from "npm:nodemailer@6.9.8";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2?target=denonext";
+// @deno-types="npm:@types/nodemailer@6.4.14"
+import nodemailer from "npm:nodemailer@6.9.8";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,7 +77,7 @@ const handler = async (req: Request): Promise<Response> => {
       console.log("Sending via SMTP:", emailAccount.smtp_host, emailAccount.smtp_port);
 
       const smtpPort = emailAccount.smtp_port || 587;
-      const transporter = createTransport({
+      const transporter = nodemailer.createTransport({
         host: emailAccount.smtp_host,
         port: smtpPort,
         secure: smtpPort === 465,
@@ -125,8 +125,6 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    const resend = new Resend(resendApiKey);
-
     // Fetch default email account for display name only
     const { data: emailAccount } = await supabase
       .from("email_accounts")
@@ -149,23 +147,39 @@ const handler = async (req: Request): Promise<Response> => {
         }))
       : undefined;
 
-    const { data, error } = await resend.emails.send({
+    // Call Resend API directly via fetch (avoids esm.sh canvas.node issue)
+    const resendPayload: Record<string, unknown> = {
       from: fromAddress,
-      to: to,
-      cc: cc,
-      bcc: bcc,
-      subject: subject,
+      to,
+      subject,
       html: htmlContent,
-      ...(resendAttachments && resendAttachments.length > 0 ? { attachments: resendAttachments } : {}),
+    };
+    if (cc && cc.length > 0) resendPayload.cc = cc;
+    if (bcc && bcc.length > 0) resendPayload.bcc = bcc;
+    if (resendAttachments && resendAttachments.length > 0) resendPayload.attachments = resendAttachments;
+
+    const resendRes = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resendApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(resendPayload),
     });
 
-    if (error) {
-      console.error("Resend API error:", error);
+    const resendBody = await resendRes.json();
+
+    if (!resendRes.ok) {
+      console.error("Resend API error:", resendBody);
+      const error = resendBody;
       return new Response(
-        JSON.stringify({ error: error.message }),
+        JSON.stringify({ error: error.message || "Resend error" }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
+
+    const data = resendBody;
+
 
     console.log("Email sent successfully via Resend:", data);
 
