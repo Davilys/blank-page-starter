@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
-import * as pdfjsLib from "https://esm.sh/pdfjs-dist@4.0.379/legacy/build/pdf.mjs";
+import * as pdfjsLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/legacy/build/pdf.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -62,9 +62,6 @@ async function extractTextFromExcel(bytes: Uint8Array): Promise<string> {
 }
 
 async function extractTextFromPdf(bytes: Uint8Array): Promise<{ text: string; pages: number }> {
-  (pdfjsLib as any).GlobalWorkerOptions.workerSrc =
-    "https://esm.sh/pdfjs-dist@4.0.379/build/pdf.worker.mjs";
-
   const loadingTask = (pdfjsLib as any).getDocument({ data: bytes, disableWorker: true } as any);
   const pdf = await loadingTask.promise;
 

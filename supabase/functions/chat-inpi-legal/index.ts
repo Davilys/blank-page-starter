@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import * as pdfjsLib from "https://esm.sh/pdfjs-dist@4.10.38/legacy/build/pdf.mjs";
+import * as pdfjsLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.mjs";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -257,7 +257,7 @@ async function extractPdfTextFromBase64(base64: string, maxPages = 50): Promise<
       bytes[i] = binaryString.charCodeAt(i);
     }
 
-    const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
+    const doc = await pdfjsLib.getDocument({ data: bytes, disableWorker: true }).promise;
     const pagesToRead = Math.min(doc.numPages, maxPages);
 
     let fullText = '';
