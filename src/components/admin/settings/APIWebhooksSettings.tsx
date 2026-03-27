@@ -34,7 +34,7 @@ interface WebhookConfig {
   enabled: boolean;
 }
 
-const ASAAS_WEBHOOK_URL = 'https://afuqrzecokubogopgfgt.supabase.co/functions/v1/asaas-webhook';
+const ASAAS_WEBHOOK_URL = 'https://scpbqsvwojhbxihyqbdz.supabase.co/functions/v1/asaas-webhook';
 
 const webhookEvents = [
   { value: 'lead.created', label: 'Novo Lead' },
