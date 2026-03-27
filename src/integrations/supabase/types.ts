@@ -1672,6 +1672,54 @@ export type Database = {
         }
         Relationships: []
       }
+      inpiknowledgebase: {
+        Row: {
+          category: string
+          content: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          priority: number | null
+          raw_html: string | null
+          source_date: string | null
+          source_url: string | null
+          tags: string[] | null
+          title: string
+          updated_at: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          category: string
+          content: string
+          created_at?: string | null
+          id: string
+          is_active?: boolean | null
+          priority?: number | null
+          raw_html?: string | null
+          source_date?: string | null
+          source_url?: string | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          priority?: number | null
+          raw_html?: string | null
+          source_date?: string | null
+          source_url?: string | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string | null
+          valid_until?: string | null
+        }
+        Relationships: []
+      }
       intelligence_process_history: {
         Row: {
           ano_finalizacao: number | null
