@@ -128,14 +128,14 @@ async function aiExtractFromBlocks(args: {
 
   const combinedText = blocks.join("\n\n---BLOCO---\n\n");
 
-  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const resp = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
@@ -226,9 +226,9 @@ serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY não configurada" }), {
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) {
+      return new Response(JSON.stringify({ error: "OPENAI_API_KEY não configurada" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -354,7 +354,7 @@ serve(async (req) => {
       const batch = blocks.slice(i, i + batchSize);
       console.log(`AI batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(blocks.length / batchSize)}`);
       try {
-        const found = await aiExtractFromBlocks({ apiKey: LOVABLE_API_KEY, blocks: batch });
+        const found = await aiExtractFromBlocks({ apiKey: OPENAI_API_KEY, blocks: batch });
         collected.push(...found);
       } catch (e) {
         const status = (e as any)?.status;
