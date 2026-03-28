@@ -269,7 +269,7 @@ async function enrichWithAI(rawContent: string, category: string): Promise<strin
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'google/gemini-2.5-flash',
         max_tokens: 1500,
         temperature: 0.1,
         messages: [
