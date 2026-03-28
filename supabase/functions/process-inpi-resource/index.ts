@@ -712,7 +712,7 @@ serve(async (req) => {
       }
 
       const parts = convertToResponsesFormat(userContent);
-      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25);
+      const result = await callOpenAI(LOVABLE_API_KEY, systemPrompt, parts, 16000, 0.25);
       if (result.error) {
         return new Response(JSON.stringify({ error: `Erro IA: ${result.status}` }), { status: result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
@@ -836,7 +836,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
       }
 
       const parts = convertToResponsesFormat(userContent);
-      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000);
+      const result = await callOpenAI(LOVABLE_API_KEY, systemPrompt, parts, 16000);
       
       if (result.error) {
         console.error('OpenAI error for resposta_notificacao:', result.status, result.error.substring(0, 300));
@@ -880,7 +880,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
       }
 
       const parts = convertToResponsesFormat(userContent);
-      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25);
+      const result = await callOpenAI(LOVABLE_API_KEY, systemPrompt, parts, 16000, 0.25);
       if (result.error) {
         return new Response(JSON.stringify({ error: `Erro IA: ${result.status}` }), { status: result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
@@ -948,8 +948,8 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
     
     // Run extraction and pass 1 in parallel
     const [extractionResult, pass1Result] = await Promise.all([
-      callOpenAI(OPENAI_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, 1000, 0.1),
-      callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 16000, 0.25),
+      callOpenAI(LOVABLE_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, 1000, 0.1),
+      callOpenAI(LOVABLE_API_KEY, pass1System, pass1User, 16000, 0.25),
     ]);
 
     // Parse extracted data
@@ -994,7 +994,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     ];
 
     console.log('PASS 2: Generating Sections V-VIII...');
-    const pass2Result = await callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 16000, 0.25);
+    const pass2Result = await callOpenAI(LOVABLE_API_KEY, pass2System, pass2User, 16000, 0.25);
 
     if (pass2Result.error) {
       console.error('PASS 2 failed:', pass2Result.status, pass2Result.error?.substring(0, 300));

@@ -354,7 +354,7 @@ serve(async (req) => {
       const batch = blocks.slice(i, i + batchSize);
       console.log(`AI batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(blocks.length / batchSize)}`);
       try {
-        const found = await aiExtractFromBlocks({ apiKey: OPENAI_API_KEY, blocks: batch });
+        const found = await aiExtractFromBlocks({ apiKey: LOVABLE_API_KEY, blocks: batch });
         collected.push(...found);
       } catch (e) {
         const status = (e as any)?.status;
