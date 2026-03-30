@@ -867,18 +867,10 @@ export default function AdminDocumentos() {
                       if (!items.length) { toast.error('Nenhum documento encontrado no arquivo'); return; }
                       let imported = 0, failed = 0;
                       for (let i = 0; i < items.length; i += 50) {
-                        const batch = items.slice(i, i + 50).map((item: any) => ({
-                          name: String(item.name ?? ''),
-                          file_url: String(item.file_url ?? ''),
-                          document_type: item.document_type ? String(item.document_type) : null,
-                          mime_type: item.mime_type ? String(item.mime_type) : null,
-                          file_size: item.file_size != null ? Number(item.file_size) : null,
-                          protocol: item.protocol ? String(item.protocol) : null,
-                          user_id: item.user_id || null,
-                          process_id: item.process_id || null,
-                          created_at: item.created_at ? new Date(item.created_at).toISOString() : new Date().toISOString(),
-                        })).filter((d: any) => d.name && d.file_url);
-                        if (!batch.length) continue;
+                        const batch = items.slice(i, i + 50).map((item: any) => {
+                          const { id, profiles, brand_processes, ...rest } = item;
+                          return rest;
+                        });
                         const { error } = await supabase.from('documents').insert(batch);
                         if (error) { failed += batch.length; } else { imported += batch.length; }
                       }
