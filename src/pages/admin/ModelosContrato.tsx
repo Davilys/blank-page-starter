@@ -483,9 +483,17 @@ export default function ModelosContrato() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button variant="outline" size="icon" onClick={fetchData} className="h-9 w-9">
                 <RefreshCw className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleExport}
+                className="h-9 gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Exportar
               </Button>
               <Button
                 variant="outline"
@@ -493,8 +501,26 @@ export default function ModelosContrato() {
                 className="h-9 gap-2"
               >
                 <Upload className="h-4 w-4" />
-                Importar
+                Importar Doc
               </Button>
+              <label className="inline-flex">
+                <input
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  onChange={handleImportJson}
+                />
+                <Button
+                  variant="outline"
+                  className="h-9 gap-2"
+                  asChild
+                >
+                  <span>
+                    <FileJson className="h-4 w-4" />
+                    Importar JSON
+                  </span>
+                </Button>
+              </label>
               <Button
                 onClick={handleNew}
                 className="h-9 gap-2 bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90 shadow-lg shadow-primary/25"
