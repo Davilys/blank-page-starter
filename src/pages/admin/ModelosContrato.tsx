@@ -6,9 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  FileStack, Plus, RefreshCw, Edit, Trash2, Copy, Eye, Upload,
+  FileStack, Plus, RefreshCw, Edit, Trash2, Copy, Eye, Upload, Download,
   Search, FileText, CheckCircle2, XCircle, Layers, Braces, Sparkles,
-  TrendingUp, Clock, Filter
+  TrendingUp, Clock, Filter, FileJson
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { TemplateUploader } from '@/components/admin/contracts/TemplateUploader';
@@ -383,6 +383,57 @@ export default function ModelosContrato() {
     setEditorOpen(true);
   };
 
+  const handleExport = () => {
+    if (templates.length === 0) {
+      toast.error('Nenhum modelo para exportar');
+      return;
+    }
+    const exportData = templates.map(t => ({
+      _type: 'contract_templates',
+      name: t.name,
+      content: t.content,
+      contract_type_id: t.contract_type_id,
+      is_active: t.is_active,
+      variables: t.variables,
+      created_at: t.created_at,
+    }));
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `modelos-contrato-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${exportData.length} modelo(s) exportado(s)`);
+  };
+
+  const handleImportJson = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      const items = Array.isArray(data) ? data : [data];
+      let imported = 0;
+      for (const item of items) {
+        if (!item.name || !item.content) continue;
+        const { error } = await supabase.from('contract_templates').insert({
+          name: item.name,
+          content: item.content,
+          contract_type_id: item.contract_type_id || null,
+          is_active: item.is_active ?? true,
+          variables: item.variables || [],
+        });
+        if (!error) imported++;
+      }
+      toast.success(`${imported} modelo(s) importado(s) com sucesso`);
+      fetchData();
+    } catch {
+      toast.error('Erro ao importar JSON. Verifique o formato do arquivo.');
+    }
+    e.target.value = '';
+  };
+
   // Stats
   const stats = useMemo(() => ({
     total: templates.length,
@@ -432,9 +483,17 @@ export default function ModelosContrato() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button variant="outline" size="icon" onClick={fetchData} className="h-9 w-9">
                 <RefreshCw className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleExport}
+                className="h-9 gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Exportar
               </Button>
               <Button
                 variant="outline"
@@ -442,8 +501,26 @@ export default function ModelosContrato() {
                 className="h-9 gap-2"
               >
                 <Upload className="h-4 w-4" />
-                Importar
+                Importar Doc
               </Button>
+              <label className="inline-flex">
+                <input
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  onChange={handleImportJson}
+                />
+                <Button
+                  variant="outline"
+                  className="h-9 gap-2"
+                  asChild
+                >
+                  <span>
+                    <FileJson className="h-4 w-4" />
+                    Importar JSON
+                  </span>
+                </Button>
+              </label>
               <Button
                 onClick={handleNew}
                 className="h-9 gap-2 bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90 shadow-lg shadow-primary/25"
