@@ -13,7 +13,7 @@ import {
   Image, File as FileIcon, User, Filter, X, RefreshCw,
   FolderOpen, Shield, Scale, Receipt, Landmark, Award,
   Newspaper, MessageSquare, Package, HardDrive, Zap, Activity,
-  ArrowUpRight, ChevronRight, BarChart3, Loader2
+  ArrowUpRight, ChevronRight, BarChart3, Loader2, Upload, FileJson
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
