@@ -13,7 +13,7 @@ import {
   Image, File as FileIcon, User, Filter, X, RefreshCw,
   FolderOpen, Shield, Scale, Receipt, Landmark, Award,
   Newspaper, MessageSquare, Package, HardDrive, Zap, Activity,
-  ArrowUpRight, ChevronRight, BarChart3, Loader2
+  ArrowUpRight, ChevronRight, BarChart3, Loader2, Upload, FileJson
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -816,9 +816,77 @@ export default function AdminDocumentos() {
                 whileTap={{ scale: 0.95 }}
                 onClick={handleRefresh}
                 className="w-9 h-9 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                title="Atualizar"
               >
                 <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
               </motion.button>
+
+              {/* Export */}
+              <motion.button
+                whileHover={{ scale: 1.06 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  const exportData = documents.map(d => ({
+                    name: d.name,
+                    file_url: d.file_url,
+                    document_type: d.document_type,
+                    mime_type: d.mime_type,
+                    file_size: d.file_size,
+                    user_id: d.user_id,
+                    process_id: d.process_id,
+                    protocol: d.protocol,
+                    created_at: d.created_at,
+                  }));
+                  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a'); a.href = url; a.download = `documentos_${new Date().toISOString().slice(0,10)}.json`; a.click();
+                  URL.revokeObjectURL(url);
+                  toast.success(`${exportData.length} documentos exportados`);
+                }}
+                className="w-9 h-9 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                title="Exportar JSON"
+              >
+                <Download className="h-4 w-4" />
+              </motion.button>
+
+              {/* Import JSON */}
+              <motion.button
+                whileHover={{ scale: 1.06 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = '.json';
+                  input.onchange = async (e: any) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      const text = await file.text();
+                      const data = JSON.parse(text);
+                      const items = Array.isArray(data) ? data : (data.data || data.documents || []);
+                      if (!items.length) { toast.error('Nenhum documento encontrado no arquivo'); return; }
+                      let imported = 0, failed = 0;
+                      for (let i = 0; i < items.length; i += 50) {
+                        const batch = items.slice(i, i + 50).map((item: any) => {
+                          const { id, profiles, brand_processes, ...rest } = item;
+                          return rest;
+                        });
+                        const { error } = await supabase.from('documents').insert(batch);
+                        if (error) { failed += batch.length; } else { imported += batch.length; }
+                      }
+                      if (failed === 0) { toast.success(`${imported} documentos importados`); }
+                      else { toast.warning(`${imported} importados, ${failed} falharam`); }
+                      fetchDocuments();
+                    } catch (err: any) { toast.error('Erro ao importar: ' + (err.message || 'Arquivo inválido')); }
+                  };
+                  input.click();
+                }}
+                className="w-9 h-9 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                title="Importar JSON"
+              >
+                <Upload className="h-4 w-4" />
+              </motion.button>
+
               <UploadDialog processes={processes} onDone={fetchDocuments} />
             </div>
           </div>
