@@ -441,23 +441,30 @@ serve(async (req) => {
       // ========================================
       // UPDATE PIPELINE STAGE FOR COMMERCIAL CLIENTS
       // ========================================
-      const { data: clientProfile } = await supabase
+      // Always set client as comercial and update pipeline stage
+      const { error: funnelError } = await supabase
         .from('profiles')
-        .select('client_funnel_type')
-        .eq('id', userId)
-        .single();
+        .update({
+          client_funnel_type: 'comercial',
+          pipeline_stage: 'assinou_contrato',
+        })
+        .eq('id', userId);
 
-      if (clientProfile?.client_funnel_type === 'comercial') {
-        const { error: stageError } = await supabase
-          .from('brand_processes')
-          .update({ pipeline_stage: 'assinou_contrato' })
-          .eq('user_id', userId);
+      if (funnelError) {
+        console.error('Error updating funnel type/pipeline stage:', funnelError);
+      } else {
+        console.log('Updated client funnel to comercial and pipeline stage to assinou_contrato');
+      }
 
-        if (stageError) {
-          console.error('Error updating pipeline stage:', stageError);
-        } else {
-          console.log('Updated pipeline stage to assinou_contrato for commercial client');
-        }
+      const { error: stageError } = await supabase
+        .from('brand_processes')
+        .update({ pipeline_stage: 'assinou_contrato' })
+        .eq('user_id', userId);
+
+      if (stageError) {
+        console.error('Error updating brand_processes pipeline stage:', stageError);
+      } else {
+        console.log('Updated brand_processes pipeline stage to assinou_contrato');
       }
     }
 
