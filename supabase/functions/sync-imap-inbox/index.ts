@@ -152,24 +152,49 @@ async function syncFolder(
       const headerBlocks = fetchResp.split(/\* (\d+) FETCH/);
       // headerBlocks: ['', seq1, data1, seq2, data2, ...]
 
-      for (const block of headerBlocks) {
-        if (!block.trim() || block.length < 30) continue;
+      // Process pairs: headerBlocks[1]=seq, headerBlocks[2]=data, etc.
+      for (let bi = 1; bi + 1 < headerBlocks.length; bi += 2) {
+        const seqNum = parseInt(headerBlocks[bi]);
+        const block = headerBlocks[bi + 1];
+        if (!block || block.length < 30) continue;
 
         try {
           const headers = parseEnvelopeHeaders(block);
+          
+          // Extract UID from the FETCH response
+          const uidMatch = block.match(/UID\s+(\d+)/i);
+          const imapUid = uidMatch ? parseInt(uidMatch[1]) : seqNum;
 
-          const { data: existing } = await supabase
-            .from("email_inbox")
-            .select("id")
-            .eq("message_id", headers.messageId)
-            .eq("folder", folderLabel)
-            .single();
+          // Check for existing: by message_id if real, or by date+from+subject
+          let existing = null;
+          if (headers.messageId) {
+            const { data } = await supabase
+              .from("email_inbox")
+              .select("id")
+              .eq("message_id", headers.messageId)
+              .eq("folder", folderLabel)
+              .single();
+            existing = data;
+          } else {
+            // For emails without real Message-ID, check by date+from+subject
+            const { data } = await supabase
+              .from("email_inbox")
+              .select("id")
+              .eq("from_email", headers.from)
+              .eq("subject", headers.subject)
+              .eq("folder", folderLabel)
+              .gte("received_at", new Date(new Date(headers.date).getTime() - 60000).toISOString())
+              .lte("received_at", new Date(new Date(headers.date).getTime() + 60000).toISOString())
+              .maybeSingle();
+            existing = data;
+          }
 
           if (!existing) {
             const isSent = folderLabel === "sent";
             const emailData = {
               account_id: emailAccount.id,
               message_id: headers.messageId,
+              imap_uid: imapUid,
               from_email: isSent ? emailAccount.email_address : headers.from,
               from_name: isSent ? (emailAccount.display_name || null) : (headers.fromName || null),
               to_email: isSent ? (headers.to || "") : emailAccount.email_address,

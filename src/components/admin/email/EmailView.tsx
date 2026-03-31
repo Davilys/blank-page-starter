@@ -444,6 +444,16 @@ export function EmailView({ email, onBack, onReply, onForward, onUseDraftFromAI 
                     <p className="text-sm font-medium">Carregando conteúdo do email...</p>
                     <p className="text-xs">Sincronizando com o servidor de email</p>
                   </div>
+                ) : isFailedHydration && !hydratedBody.body_text && !hydratedBody.body_html ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <MailX className="h-8 w-8 mb-3 text-muted-foreground/50" />
+                    <p className="text-sm font-medium">Conteúdo não disponível</p>
+                    <p className="text-xs mb-3">Não foi possível carregar o conteúdo deste email</p>
+                    <Button variant="outline" size="sm" className="gap-2" onClick={hydrateEmail}>
+                      <Reply className="h-3.5 w-3.5" />
+                      Tentar novamente
+                    </Button>
+                  </div>
                 ) : (
                   <div className="prose prose-sm max-w-none dark:prose-invert">
                     {displayBodyHtml ? (
