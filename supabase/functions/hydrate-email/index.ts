@@ -235,8 +235,9 @@ serve(async (req) => {
 
     if (emailErr || !email) throw new Error("Email not found");
 
-    // Already hydrated?
-    if (email.body_fetched_at && (email.body_text || email.body_html)) {
+    // Already hydrated? (but allow retry if body is an error placeholder)
+    const isFailedPlaceholder = email.body_text?.startsWith("(") && !email.body_html;
+    if (email.body_fetched_at && (email.body_text || email.body_html) && !isFailedPlaceholder) {
       return new Response(
         JSON.stringify({ success: true, already_hydrated: true }),
         { headers: { "Content-Type": "application/json", ...corsHeaders } }
