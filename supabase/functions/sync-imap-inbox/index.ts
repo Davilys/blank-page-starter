@@ -146,10 +146,11 @@ async function syncFolder(
       const fetchResp = await sendCommand(
         conn,
         fetchTag,
-        `FETCH ${currentStart}:${currentEnd} (BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE MESSAGE-ID)])`
+        `FETCH ${currentStart}:${currentEnd} (UID BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE MESSAGE-ID)])`
       );
 
-      const headerBlocks = fetchResp.split(/\* \d+ FETCH/);
+      const headerBlocks = fetchResp.split(/\* (\d+) FETCH/);
+      // headerBlocks: ['', seq1, data1, seq2, data2, ...]
 
       for (const block of headerBlocks) {
         if (!block.trim() || block.length < 30) continue;
