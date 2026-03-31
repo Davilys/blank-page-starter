@@ -130,9 +130,22 @@ const Obrigado = () => {
                     <span className="font-medium text-right">{registrationData.brandData?.businessArea}</span>
                   </div>
                   
+                  {registrationData.paymentMethod && (
+                    <div className="flex items-start justify-between py-3 border-b border-border">
+                      <span className="text-muted-foreground">Forma de Pagamento</span>
+                      <span className="font-medium">
+                        {registrationData.paymentMethod === 'pix' ? 'PIX à vista' :
+                         registrationData.paymentMethod === 'credit_6x' ? 'Cartão 6x' :
+                         registrationData.paymentMethod === 'boleto_3x' ? 'Boleto 3x' :
+                         registrationData.paymentMethod}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex items-start justify-between py-3 border-b border-border">
                     <span className="text-muted-foreground">Valor</span>
-                    <span className="font-medium text-accent">R$ 698,97</span>
+                    <span className="font-medium text-accent">
+                      {(registrationData.paymentValue || 698.97).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </span>
                   </div>
                   
                   <div className="flex items-start justify-between py-3">
