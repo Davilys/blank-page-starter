@@ -11,6 +11,9 @@ interface SyncRequest {
   account_id?: string;
 }
 
+// Max messages to sync per invocation (prevents CPU timeout)
+const MAX_SYNC_PER_CALL = 50;
+
 // ==== MIME RFC 2047 Decoder ====
 function decodeMimeWords(input: string): string {
   if (!input || !input.includes("=?")) return input;
@@ -19,24 +22,21 @@ function decodeMimeWords(input: string): string {
     (_match, _charset, encoding, encoded) => {
       try {
         if (encoding.toUpperCase() === "B") {
-          // Base64
           const bytes = Uint8Array.from(atob(encoded), c => c.charCodeAt(0));
           return new TextDecoder("utf-8").decode(bytes);
         }
-        // Quoted-Printable
         const decoded = encoded
           .replace(/_/g, " ")
           .replace(/=([0-9A-Fa-f]{2})/g, (_: string, hex: string) =>
             String.fromCharCode(parseInt(hex, 16))
           );
-        // Try UTF-8 decode for multi-byte chars
         const bytes = new Uint8Array([...decoded].map(c => c.charCodeAt(0)));
         return new TextDecoder("utf-8").decode(bytes);
       } catch {
         return encoded;
       }
     }
-  ).replace(/\r?\n[ \t]+/g, ""); // unfold headers
+  ).replace(/\r?\n[ \t]+/g, "");
 }
 
 async function sendCommand(
@@ -51,7 +51,7 @@ async function sendCommand(
 
   const buffer = new Uint8Array(32768);
   let response = "";
-  const deadline = Date.now() + 8000;
+  const deadline = Date.now() + 10000;
 
   while (Date.now() < deadline) {
     const n = await conn.read(buffer);
@@ -107,14 +107,18 @@ function parseEnvelopeHeaders(raw: string): {
   };
 }
 
+/**
+ * Sync only the NEWEST messages from a folder.
+ * Fetches from (total - MAX_SYNC_PER_CALL + 1) to total,
+ * skipping any already in the database.
+ */
 async function syncFolder(
   conn: Deno.TcpConn | Deno.TlsConn,
   supabase: any,
   emailAccount: any,
   folderName: string,
   folderLabel: string,
-  tagPrefix: number,
-  batchSize: number
+  tagPrefix: number
 ): Promise<{ synced: { subject: string; from: string }[]; total: number }> {
   const selectResp = await sendCommand(conn, `F${tagPrefix}`, `SELECT "${folderName}"`);
   
@@ -130,70 +134,67 @@ async function syncFolder(
   const syncedEmails: { subject: string; from: string }[] = [];
 
   if (totalMessages > 0) {
-    let currentStart = 1;
+    // Only fetch the newest MAX_SYNC_PER_CALL messages
+    const start = Math.max(1, totalMessages - MAX_SYNC_PER_CALL + 1);
+    const end = totalMessages;
+    
+    console.log(`[${folderName}] Fetching newest messages ${start}:${end} (of ${totalMessages})`);
 
-    while (currentStart <= totalMessages) {
-      const currentEnd = Math.min(currentStart + batchSize - 1, totalMessages);
-      console.log(`[${folderName}] Fetching batch ${currentStart}:${currentEnd} of ${totalMessages}`);
+    const fetchTag = `F${tagPrefix}B1`;
+    const fetchResp = await sendCommand(
+      conn,
+      fetchTag,
+      `FETCH ${start}:${end} (BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE MESSAGE-ID)])`
+    );
 
-      const fetchTag = `F${tagPrefix}B${currentStart}`;
-      const fetchResp = await sendCommand(
-        conn,
-        fetchTag,
-        `FETCH ${currentStart}:${currentEnd} (BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE MESSAGE-ID)])`
-      );
+    const headerBlocks = fetchResp.split(/\* \d+ FETCH/);
 
-      const headerBlocks = fetchResp.split(/\* \d+ FETCH/);
+    for (const block of headerBlocks) {
+      if (!block.trim() || block.length < 30) continue;
 
-      for (const block of headerBlocks) {
-        if (!block.trim() || block.length < 30) continue;
+      try {
+        const headers = parseEnvelopeHeaders(block);
 
-        try {
-          const headers = parseEnvelopeHeaders(block);
+        const { data: existing } = await supabase
+          .from("email_inbox")
+          .select("id")
+          .eq("message_id", headers.messageId)
+          .eq("folder", folderLabel)
+          .single();
 
-          const { data: existing } = await supabase
+        if (!existing) {
+          const isSent = folderLabel === "sent";
+          const emailData = {
+            account_id: emailAccount.id,
+            message_id: headers.messageId,
+            from_email: isSent ? emailAccount.email_address : headers.from,
+            from_name: isSent ? (emailAccount.display_name || null) : (headers.fromName || null),
+            to_email: isSent ? (headers.to || "") : emailAccount.email_address,
+            to_name: isSent ? (headers.toName || null) : null,
+            subject: headers.subject,
+            body_text: null,
+            body_html: null,
+            received_at: new Date(headers.date).toISOString(),
+            is_read: isSent ? true : false,
+            is_starred: false,
+            is_archived: false,
+            folder: folderLabel,
+          };
+
+          const { error: insertError } = await supabase
             .from("email_inbox")
-            .select("id")
-            .eq("message_id", headers.messageId)
-            .eq("folder", folderLabel)
-            .single();
+            .insert(emailData);
 
-          if (!existing) {
-            const isSent = folderLabel === "sent";
-            const emailData = {
-              account_id: emailAccount.id,
-              message_id: headers.messageId,
-              from_email: isSent ? emailAccount.email_address : headers.from,
-              from_name: isSent ? (emailAccount.display_name || null) : (headers.fromName || null),
-              to_email: isSent ? (headers.to || "") : emailAccount.email_address,
-              to_name: isSent ? (headers.toName || null) : null,
+          if (!insertError) {
+            syncedEmails.push({
               subject: headers.subject,
-              body_text: null,
-              body_html: null,
-              received_at: new Date(headers.date).toISOString(),
-              is_read: isSent ? true : false,
-              is_starred: false,
-              is_archived: false,
-              folder: folderLabel,
-            };
-
-            const { error: insertError } = await supabase
-              .from("email_inbox")
-              .insert(emailData);
-
-            if (!insertError) {
-              syncedEmails.push({
-                subject: headers.subject,
-                from: headers.from,
-              });
-            }
+              from: headers.from,
+            });
           }
-        } catch (parseError) {
-          console.error(`[${folderName}] Error parsing message:`, parseError);
         }
+      } catch (parseError) {
+        console.error(`[${folderName}] Error parsing message:`, parseError);
       }
-
-      currentStart = currentEnd + 1;
     }
   }
 
@@ -201,8 +202,8 @@ async function syncFolder(
 }
 
 const SENT_FOLDER_NAMES = [
+  "INBOX.Sent",
   "Sent",
-  "INBOX.Sent", 
   "Sent Items",
   "Sent Messages",
   "[Gmail]/Sent Mail",
@@ -217,7 +218,6 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const { account_id }: SyncRequest = await req.json().catch(() => ({}));
-    const batchSize = 10;
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -267,19 +267,19 @@ const handler = async (req: Request): Promise<Response> => {
     }
     console.log("Logged in successfully");
 
-    // 1. Sync INBOX
-    const inboxResult = await syncFolder(conn, supabase, emailAccount, "INBOX", "inbox", 1, batchSize);
+    // 1. Sync INBOX (newest 50 only)
+    const inboxResult = await syncFolder(conn, supabase, emailAccount, "INBOX", "inbox", 1);
 
     // 2. List folders to find Sent folder
     const listResp = await sendCommand(conn, "L001", 'LIST "" "*"');
     console.log("Available folders:", listResp.substring(0, 500));
 
-    // 3. Try to find and sync Sent folder
+    // 3. Try to find and sync Sent folder (newest 50 only)
     let sentResult = { synced: [] as { subject: string; from: string }[], total: 0 };
     for (const sentName of SENT_FOLDER_NAMES) {
       if (listResp.includes(sentName)) {
         console.log(`Found sent folder: ${sentName}`);
-        sentResult = await syncFolder(conn, supabase, emailAccount, sentName, "sent", 2, batchSize);
+        sentResult = await syncFolder(conn, supabase, emailAccount, sentName, "sent", 2);
         break;
       }
     }
