@@ -127,14 +127,11 @@ export function EmailView({ email, onBack, onReply, onForward, onUseDraftFromAI 
   }>({});
   const queryClient = useQueryClient();
 
-  // Auto-hydrate email content if missing
-  useEffect(() => {
-    const hasBody = email.body_text || email.body_html || email.body_fetched_at;
-    if (hasBody) {
-      setHydratedBody({});
-      return;
-    }
-
+  // Auto-hydrate email content if missing or previously failed
+  const isFailedHydration = !!email.body_fetched_at && 
+    (email.body_text?.startsWith("(") || (!email.body_text && !email.body_html));
+  
+  const hydrateEmail = () => {
     setIsHydrating(true);
     supabase.functions.invoke('hydrate-email', { body: { email_id: email.id } })
       .then(({ data, error }) => {
@@ -152,7 +149,16 @@ export function EmailView({ email, onBack, onReply, onForward, onUseDraftFromAI 
         }
       })
       .finally(() => setIsHydrating(false));
-  }, [email.id, email.body_text, email.body_html, email.body_fetched_at, queryClient]);
+  };
+
+  useEffect(() => {
+    const hasBody = (email.body_text || email.body_html) && !isFailedHydration;
+    if (hasBody || email.body_fetched_at && !isFailedHydration) {
+      setHydratedBody({});
+      return;
+    }
+    hydrateEmail();
+  }, [email.id]);
 
   // Use hydrated content or original
   const displayBodyText = hydratedBody.body_text || email.body_text;
