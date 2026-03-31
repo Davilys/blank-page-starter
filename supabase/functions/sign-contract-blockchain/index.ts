@@ -365,6 +365,8 @@ serve(async (req) => {
             origin: 'site',
             priority: 'high',
             last_contact: new Date().toISOString(),
+            client_funnel_type: 'comercial',
+            pipeline_stage: 'assinou_contrato',
           });
 
           if (profileError) {
