@@ -229,7 +229,7 @@ serve(async (req) => {
     // Get email record with account info
     const { data: email, error: emailErr } = await supabase
       .from("email_inbox")
-      .select("id, message_id, folder, body_text, body_html, body_fetched_at, account_id")
+      .select("id, message_id, folder, body_text, body_html, body_fetched_at, account_id, from_email, subject, received_at, imap_uid")
       .eq("id", email_id)
       .single();
 
