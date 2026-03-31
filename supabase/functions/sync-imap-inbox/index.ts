@@ -86,21 +86,13 @@ function parseEnvelopeHeaders(raw: string): {
   date: string;
   messageId: string;
 } {
-  // Unfold headers for better parsing
-  const unfolded = raw.replace(/\r?\n[ \t]+/g, " ");
-  
-  const fromMatch = unfolded.match(/From:\s*(?:"?([^"<]*)"?\s*)?<?([^>\r\n]+)>?/i);
-  const toMatch = unfolded.match(/To:\s*(?:"?([^"<]*)"?\s*)?<?([^>\r\n]+)>?/i);
-  const subjectMatch = unfolded.match(/Subject:\s*(.+?)(?:\r?\n\S|\r?\n$)/is);
-  const dateMatch = unfolded.match(/Date:\s*(.+?)(?:\r?\n|\r?\n$)/i);
-  // More robust Message-ID parsing: handle <...> and bare IDs
-  const messageIdMatch = unfolded.match(/Message-ID:\s*<?([^>\s\r\n]+)>?/i);
+  const fromMatch = raw.match(/From:\s*(?:"?([^"<]*)"?\s*)?<?([^>\r\n]+)>?/i);
+  const toMatch = raw.match(/To:\s*(?:"?([^"<]*)"?\s*)?<?([^>\r\n]+)>?/i);
+  const subjectMatch = raw.match(/Subject:\s*(.+?)(?:\r\n(?![ \t])|\r?\n(?![ \t]))/is);
+  const dateMatch = raw.match(/Date:\s*(.+?)(?:\r\n|\r?\n)/i);
+  const messageIdMatch = raw.match(/Message-ID:\s*<?([^>\r\n]+)>?/i);
 
-  const rawSubject = subjectMatch?.[1]?.trim() || "(Sem assunto)";
-  
-  // Only use real Message-IDs (must contain @), otherwise null
-  const parsedMessageId = messageIdMatch?.[1]?.trim() || null;
-  const isRealMessageId = parsedMessageId && parsedMessageId.includes("@");
+  const rawSubject = subjectMatch?.[1]?.trim().replace(/\r?\n[ \t]+/g, " ") || "(Sem assunto)";
 
   return {
     fromName: decodeMimeWords(fromMatch?.[1]?.trim() || ""),
@@ -109,7 +101,9 @@ function parseEnvelopeHeaders(raw: string): {
     to: toMatch?.[2]?.trim() || "",
     subject: decodeMimeWords(rawSubject),
     date: dateMatch?.[1]?.trim() || new Date().toISOString(),
-    messageId: isRealMessageId ? parsedMessageId : null,
+    messageId:
+      messageIdMatch?.[1]?.trim() ||
+      `${Date.now()}-${Math.random().toString(36)}`,
   };
 }
 
@@ -146,55 +140,29 @@ async function syncFolder(
       const fetchResp = await sendCommand(
         conn,
         fetchTag,
-        `FETCH ${currentStart}:${currentEnd} (UID BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE MESSAGE-ID)])`
+        `FETCH ${currentStart}:${currentEnd} (BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE MESSAGE-ID)])`
       );
 
-      const headerBlocks = fetchResp.split(/\* (\d+) FETCH/);
-      // headerBlocks: ['', seq1, data1, seq2, data2, ...]
+      const headerBlocks = fetchResp.split(/\* \d+ FETCH/);
 
-      // Process pairs: headerBlocks[1]=seq, headerBlocks[2]=data, etc.
-      for (let bi = 1; bi + 1 < headerBlocks.length; bi += 2) {
-        const seqNum = parseInt(headerBlocks[bi]);
-        const block = headerBlocks[bi + 1];
-        if (!block || block.length < 30) continue;
+      for (const block of headerBlocks) {
+        if (!block.trim() || block.length < 30) continue;
 
         try {
           const headers = parseEnvelopeHeaders(block);
-          
-          // Extract UID from the FETCH response
-          const uidMatch = block.match(/UID\s+(\d+)/i);
-          const imapUid = uidMatch ? parseInt(uidMatch[1]) : seqNum;
 
-          // Check for existing: by message_id if real, or by date+from+subject
-          let existing = null;
-          if (headers.messageId) {
-            const { data } = await supabase
-              .from("email_inbox")
-              .select("id")
-              .eq("message_id", headers.messageId)
-              .eq("folder", folderLabel)
-              .single();
-            existing = data;
-          } else {
-            // For emails without real Message-ID, check by date+from+subject
-            const { data } = await supabase
-              .from("email_inbox")
-              .select("id")
-              .eq("from_email", headers.from)
-              .eq("subject", headers.subject)
-              .eq("folder", folderLabel)
-              .gte("received_at", new Date(new Date(headers.date).getTime() - 60000).toISOString())
-              .lte("received_at", new Date(new Date(headers.date).getTime() + 60000).toISOString())
-              .maybeSingle();
-            existing = data;
-          }
+          const { data: existing } = await supabase
+            .from("email_inbox")
+            .select("id")
+            .eq("message_id", headers.messageId)
+            .eq("folder", folderLabel)
+            .single();
 
           if (!existing) {
             const isSent = folderLabel === "sent";
             const emailData = {
               account_id: emailAccount.id,
               message_id: headers.messageId,
-              imap_uid: imapUid,
               from_email: isSent ? emailAccount.email_address : headers.from,
               from_name: isSent ? (emailAccount.display_name || null) : (headers.fromName || null),
               to_email: isSent ? (headers.to || "") : emailAccount.email_address,
