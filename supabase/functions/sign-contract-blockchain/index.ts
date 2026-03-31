@@ -406,6 +406,7 @@ serve(async (req) => {
         .update({
           assigned_to: contractData.created_by,
           created_by: contractData.created_by,
+          client_funnel_type: 'comercial',
         })
         .eq('id', userId)
         .is('assigned_to', null); // Só atribui se ainda não tiver responsável
