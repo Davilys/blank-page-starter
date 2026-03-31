@@ -1,0 +1,1 @@
+ALTER TABLE public.contracts ADD COLUMN IF NOT EXISTS suggested_classes jsonb DEFAULT NULL;

@@ -900,6 +900,7 @@ export type Database = {
           signed_at: string | null
           start_date: string | null
           subject: string | null
+          suggested_classes: Json | null
           template_id: string | null
           user_agent: string | null
           user_id: string | null
@@ -944,6 +945,7 @@ export type Database = {
           signed_at?: string | null
           start_date?: string | null
           subject?: string | null
+          suggested_classes?: Json | null
           template_id?: string | null
           user_agent?: string | null
           user_id?: string | null
@@ -988,6 +990,7 @@ export type Database = {
           signed_at?: string | null
           start_date?: string | null
           subject?: string | null
+          suggested_classes?: Json | null
           template_id?: string | null
           user_agent?: string | null
           user_id?: string | null
