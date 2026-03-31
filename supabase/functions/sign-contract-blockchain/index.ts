@@ -365,8 +365,6 @@ serve(async (req) => {
             origin: 'site',
             priority: 'high',
             last_contact: new Date().toISOString(),
-            client_funnel_type: 'comercial',
-            pipeline_stage: 'assinou_contrato',
           });
 
           if (profileError) {
@@ -406,7 +404,6 @@ serve(async (req) => {
         .update({
           assigned_to: contractData.created_by,
           created_by: contractData.created_by,
-          client_funnel_type: 'comercial',
         })
         .eq('id', userId)
         .is('assigned_to', null); // Só atribui se ainda não tiver responsável
@@ -441,30 +438,23 @@ serve(async (req) => {
       // ========================================
       // UPDATE PIPELINE STAGE FOR COMMERCIAL CLIENTS
       // ========================================
-      // Always set client as comercial and update pipeline stage
-      const { error: funnelError } = await supabase
+      const { data: clientProfile } = await supabase
         .from('profiles')
-        .update({
-          client_funnel_type: 'comercial',
-          pipeline_stage: 'assinou_contrato',
-        })
-        .eq('id', userId);
+        .select('client_funnel_type')
+        .eq('id', userId)
+        .single();
 
-      if (funnelError) {
-        console.error('Error updating funnel type/pipeline stage:', funnelError);
-      } else {
-        console.log('Updated client funnel to comercial and pipeline stage to assinou_contrato');
-      }
+      if (clientProfile?.client_funnel_type === 'comercial') {
+        const { error: stageError } = await supabase
+          .from('brand_processes')
+          .update({ pipeline_stage: 'assinou_contrato' })
+          .eq('user_id', userId);
 
-      const { error: stageError } = await supabase
-        .from('brand_processes')
-        .update({ pipeline_stage: 'assinou_contrato' })
-        .eq('user_id', userId);
-
-      if (stageError) {
-        console.error('Error updating brand_processes pipeline stage:', stageError);
-      } else {
-        console.log('Updated brand_processes pipeline stage to assinou_contrato');
+        if (stageError) {
+          console.error('Error updating pipeline stage:', stageError);
+        } else {
+          console.log('Updated pipeline stage to assinou_contrato for commercial client');
+        }
       }
     }
 
