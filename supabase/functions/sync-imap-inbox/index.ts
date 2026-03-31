@@ -86,13 +86,21 @@ function parseEnvelopeHeaders(raw: string): {
   date: string;
   messageId: string;
 } {
-  const fromMatch = raw.match(/From:\s*(?:"?([^"<]*)"?\s*)?<?([^>\r\n]+)>?/i);
-  const toMatch = raw.match(/To:\s*(?:"?([^"<]*)"?\s*)?<?([^>\r\n]+)>?/i);
-  const subjectMatch = raw.match(/Subject:\s*(.+?)(?:\r\n(?![ \t])|\r?\n(?![ \t]))/is);
-  const dateMatch = raw.match(/Date:\s*(.+?)(?:\r\n|\r?\n)/i);
-  const messageIdMatch = raw.match(/Message-ID:\s*<?([^>\r\n]+)>?/i);
+  // Unfold headers for better parsing
+  const unfolded = raw.replace(/\r?\n[ \t]+/g, " ");
+  
+  const fromMatch = unfolded.match(/From:\s*(?:"?([^"<]*)"?\s*)?<?([^>\r\n]+)>?/i);
+  const toMatch = unfolded.match(/To:\s*(?:"?([^"<]*)"?\s*)?<?([^>\r\n]+)>?/i);
+  const subjectMatch = unfolded.match(/Subject:\s*(.+?)(?:\r?\n\S|\r?\n$)/is);
+  const dateMatch = unfolded.match(/Date:\s*(.+?)(?:\r?\n|\r?\n$)/i);
+  // More robust Message-ID parsing: handle <...> and bare IDs
+  const messageIdMatch = unfolded.match(/Message-ID:\s*<?([^>\s\r\n]+)>?/i);
 
-  const rawSubject = subjectMatch?.[1]?.trim().replace(/\r?\n[ \t]+/g, " ") || "(Sem assunto)";
+  const rawSubject = subjectMatch?.[1]?.trim() || "(Sem assunto)";
+  
+  // Only use real Message-IDs (must contain @), otherwise null
+  const parsedMessageId = messageIdMatch?.[1]?.trim() || null;
+  const isRealMessageId = parsedMessageId && parsedMessageId.includes("@");
 
   return {
     fromName: decodeMimeWords(fromMatch?.[1]?.trim() || ""),
@@ -101,9 +109,7 @@ function parseEnvelopeHeaders(raw: string): {
     to: toMatch?.[2]?.trim() || "",
     subject: decodeMimeWords(rawSubject),
     date: dateMatch?.[1]?.trim() || new Date().toISOString(),
-    messageId:
-      messageIdMatch?.[1]?.trim() ||
-      `${Date.now()}-${Math.random().toString(36)}`,
+    messageId: isRealMessageId ? parsedMessageId : null,
   };
 }
 
