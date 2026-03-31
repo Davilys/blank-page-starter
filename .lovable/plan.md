@@ -1,71 +1,64 @@
 
 
-## Plano: Exportar e Importar TODOS os Dados do Sistema
+## Problem Analysis
 
-### Problema Atual
-A exportação/importação só cobre 3 tabelas (leads, profiles, contracts). O sistema tem **~50 tabelas** com dados importantes que ficam de fora.
+The email body isn't loading because of a chain of issues:
 
-### Solução
+1. **Fake Message-IDs during sync**: `sync-imap-inbox` generates artificial message IDs (`${Date.now()}-${Math.random()}`) when it can't parse a real one from headers. These fake IDs can never be found on the server.
 
-Expandir ambos os componentes (BackupSettings e BackupImportSection) para cobrir todas as tabelas do sistema, organizadas por categoria, com paginação para superar o limite de 1000 registros.
+2. **Hydrate search fails**: `hydrate-email` uses `SEARCH HEADER MESSAGE-ID "..."` with these fake IDs, gets no results, and writes `"(Conteúdo não disponível no servidor)"` as `body_text` + sets `body_fetched_at`.
 
-### Tabelas que serão incluídas
+3. **No retry possible**: `EmailView.tsx` checks `email.body_fetched_at` and skips hydration if it's set -- so failed emails are permanently stuck.
 
-**Dados Principais (já existentes):**
-- leads, profiles, contracts
+## Plan
 
-**Dados de Negócio (novos):**
-- brand_processes, invoices, documents, inpi_resources, process_events, publicacoes_marcas
+### 1. Fix `sync-imap-inbox` to fetch body inline (not just headers)
 
-**Contratos (detalhes):**
-- contract_attachments, contract_comments, contract_notes, contract_tasks, contract_templates, contract_types, contract_renewal_history
+Instead of only fetching `BODY.PEEK[HEADER.FIELDS (...)]`, change the FETCH command to also grab the body:
+- Use `FETCH N:M (BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE MESSAGE-ID)] BODY.PEEK[TEXT])` -- but this is too heavy for batch sync of 19k+ messages.
 
-**Comunicação:**
-- chat_messages, notifications, notification_templates, email_templates, email_logs, email_inbox, email_accounts
+**Better approach**: Keep sync as headers-only, but fix the Message-ID parsing and improve hydrate fallback.
 
-**Marketing:**
-- marketing_campaigns, marketing_ads, marketing_conversions, marketing_attribution, marketing_config, marketing_ab_tests, marketing_ab_variants, marketing_ad_performance, marketing_audience_suggestions, marketing_budget_alerts, marketing_generated_ads
+### 2. Fix `sync-imap-inbox` -- store sequence number and real Message-ID
 
-**Remarketing:**
-- client_remarketing_campaigns, client_remarketing_queue, lead_remarketing_campaigns, lead_remarketing_queue
+- Improve the header parsing regex to better capture Message-ID from the FETCH response
+- Store the IMAP sequence number (UID) alongside the message for reliable retrieval later
 
-**CRM/Atividades:**
-- client_activities, client_notes, client_appointments, lead_activities
+### 3. Fix `hydrate-email` -- add fallback search strategies
 
-**INPI/RPI:**
-- rpi_uploads, rpi_entries, inpi_knowledge_base, inpi_sync_logs, publicacao_logs
+When `SEARCH HEADER MESSAGE-ID` fails:
+- Try `SEARCH ON <date> FROM <sender> SUBJECT <subject>` as fallback
+- If the message_id looks auto-generated (contains random chars without `@`), skip the Message-ID search entirely and go straight to date/from/subject search
 
-**Sistema/Config:**
-- system_settings, admin_permissions, user_roles, notification_logs, notification_dispatch_logs, channel_notification_templates, ai_providers, ai_usage_logs, login_history, signature_audit_log, import_logs
+### 4. Fix `EmailView.tsx` -- allow re-hydration of failed emails
 
-**Outros:**
-- award_entries, meetings, meeting_participants, conversations, conversation_messages, conversation_participants, call_signals, upsell_engine_config, upsell_engine_weights, upsell_monetization_logs, intelligence_process_history, promotion_expiration_logs
+Change the `hasBody` check so that emails with placeholder error text like `"(Conteúdo não disponível no servidor)"` are retried:
+- Check if `body_text` starts with `"("` and `body_fetched_at` is set -- treat as failed and allow retry
+- Add a manual "Retry" button for failed hydrations
 
-### Alterações Técnicas
+### Files to modify
 
-#### 1. BackupSettings.tsx - Exportação Completa
-- Criar lista completa de todas as tabelas com seus nomes amigáveis e `_type`
-- Implementar função `fetchAllFromTable()` com paginação (busca em lotes de 1000 até esgotar)
-- Reorganizar botões de exportação: manter os individuais (Leads, Clientes, Contratos) + adicionar botão "Tudo" que realmente exporta TUDO
-- Cada registro no JSON receberá `_type` com o nome da tabela
-- Mostrar progresso durante exportação completa (ex: "Exportando tabela 5 de 50...")
+| File | Change |
+|------|--------|
+| `supabase/functions/sync-imap-inbox/index.ts` | Improve Message-ID parsing; store UID from FETCH response |
+| `supabase/functions/hydrate-email/index.ts` | Add fallback SEARCH by date+from+subject when Message-ID fails; detect fake message IDs |
+| `src/components/admin/email/EmailView.tsx` | Fix hasBody check to allow re-hydration of failed emails; add retry button |
 
-#### 2. BackupImportSection.tsx - Importação Completa
-- Expandir o `ImportTarget` type para incluir todas as tabelas
-- Expandir o mapeamento no `switch/case` do `importData` para reconhecer todos os `_type` e direcionar para a tabela correta
-- Melhorar auto-detecção para mais tipos de dados
-- Adicionar todas as tabelas no Select de destino, organizadas por categoria
+### Technical Details
 
-#### 3. Paginação na Exportação
-- Função helper que faz queries em loop com `.range(from, to)` até não retornar mais dados
-- Garante que tabelas com mais de 1000 registros sejam exportadas completamente
+**hydrate-email fallback search:**
+```
+SEARCH ON 15-Mar-2026 FROM "sender@email.com"
+```
+Then iterate results to match subject if multiple hits.
 
-### Arquivos Modificados
-- `src/components/admin/settings/BackupSettings.tsx`
-- `src/components/admin/settings/BackupImportSection.tsx`
+**Detecting fake message IDs:**
+A real Message-ID contains `@` (e.g., `<abc123@mail.example.com>`). If it doesn't contain `@`, it's the auto-generated fake one.
 
-### Sem Impacto
-- Nenhuma tabela existente será alterada (sem migrations)
-- Nenhuma lógica de negócio existente será modificada
-- Apenas a UI de exportação/importação será expandida
+**EmailView re-hydration logic:**
+```ts
+const isFailedHydration = email.body_fetched_at && 
+  (email.body_text?.startsWith("(") || (!email.body_text && !email.body_html));
+const hasBody = (email.body_text || email.body_html) && !isFailedHydration;
+```
 
