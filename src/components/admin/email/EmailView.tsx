@@ -127,14 +127,11 @@ export function EmailView({ email, onBack, onReply, onForward, onUseDraftFromAI 
   }>({});
   const queryClient = useQueryClient();
 
-  // Auto-hydrate email content if missing
-  useEffect(() => {
-    const hasBody = email.body_text || email.body_html || email.body_fetched_at;
-    if (hasBody) {
-      setHydratedBody({});
-      return;
-    }
-
+  // Auto-hydrate email content if missing or previously failed
+  const isFailedHydration = !!email.body_fetched_at && 
+    (email.body_text?.startsWith("(") || (!email.body_text && !email.body_html));
+  
+  const hydrateEmail = () => {
     setIsHydrating(true);
     supabase.functions.invoke('hydrate-email', { body: { email_id: email.id } })
       .then(({ data, error }) => {
@@ -152,7 +149,16 @@ export function EmailView({ email, onBack, onReply, onForward, onUseDraftFromAI 
         }
       })
       .finally(() => setIsHydrating(false));
-  }, [email.id, email.body_text, email.body_html, email.body_fetched_at, queryClient]);
+  };
+
+  useEffect(() => {
+    const hasBody = (email.body_text || email.body_html) && !isFailedHydration;
+    if (hasBody || email.body_fetched_at && !isFailedHydration) {
+      setHydratedBody({});
+      return;
+    }
+    hydrateEmail();
+  }, [email.id]);
 
   // Use hydrated content or original
   const displayBodyText = hydratedBody.body_text || email.body_text;
@@ -437,6 +443,16 @@ export function EmailView({ email, onBack, onReply, onForward, onUseDraftFromAI 
                     <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
                     <p className="text-sm font-medium">Carregando conteúdo do email...</p>
                     <p className="text-xs">Sincronizando com o servidor de email</p>
+                  </div>
+                ) : isFailedHydration && !hydratedBody.body_text && !hydratedBody.body_html ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <MailX className="h-8 w-8 mb-3 text-muted-foreground/50" />
+                    <p className="text-sm font-medium">Conteúdo não disponível</p>
+                    <p className="text-xs mb-3">Não foi possível carregar o conteúdo deste email</p>
+                    <Button variant="outline" size="sm" className="gap-2" onClick={hydrateEmail}>
+                      <Reply className="h-3.5 w-3.5" />
+                      Tentar novamente
+                    </Button>
                   </div>
                 ) : (
                   <div className="prose prose-sm max-w-none dark:prose-invert">

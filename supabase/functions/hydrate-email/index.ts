@@ -229,14 +229,15 @@ serve(async (req) => {
     // Get email record with account info
     const { data: email, error: emailErr } = await supabase
       .from("email_inbox")
-      .select("id, message_id, folder, body_text, body_html, body_fetched_at, account_id")
+      .select("id, message_id, folder, body_text, body_html, body_fetched_at, account_id, from_email, subject, received_at, imap_uid")
       .eq("id", email_id)
       .single();
 
     if (emailErr || !email) throw new Error("Email not found");
 
-    // Already hydrated?
-    if (email.body_fetched_at && (email.body_text || email.body_html)) {
+    // Already hydrated? (but allow retry if body is an error placeholder)
+    const isFailedPlaceholder = email.body_text?.startsWith("(") && !email.body_html;
+    if (email.body_fetched_at && (email.body_text || email.body_html) && !isFailedPlaceholder) {
       return new Response(
         JSON.stringify({ success: true, already_hydrated: true }),
         { headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -299,16 +300,59 @@ serve(async (req) => {
       );
     }
 
-    // Search by Message-ID
-    const searchResp = await sendCmd(
-      conn, "H003",
-      `SEARCH HEADER MESSAGE-ID "${email.message_id}"`
-    );
-    const searchMatch = searchResp.match(/\* SEARCH\s+([\d\s]+)/);
-
-    if (!searchMatch || !searchMatch[1].trim()) {
+    // Search strategy: try Message-ID first, then fallback to date+from
+    let seqNum: string | null = null;
+    const hasRealMessageId = email.message_id && email.message_id.includes("@");
+    
+    // Strategy 1: If we have an IMAP UID stored, use FETCH directly
+    if (email.imap_uid) {
+      console.log(`Trying stored IMAP UID: ${email.imap_uid}`);
+      // UID might have changed, but try it
+      seqNum = String(email.imap_uid);
+    }
+    
+    // Strategy 2: Search by Message-ID (only if real)
+    if (!seqNum && hasRealMessageId) {
+      console.log(`Searching by Message-ID: ${email.message_id}`);
+      const searchResp = await sendCmd(
+        conn, "H003",
+        `SEARCH HEADER MESSAGE-ID "${email.message_id}"`
+      );
+      const searchMatch = searchResp.match(/\* SEARCH\s+([\d\s]+)/);
+      if (searchMatch && searchMatch[1].trim()) {
+        seqNum = searchMatch[1].trim().split(/\s+/)[0];
+        console.log(`Found by Message-ID at seq ${seqNum}`);
+      }
+    }
+    
+    // Strategy 3: Fallback search by date + from
+    if (!seqNum) {
+      console.log("Falling back to date+from search");
+      const receivedDate = email.received_at ? new Date(email.received_at) : null;
+      if (receivedDate && email.from_email) {
+        const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        const imapDate = `${receivedDate.getDate()}-${months[receivedDate.getMonth()]}-${receivedDate.getFullYear()}`;
+        
+        // Extract just the email address part
+        const fromEmail = email.from_email.replace(/.*</, "").replace(/>.*/, "").trim();
+        
+        const fallbackResp = await sendCmd(
+          conn, "H003F",
+          `SEARCH ON ${imapDate} FROM "${fromEmail}"`
+        );
+        const fallbackMatch = fallbackResp.match(/\* SEARCH\s+([\d\s]+)/);
+        if (fallbackMatch && fallbackMatch[1].trim()) {
+          const candidates = fallbackMatch[1].trim().split(/\s+/);
+          // Use the last match (most recent) if multiple
+          seqNum = candidates[candidates.length - 1];
+          console.log(`Found by date+from fallback at seq ${seqNum} (${candidates.length} candidates)`);
+        }
+      }
+    }
+    
+    if (!seqNum) {
       conn.close();
-      console.log("Message not found on server for ID:", email.message_id);
+      console.log("Message not found on server after all strategies");
       await supabase.from("email_inbox").update({
         body_fetched_at: new Date().toISOString(),
         body_text: "(Conteúdo não disponível no servidor)",
@@ -318,8 +362,6 @@ serve(async (req) => {
         { headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
-
-    const seqNum = searchMatch[1].trim().split(/\s+/)[0];
     console.log(`Found message at sequence ${seqNum}, fetching body...`);
 
     // Fetch full message (60s timeout for large messages)
