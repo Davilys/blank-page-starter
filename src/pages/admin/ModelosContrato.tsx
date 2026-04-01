@@ -8,8 +8,9 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   FileStack, Plus, RefreshCw, Edit, Trash2, Copy, Eye, Upload, Download,
   Search, FileText, CheckCircle2, XCircle, Layers, Braces, Sparkles,
-  TrendingUp, Clock, Filter, FileJson
+  TrendingUp, Clock, Filter, FileJson, Printer
 } from 'lucide-react';
+import { downloadUnifiedContractPDF } from '@/hooks/useUnifiedContractDownload';
 import { toast } from 'sonner';
 import { TemplateUploader } from '@/components/admin/contracts/TemplateUploader';
 import { ContractRenderer } from '@/components/contracts/ContractRenderer';
