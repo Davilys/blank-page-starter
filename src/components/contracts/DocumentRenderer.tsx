@@ -450,7 +450,7 @@ function buildBlockchainCertificationHtml(sig: BlockchainSignature, verification
   <div style="margin-top:32px;page-break-inside:avoid;">
     <div style="text-align:center;padding:16px 0;border-top:1px solid #e5e7eb;font-size:10px;color:#6b7280;">
       <p>Contrato gerado e assinado eletronicamente pelo sistema WebMarcas</p>
-      <p>www.webmarcas.net | juridico@webmarcas.net</p>
+      <p>www.webpatentes.com.br | juridico@webpatentes.com.br</p>
       <p>Data e hora da geração: ${new Date().toLocaleString('pt-BR')}</p>
     </div>
     <div style="height:4px;background:#0284c7;margin:16px 0;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>
