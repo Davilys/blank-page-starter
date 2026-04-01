@@ -252,8 +252,8 @@ export function DocumentRenderer({
       <div className="bg-white p-6 border-b">
         <div className="flex items-center justify-between pb-3">
           <img src={webmarcasLogo} alt="WebMarcas" className="h-12 object-contain" onError={(e) => { e.currentTarget.src = WEBMARCAS_LOGO_FALLBACK; }} />
-          <a href="https://www.webmarcas.net" className="text-sm font-medium" style={{ color: '#0EA5E9' }}>
-            www.webmarcas.net
+          <a href="https://www.webpatentes.com.br" className="text-sm font-medium" style={{ color: '#0EA5E9' }}>
+            www.webpatentes.com.br
           </a>
         </div>
         <div className="h-2 w-full rounded-sm" style={{ background: 'linear-gradient(90deg, #f97316, #fbbf24)' }} />
