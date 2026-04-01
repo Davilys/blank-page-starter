@@ -239,7 +239,7 @@ export function generateSignedContractHtml(
       <!-- Footer before certification -->
       <div style="text-align: center; padding: 16px 0; border-top: 1px solid #e5e7eb; font-size: 10px; color: #6b7280;">
         <p>Contrato gerado e assinado eletronicamente pelo sistema WebMarcas</p>
-        <p>www.webmarcas.net | juridico@webmarcas.net</p>
+        <p>www.webpatentes.com.br | juridico@webpatentes.com.br</p>
         <p>Data e hora da geração: ${new Date().toLocaleString('pt-BR')}</p>
       </div>
       
@@ -465,7 +465,7 @@ export function generateSignedContractHtml(
 <body>
   <div class="header">
     <span class="header-logo">WebMarcas</span>
-    <span class="header-url">www.webmarcas.net</span>
+    <span class="header-url">www.webpatentes.com.br</span>
   </div>
   
   <div class="gradient-bar"></div>
@@ -508,7 +508,7 @@ export function generateSignedContractHtml(
   
   <div class="footer">
     <p>Contrato gerado e assinado eletronicamente pelo sistema WebMarcas</p>
-    <p>www.webmarcas.net | contato@webmarcas.net</p>
+    <p>www.webpatentes.com.br | contato@webpatentes.com.br</p>
   </div>
 </body>
 </html>`;

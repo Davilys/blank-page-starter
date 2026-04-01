@@ -132,7 +132,7 @@ function generateContractHTML(
       <!-- Footer before certification -->
       <div class="pdf-footer">
         <p>Contrato gerado e assinado eletronicamente pelo sistema WebMarcas</p>
-        <p>www.webmarcas.net | juridico@webmarcas.net</p>
+        <p>www.webpatentes.com.br | juridico@webpatentes.com.br</p>
         <p>Data e hora da geração: ${new Date().toLocaleString('pt-BR')}</p>
       </div>
       
@@ -458,7 +458,7 @@ function generateContractHTML(
   <!-- Header with Logo and URL -->
   <div class="pdf-header">
     <img src="${logoBase64}" alt="WebMarcas" />
-    <span class="pdf-header-url">www.webmarcas.net</span>
+    <span class="pdf-header-url">www.webpatentes.com.br</span>
   </div>
   
   <!-- Orange/Yellow Gradient Bar -->

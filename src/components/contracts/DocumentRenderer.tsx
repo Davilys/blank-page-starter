@@ -6,13 +6,13 @@ import { ContractRenderer } from '@/components/contracts/ContractRenderer';
 
 // Função para gerar URL de verificação dinâmica baseada no domínio atual
 const getVerificationUrl = (hash: string) => {
-  const base = typeof window !== 'undefined' ? window.location.origin : 'https://webmarcas.net';
+  const base = typeof window !== 'undefined' ? window.location.origin : 'https://webpatentes.com.br';
   return `${base}/verificar-contrato?hash=${hash}`;
 };
 
 // Função para obter o host atual para exibição
 const getCurrentHost = () => {
-  return typeof window !== 'undefined' ? window.location.host : 'webmarcas.net';
+  return typeof window !== 'undefined' ? window.location.host : 'webpatentes.com.br';
 };
 
 interface BlockchainSignature {
@@ -252,8 +252,8 @@ export function DocumentRenderer({
       <div className="bg-white p-6 border-b">
         <div className="flex items-center justify-between pb-3">
           <img src={webmarcasLogo} alt="WebMarcas" className="h-12 object-contain" onError={(e) => { e.currentTarget.src = WEBMARCAS_LOGO_FALLBACK; }} />
-          <a href="https://www.webmarcas.net" className="text-sm font-medium" style={{ color: '#0EA5E9' }}>
-            www.webmarcas.net
+          <a href="https://www.webpatentes.com.br" className="text-sm font-medium" style={{ color: '#0EA5E9' }}>
+            www.webpatentes.com.br
           </a>
         </div>
         <div className="h-2 w-full rounded-sm" style={{ background: 'linear-gradient(90deg, #f97316, #fbbf24)' }} />
@@ -395,7 +395,7 @@ export function DocumentRenderer({
       <div className="bg-gray-100 px-8 py-4 border-t text-center text-xs text-gray-500">
         <p>WebMarcas Intelligence PI - CNPJ: 39.528.012/0001-29</p>
         <p>Av. Brigadeiro Luís Antônio, 2696 - São Paulo - SP, CEP: 01402-000</p>
-        <p>Tel: (11) 91112-0225 | juridico@webmarcas.net</p>
+        <p>Tel: (11) 91112-0225 | juridico@webpatentes.com.br</p>
       </div>
     </div>
   );
@@ -450,7 +450,7 @@ function buildBlockchainCertificationHtml(sig: BlockchainSignature, verification
   <div style="margin-top:32px;page-break-inside:avoid;">
     <div style="text-align:center;padding:16px 0;border-top:1px solid #e5e7eb;font-size:10px;color:#6b7280;">
       <p>Contrato gerado e assinado eletronicamente pelo sistema WebMarcas</p>
-      <p>www.webmarcas.net | juridico@webmarcas.net</p>
+      <p>www.webpatentes.com.br | juridico@webpatentes.com.br</p>
       <p>Data e hora da geração: ${new Date().toLocaleString('pt-BR')}</p>
     </div>
     <div style="height:4px;background:#0284c7;margin:16px 0;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>
@@ -497,7 +497,7 @@ export function generateDocumentPrintHTML(
   baseUrl?: string,
   logoBase64?: string
 ): string {
-  const verificationBase = baseUrl || (typeof window !== 'undefined' ? window.location.origin : 'https://webmarcas.net');
+  const verificationBase = baseUrl || (typeof window !== 'undefined' ? window.location.origin : 'https://webpatentes.com.br');
 
   // Se for um HTML completo salvo, injetar a seção de certificação se o contrato estiver assinado
   const trimmed = content.trim();
@@ -619,7 +619,7 @@ export function generateDocumentPrintHTML(
 <body>
   <div class="header">
     <img src="${logoSrc}" alt="WebMarcas" class="header-logo" />
-    <span class="header-url">www.webmarcas.net</span>
+    <span class="header-url">www.webpatentes.com.br</span>
   </div>
   <div class="gradient-bar"></div>
   ${headerSection}
@@ -661,7 +661,7 @@ export function generateDocumentPrintHTML(
   ${blockchainSignature?.hash ? buildBlockchainCertificationHtml(blockchainSignature, verificationBase) : `
   <div class="footer">
     <p>WebMarcas Intelligence PI - CNPJ: 39.528.012/0001-29</p>
-    <p>Av. Brigadeiro Luís Antônio, 2696 - São Paulo - SP | Tel: (11) 91112-0225 | juridico@webmarcas.net</p>
+    <p>Av. Brigadeiro Luís Antônio, 2696 - São Paulo - SP | Tel: (11) 91112-0225 | juridico@webpatentes.com.br</p>
   </div>
   `}
 </body>

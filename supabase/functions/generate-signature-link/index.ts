@@ -28,7 +28,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Production domain — always use this to avoid broken links from preview environments
-    const PRODUCTION_DOMAIN = 'https://webmarcas.net';
+    const PRODUCTION_DOMAIN = 'https://webpatentes.com.br';
 
     // Determine base URL with multiple safeguards:
     // 1. Use SITE_URL only if it's NOT a preview/lovable domain (admin may have misconfigured it)
