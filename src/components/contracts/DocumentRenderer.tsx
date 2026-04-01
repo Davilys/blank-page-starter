@@ -497,7 +497,7 @@ export function generateDocumentPrintHTML(
   baseUrl?: string,
   logoBase64?: string
 ): string {
-  const verificationBase = baseUrl || (typeof window !== 'undefined' ? window.location.origin : 'https://webmarcas.net');
+  const verificationBase = baseUrl || (typeof window !== 'undefined' ? window.location.origin : 'https://webpatentes.com.br');
 
   // Se for um HTML completo salvo, injetar a seção de certificação se o contrato estiver assinado
   const trimmed = content.trim();
