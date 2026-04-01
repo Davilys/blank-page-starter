@@ -661,7 +661,7 @@ export function generateDocumentPrintHTML(
   ${blockchainSignature?.hash ? buildBlockchainCertificationHtml(blockchainSignature, verificationBase) : `
   <div class="footer">
     <p>WebMarcas Intelligence PI - CNPJ: 39.528.012/0001-29</p>
-    <p>Av. Brigadeiro Luís Antônio, 2696 - São Paulo - SP | Tel: (11) 91112-0225 | juridico@webmarcas.net</p>
+    <p>Av. Brigadeiro Luís Antônio, 2696 - São Paulo - SP | Tel: (11) 91112-0225 | juridico@webpatentes.com.br</p>
   </div>
   `}
 </body>

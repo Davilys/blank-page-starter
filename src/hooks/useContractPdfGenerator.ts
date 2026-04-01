@@ -50,7 +50,7 @@ export async function generateContractPDF(
   // Add website URL
   pdf.setFontSize(10);
   pdf.setTextColor(2, 132, 199); // Blue color
-  pdf.text('www.webmarcas.net', pageWidth - margin, yPosition + 10, { align: 'right' });
+  pdf.text('www.webpatentes.com.br', pageWidth - margin, yPosition + 10, { align: 'right' });
 
   yPosition += 20;
 

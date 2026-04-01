@@ -508,7 +508,7 @@ export function generateSignedContractHtml(
   
   <div class="footer">
     <p>Contrato gerado e assinado eletronicamente pelo sistema WebMarcas</p>
-    <p>www.webmarcas.net | contato@webmarcas.net</p>
+    <p>www.webpatentes.com.br | contato@webpatentes.com.br</p>
   </div>
 </body>
 </html>`;

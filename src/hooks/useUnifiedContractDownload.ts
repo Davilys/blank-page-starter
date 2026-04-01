@@ -458,7 +458,7 @@ function generateContractHTML(
   <!-- Header with Logo and URL -->
   <div class="pdf-header">
     <img src="${logoBase64}" alt="WebMarcas" />
-    <span class="pdf-header-url">www.webmarcas.net</span>
+    <span class="pdf-header-url">www.webpatentes.com.br</span>
   </div>
   
   <!-- Orange/Yellow Gradient Bar -->
