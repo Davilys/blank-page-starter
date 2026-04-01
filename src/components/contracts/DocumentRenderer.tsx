@@ -619,7 +619,7 @@ export function generateDocumentPrintHTML(
 <body>
   <div class="header">
     <img src="${logoSrc}" alt="WebMarcas" class="header-logo" />
-    <span class="header-url">www.webmarcas.net</span>
+    <span class="header-url">www.webpatentes.com.br</span>
   </div>
   <div class="gradient-bar"></div>
   ${headerSection}
