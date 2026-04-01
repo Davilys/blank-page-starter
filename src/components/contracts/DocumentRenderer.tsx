@@ -12,7 +12,7 @@ const getVerificationUrl = (hash: string) => {
 
 // Função para obter o host atual para exibição
 const getCurrentHost = () => {
-  return typeof window !== 'undefined' ? window.location.host : 'webmarcas.net';
+  return typeof window !== 'undefined' ? window.location.host : 'webpatentes.com.br';
 };
 
 interface BlockchainSignature {
