@@ -465,7 +465,7 @@ export function generateSignedContractHtml(
 <body>
   <div class="header">
     <span class="header-logo">WebMarcas</span>
-    <span class="header-url">www.webmarcas.net</span>
+    <span class="header-url">www.webpatentes.com.br</span>
   </div>
   
   <div class="gradient-bar"></div>
