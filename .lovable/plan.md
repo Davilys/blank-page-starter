@@ -1,22 +1,28 @@
 
 
-## Fix: Missing `suggested_classes` column on `contracts` table
+## Corrigir apenas os fallbacks de domínio: `webmarcas.net` → `webpatentes.com.br`
 
-### Problem
-The `CreateContractDialog` and other components reference a `suggested_classes` column on the `contracts` table, but this column doesn't exist in the database schema. This causes the error: `"Could not find the 'suggested_classes' column of 'contracts' in the schema cache"`.
+### Escopo reduzido (mudança provisória)
 
-### Solution
-Add a database migration to create the missing column:
+Alterar **apenas** as constantes de fallback/produção, sem tocar em textos de template ou emails.
 
-```sql
-ALTER TABLE public.contracts 
-ADD COLUMN suggested_classes jsonb DEFAULT NULL;
-```
+### Arquivos e alterações
 
-This is a single migration — no code changes needed since the frontend already references this column correctly.
+1. **`supabase/functions/generate-signature-link/index.ts`** (linha 37)
+   - `PRODUCTION_DOMAIN = 'https://webmarcas.net'` → `'https://webpatentes.com.br'`
 
-### Technical Details
-- Column type: `jsonb` (stores objects like `{ classes: [1,2], descriptions: [...], selected: [1] }`)
-- Nullable, default `NULL`
-- Used by: `CreateContractDialog`, `AssinarDocumento`, `create-asaas-payment` edge function, `get-contract-by-token` edge function
+2. **`src/hooks/useContractPdfGenerator.ts`**
+   - Footer: `www.webmarcas.net` → `www.webpatentes.com.br`
+   - Footer email: `juridico@webmarcas.net` → `juridico@webpatentes.com.br`
+
+3. **`src/components/contracts/ContractRenderer.tsx`**
+   - Fallback URL no header/footer → `webpatentes.com.br`
+
+4. **`src/components/contracts/DocumentRenderer.tsx`**
+   - Fallback URL de verificação → `webpatentes.com.br`
+
+5. **`src/hooks/useUnifiedContractDownload.ts`** e **`src/hooks/useContractPdfUpload.ts`**
+   - Apenas URLs de fallback no header/footer do PDF
+
+Somente domínios em URLs e emails de rodapé. Nome "WebMarcas" permanece intacto.
 
