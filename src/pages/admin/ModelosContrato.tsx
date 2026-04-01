@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   FileStack, Plus, RefreshCw, Edit, Trash2, Copy, Eye, Upload, Download,
   Search, FileText, CheckCircle2, XCircle, Layers, Braces, Sparkles,
-  TrendingUp, Clock, Filter, FileJson
+  TrendingUp, Clock, Filter, FileJson, Printer
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { TemplateUploader } from '@/components/admin/contracts/TemplateUploader';
@@ -136,6 +136,7 @@ function TemplateCard({
   onDuplicate,
   onDelete,
   onToggleActive,
+  onPrintMinuta,
 }: {
   template: ContractTemplate;
   index: number;
@@ -144,6 +145,7 @@ function TemplateCard({
   onDuplicate: (t: ContractTemplate) => void;
   onDelete: (id: string) => void;
   onToggleActive: (t: ContractTemplate) => void;
+  onPrintMinuta: (t: ContractTemplate) => void;
 }) {
   const vars = Array.isArray(template.variables) ? template.variables as string[] : [];
   const docType = getDocumentType(template.name);
@@ -253,7 +255,7 @@ function TemplateCard({
         </div>
 
         {/* Actions */}
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-5 gap-1.5">
           <Button
             variant="outline"
             size="sm"
@@ -266,22 +268,30 @@ function TemplateCard({
           <Button
             variant="outline"
             size="sm"
-            className="h-8 text-xs gap-1"
+            className="h-8 text-xs"
             onClick={() => onPreview(template)}
+            title="Visualizar"
           >
             <Eye className="h-3.5 w-3.5" />
           </Button>
-          <div className="flex gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1 h-8 text-xs"
-              onClick={() => onDuplicate(template)}
-              title="Duplicar"
-            >
-              <Copy className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => onPrintMinuta(template)}
+            title="Imprimir Minuta"
+          >
+            <Printer className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => onDuplicate(template)}
+            title="Duplicar"
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </Button>
         </div>
         <Button
           variant="ghost"
@@ -372,6 +382,175 @@ export default function ModelosContrato() {
     setPreviewData({ content: renderPreviewContent(t.content), name: t.name });
     setPreviewOpen(true);
   };
+
+  const handlePrintMinuta = async (t: ContractTemplate) => {
+    try {
+      const previewContent = renderPreviewContent(t.content);
+      const docType = getDocumentType(t.name);
+      
+      // Import logo
+      const logoModule = await import('@/assets/webmarcas-logo-new.png');
+      const logoUrl = logoModule.default;
+      const response = await fetch(logoUrl);
+      const blob = await response.blob();
+      const logoBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Failed'));
+        reader.readAsDataURL(blob);
+      });
+
+      // Format content
+      const formatContent = (text: string): string => {
+        const lines = text.split('\n');
+        return lines.map(line => {
+          const trimmed = line.trim();
+          if (!trimmed) return '<div style="height: 12px;"></div>';
+          if (/^\d+\.\s*CLÁUSULA/.test(trimmed)) return `<h2 style="font-weight: bold; font-size: 12px; color: #0284c7; margin-top: 20px; margin-bottom: 8px;">${trimmed}</h2>`;
+          if (/^\d+\.\d+\s/.test(trimmed)) return `<p style="font-size: 11px; color: #1f2937; margin-bottom: 8px; padding-left: 16px;">${trimmed}</p>`;
+          if (/^[a-z]\)/.test(trimmed)) return `<p style="font-size: 11px; color: #1f2937; margin-bottom: 4px; padding-left: 32px;">${trimmed}</p>`;
+          if (trimmed.startsWith('•')) return `<p style="font-size: 11px; color: #1f2937; margin-bottom: 8px; padding-left: 16px;">${trimmed}</p>`;
+          if (/^I+\)/.test(trimmed)) return `<p style="font-size: 11px; color: #1f2937; margin-bottom: 12px; font-weight: 500;">${trimmed}</p>`;
+          if (trimmed.match(/^_+$/)) return '';
+          if (trimmed === 'CONTRATADA:' || trimmed === 'CONTRATANTE:') return `<p style="font-size: 11px; font-weight: bold; text-align: center; color: #1f2937; margin-top: 24px; margin-bottom: 4px;">${trimmed}</p>`;
+          if (trimmed.startsWith('São Paulo,')) return `<p style="font-size: 11px; color: #1f2937; margin-top: 24px; margin-bottom: 24px;">${trimmed}</p>`;
+          if (/^[A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s]+$/.test(trimmed) && trimmed.length > 3) return `<p style="font-size: 10px; text-align: center; color: #1f2937; font-weight: 600; margin-bottom: 4px;">${trimmed}</p>`;
+          return `<p style="font-size: 11px; color: #1f2937; margin-bottom: 12px; line-height: 1.6;">${trimmed}</p>`;
+        }).join('\n');
+      };
+
+      const contractTitle = t.name.toUpperCase();
+
+      const minutaHtml = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=210mm, initial-scale=1.0">
+  <title>MINUTA - ${t.name}</title>
+  <style>
+    @page { size: A4; margin: 20mm; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 210mm; min-height: 297mm; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #1f2937; background: white; padding: 30px; font-size: 11px; max-width: 210mm; margin: 0 auto; position: relative; }
+    
+    /* Watermark */
+    .watermark {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%, -50%) rotate(-45deg);
+      font-size: 120px; font-weight: 900;
+      color: rgba(239, 68, 68, 0.08);
+      letter-spacing: 20px; z-index: 0;
+      pointer-events: none; white-space: nowrap;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    
+    /* Badge */
+    .minuta-badge {
+      position: fixed; top: 12px; left: 50%;
+      transform: translateX(-50%);
+      background: #dc2626; color: white;
+      padding: 6px 24px; border-radius: 4px;
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 1px; z-index: 10;
+      border: 2px solid #b91c1c;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    
+    .pdf-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; margin-top: 30px; }
+    .pdf-header img { height: 48px; width: auto; object-fit: contain; }
+    .pdf-header-url { color: #0284c7; font-weight: 600; font-size: 14px; }
+    .pdf-gradient-bar { height: 8px; width: 100%; background: linear-gradient(90deg, #f97316, #fbbf24); border-radius: 3px; margin-bottom: 24px; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .pdf-main-title { text-align: center; color: #0284c7; font-size: 20px; font-weight: bold; margin-bottom: 16px; text-decoration: underline; }
+    .pdf-contract-title-box { background-color: #1e3a5f; color: white; text-align: center; padding: 14px 20px; border-radius: 6px; margin-bottom: 16px; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .pdf-contract-title-box p { font-weight: 600; font-size: 12px; line-height: 1.5; color: white; }
+    .pdf-highlight-box { background-color: #FEF9E7; border-left: 4px solid #F59E0B; padding: 16px; margin-bottom: 24px; color: #374151; font-size: 11px; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .pdf-content { margin-top: 16px; position: relative; z-index: 1; }
+    .pdf-footer { margin-top: 32px; border-top: 1px solid #e5e7eb; padding-top: 16px; text-align: center; color: #6b7280; font-size: 9px; }
+    
+    @media print {
+      .no-print { display: none !important; }
+      .watermark { position: fixed; }
+      .minuta-badge { position: fixed; }
+    }
+    
+    .save-pdf-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; gap: 8px; }
+    .save-pdf-btn { background: linear-gradient(135deg, #0284c7, #0369a1); color: white; padding: 12px 24px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3); display: flex; align-items: center; gap: 8px; }
+    .save-pdf-btn:hover { transform: translateY(-2px); }
+    .close-btn { background: #6b7280; color: white; padding: 12px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <!-- Watermark -->
+  <div class="watermark">MINUTA</div>
+  
+  <!-- Badge -->
+  <div class="minuta-badge">⚠ DOCUMENTO SEM VALOR JURÍDICO — APENAS MINUTA</div>
+
+  <!-- Floating buttons -->
+  <div class="save-pdf-container no-print">
+    <button class="save-pdf-btn" onclick="window.print()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Salvar como PDF
+    </button>
+    <button class="close-btn" onclick="window.close()">Fechar</button>
+  </div>
+
+  <!-- Header -->
+  <div class="pdf-header">
+    <img src="${logoBase64}" alt="WebMarcas" />
+    <span class="pdf-header-url">www.webpatentes.com.br</span>
+  </div>
+  
+  <div class="pdf-gradient-bar"></div>
+
+  ${docType === 'procuracao' ? `
+  <h1 class="pdf-main-title">PROCURAÇÃO PARA REPRESENTAÇÃO JUNTO AO INPI</h1>
+  <p style="text-align: center; color: #4B5563; font-size: 14px; font-style: italic; margin-bottom: 24px;">Instrumento Particular de Procuração para fins de Registro de Marca</p>
+  <div class="pdf-highlight-box">
+    <p>Pelo presente instrumento particular de PROCURAÇÃO, o(a) outorgante abaixo identificado(a) nomeia e constitui como seu bastante PROCURADOR...</p>
+  </div>
+  ` : `
+  <h1 class="pdf-main-title" style="text-decoration: underline;">CONTRATO</h1>
+  <div class="pdf-contract-title-box">
+    <p>${contractTitle}</p>
+  </div>
+  <div class="pdf-highlight-box">
+    <p style="margin-bottom: 8px;">Os termos deste instrumento aplicam-se apenas a contratações com negociações personalizadas, tratadas diretamente com a equipe comercial da WebMarcas Intelligence PI.</p>
+    <p>Os termos aqui celebrados são adicionais ao "Contrato de Prestação de Serviços e Gestão de Pagamentos e Outras Avenças" com aceite integral no momento do envio da Proposta.</p>
+  </div>
+  `}
+  
+  <div class="pdf-content">
+    ${formatContent(previewContent)}
+  </div>
+  
+  <div class="pdf-footer">
+    <p>MINUTA — Documento sem valor jurídico, gerado apenas para fins de análise e revisão</p>
+    <p>WebMarcas Intelligence PI | www.webpatentes.com.br</p>
+    <p>Gerado em: ${new Date().toLocaleString('pt-BR')}</p>
+  </div>
+</body>
+</html>`;
+
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        toast.error('Não foi possível abrir a janela de impressão.');
+        return;
+      }
+      printWindow.document.write(minutaHtml);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 500);
+      };
+    } catch (err) {
+      console.error('Erro ao imprimir minuta:', err);
+      toast.error('Erro ao gerar minuta para impressão');
+    }
+  };
+
 
   const handleEdit = (t: ContractTemplate) => {
     setEditingTemplate(t);
@@ -648,6 +827,7 @@ export default function ModelosContrato() {
                   onDuplicate={handleDuplicate}
                   onDelete={handleDelete}
                   onToggleActive={handleToggleActive}
+                  onPrintMinuta={handlePrintMinuta}
                 />
               ))}
             </div>
