@@ -395,7 +395,7 @@ export function DocumentRenderer({
       <div className="bg-gray-100 px-8 py-4 border-t text-center text-xs text-gray-500">
         <p>WebMarcas Intelligence PI - CNPJ: 39.528.012/0001-29</p>
         <p>Av. Brigadeiro Luís Antônio, 2696 - São Paulo - SP, CEP: 01402-000</p>
-        <p>Tel: (11) 91112-0225 | juridico@webmarcas.net</p>
+        <p>Tel: (11) 91112-0225 | juridico@webpatentes.com.br</p>
       </div>
     </div>
   );
