@@ -6,7 +6,7 @@ import { ContractRenderer } from '@/components/contracts/ContractRenderer';
 
 // Função para gerar URL de verificação dinâmica baseada no domínio atual
 const getVerificationUrl = (hash: string) => {
-  const base = typeof window !== 'undefined' ? window.location.origin : 'https://webmarcas.net';
+  const base = typeof window !== 'undefined' ? window.location.origin : 'https://webpatentes.com.br';
   return `${base}/verificar-contrato?hash=${hash}`;
 };
 
