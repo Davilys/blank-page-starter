@@ -553,6 +553,7 @@ export default function ModelosContrato() {
   };
 
 
+  const handleEdit = (t: ContractTemplate) => {
     setEditingTemplate(t);
     setEditorOpen(true);
   };
