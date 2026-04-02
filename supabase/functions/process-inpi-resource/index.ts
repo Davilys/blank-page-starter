@@ -152,7 +152,9 @@ function buildMandatoryOpeningBlock(
     : 'N/I';
   const nclClass = data.ncl_class || 'N/I';
   const holder = data.holder || 'N/I';
-  const opponent = data.examiner_or_opponent || 'N/I';
+  const examinerOrOpponent = data.examiner_or_opponent || 'N/I';
+  const isOposicao = /OPOSIÇÃO/i.test(resourceTypeLabel);
+  const personLabel = isOposicao ? 'Oponente' : 'Examinador(a)';
 
   return `RECURSO ADMINISTRATIVO – ${resourceTypeLabel}
 
@@ -166,7 +168,7 @@ Processo INPI nº: ${processNum}
 Marca: ${brandLine}
 Classe NCL (12ª Ed.): ${nclClass}
 Titular/Requerente: ${holder}
-Oponente: ${opponent}
+${personLabel}: ${examinerOrOpponent}
 Procurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79`;
 }
 
@@ -232,7 +234,7 @@ function enrichExtractedData(
     if (m) enriched.holder = m[1].trim();
   }
   if (!enriched.examiner_or_opponent || enriched.examiner_or_opponent === 'N/I') {
-    const m = content.match(/(?:Oponente|Citante)[^:]*:\s*([^\n]+)/i);
+    const m = content.match(/(?:Oponente|Citante|Examinador(?:a)?)[^:]*:\s*([^\n]+)/i);
     if (m) enriched.examiner_or_opponent = m[1].trim();
   }
   return enriched;
@@ -616,7 +618,7 @@ function buildExtractionPrompt(): string {
   "brand_name": "nome da marca",
   "ncl_class": "classe NCL com descrição",
   "holder": "nome do titular/requerente",
-  "examiner_or_opponent": "oponente ou examinador identificado",
+  "examiner_or_opponent": "Se for oposição: nome do oponente. Se for indeferimento ou exigência de mérito: nome do(a) examinador(a) do INPI que assinou a decisão. Se for notificação extrajudicial: nome do notificado.",
   "legal_basis": "fundamento legal usado pelo INPI na decisão"
 }`;
 }
