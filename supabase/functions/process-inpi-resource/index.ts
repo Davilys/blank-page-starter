@@ -23,7 +23,8 @@ async function callOpenAI(
   apiKey: string,
   systemPrompt: string,
   userParts: any[],
-  maxTokens: number = 16000
+  maxTokens: number = 16000,
+  temperature?: number
 ): Promise<{ content: string; error?: string; status?: number }> {
   const inputMessages = [
     { role: 'system', content: systemPrompt },
@@ -40,6 +41,7 @@ async function callOpenAI(
       model: 'gpt-4o-2024-11-20',
       input: inputMessages,
       max_output_tokens: maxTokens,
+      ...(typeof temperature === 'number' ? { temperature } : {}),
     }),
   });
 
