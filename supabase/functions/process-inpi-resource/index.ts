@@ -234,7 +234,7 @@ function enrichExtractedData(
     if (m) enriched.holder = m[1].trim();
   }
   if (!enriched.examiner_or_opponent || enriched.examiner_or_opponent === 'N/I') {
-    const m = content.match(/(?:Oponente|Citante)[^:]*:\s*([^\n]+)/i);
+    const m = content.match(/(?:Oponente|Citante|Examinador(?:a)?)[^:]*:\s*([^\n]+)/i);
     if (m) enriched.examiner_or_opponent = m[1].trim();
   }
   return enriched;
