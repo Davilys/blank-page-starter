@@ -152,7 +152,9 @@ function buildMandatoryOpeningBlock(
     : 'N/I';
   const nclClass = data.ncl_class || 'N/I';
   const holder = data.holder || 'N/I';
-  const opponent = data.examiner_or_opponent || 'N/I';
+  const examinerOrOpponent = data.examiner_or_opponent || 'N/I';
+  const isOposicao = /OPOSIÇÃO/i.test(resourceTypeLabel);
+  const personLabel = isOposicao ? 'Oponente' : 'Examinador(a)';
 
   return `RECURSO ADMINISTRATIVO – ${resourceTypeLabel}
 
@@ -166,7 +168,7 @@ Processo INPI nº: ${processNum}
 Marca: ${brandLine}
 Classe NCL (12ª Ed.): ${nclClass}
 Titular/Requerente: ${holder}
-Oponente: ${opponent}
+${personLabel}: ${examinerOrOpponent}
 Procurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79`;
 }
 

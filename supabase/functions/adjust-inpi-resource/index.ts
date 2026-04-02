@@ -173,9 +173,11 @@ INSTRUÇÕES FINAIS:
       const brandLine = d.brand_name || 'N/I';
       const nclClass = d.ncl_class || 'N/I';
       const holder = d.holder || 'N/I';
-      const opponent = d.examiner_or_opponent || 'N/I';
+      const examinerOrOpponent = d.examiner_or_opponent || 'N/I';
+      const isOposicao = resourceType === 'oposicao';
+      const personLabel = isOposicao ? 'Oponente' : 'Examinador(a)';
 
-      const header = `RECURSO ADMINISTRATIVO – ${label}\n\nMARCA: ${brandUpper}\n\nEXCELENTÍSSIMO SENHOR PRESIDENTE DA DIRETORIA DE MARCAS,\nPATENTES E DESENHOS INDUSTRIAIS DO INSTITUTO NACIONAL\nDA PROPRIEDADE INDUSTRIAL – INPI\n\nProcesso INPI nº: ${processNum}\nMarca: ${brandLine}\nClasse NCL (12ª Ed.): ${nclClass}\nTitular/Requerente: ${holder}\nOponente: ${opponent}\nProcurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79`;
+      const header = `RECURSO ADMINISTRATIVO – ${label}\n\nMARCA: ${brandUpper}\n\nEXCELENTÍSSIMO SENHOR PRESIDENTE DA DIRETORIA DE MARCAS,\nPATENTES E DESENHOS INDUSTRIAIS DO INSTITUTO NACIONAL\nDA PROPRIEDADE INDUSTRIAL – INPI\n\nProcesso INPI nº: ${processNum}\nMarca: ${brandLine}\nClasse NCL (12ª Ed.): ${nclClass}\nTitular/Requerente: ${holder}\n${personLabel}: ${examinerOrOpponent}\nProcurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79`;
 
       // Find section I in adjusted content
       const sectionMatch = trimmed.match(/\n?\s*(I\s*[–—\-\.]\s*)/);
