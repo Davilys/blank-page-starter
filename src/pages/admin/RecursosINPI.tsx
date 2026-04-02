@@ -426,7 +426,9 @@ export default function RecursosINPI() {
     if (startsWithSection && !hasHeader && RESOURCE_TYPE_LABELS_UPPER[resource.resource_type]) {
       const label = RESOURCE_TYPE_LABELS_UPPER[resource.resource_type];
       const brandUpper = (data.brand_name || 'N/I').toUpperCase();
-      const header = `RECURSO ADMINISTRATIVO – ${label}\n\nMARCA: ${brandUpper}\n\nEXCELENTÍSSIMO SENHOR PRESIDENTE DA DIRETORIA DE MARCAS,\nPATENTES E DESENHOS INDUSTRIAIS DO INSTITUTO NACIONAL\nDA PROPRIEDADE INDUSTRIAL – INPI\n\nProcesso INPI nº: ${data.process_number || 'N/I'}\nMarca: ${data.brand_name || 'N/I'}\nClasse NCL (12ª Ed.): ${data.ncl_class || 'N/I'}\nTitular/Requerente: ${data.holder || 'N/I'}\nOponente: ${data.examiner_or_opponent || 'N/I'}\nProcurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79`;
+      const isOposicao = resource.resource_type === 'oposicao';
+      const personLabel = isOposicao ? 'Oponente' : 'Examinador(a)';
+      const header = `RECURSO ADMINISTRATIVO – ${label}\n\nMARCA: ${brandUpper}\n\nEXCELENTÍSSIMO SENHOR PRESIDENTE DA DIRETORIA DE MARCAS,\nPATENTES E DESENHOS INDUSTRIAIS DO INSTITUTO NACIONAL\nDA PROPRIEDADE INDUSTRIAL – INPI\n\nProcesso INPI nº: ${data.process_number || 'N/I'}\nMarca: ${data.brand_name || 'N/I'}\nClasse NCL (12ª Ed.): ${data.ncl_class || 'N/I'}\nTitular/Requerente: ${data.holder || 'N/I'}\n${personLabel}: ${data.examiner_or_opponent || 'N/I'}\nProcurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79`;
       content = `${header}\n\n${content}`;
       // Persist the fix
       supabase.from('inpi_resources').update({ draft_content: content }).eq('id', resource.id).then();
