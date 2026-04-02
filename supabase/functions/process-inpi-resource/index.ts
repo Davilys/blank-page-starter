@@ -618,7 +618,7 @@ function buildExtractionPrompt(): string {
   "brand_name": "nome da marca",
   "ncl_class": "classe NCL com descrição",
   "holder": "nome do titular/requerente",
-  "examiner_or_opponent": "oponente ou examinador identificado",
+  "examiner_or_opponent": "Se for oposição: nome do oponente. Se for indeferimento ou exigência de mérito: nome do(a) examinador(a) do INPI que assinou a decisão. Se for notificação extrajudicial: nome do notificado.",
   "legal_basis": "fundamento legal usado pelo INPI na decisão"
 }`;
 }
