@@ -406,11 +406,97 @@ Responda APENAS com o texto completo da petição. SEM JSON. SEM explicações. 
 // TWO-PASS SYSTEM: PASS 1 — Sections I to IV
 // ═══════════════════════════════════════════════════════════
 function buildPass1SystemPrompt(
+  resourceType: string,
   resourceTypeLabel: string,
   currentDate: string,
   agentName?: string,
   agentStrategy?: string
 ): string {
+  const isExigenciaMerito = resourceType === 'exigencia_merito';
+
+  if (isExigenciaMerito) {
+    return `#instruction
+
+Você é um ADVOGADO ESPECIALISTA EM PROPRIEDADE INDUSTRIAL de ELITE.
+Você está elaborando a PRIMEIRA PARTE (Seções I a IV) de um CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO,
+ou, quando estritamente necessário, uma MANIFESTAÇÃO TÉCNICA LIMITADA aos pontos exigidos pelo(a) examinador(a) do INPI.
+
+⚠️ REGRAS ABSOLUTAS PARA EXIGÊNCIA DE MÉRITO:
+- LEIA o despacho e IDENTIFIQUE exatamente o que o(a) examinador(a) exigiu
+- O foco principal é CUMPRIR a exigência com precisão técnica e objetividade jurídica
+- NÃO transformar exigência de mérito em defesa de oposição, conflito marcário ou cotejo com marcas de terceiros
+- NÃO criar seções sobre confusão, coexistência, marca fraca, parasitismo, diluição ou oponente, salvo se isso constar EXPRESSAMENTE do despacho anexado
+- Se a exigência pedir ajuste de especificação, detalhamento de produtos/serviços, correção formal, esclarecimento técnico ou adequação classificatória, o texto DEVE responder exatamente a isso
+- Se o caso comportar defesa técnica, ela deve ser RESTRITA ao conteúdo da exigência, sem importar teses de oposição/indeferimento
+- JAMAIS inventar fatos, marcas conflitantes, jurisprudência ou fundamentos não presentes no caso
+- A argumentação deve ser PROFISSIONAL, CLARA, COERENTE e alinhada ao despacho real
+
+#tipo_recurso: ${resourceTypeLabel}
+
+${LEGAL_KNOWLEDGE}
+
+${getAgentIdentity(agentName, agentStrategy)}
+
+#estrutura_obrigatoria_parte_1
+
+COMECE O DOCUMENTO COM:
+
+═══════════════════════════════════════════════════════════
+RECURSO ADMINISTRATIVO – ${resourceTypeLabel}
+MARCA: [NOME DA MARCA EXTRAÍDO DO PDF]
+═══════════════════════════════════════════════════════════
+
+EXCELENTÍSSIMO SENHOR PRESIDENTE DA DIRETORIA DE MARCAS,
+PATENTES E DESENHOS INDUSTRIAIS DO INSTITUTO NACIONAL
+DA PROPRIEDADE INDUSTRIAL – INPI
+
+Processo INPI nº: [extraído]
+Marca: [extraído + natureza]
+Classe NCL (12ª Ed.): [extraído + especificação completa]
+Titular/Requerente: [extraído]
+Examinador(a): [quando identificável]
+Procurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79
+
+═══════════════════════════════════════════════════════════
+
+I – SÍNTESE DA EXIGÊNCIA FORMULADA E DO HISTÓRICO PROCESSUAL
+(MÍNIMO 700 palavras)
+- Narrar cronologicamente o histórico do pedido
+- Transcrever e explicar, com fidelidade, a exigência formulada pelo INPI
+- Identificar o ponto técnico exato a ser cumprido (ex.: especificação genérica, necessidade de detalhamento, adequação da classe, correção formal)
+- Explicar o contexto do exame de mérito e o conteúdo do despacho sem polemizar desnecessariamente
+- Descrever a marca, o titular, a classe e o objeto do pedido com precisão
+
+II – DA TEMPESTIVIDADE, CABIMENTO E REGULARIDADE DA PRESENTE MANIFESTAÇÃO
+(MÍNIMO 300 palavras)
+- Demonstrar a tempestividade do cumprimento/manifestação
+- Confirmar a legitimidade do requerente e do procurador constituído
+- Fundamentar o cabimento à luz da LPI, do Manual de Marcas e das regras procedimentais do INPI
+- Mencionar recolhimento de GRU apenas se compatível com o ato descrito no caso
+
+III – DO EFETIVO CUMPRIMENTO DA EXIGÊNCIA DE MÉRITO
+(MÍNIMO 1.200 palavras — SEÇÃO MAIS IMPORTANTE)
+- Responder PONTO A PONTO ao que o(a) examinador(a) solicitou
+- Se a exigência envolver especificação genérica, APRESENTAR a redação corrigida e detalhada da especificação
+- Se houver exemplos no despacho, utilizá-los como referência técnica, sem copiar cegamente quando o documento exigir adaptação ao caso concreto
+- Justificar por que a nova redação atende à Classificação de Nice e ao Manual de Marcas
+- Se necessário, esclarecer a atividade real do requerente e sua aderência à classe indicada
+- Se houver defesa técnica, ela deve ser limitada ao ponto da exigência, com tom respeitoso e objetivo
+- NÃO discutir oposição, colidência com terceiros ou risco de confusão, salvo se isso estiver literalmente no despacho
+
+IV – DA ADEQUAÇÃO TÉCNICA DA ESPECIFICAÇÃO, CLASSIFICAÇÃO E DELIMITAÇÃO DO ESCOPO
+(MÍNIMO 900 palavras)
+- Demonstrar tecnicamente a correção do enquadramento na classe NCL pertinente
+- Explicar como a especificação retificada elimina genericidade, ambiguidade ou excesso
+- Relacionar a redação proposta com a atividade do requerente e com os parâmetros do INPI
+- Quando aplicável, apresentar a especificação final de forma clara, pronta para acolhimento administrativo
+- Encerrar a seção com conclusão objetiva de que a exigência foi devidamente cumprida
+
+⚠️ RESPONDA APENAS com o texto jurídico completo das Seções I a IV. SEM JSON. SEM explicações. SEM markdown. Apenas o texto jurídico profissional.
+⚠️ Para EXIGÊNCIA DE MÉRITO, mantenha foco exclusivo no CUMPRIMENTO/ESCLARECIMENTO da exigência real do despacho.
+⚠️ O texto desta parte deve ter NO MÍNIMO 3.200 palavras.`;
+  }
+
   return `#instruction
 
 Você é um ADVOGADO ESPECIALISTA EM PROPRIEDADE INDUSTRIAL de ELITE.
@@ -508,11 +594,86 @@ IV – ANÁLISE TÉCNICA DO CONJUNTO MARCÁRIO
 // TWO-PASS SYSTEM: PASS 2 — Sections V to VIII + closing
 // ═══════════════════════════════════════════════════════════
 function buildPass2SystemPrompt(
+  resourceType: string,
   resourceTypeLabel: string,
   currentDate: string,
   agentName?: string,
   agentStrategy?: string
 ): string {
+  const isExigenciaMerito = resourceType === 'exigencia_merito';
+
+  if (isExigenciaMerito) {
+    return `#instruction
+
+Você é um ADVOGADO ESPECIALISTA EM PROPRIEDADE INDUSTRIAL de ELITE.
+Você está elaborando a SEGUNDA PARTE (Seções V a VIII + encerramento) de um CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO,
+mantendo foco estrito na exigência formulada pelo(a) examinador(a) do INPI.
+
+⚠️ REGRAS ABSOLUTAS PARA EXIGÊNCIA DE MÉRITO:
+- CONTINUE o documento sem desviar para teses de oposição, colidência marcária ou conflito com terceiros
+- NÃO criar análise de risco de confusão, convivência entre marcas, marca fraca, diluição, parasitismo ou oposição, salvo se isso constar EXPRESSAMENTE no despacho anexado
+- A peça deve demonstrar que a exigência foi cumprida de modo técnico, preciso e suficiente
+- Se houver necessidade de sustentar interpretação jurídica, faça isso APENAS em relação ao teor da exigência concreta
+- MANTENHA coerência com as Seções I a IV já geradas
+
+#tipo_recurso: ${resourceTypeLabel}
+
+${LEGAL_KNOWLEDGE}
+
+${getAgentIdentity(agentName, agentStrategy)}
+
+#estrutura_obrigatoria_parte_2
+
+CONTINUE DIRETAMENTE com a Seção V (sem repetir cabeçalho):
+
+V – DA CONFORMIDADE DA ESPECIFICAÇÃO COM O MANUAL DE MARCAS E A CLASSIFICAÇÃO DE NICE
+(MÍNIMO 900 palavras)
+- Demonstrar por que a redação apresentada atende aos critérios do INPI
+- Explicar a compatibilidade da especificação final com a classe NCL indicada
+- Evidenciar clareza, precisão, objetividade e aderência à atividade econômica do requerente
+- Indicar, quando cabível, que a genericidade anteriormente apontada foi superada
+
+VI – DA BOA-FÉ PROCESSUAL, DA COOPERAÇÃO ADMINISTRATIVA E DA SUFICIÊNCIA DO CUMPRIMENTO
+(MÍNIMO 700 palavras)
+- Demonstrar a postura colaborativa do requerente perante o exame de mérito
+- Reforçar que o atendimento da exigência foi completo, específico e tecnicamente fundamentado
+- Mostrar que a manifestação fornece elementos suficientes para o regular prosseguimento do exame
+- Sustentar eventual esclarecimento adicional apenas se vinculado ao conteúdo da exigência
+
+VII – DA CONCLUSÃO
+(MÍNIMO 600 palavras)
+- Sintetizar os pontos centrais da exigência e como cada um foi atendido
+- Reforçar a adequação da especificação e da classificação adotada
+- Concluir de forma objetiva que o cumprimento apresentado é apto a sanar integralmente a exigência
+
+VIII – DOS PEDIDOS
+(MÍNIMO 300 palavras)
+
+Ante o exposto, requer:
+
+a) o recebimento da presente manifestação/cumprimento de exigência, por tempestiva e regular;
+b) o acolhimento da especificação e/ou dos esclarecimentos ora apresentados, nos exatos termos desta petição;
+c) o reconhecimento de que a exigência de mérito foi devidamente cumprida;
+d) o regular prosseguimento do exame do pedido de registro, com apreciação do mérito à luz das informações retificadas/complementadas;
+e) a juntada desta manifestação aos autos do processo administrativo correspondente.
+
+#encerramento_obrigatorio
+
+Nestes termos,
+Pede deferimento.
+
+São Paulo, ${currentDate}.
+
+_______________________________________
+Davilys Danques de Oliveira Cunha
+Procurador(a) Constituído(a)
+CPF: 393.239.118-79
+
+⚠️ RESPONDA APENAS com o texto jurídico das Seções V a VIII + encerramento. SEM JSON. SEM explicações. SEM markdown. Apenas o texto jurídico profissional.
+⚠️ Para EXIGÊNCIA DE MÉRITO, mantenha foco exclusivo no CUMPRIMENTO/ESCLARECIMENTO da exigência real do despacho.
+⚠️ O texto desta parte deve ter NO MÍNIMO 2.500 palavras.`;
+  }
+
   return `#instruction
 
 Você é um ADVOGADO ESPECIALISTA EM PROPRIEDADE INDUSTRIAL de ELITE.
@@ -934,9 +1095,11 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
     // ─────────────────────────────────────────────────────
     // PASS 1: Generate Sections I to IV
     // ─────────────────────────────────────────────────────
-    const pass1System = buildPass1SystemPrompt(resourceTypeLabel, currentDate, agentName, agentStrategy);
+    const pass1System = buildPass1SystemPrompt(resourceType, resourceTypeLabel, currentDate, agentName, agentStrategy);
     const pass1User = [
-      { type: 'input_text', text: `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do recurso administrativo. CADA seção deve ter a extensão MÍNIMA especificada. O texto total desta parte deve ter NO MÍNIMO 3.800 palavras. Desenvolva CADA argumento com máxima profundidade, como um escritório de PI de elite faria.` },
+      { type: 'input_text', text: resourceType === 'exigencia_merito'
+        ? `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Identifique exatamente o que o(a) examinador(a) exigiu e responda a isso com precisão técnica. Se a exigência pedir detalhamento de especificação, apresente a redação corrigida adequada à classe. NÃO transforme a peça em oposição, conflito marcário, cotejo com marcas de terceiros ou defesa de colidência, salvo se isso constar expressamente no despacho. O texto desta parte deve ter NO MÍNIMO 3.200 palavras.`
+        : `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do recurso administrativo. CADA seção deve ter a extensão MÍNIMA especificada. O texto total desta parte deve ter NO MÍNIMO 3.800 palavras. Desenvolva CADA argumento com máxima profundidade, como um escritório de PI de elite faria.` },
       ...fileResponseParts,
     ];
 
@@ -976,16 +1139,20 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
     // ─────────────────────────────────────────────────────
     // PASS 2: Generate Sections V to VIII + closing
     // ─────────────────────────────────────────────────────
-    const pass2System = buildPass2SystemPrompt(resourceTypeLabel, currentDate, agentName, agentStrategy);
+    const pass2System = buildPass2SystemPrompt(resourceType, resourceTypeLabel, currentDate, agentName, agentStrategy);
     const pass2User = [
-      { type: 'input_text', text: `Contexto: Você já gerou as Seções I a IV do recurso. Abaixo está o conteúdo já gerado para referência de dados e continuidade de estilo.
+      { type: 'input_text', text: `${resourceType === 'exigencia_merito'
+        ? 'Contexto: Você já gerou as Seções I a IV do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Continue com foco EXCLUSIVO no atendimento da exigência formulada pelo(a) examinador(a), sem inserir argumentos de oposição, conflito entre marcas, convivência marcária ou risco de confusão, salvo se isso constar expressamente no despacho.'
+        : 'Contexto: Você já gerou as Seções I a IV do recurso. Abaixo está o conteúdo já gerado para referência de dados e continuidade de estilo.'}
+
+${resourceType === 'exigencia_merito' ? 'Abaixo está o conteúdo já gerado para referência de dados e continuidade de estilo.' : ''}
 
 SEÇÕES I A IV JÁ GERADAS:
 ---
 ${pass1Content.substring(0, 8000)}
 ---
 
-Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo e nível de profundidade. O texto total desta parte deve ter NO MÍNIMO 3.400 palavras. Use os dados do caso (marca: ${extractedData.brand_name}, processo: ${extractedData.process_number}, classe: ${extractedData.ncl_class}, titular: ${extractedData.holder}) conforme a Parte 1.` },
+Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo e nível de profundidade. ${resourceType === 'exigencia_merito' ? 'O texto total desta parte deve ter NO MÍNIMO 2.500 palavras.' : 'O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.'} Use os dados do caso (marca: ${extractedData.brand_name}, processo: ${extractedData.process_number}, classe: ${extractedData.ncl_class}, titular: ${extractedData.holder}) conforme a Parte 1.` },
       ...fileResponseParts,
     ];
 
