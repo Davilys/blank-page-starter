@@ -76,9 +76,7 @@ export default function VerificarContrato() {
   };
 
   const handleDownloadOTS = () => {
-    if (verification?.otsFileUrl) {
-      window.open(verification.otsFileUrl, '_blank');
-    }
+    // OTS file no longer exposed in public verification
   };
 
   return (
