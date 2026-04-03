@@ -46,57 +46,20 @@ export default function VerificarContrato() {
     setHasSearched(true);
 
     try {
+      // Use security definer function to verify without exposing sensitive data
       const { data, error } = await supabase
-        .from('contracts')
-        .select(`
-          id,
-          contract_number,
-          blockchain_hash,
-          blockchain_timestamp,
-          signature_ip,
-          blockchain_network,
-          signed_at,
-          subject,
-          user_id,
-          ots_file_url,
-          profiles:user_id (
-            full_name
-          ),
-          brand_processes:process_id (
-            brand_name
-          )
-        `)
-        .eq('blockchain_hash', hashToSearch)
-        .single();
+        .rpc('verify_contract_by_hash', { p_hash: hashToSearch });
 
-      if (error || !data) {
+      if (error || !data || (Array.isArray(data) && data.length === 0)) {
         setVerification({ found: false });
       } else {
-        // Fetch signed PDF from documents table
-        let signedPdfUrl: string | null = null;
-        const { data: docData } = await supabase
-          .from('documents')
-          .select('file_url')
-          .eq('contract_id', data.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        
-        if (docData?.file_url) {
-          signedPdfUrl = docData.file_url;
-        }
-
+        const contract = Array.isArray(data) ? data[0] : data;
         setVerification({
           found: true,
-          contractNumber: data.contract_number || undefined,
-          signedAt: data.blockchain_timestamp || data.signed_at || undefined,
-          ipAddress: data.signature_ip || undefined,
-          network: data.blockchain_network || 'Bitcoin (OpenTimestamps)',
-          brandName: (data.brand_processes as any)?.brand_name || data.subject || undefined,
-          clientName: (data.profiles as any)?.full_name || undefined,
-          otsFileUrl: data.ots_file_url || null,
-          contractId: data.id,
-          signedPdfUrl,
+          contractNumber: contract.contract_number || undefined,
+          signedAt: contract.blockchain_timestamp || contract.signed_at || undefined,
+          network: contract.blockchain_network || 'Bitcoin (OpenTimestamps)',
+          brandName: contract.subject || undefined,
         });
       }
     } catch (err) {
