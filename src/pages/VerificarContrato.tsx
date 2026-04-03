@@ -53,12 +53,12 @@ export default function VerificarContrato() {
     try {
       // Use security definer function to verify without exposing sensitive data
       const { data, error } = await supabase
-        .rpc('verify_contract_by_hash', { p_hash: hashToSearch });
+        .rpc('verify_contract_by_hash' as any, { p_hash: hashToSearch });
 
       if (error || !data || (Array.isArray(data) && data.length === 0)) {
         setVerification({ found: false });
       } else {
-        const contract = Array.isArray(data) ? data[0] : data;
+        const contract = (Array.isArray(data) ? data[0] : data) as VerifyResult;
         setVerification({
           found: true,
           contractNumber: contract.contract_number || undefined,
