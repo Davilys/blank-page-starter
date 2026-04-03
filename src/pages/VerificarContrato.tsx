@@ -11,13 +11,18 @@ interface ContractVerification {
   found: boolean;
   contractNumber?: string;
   signedAt?: string;
-  ipAddress?: string;
   network?: string;
   brandName?: string;
-  clientName?: string;
-  otsFileUrl?: string | null;
-  contractId?: string;
-  signedPdfUrl?: string | null;
+}
+
+interface VerifyResult {
+  contract_number: string | null;
+  blockchain_hash: string | null;
+  blockchain_tx_id: string | null;
+  blockchain_network: string | null;
+  blockchain_timestamp: string | null;
+  signed_at: string | null;
+  subject: string | null;
 }
 
 export default function VerificarContrato() {
@@ -46,57 +51,20 @@ export default function VerificarContrato() {
     setHasSearched(true);
 
     try {
+      // Use security definer function to verify without exposing sensitive data
       const { data, error } = await supabase
-        .from('contracts')
-        .select(`
-          id,
-          contract_number,
-          blockchain_hash,
-          blockchain_timestamp,
-          signature_ip,
-          blockchain_network,
-          signed_at,
-          subject,
-          user_id,
-          ots_file_url,
-          profiles:user_id (
-            full_name
-          ),
-          brand_processes:process_id (
-            brand_name
-          )
-        `)
-        .eq('blockchain_hash', hashToSearch)
-        .single();
+        .rpc('verify_contract_by_hash' as any, { p_hash: hashToSearch });
 
-      if (error || !data) {
+      if (error || !data || (Array.isArray(data) && data.length === 0)) {
         setVerification({ found: false });
       } else {
-        // Fetch signed PDF from documents table
-        let signedPdfUrl: string | null = null;
-        const { data: docData } = await supabase
-          .from('documents')
-          .select('file_url')
-          .eq('contract_id', data.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        
-        if (docData?.file_url) {
-          signedPdfUrl = docData.file_url;
-        }
-
+        const contract = (Array.isArray(data) ? data[0] : data) as VerifyResult;
         setVerification({
           found: true,
-          contractNumber: data.contract_number || undefined,
-          signedAt: data.blockchain_timestamp || data.signed_at || undefined,
-          ipAddress: data.signature_ip || undefined,
-          network: data.blockchain_network || 'Bitcoin (OpenTimestamps)',
-          brandName: (data.brand_processes as any)?.brand_name || data.subject || undefined,
-          clientName: (data.profiles as any)?.full_name || undefined,
-          otsFileUrl: data.ots_file_url || null,
-          contractId: data.id,
-          signedPdfUrl,
+          contractNumber: contract.contract_number || undefined,
+          signedAt: contract.blockchain_timestamp || contract.signed_at || undefined,
+          network: contract.blockchain_network || 'Bitcoin (OpenTimestamps)',
+          brandName: contract.subject || undefined,
         });
       }
     } catch (err) {
@@ -108,9 +76,7 @@ export default function VerificarContrato() {
   };
 
   const handleDownloadOTS = () => {
-    if (verification?.otsFileUrl) {
-      window.open(verification.otsFileUrl, '_blank');
-    }
+    // OTS file no longer exposed in public verification
   };
 
   return (
@@ -216,22 +182,10 @@ export default function VerificarContrato() {
                           <p className="font-medium">{verification.brandName}</p>
                         </div>
                       )}
-                      {verification.clientName && (
-                        <div>
-                          <span className="text-gray-500">Cliente:</span>
-                          <p className="font-medium">{verification.clientName}</p>
-                        </div>
-                      )}
                       {verification.signedAt && (
                         <div>
                           <span className="text-gray-500">Data/Hora da Assinatura:</span>
                           <p className="font-medium">{new Date(verification.signedAt).toLocaleString('pt-BR')}</p>
-                        </div>
-                      )}
-                      {verification.ipAddress && (
-                        <div>
-                          <span className="text-gray-500">IP do Signatário:</span>
-                          <p className="font-medium font-mono text-xs">{verification.ipAddress}</p>
                         </div>
                       )}
                       {verification.network && (
@@ -247,20 +201,6 @@ export default function VerificarContrato() {
                       <p className="font-mono text-xs break-all bg-gray-100 p-2 rounded mt-1">{hash}</p>
                     </div>
 
-                    {verification.signedPdfUrl && (
-                      <div className="pt-4 border-t">
-                        <a 
-                          href={verification.signedPdfUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                        >
-                          <Button className="w-full bg-green-600 hover:bg-green-700 text-white">
-                            <Download className="h-4 w-4 mr-2" />
-                            Baixar Contrato Assinado (PDF)
-                          </Button>
-                        </a>
-                      </div>
-                    )}
                   </div>
 
                   <div className="mt-6 p-4 bg-sky-50 rounded-lg border border-sky-200">
@@ -299,17 +239,6 @@ export default function VerificarContrato() {
                     </p>
                     
                     <div className="space-y-3">
-                      {verification.otsFileUrl && (
-                        <Button 
-                          variant="outline" 
-                          className="w-full border-amber-400 text-amber-700 hover:bg-amber-100"
-                          onClick={handleDownloadOTS}
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Baixar Arquivo de Prova (.ots)
-                        </Button>
-                      )}
-                      
                       <a 
                         href="https://opentimestamps.org" 
                         target="_blank" 
@@ -326,10 +255,7 @@ export default function VerificarContrato() {
                       </a>
                       
                       <p className="text-xs text-amber-600 text-center">
-                        {verification.otsFileUrl 
-                          ? "Baixe o arquivo .ots e arraste-o para o site OpenTimestamps para verificação independente"
-                          : "A prova blockchain está pendente de confirmação. Tente novamente em alguns minutos."
-                        }
+                        Acesse o site oficial do OpenTimestamps para verificação independente do registro blockchain.
                       </p>
                     </div>
                   </div>
