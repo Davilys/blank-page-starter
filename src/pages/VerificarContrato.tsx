@@ -201,20 +201,6 @@ export default function VerificarContrato() {
                       <p className="font-mono text-xs break-all bg-gray-100 p-2 rounded mt-1">{hash}</p>
                     </div>
 
-                    {verification.signedPdfUrl && (
-                      <div className="pt-4 border-t">
-                        <a 
-                          href={verification.signedPdfUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                        >
-                          <Button className="w-full bg-green-600 hover:bg-green-700 text-white">
-                            <Download className="h-4 w-4 mr-2" />
-                            Baixar Contrato Assinado (PDF)
-                          </Button>
-                        </a>
-                      </div>
-                    )}
                   </div>
 
                   <div className="mt-6 p-4 bg-sky-50 rounded-lg border border-sky-200">
