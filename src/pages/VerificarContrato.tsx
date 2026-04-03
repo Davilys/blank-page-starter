@@ -182,22 +182,10 @@ export default function VerificarContrato() {
                           <p className="font-medium">{verification.brandName}</p>
                         </div>
                       )}
-                      {verification.clientName && (
-                        <div>
-                          <span className="text-gray-500">Cliente:</span>
-                          <p className="font-medium">{verification.clientName}</p>
-                        </div>
-                      )}
                       {verification.signedAt && (
                         <div>
                           <span className="text-gray-500">Data/Hora da Assinatura:</span>
                           <p className="font-medium">{new Date(verification.signedAt).toLocaleString('pt-BR')}</p>
-                        </div>
-                      )}
-                      {verification.ipAddress && (
-                        <div>
-                          <span className="text-gray-500">IP do Signatário:</span>
-                          <p className="font-medium font-mono text-xs">{verification.ipAddress}</p>
                         </div>
                       )}
                       {verification.network && (
