@@ -239,17 +239,6 @@ export default function VerificarContrato() {
                     </p>
                     
                     <div className="space-y-3">
-                      {verification.otsFileUrl && (
-                        <Button 
-                          variant="outline" 
-                          className="w-full border-amber-400 text-amber-700 hover:bg-amber-100"
-                          onClick={handleDownloadOTS}
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Baixar Arquivo de Prova (.ots)
-                        </Button>
-                      )}
-                      
                       <a 
                         href="https://opentimestamps.org" 
                         target="_blank" 
@@ -266,10 +255,7 @@ export default function VerificarContrato() {
                       </a>
                       
                       <p className="text-xs text-amber-600 text-center">
-                        {verification.otsFileUrl 
-                          ? "Baixe o arquivo .ots e arraste-o para o site OpenTimestamps para verificação independente"
-                          : "A prova blockchain está pendente de confirmação. Tente novamente em alguns minutos."
-                        }
+                        Acesse o site oficial do OpenTimestamps para verificação independente do registro blockchain.
                       </p>
                     </div>
                   </div>
