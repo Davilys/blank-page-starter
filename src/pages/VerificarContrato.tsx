@@ -11,13 +11,18 @@ interface ContractVerification {
   found: boolean;
   contractNumber?: string;
   signedAt?: string;
-  ipAddress?: string;
   network?: string;
   brandName?: string;
-  clientName?: string;
-  otsFileUrl?: string | null;
-  contractId?: string;
-  signedPdfUrl?: string | null;
+}
+
+interface VerifyResult {
+  contract_number: string | null;
+  blockchain_hash: string | null;
+  blockchain_tx_id: string | null;
+  blockchain_network: string | null;
+  blockchain_timestamp: string | null;
+  signed_at: string | null;
+  subject: string | null;
 }
 
 export default function VerificarContrato() {
