@@ -335,7 +335,62 @@ export default function AdminClientes() {
   // Wrapper without args — safe to pass directly to onClick handlers and callbacks
   const refreshClients = () => fetchClients(0);
 
-  const handleClientClick = (client: ClientWithProcess) => {
+  const handleExportCRM = async () => {
+    try {
+      toast.info('Preparando exportação CRM...');
+
+      // Fetch complete profile data (including address fields not in main query)
+      const [fullProfiles, processes] = await Promise.all([
+        fetchAllRows<any>(
+          'profiles',
+          'id, full_name, email, phone, company_name, cpf_cnpj, address, neighborhood, address_number, address_complement, city, state, zip_code, origin, priority, contract_value, client_funnel_type, created_at'
+        ),
+        fetchAllRows<any>('brand_processes', 'id, user_id, brand_name, pipeline_stage, process_number'),
+      ]);
+
+      const crmRows: CRMExportableClient[] = [];
+
+      for (const p of fullProfiles) {
+        const userProcesses = (processes || []).filter((bp: any) => bp.user_id === p.id);
+
+        if (userProcesses.length === 0) {
+          crmRows.push({
+            full_name: p.full_name, email: p.email, phone: p.phone,
+            company_name: p.company_name, cpf_cnpj: p.cpf_cnpj,
+            address: p.address, neighborhood: p.neighborhood,
+            address_number: p.address_number, address_complement: p.address_complement,
+            city: p.city, state: p.state, zip_code: p.zip_code,
+            origin: p.origin, priority: p.priority, contract_value: p.contract_value,
+            brand_name: null, pipeline_stage: null, process_number: null,
+            client_funnel_type: p.client_funnel_type || 'juridico',
+            created_at: p.created_at,
+          });
+        } else {
+          for (const proc of userProcesses) {
+            crmRows.push({
+              full_name: p.full_name, email: p.email, phone: p.phone,
+              company_name: p.company_name, cpf_cnpj: p.cpf_cnpj,
+              address: p.address, neighborhood: p.neighborhood,
+              address_number: p.address_number, address_complement: p.address_complement,
+              city: p.city, state: p.state, zip_code: p.zip_code,
+              origin: p.origin, priority: p.priority, contract_value: p.contract_value,
+              brand_name: proc.brand_name, pipeline_stage: proc.pipeline_stage,
+              process_number: proc.process_number,
+              client_funnel_type: p.client_funnel_type || 'juridico',
+              created_at: p.created_at,
+            });
+          }
+        }
+      }
+
+      exportToCRMCSV(crmRows);
+      toast.success(`${crmRows.length} registros exportados para CSV CRM`);
+    } catch (error) {
+      console.error('CRM export error:', error);
+      toast.error('Erro ao exportar para CRM');
+    }
+  };
+
     setSelectedClient(client);
     setDetailOpen(true);
   };
@@ -460,6 +515,9 @@ export default function AdminClientes() {
               />
               <Button variant="outline" size="sm" className="h-9 gap-1.5 border-border/60" onClick={() => setImportExportOpen(true)}>
                 <Upload className="h-3.5 w-3.5" /> Importar
+              </Button>
+              <Button variant="outline" size="sm" className="h-9 gap-1.5 border-border/60" onClick={handleExportCRM}>
+                <Download className="h-3.5 w-3.5" /> Exportar CRM
               </Button>
               <CreateClientDialog onClientCreated={refreshClients} />
             </div>
