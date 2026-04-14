@@ -7,6 +7,8 @@ export interface ParsedClient {
   phone?: string;
   company_name?: string;
   cpf_cnpj?: string;
+  cpf?: string;
+  cnpj?: string;
   address?: string;
   neighborhood?: string;
   address_number?: string;
@@ -18,6 +20,9 @@ export interface ParsedClient {
   priority?: string;
   contract_value?: number;
   brand_name?: string;
+  pipeline_stage?: string;
+  client_funnel_type?: string;
+  process_number?: string;
   // Raw data for mapping
   _raw?: Record<string, unknown>;
   _rowIndex?: number;
@@ -41,6 +46,8 @@ export const SYSTEM_FIELDS = [
   { key: 'phone', label: 'Telefone', required: false },
   { key: 'company_name', label: 'Empresa', required: false },
   { key: 'cpf_cnpj', label: 'CPF/CNPJ', required: false },
+  { key: 'cpf', label: 'CPF', required: false },
+  { key: 'cnpj', label: 'CNPJ', required: false },
   { key: 'address', label: 'Endereço', required: false },
   { key: 'neighborhood', label: 'Bairro', required: false },
   { key: 'address_number', label: 'Número', required: false },
@@ -52,6 +59,9 @@ export const SYSTEM_FIELDS = [
   { key: 'priority', label: 'Prioridade', required: false },
   { key: 'contract_value', label: 'Valor do Contrato', required: false },
   { key: 'brand_name', label: 'Marca', required: false },
+  { key: 'pipeline_stage', label: 'Fase do Pipeline', required: false },
+  { key: 'client_funnel_type', label: 'Tipo de Funil', required: false },
+  { key: 'process_number', label: 'Nº do Processo', required: false },
 ];
 
 // Common field name variations for auto-mapping
@@ -60,7 +70,9 @@ const FIELD_ALIASES: Record<string, string[]> = {
   email: ['email', 'e-mail', 'correio', 'mail', 'email_address'],
   phone: ['telefone', 'phone', 'tel', 'celular', 'mobile', 'whatsapp', 'fone', 'phone_number'],
   company_name: ['empresa', 'company', 'company_name', 'organization', 'organização', 'organizacao', 'razao_social'],
-  cpf_cnpj: ['cpf', 'cnpj', 'cpf_cnpj', 'documento', 'vat', 'tax_id', 'cpf/cnpj', 'cpf ou cnpj', 'cpf_ou_cnpj'],
+  cpf_cnpj: ['cpf_cnpj', 'documento', 'vat', 'tax_id', 'cpf/cnpj', 'cpf ou cnpj', 'cpf_ou_cnpj'],
+  cpf: ['cpf'],
+  cnpj: ['cnpj'],
   address: ['endereco', 'endereço', 'address', 'logradouro', 'rua', 'street'],
   neighborhood: ['bairro', 'neighborhood', 'district'],
   address_number: ['numero', 'número', 'nro', 'num', 'number', 'address_number'],
@@ -72,6 +84,9 @@ const FIELD_ALIASES: Record<string, string[]> = {
   priority: ['prioridade', 'priority', 'urgencia', 'urgência'],
   contract_value: ['valor', 'value', 'contract_value', 'valor_contrato', 'amount', 'total'],
   brand_name: ['marca', 'brand', 'brand_name', 'nome_marca', 'nome da marca'],
+  pipeline_stage: ['pipeline_stage', 'fase', 'fase_pipeline', 'stage', 'etapa'],
+  client_funnel_type: ['client_funnel_type', 'funil', 'tipo_funil', 'funnel', 'funnel_type'],
+  process_number: ['process_number', 'numero_processo', 'nro_processo', 'processo'],
 };
 
 /**
