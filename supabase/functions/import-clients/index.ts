@@ -262,15 +262,19 @@ async function processClient(
     .then(() => {/* ok */})
     .catch(() => {/* ignore duplicate */});
 
-  // 4. Create brand_process → Jurídico > Protocolado
+  // 4. Create brand_process with pipeline stage from CSV
   const brandName = client.brand_name || client.company_name || client.full_name || email;
+  const funnelType = client.client_funnel_type || 'juridico';
+  const defaultStage = funnelType === 'comercial' ? 'assinou_contrato' : 'protocolado';
+  const pipelineStage = normalizePipelineStage(client.pipeline_stage, defaultStage);
   await supabaseAdmin
     .from('brand_processes')
     .insert({
       user_id: userId,
       brand_name: brandName,
       status: 'em_andamento',
-      pipeline_stage: 'protocolado',
+      pipeline_stage: pipelineStage,
+      process_number: client.process_number || null,
     });
 
   // Remove from leads table if exists (client ≠ lead)
