@@ -343,7 +343,7 @@ export default function AdminClientes() {
       const [fullProfiles, processes] = await Promise.all([
         fetchAllRows<any>(
           'profiles',
-          'id, full_name, email, phone, company_name, cpf_cnpj, address, neighborhood, address_number, address_complement, city, state, zip_code, origin, priority, contract_value, client_funnel_type, created_at'
+          'id, full_name, email, phone, company_name, cpf_cnpj, cpf, cnpj, address, neighborhood, address_number, address_complement, city, state, zip_code, origin, priority, contract_value, client_funnel_type, created_at'
         ),
         fetchAllRows<any>('brand_processes', 'id, user_id, brand_name, pipeline_stage, process_number'),
       ]);
@@ -357,6 +357,7 @@ export default function AdminClientes() {
           crmRows.push({
             full_name: p.full_name, email: p.email, phone: p.phone,
             company_name: p.company_name, cpf_cnpj: p.cpf_cnpj,
+            cpf: p.cpf, cnpj: p.cnpj,
             address: p.address, neighborhood: p.neighborhood,
             address_number: p.address_number, address_complement: p.address_complement,
             city: p.city, state: p.state, zip_code: p.zip_code,
@@ -370,6 +371,7 @@ export default function AdminClientes() {
             crmRows.push({
               full_name: p.full_name, email: p.email, phone: p.phone,
               company_name: p.company_name, cpf_cnpj: p.cpf_cnpj,
+              cpf: p.cpf, cnpj: p.cnpj,
               address: p.address, neighborhood: p.neighborhood,
               address_number: p.address_number, address_complement: p.address_complement,
               city: p.city, state: p.state, zip_code: p.zip_code,

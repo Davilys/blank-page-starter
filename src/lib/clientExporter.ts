@@ -10,6 +10,8 @@ export interface CRMExportableClient {
   phone?: string | null;
   company_name?: string | null;
   cpf_cnpj?: string | null;
+  cpf?: string | null;
+  cnpj?: string | null;
   address?: string | null;
   neighborhood?: string | null;
   address_number?: string | null;
@@ -28,7 +30,7 @@ export interface CRMExportableClient {
 }
 
 const CRM_COLUMNS: (keyof CRMExportableClient)[] = [
-  'full_name', 'email', 'phone', 'company_name', 'cpf_cnpj',
+  'full_name', 'email', 'phone', 'company_name', 'cpf_cnpj', 'cpf', 'cnpj',
   'address', 'neighborhood', 'address_number', 'address_complement',
   'city', 'state', 'zip_code', 'origin', 'priority', 'contract_value',
   'brand_name', 'pipeline_stage', 'client_funnel_type', 'process_number', 'created_at',
