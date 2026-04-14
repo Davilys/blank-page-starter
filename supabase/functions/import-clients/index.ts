@@ -22,12 +22,32 @@ interface ClientToImport {
   priority?: string;
   contract_value?: number;
   brand_name?: string;
+  pipeline_stage?: string;
+  client_funnel_type?: string;
+  process_number?: string;
 }
 
 interface ProcessResult {
   status: 'imported' | 'updated' | 'skipped' | 'error';
   email: string;
   message?: string;
+}
+
+// ── Allowed pipeline stages (must match pipelineStage.ts) ────────────────
+const ALLOWED_PIPELINE_STAGES = new Set([
+  'protocolado', '003', 'oposicao', 'exigencia_merito', 'exigencia_de_mrito',
+  'indeferimento', 'indeferido', 'notificacao', 'deferimento', 'deferido',
+  'certificados', 'certificado', 'renovacao', 'distrato',
+  'assinou_contrato', 'pagamento_ok', 'pagou_taxa', 'taxa_inpi_paga',
+  'em_andamento', 'depositada', 'arquivado', 'arquivados',
+  'publicado_rpi', 'em_exame', 'concedido', 'registrada',
+]);
+
+function normalizePipelineStage(stage?: string | null, fallback = 'protocolado'): string {
+  if (!stage || typeof stage !== 'string') return fallback;
+  const cleaned = stage.trim().toLowerCase();
+  if (cleaned === 'arquivados') return 'arquivado';
+  return ALLOWED_PIPELINE_STAGES.has(cleaned) ? cleaned : fallback;
 }
 
 // ── Find existing profile by cascading criteria ──────────────────────────
@@ -121,31 +141,35 @@ async function processClient(
 
     if (error) return { status: 'error', email, message: `Erro ao atualizar: ${error.message}` };
 
-    // Ensure brand_process exists in Jurídico > Protocolado
+    // Ensure brand_process exists with correct pipeline stage
     const brandName = client.brand_name || client.company_name || client.full_name || email;
+    const funnelType = client.client_funnel_type || 'juridico';
+    const defaultStage = funnelType === 'comercial' ? 'assinou_contrato' : 'protocolado';
+    const pipelineStage = normalizePipelineStage(client.pipeline_stage, defaultStage);
     await supabaseAdmin
       .from('brand_processes')
       .upsert({
         user_id: existingProfile.id,
         brand_name: brandName,
         status: 'em_andamento',
-        pipeline_stage: 'protocolado',
-      }, { onConflict: 'user_id,brand_name', ignoreDuplicates: true })
+        pipeline_stage: pipelineStage,
+        process_number: client.process_number || null,
+      }, { onConflict: 'user_id,brand_name', ignoreDuplicates: false })
       .then(() => {/* ok */})
       .catch(() => {
-        // Fallback: insert ignoring conflicts
         supabaseAdmin.from('brand_processes').insert({
           user_id: existingProfile.id,
           brand_name: brandName,
           status: 'em_andamento',
-          pipeline_stage: 'protocolado',
+          pipeline_stage: pipelineStage,
+          process_number: client.process_number || null,
         });
       });
 
-    // Update client_funnel_type to juridico
+    // Update client_funnel_type
     await supabaseAdmin
       .from('profiles')
-      .update({ client_funnel_type: 'juridico' })
+      .update({ client_funnel_type: funnelType })
       .eq('id', existingProfile.id);
 
     // Remove from leads table if exists (client ≠ lead)
@@ -202,7 +226,7 @@ async function processClient(
       zip_code: client.zip_code || null,
       origin: 'import',
       priority: client.priority || 'medium',
-      client_funnel_type: 'juridico',
+        client_funnel_type: client.client_funnel_type || 'juridico',
       created_by: callerUserId,
       assigned_to: callerUserId,
     });
@@ -224,7 +248,7 @@ async function processClient(
         zip_code: client.zip_code || null,
         origin: 'import',
         priority: client.priority || 'medium',
-        client_funnel_type: 'juridico',
+        client_funnel_type: client.client_funnel_type || 'juridico',
         created_by: callerUserId,
         assigned_to: callerUserId,
       })
@@ -238,15 +262,19 @@ async function processClient(
     .then(() => {/* ok */})
     .catch(() => {/* ignore duplicate */});
 
-  // 4. Create brand_process → Jurídico > Protocolado
+  // 4. Create brand_process with pipeline stage from CSV
   const brandName = client.brand_name || client.company_name || client.full_name || email;
+  const funnelType = client.client_funnel_type || 'juridico';
+  const defaultStage = funnelType === 'comercial' ? 'assinou_contrato' : 'protocolado';
+  const pipelineStage = normalizePipelineStage(client.pipeline_stage, defaultStage);
   await supabaseAdmin
     .from('brand_processes')
     .insert({
       user_id: userId,
       brand_name: brandName,
       status: 'em_andamento',
-      pipeline_stage: 'protocolado',
+      pipeline_stage: pipelineStage,
+      process_number: client.process_number || null,
     });
 
   // Remove from leads table if exists (client ≠ lead)
