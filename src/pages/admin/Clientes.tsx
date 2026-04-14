@@ -391,6 +391,7 @@ export default function AdminClientes() {
     }
   };
 
+  const handleClientClick = (client: ClientWithProcess) => {
     setSelectedClient(client);
     setDetailOpen(true);
   };
