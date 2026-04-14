@@ -22,6 +22,9 @@ interface ClientToImport {
   priority?: string;
   contract_value?: number;
   brand_name?: string;
+  pipeline_stage?: string;
+  client_funnel_type?: string;
+  process_number?: string;
 }
 
 interface ProcessResult {
