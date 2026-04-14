@@ -3,6 +3,65 @@ import Papa from 'papaparse';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
+// ── CRM-compatible export ─────────────────────────────────────────
+export interface CRMExportableClient {
+  full_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  company_name?: string | null;
+  cpf_cnpj?: string | null;
+  address?: string | null;
+  neighborhood?: string | null;
+  address_number?: string | null;
+  address_complement?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip_code?: string | null;
+  origin?: string | null;
+  priority?: string | null;
+  contract_value?: number | null;
+  brand_name?: string | null;
+  pipeline_stage?: string | null;
+  client_funnel_type?: string | null;
+  process_number?: string | null;
+  created_at?: string | null;
+}
+
+const CRM_COLUMNS: (keyof CRMExportableClient)[] = [
+  'full_name', 'email', 'phone', 'company_name', 'cpf_cnpj',
+  'address', 'neighborhood', 'address_number', 'address_complement',
+  'city', 'state', 'zip_code', 'origin', 'priority', 'contract_value',
+  'brand_name', 'pipeline_stage', 'client_funnel_type', 'process_number', 'created_at',
+];
+
+/**
+ * Export clients to a CRM-compatible CSV with snake_case headers.
+ * Deduplicates by profile id + brand_name.
+ */
+export function exportToCRMCSV(clients: CRMExportableClient[], filename: string = 'clientes_crm'): void {
+  // Deduplicate by composite key
+  const seen = new Set<string>();
+  const unique = clients.filter(c => {
+    const key = `${c.email || ''}|${c.brand_name || ''}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  const rows = unique.map(client => {
+    const row: Record<string, string | number> = {};
+    for (const col of CRM_COLUMNS) {
+      const val = client[col];
+      row[col] = val != null ? (typeof val === 'number' ? val : String(val)) : '';
+    }
+    return row;
+  });
+
+  const csv = Papa.unparse(rows, { quotes: true, delimiter: ',' });
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  downloadBlob(blob, `${filename}.csv`);
+}
+
 export interface ExportableClient {
   id: string;
   full_name?: string | null;

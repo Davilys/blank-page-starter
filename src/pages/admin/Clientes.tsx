@@ -6,7 +6,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, LayoutGrid, List, RefreshCw, Users, Filter, X, Upload, Briefcase, Scale, Star, UserCheck, UserPlus, Mail, Settings2 } from 'lucide-react';
+import { Search, LayoutGrid, List, RefreshCw, Users, Filter, X, Upload, Download, Briefcase, Scale, Star, UserCheck, UserPlus, Mail, Settings2 } from 'lucide-react';
+import { exportToCRMCSV, type CRMExportableClient } from '@/lib/clientExporter';
 import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -334,6 +335,62 @@ export default function AdminClientes() {
   // Wrapper without args — safe to pass directly to onClick handlers and callbacks
   const refreshClients = () => fetchClients(0);
 
+  const handleExportCRM = async () => {
+    try {
+      toast.info('Preparando exportação CRM...');
+
+      // Fetch complete profile data (including address fields not in main query)
+      const [fullProfiles, processes] = await Promise.all([
+        fetchAllRows<any>(
+          'profiles',
+          'id, full_name, email, phone, company_name, cpf_cnpj, address, neighborhood, address_number, address_complement, city, state, zip_code, origin, priority, contract_value, client_funnel_type, created_at'
+        ),
+        fetchAllRows<any>('brand_processes', 'id, user_id, brand_name, pipeline_stage, process_number'),
+      ]);
+
+      const crmRows: CRMExportableClient[] = [];
+
+      for (const p of fullProfiles) {
+        const userProcesses = (processes || []).filter((bp: any) => bp.user_id === p.id);
+
+        if (userProcesses.length === 0) {
+          crmRows.push({
+            full_name: p.full_name, email: p.email, phone: p.phone,
+            company_name: p.company_name, cpf_cnpj: p.cpf_cnpj,
+            address: p.address, neighborhood: p.neighborhood,
+            address_number: p.address_number, address_complement: p.address_complement,
+            city: p.city, state: p.state, zip_code: p.zip_code,
+            origin: p.origin, priority: p.priority, contract_value: p.contract_value,
+            brand_name: null, pipeline_stage: null, process_number: null,
+            client_funnel_type: p.client_funnel_type || 'juridico',
+            created_at: p.created_at,
+          });
+        } else {
+          for (const proc of userProcesses) {
+            crmRows.push({
+              full_name: p.full_name, email: p.email, phone: p.phone,
+              company_name: p.company_name, cpf_cnpj: p.cpf_cnpj,
+              address: p.address, neighborhood: p.neighborhood,
+              address_number: p.address_number, address_complement: p.address_complement,
+              city: p.city, state: p.state, zip_code: p.zip_code,
+              origin: p.origin, priority: p.priority, contract_value: p.contract_value,
+              brand_name: proc.brand_name, pipeline_stage: proc.pipeline_stage,
+              process_number: proc.process_number,
+              client_funnel_type: p.client_funnel_type || 'juridico',
+              created_at: p.created_at,
+            });
+          }
+        }
+      }
+
+      exportToCRMCSV(crmRows);
+      toast.success(`${crmRows.length} registros exportados para CSV CRM`);
+    } catch (error) {
+      console.error('CRM export error:', error);
+      toast.error('Erro ao exportar para CRM');
+    }
+  };
+
   const handleClientClick = (client: ClientWithProcess) => {
     setSelectedClient(client);
     setDetailOpen(true);
@@ -459,6 +516,9 @@ export default function AdminClientes() {
               />
               <Button variant="outline" size="sm" className="h-9 gap-1.5 border-border/60" onClick={() => setImportExportOpen(true)}>
                 <Upload className="h-3.5 w-3.5" /> Importar
+              </Button>
+              <Button variant="outline" size="sm" className="h-9 gap-1.5 border-border/60" onClick={handleExportCRM}>
+                <Download className="h-3.5 w-3.5" /> Exportar CRM
               </Button>
               <CreateClientDialog onClientCreated={refreshClients} />
             </div>
