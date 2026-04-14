@@ -1,28 +1,32 @@
 
 
-## Corrigir apenas os fallbacks de domínio: `webmarcas.net` → `webpatentes.com.br`
+## Plano: Exportar Clientes para CRM Compativel (CSV)
 
-### Escopo reduzido (mudança provisória)
+### Resumo
+Adicionar botao "Exportar CRM" na pagina de Clientes que gera um CSV com headers em snake_case compativeis com o auto-mapper do `clientParser.ts`, incluindo todos os campos do perfil + marca + pipeline_stage + client_funnel_type.
 
-Alterar **apenas** as constantes de fallback/produção, sem tocar em textos de template ou emails.
+### Alteracoes
 
-### Arquivos e alterações
+#### 1. `src/lib/clientExporter.ts` — Nova funcao `exportToCRMCSV`
 
-1. **`supabase/functions/generate-signature-link/index.ts`** (linha 37)
-   - `PRODUCTION_DOMAIN = 'https://webmarcas.net'` → `'https://webpatentes.com.br'`
+- Nova interface `CRMExportableClient` com todos os campos: `full_name`, `email`, `phone`, `company_name`, `cpf_cnpj`, `address`, `neighborhood`, `address_number`, `address_complement`, `city`, `state`, `zip_code`, `origin`, `priority`, `contract_value`, `brand_name`, `pipeline_stage`, `client_funnel_type`, `process_number`, `created_at`
+- Gera CSV com `Papa.unparse` usando separador virgula (`,`) e headers em snake_case
+- Deduplicacao por `id + brand_name` (um registro por marca/processo)
+- Adiciona BOM UTF-8 para compatibilidade
+- Download automatico do blob
 
-2. **`src/hooks/useContractPdfGenerator.ts`**
-   - Footer: `www.webmarcas.net` → `www.webpatentes.com.br`
-   - Footer email: `juridico@webmarcas.net` → `juridico@webpatentes.com.br`
+#### 2. `src/pages/admin/Clientes.tsx` — Novo botao + handler
 
-3. **`src/components/contracts/ContractRenderer.tsx`**
-   - Fallback URL no header/footer → `webpatentes.com.br`
+- Novo botao "Exportar CRM" com icone `Download` ao lado do botao "Importar" (linha ~460)
+- Handler `handleExportCRM`:
+  - Busca dados completos dos perfis (incluindo `address`, `neighborhood`, `address_number`, `address_complement`, `city`, `state`, `zip_code` que nao sao carregados no fetch principal)
+  - Combina com `brand_processes` ja carregados
+  - Gera CSV de ambos os funis com todos os clientes
+  - Sem dialog — exportacao direta com toast de feedback
 
-4. **`src/components/contracts/DocumentRenderer.tsx`**
-   - Fallback URL de verificação → `webpatentes.com.br`
+### Detalhes Tecnicos
 
-5. **`src/hooks/useUnifiedContractDownload.ts`** e **`src/hooks/useContractPdfUpload.ts`**
-   - Apenas URLs de fallback no header/footer do PDF
-
-Somente domínios em URLs e emails de rodapé. Nome "WebMarcas" permanece intacto.
+- O fetch principal de `profiles` na pagina nao inclui `address`, `neighborhood`, `address_number`, `address_complement`, `city`, `state`, `zip_code`. O handler fara uma query separada buscando esses campos adicionais e mesclando com os dados ja carregados.
+- Usa `fetchAllRows` existente para paginar alem de 1000 registros.
+- Headers snake_case mapeiam 1:1 com os aliases do `clientParser.ts`, garantindo importacao perfeita.
 
