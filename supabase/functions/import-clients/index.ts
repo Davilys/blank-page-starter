@@ -33,6 +33,23 @@ interface ProcessResult {
   message?: string;
 }
 
+// ── Allowed pipeline stages (must match pipelineStage.ts) ────────────────
+const ALLOWED_PIPELINE_STAGES = new Set([
+  'protocolado', '003', 'oposicao', 'exigencia_merito', 'exigencia_de_mrito',
+  'indeferimento', 'indeferido', 'notificacao', 'deferimento', 'deferido',
+  'certificados', 'certificado', 'renovacao', 'distrato',
+  'assinou_contrato', 'pagamento_ok', 'pagou_taxa', 'taxa_inpi_paga',
+  'em_andamento', 'depositada', 'arquivado', 'arquivados',
+  'publicado_rpi', 'em_exame', 'concedido', 'registrada',
+]);
+
+function normalizePipelineStage(stage?: string | null, fallback = 'protocolado'): string {
+  if (!stage || typeof stage !== 'string') return fallback;
+  const cleaned = stage.trim().toLowerCase();
+  if (cleaned === 'arquivados') return 'arquivado';
+  return ALLOWED_PIPELINE_STAGES.has(cleaned) ? cleaned : fallback;
+}
+
 // ── Find existing profile by cascading criteria ──────────────────────────
 async function findExistingProfile(
   supabaseAdmin: ReturnType<typeof createClient>,
