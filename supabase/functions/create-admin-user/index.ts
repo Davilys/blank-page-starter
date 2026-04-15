@@ -23,7 +23,7 @@ serve(async (req) => {
       }
     );
 
-    const { email, password, fullName, fullAccess, permissions } = await req.json();
+    const { email, password, fullName, fullAccess, permissions, viewOwnClientsOnly } = await req.json();
 
     let userId: string;
 
@@ -40,7 +40,6 @@ serve(async (req) => {
     if (authError) {
       // If user already exists, find them and promote to admin
       if (authError.message?.includes('already been registered')) {
-        // Find existing user by email
         const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
         if (listError) throw listError;
 
@@ -51,6 +50,15 @@ serve(async (req) => {
 
         userId = existingUser.id;
 
+        // Update password for existing user so the new admin password works
+        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+          password,
+        });
+        if (updateError) {
+          console.error("Error updating password:", updateError);
+          throw new Error('Erro ao atualizar senha do usuário existente: ' + updateError.message);
+        }
+
         // Update profile name if provided
         if (fullName) {
           await supabaseAdmin
@@ -59,7 +67,7 @@ serve(async (req) => {
             .eq('id', userId);
         }
 
-        console.log(`User ${email} already exists (${userId}), promoting to admin.`);
+        console.log(`User ${email} already exists (${userId}), promoted to admin with updated password.`);
       } else {
         throw authError;
       }
@@ -78,6 +86,12 @@ serve(async (req) => {
     if (roleError) {
       throw roleError;
     }
+
+    // Clear any existing permissions for this user before inserting new ones
+    await supabaseAdmin
+      .from("admin_permissions")
+      .delete()
+      .eq("user_id", userId);
 
     // If not full access and permissions provided, insert them
     if (!fullAccess && permissions) {
@@ -99,6 +113,22 @@ serve(async (req) => {
         if (permError) {
           console.error("Error inserting permissions:", permError);
         }
+      }
+    }
+
+    // Handle viewOwnClientsOnly permission
+    if (viewOwnClientsOnly) {
+      const { error: ownError } = await supabaseAdmin
+        .from("admin_permissions")
+        .insert({
+          user_id: userId,
+          permission_key: "clients_own_only",
+          can_view: true,
+          can_edit: false,
+          can_delete: false,
+        });
+      if (ownError) {
+        console.error("Error saving clients_own_only:", ownError);
       }
     }
 
