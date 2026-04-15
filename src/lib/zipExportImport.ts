@@ -3,6 +3,49 @@ import { supabase } from '@/integrations/supabase/client';
 
 export type ProgressCallback = (current: number, total: number, label: string) => void;
 
+// ─── Helpers ─────────────────────────────────────────
+
+function extractStoragePath(fileUrl: string): string | null {
+  const marker = '/storage/v1/object/public/documents/';
+  const idx = fileUrl.indexOf(marker);
+  if (idx === -1) return null;
+  return decodeURIComponent(fileUrl.substring(idx + marker.length));
+}
+
+async function downloadFile(fileUrl: string): Promise<Blob | null> {
+  // Try Supabase SDK first
+  const storagePath = extractStoragePath(fileUrl);
+  if (storagePath) {
+    try {
+      const { data, error } = await supabase.storage.from('documents').download(storagePath);
+      if (!error && data) return data;
+      console.warn(`SDK download failed for ${storagePath}:`, error?.message);
+    } catch (e: any) {
+      console.warn(`SDK download exception for ${storagePath}:`, e.message);
+    }
+  }
+
+  // Fallback to fetch
+  try {
+    const response = await fetch(fileUrl);
+    if (response.ok) return await response.blob();
+    console.warn(`Fetch failed for ${fileUrl}: ${response.status}`);
+  } catch (e: any) {
+    console.warn(`Fetch exception for ${fileUrl}:`, e.message);
+  }
+
+  return null;
+}
+
+export function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ─── Document Export ──────────────────────────────────
 
 interface DocumentForExport {
@@ -30,7 +73,8 @@ interface DocumentManifestEntry {
   created_at: string | null;
   client_email: string | null;
   brand_name: string | null;
-  file_path: string; // path inside ZIP
+  file_path: string;
+  original_file_url: string;
 }
 
 export async function exportDocumentsZip(
@@ -48,15 +92,12 @@ export async function exportDocumentsZip(
     const safeName = `${(doc.protocol || doc.id).replace(/[^a-zA-Z0-9_-]/g, '_')}_${doc.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
     let fileAdded = false;
 
-    try {
-      const response = await fetch(doc.file_url);
-      if (response.ok) {
-        const blob = await response.blob();
-        filesFolder.file(safeName, blob);
-        fileAdded = true;
-      }
-    } catch {
-      // File not accessible, skip
+    const blob = await downloadFile(doc.file_url);
+    if (blob) {
+      filesFolder.file(safeName, blob);
+      fileAdded = true;
+    } else {
+      console.error(`Não foi possível baixar o arquivo: ${doc.name} (${doc.file_url})`);
     }
 
     manifest.push({
@@ -64,11 +105,12 @@ export async function exportDocumentsZip(
       document_type: doc.document_type,
       mime_type: doc.mime_type,
       file_size: doc.file_size,
-      protocol: doc.protocol,
+      protocol: doc.protocol ?? null,
       created_at: doc.created_at,
       client_email: (doc.profiles as any)?.email || null,
       brand_name: (doc.brand_processes as any)?.brand_name || null,
       file_path: fileAdded ? `files/${safeName}` : '',
+      original_file_url: doc.file_url,
     });
   }
 
@@ -115,7 +157,7 @@ interface ContractManifestEntry {
   client_email: string | null;
   client_name: string | null;
   created_at: string | null;
-  pdf_files: string[]; // paths inside ZIP
+  pdf_files: string[];
 }
 
 export async function exportContractsZip(
@@ -132,7 +174,6 @@ export async function exportContractsZip(
 
     const pdfFiles: string[] = [];
 
-    // Fetch associated PDF documents
     try {
       const { data: docs } = await supabase
         .from('documents')
@@ -141,18 +182,17 @@ export async function exportContractsZip(
 
       if (docs && docs.length > 0) {
         for (const doc of docs) {
-          try {
-            const resp = await fetch(doc.file_url);
-            if (resp.ok) {
-              const blob = await resp.blob();
-              const safeName = `${(c.contract_number || c.id).replace(/[^a-zA-Z0-9_-]/g, '_')}_${doc.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-              pdfsFolder.file(safeName, blob);
-              pdfFiles.push(`pdfs/${safeName}`);
-            }
-          } catch { /* skip */ }
+          const blob = await downloadFile(doc.file_url);
+          if (blob) {
+            const safeName = `${(c.contract_number || c.id).replace(/[^a-zA-Z0-9_-]/g, '_')}_${doc.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+            pdfsFolder.file(safeName, blob);
+            pdfFiles.push(`pdfs/${safeName}`);
+          }
         }
       }
-    } catch { /* skip */ }
+    } catch (e: any) {
+      console.warn(`Erro ao buscar docs do contrato ${c.id}:`, e.message);
+    }
 
     manifest.push({
       contract_number: c.contract_number,
@@ -189,7 +229,7 @@ export async function importDocumentsZip(
   const manifestFile = zip.file('manifest.json');
   if (!manifestFile) throw new Error('Arquivo manifest.json não encontrado no ZIP');
 
-  const manifest: DocumentManifestEntry[] = JSON.parse(await manifestFile.async('text'));
+  const manifest: (DocumentManifestEntry & { original_file_url?: string })[] = JSON.parse(await manifestFile.async('text'));
   let imported = 0;
   let failed = 0;
   const errors: string[] = [];
@@ -199,43 +239,47 @@ export async function importDocumentsZip(
     onProgress?.(i + 1, manifest.length, entry.name);
 
     try {
-      let storagePath = '';
+      let fileBlob: Blob | null = null;
 
-      // Upload file to Storage if it exists in ZIP
+      // Try from ZIP first
       if (entry.file_path) {
         const fileData = zip.file(entry.file_path);
         if (fileData) {
-          const blob = await fileData.async('blob');
-          const ext = entry.name.split('.').pop() || 'bin';
-          const uploadPath = `imported/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-
-          const { error: uploadErr } = await supabase.storage
-            .from('documents')
-            .upload(uploadPath, blob, { cacheControl: '3600', upsert: false });
-
-          if (uploadErr) {
-            errors.push(`Upload falhou para ${entry.name}: ${uploadErr.message}`);
-            failed++;
-            continue;
-          }
-
-          const { data: urlData } = supabase.storage.from('documents').getPublicUrl(uploadPath);
-          storagePath = urlData.publicUrl;
+          fileBlob = await fileData.async('blob');
         }
       }
 
-      if (!storagePath) {
+      // Fallback: re-download from original URL
+      if (!fileBlob && entry.original_file_url) {
+        fileBlob = await downloadFile(entry.original_file_url);
+      }
+
+      if (!fileBlob) {
         errors.push(`Sem arquivo para ${entry.name}`);
         failed++;
         continue;
       }
 
-      // Call edge function to create document record
+      const ext = entry.name.split('.').pop() || 'bin';
+      const uploadPath = `imported/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from('documents')
+        .upload(uploadPath, fileBlob, { cacheControl: '3600', upsert: false });
+
+      if (uploadErr) {
+        errors.push(`Upload falhou para ${entry.name}: ${uploadErr.message}`);
+        failed++;
+        continue;
+      }
+
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(uploadPath);
+
       const { error: fnErr } = await supabase.functions.invoke('import-documents-zip', {
         body: {
           documents: [{
             name: entry.name,
-            file_url: storagePath,
+            file_url: urlData.publicUrl,
             document_type: entry.document_type,
             mime_type: entry.mime_type,
             file_size: entry.file_size,
@@ -282,7 +326,6 @@ export async function importContractsZip(
     onProgress?.(i + 1, manifest.length, entry.contract_number || entry.subject || `Contrato ${i + 1}`);
 
     try {
-      // Upload associated PDFs
       const uploadedPdfs: { name: string; file_url: string }[] = [];
       for (const pdfPath of entry.pdf_files) {
         const pdfData = zip.file(pdfPath);
@@ -334,15 +377,4 @@ export async function importContractsZip(
   }
 
   return { imported, failed, errors };
-}
-
-// ─── Helpers ─────────────────────────────────────────
-
-export function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
 }
