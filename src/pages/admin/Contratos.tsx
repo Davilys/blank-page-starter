@@ -687,6 +687,26 @@ export default function AdminContratos() {
           </div>
         </motion.div>
 
+        {/* ZIP Progress Bar */}
+        {zipProgress && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm p-4 space-y-2"
+          >
+            <div className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-2">
+                <Archive className="h-4 w-4 text-primary animate-pulse" />
+                <span className="font-medium truncate max-w-[300px]">{zipProgress.label}</span>
+              </span>
+              <span className="text-muted-foreground text-xs">
+                {zipProgress.current} / {zipProgress.total}
+              </span>
+            </div>
+            <Progress value={(zipProgress.current / Math.max(zipProgress.total, 1)) * 100} className="h-2" />
+          </motion.div>
+        )}
+
         {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
