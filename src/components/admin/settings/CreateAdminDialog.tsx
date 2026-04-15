@@ -88,41 +88,7 @@ export function CreateAdminDialog({ open, onOpenChange }: CreateAdminDialogProps
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      // If not full access, save permissions
-      if (!formData.fullAccess && data?.userId) {
-        const permissionsToInsert = Object.entries(formData.permissions)
-          .filter(([_, perms]) => perms.can_view || perms.can_edit || perms.can_delete)
-          .map(([key, perms]) => ({
-            user_id: data.userId,
-            permission_key: key,
-            can_view: perms.can_view,
-            can_edit: perms.can_edit,
-            can_delete: perms.can_delete,
-          }));
-
-        if (permissionsToInsert.length > 0) {
-          const { error: permError } = await supabase
-            .from('admin_permissions')
-            .insert(permissionsToInsert);
-
-          if (permError) throw permError;
-        }
-      }
-
-      // Save clients_own_only permission
-      if (formData.viewOwnClientsOnly && data?.userId) {
-        const { error: ownError } = await supabase
-          .from('admin_permissions')
-          .insert({
-            user_id: data.userId,
-            permission_key: 'clients_own_only',
-            can_view: true,
-            can_edit: false,
-            can_delete: false,
-          });
-        if (ownError) console.error('Error saving clients_own_only:', ownError);
-      }
-
+      // All permissions are now handled by the edge function
       return data;
     },
     onSuccess: () => {
