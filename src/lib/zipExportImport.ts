@@ -73,8 +73,11 @@ interface DocumentManifestEntry {
   created_at: string | null;
   client_email: string | null;
   brand_name: string | null;
+  // Dual-key for cross-project compatibility
   file_path: string;
+  zip_filename: string;
   original_file_url: string;
+  file_url: string;
 }
 
 export async function exportDocumentsZip(
@@ -100,6 +103,8 @@ export async function exportDocumentsZip(
       console.error(`Não foi possível baixar o arquivo: ${doc.name} (${doc.file_url})`);
     }
 
+    const filePath = fileAdded ? `files/${safeName}` : '';
+
     manifest.push({
       name: doc.name,
       document_type: doc.document_type,
@@ -109,8 +114,11 @@ export async function exportDocumentsZip(
       created_at: doc.created_at,
       client_email: (doc.profiles as any)?.email || null,
       brand_name: (doc.brand_processes as any)?.brand_name || null,
-      file_path: fileAdded ? `files/${safeName}` : '',
+      // Write both keys for compatibility
+      file_path: filePath,
+      zip_filename: filePath,
       original_file_url: doc.file_url,
+      file_url: doc.file_url,
     });
   }
 
@@ -157,7 +165,9 @@ interface ContractManifestEntry {
   client_email: string | null;
   client_name: string | null;
   created_at: string | null;
+  // Dual-key for compatibility
   pdf_files: string[];
+  attached_pdfs: string[];
 }
 
 export async function exportContractsZip(
@@ -211,7 +221,9 @@ export async function exportContractsZip(
       client_email: (c.profile as any)?.email || null,
       client_name: (c.profile as any)?.full_name || null,
       created_at: c.created_at,
+      // Write both keys
       pdf_files: pdfFiles,
+      attached_pdfs: pdfFiles,
     });
   }
 
@@ -229,11 +241,28 @@ export async function importDocumentsZip(
   const manifestFile = zip.file('manifest.json');
   if (!manifestFile) throw new Error('Arquivo manifest.json não encontrado no ZIP');
 
-  const manifest: (DocumentManifestEntry & { original_file_url?: string })[] = JSON.parse(await manifestFile.async('text'));
+  const rawManifest: any[] = JSON.parse(await manifestFile.async('text'));
   let imported = 0;
   let failed = 0;
   const errors: string[] = [];
 
+  // Normalize manifest entries for cross-project compatibility
+  const manifest = rawManifest.map((entry: any) => ({
+    name: entry.name,
+    document_type: entry.document_type,
+    mime_type: entry.mime_type,
+    file_size: entry.file_size,
+    protocol: entry.protocol ?? null,
+    created_at: entry.created_at,
+    client_email: entry.client_email,
+    brand_name: entry.brand_name,
+    // Accept both field names
+    file_path: entry.file_path || entry.zip_filename || '',
+    original_file_url: entry.original_file_url || entry.file_url || '',
+  }));
+
+  // Process in batches of 50
+  const BATCH_SIZE = 50;
   for (let i = 0; i < manifest.length; i++) {
     const entry = manifest[i];
     onProgress?.(i + 1, manifest.length, entry.name);
@@ -241,7 +270,7 @@ export async function importDocumentsZip(
     try {
       let fileBlob: Blob | null = null;
 
-      // Try from ZIP first
+      // Try from ZIP first using normalized file_path
       if (entry.file_path) {
         const fileData = zip.file(entry.file_path);
         if (fileData) {
@@ -255,7 +284,7 @@ export async function importDocumentsZip(
       }
 
       if (!fileBlob) {
-        errors.push(`Sem arquivo para ${entry.name}`);
+        errors.push(`Arquivo não encontrado no ZIP para: ${entry.name} (path: ${entry.file_path})`);
         failed++;
         continue;
       }
@@ -268,7 +297,7 @@ export async function importDocumentsZip(
         .upload(uploadPath, fileBlob, { cacheControl: '3600', upsert: false });
 
       if (uploadErr) {
-        errors.push(`Upload falhou para ${entry.name}: ${uploadErr.message}`);
+        errors.push(`Falha no upload para ${entry.name}: ${uploadErr.message}`);
         failed++;
         continue;
       }
@@ -292,7 +321,7 @@ export async function importDocumentsZip(
       });
 
       if (fnErr) {
-        errors.push(`Erro ao registrar ${entry.name}: ${fnErr.message}`);
+        errors.push(`Falha ao registrar no banco: ${entry.name}: ${fnErr.message}`);
         failed++;
       } else {
         imported++;
@@ -316,10 +345,32 @@ export async function importContractsZip(
   const manifestFile = zip.file('contracts_manifest.json');
   if (!manifestFile) throw new Error('Arquivo contracts_manifest.json não encontrado no ZIP');
 
-  const manifest: ContractManifestEntry[] = JSON.parse(await manifestFile.async('text'));
+  const rawManifest: any[] = JSON.parse(await manifestFile.async('text'));
   let imported = 0;
   let failed = 0;
   const errors: string[] = [];
+
+  // Normalize manifest entries for cross-project compatibility
+  const manifest = rawManifest.map((entry: any) => ({
+    contract_number: entry.contract_number,
+    subject: entry.subject,
+    contract_value: entry.contract_value,
+    start_date: entry.start_date,
+    end_date: entry.end_date,
+    signature_status: entry.signature_status,
+    signed_at: entry.signed_at,
+    contract_html: entry.contract_html,
+    description: entry.description,
+    payment_method: entry.payment_method,
+    document_type: entry.document_type,
+    contract_type_name: entry.contract_type_name,
+    template_name: entry.template_name,
+    client_email: entry.client_email,
+    client_name: entry.client_name,
+    created_at: entry.created_at,
+    // Accept both field names
+    pdf_files: entry.pdf_files || entry.attached_pdfs || [],
+  }));
 
   for (let i = 0; i < manifest.length; i++) {
     const entry = manifest[i];
@@ -339,7 +390,11 @@ export async function importContractsZip(
           if (!uploadErr) {
             const { data: urlData } = supabase.storage.from('documents').getPublicUrl(uploadPath);
             uploadedPdfs.push({ name: pdfPath.split('/').pop() || 'documento.pdf', file_url: urlData.publicUrl });
+          } else {
+            errors.push(`Falha no upload do PDF ${pdfPath}: ${uploadErr.message}`);
           }
+        } else {
+          errors.push(`PDF não encontrado no ZIP: ${pdfPath}`);
         }
       }
 
@@ -365,7 +420,7 @@ export async function importContractsZip(
       });
 
       if (fnErr) {
-        errors.push(`Erro ao importar contrato ${entry.contract_number || i}: ${fnErr.message}`);
+        errors.push(`Falha ao registrar contrato ${entry.contract_number || i}: ${fnErr.message}`);
         failed++;
       } else {
         imported++;
