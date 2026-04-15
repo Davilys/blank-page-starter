@@ -7,13 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
+import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Search, Plus, FileText, Download, Eye, Trash2, MoreVertical,
   Image, File as FileIcon, User, Filter, X, RefreshCw,
   FolderOpen, Shield, Scale, Receipt, Landmark, Award,
   Newspaper, MessageSquare, Package, HardDrive, Zap, Activity,
-  ArrowUpRight, ChevronRight, BarChart3, Loader2, Upload, FileJson
+  ArrowUpRight, ChevronRight, BarChart3, Loader2, Upload, FileJson, Archive
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -21,6 +22,7 @@ import { ptBR } from 'date-fns/locale';
 import { DocumentUploader } from '@/components/shared/DocumentUploader';
 import { DocumentPreview } from '@/components/shared/DocumentPreview';
 import { cn } from '@/lib/utils';
+import { exportDocumentsZip, importDocumentsZip, downloadBlob, type ProgressCallback } from '@/lib/zipExportImport';
 
 // ─── Types ────────────────────────────────────────
 interface Document {
@@ -633,6 +635,8 @@ export default function AdminDocumentos() {
   const [refreshing, setRefreshing] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [zipProgress, setZipProgress] = useState<{ current: number; total: number; label: string } | null>(null);
+  const [zipImporting, setZipImporting] = useState(false);
 
   useEffect(() => {
     fetchAll();
@@ -821,76 +825,96 @@ export default function AdminDocumentos() {
                 <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
               </motion.button>
 
-              {/* Export */}
+              {/* Export ZIP */}
               <motion.button
                 whileHover={{ scale: 1.06 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  const exportData = documents.map(d => ({
-                    name: d.name,
-                    file_url: d.file_url,
-                    document_type: d.document_type,
-                    mime_type: d.mime_type,
-                    file_size: d.file_size,
-                    user_id: d.user_id,
-                    process_id: d.process_id,
-                    protocol: d.protocol,
-                    created_at: d.created_at,
-                  }));
-                  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a'); a.href = url; a.download = `documentos_${new Date().toISOString().slice(0,10)}.json`; a.click();
-                  URL.revokeObjectURL(url);
-                  toast.success(`${exportData.length} documentos exportados`);
+                disabled={!!zipProgress}
+                onClick={async () => {
+                  if (documents.length === 0) { toast.error('Nenhum documento para exportar'); return; }
+                  setZipProgress({ current: 0, total: documents.length, label: 'Iniciando...' });
+                  try {
+                    const blob = await exportDocumentsZip(documents, (current, total, label) => {
+                      setZipProgress({ current, total, label });
+                    });
+                    downloadBlob(blob, `documentos_${new Date().toISOString().slice(0,10)}.zip`);
+                    toast.success(`${documents.length} documentos exportados como ZIP`);
+                  } catch (err: any) {
+                    toast.error('Erro ao exportar: ' + (err.message || 'Erro desconhecido'));
+                  } finally {
+                    setZipProgress(null);
+                  }
                 }}
-                className="w-9 h-9 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                title="Exportar JSON"
+                className="w-9 h-9 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                title="Exportar ZIP (com arquivos)"
               >
-                <Download className="h-4 w-4" />
+                {zipProgress ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
               </motion.button>
 
-              {/* Import JSON */}
+              {/* Import ZIP */}
               <motion.button
                 whileHover={{ scale: 1.06 }}
                 whileTap={{ scale: 0.95 }}
+                disabled={zipImporting}
                 onClick={() => {
                   const input = document.createElement('input');
                   input.type = 'file';
-                  input.accept = '.json';
+                  input.accept = '.zip';
                   input.onchange = async (e: any) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
+                    setZipImporting(true);
+                    setZipProgress({ current: 0, total: 1, label: 'Lendo ZIP...' });
                     try {
-                      const text = await file.text();
-                      const data = JSON.parse(text);
-                      const items = Array.isArray(data) ? data : (data.data || data.documents || []);
-                      if (!items.length) { toast.error('Nenhum documento encontrado no arquivo'); return; }
-                      let imported = 0, failed = 0;
-                      for (let i = 0; i < items.length; i += 50) {
-                        const batch = items.slice(i, i + 50).map((item: any) => {
-                          const { id, profiles, brand_processes, ...rest } = item;
-                          return rest;
-                        });
-                        const { error } = await supabase.from('documents').insert(batch);
-                        if (error) { failed += batch.length; } else { imported += batch.length; }
+                      const result = await importDocumentsZip(file, (current, total, label) => {
+                        setZipProgress({ current, total, label });
+                      });
+                      if (result.failed === 0) {
+                        toast.success(`${result.imported} documentos importados com sucesso!`);
+                      } else {
+                        toast.warning(`${result.imported} importados, ${result.failed} falharam`);
                       }
-                      if (failed === 0) { toast.success(`${imported} documentos importados`); }
-                      else { toast.warning(`${imported} importados, ${failed} falharam`); }
+                      if (result.errors.length > 0) console.warn('Import errors:', result.errors);
                       fetchDocuments();
-                    } catch (err: any) { toast.error('Erro ao importar: ' + (err.message || 'Arquivo inválido')); }
+                    } catch (err: any) {
+                      toast.error('Erro ao importar: ' + (err.message || 'Arquivo inválido'));
+                    } finally {
+                      setZipImporting(false);
+                      setZipProgress(null);
+                    }
                   };
                   input.click();
                 }}
-                className="w-9 h-9 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                title="Importar JSON"
+                className="w-9 h-9 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                title="Importar ZIP"
               >
-                <Upload className="h-4 w-4" />
+                {zipImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
               </motion.button>
 
               <UploadDialog processes={processes} onDone={fetchDocuments} />
             </div>
           </div>
         </motion.div>
+
+        {/* ── ZIP Progress Bar ── */}
+        {zipProgress && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="relative z-10 rounded-xl border border-border/50 bg-card/80 backdrop-blur-xl p-4 space-y-2"
+          >
+            <div className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-2">
+                <Archive className="h-4 w-4 text-primary animate-pulse" />
+                <span className="font-medium truncate max-w-[300px]">{zipProgress.label}</span>
+              </span>
+              <span className="text-muted-foreground text-xs">
+                {zipProgress.current} / {zipProgress.total}
+              </span>
+            </div>
+            <Progress value={(zipProgress.current / Math.max(zipProgress.total, 1)) * 100} className="h-2" />
+          </motion.div>
+        )}
 
         {/* ── KPI Cards ── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 relative z-10">

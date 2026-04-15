@@ -5,11 +5,12 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Search, Plus, RefreshCw, FileSignature, MoreHorizontal, 
   Eye, Trash2, Download, Send, Filter, CheckCircle, XCircle, Loader2, Timer, Edit,
-  TrendingUp, DollarSign, FileText, PenTool, RotateCcw
+  TrendingUp, DollarSign, FileText, PenTool, RotateCcw, Archive, Upload
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, isToday, isThisWeek, isThisMonth } from 'date-fns';
@@ -23,6 +24,7 @@ import { DatePeriodFilter, type DateFilterType } from '@/components/admin/client
 import { motion } from 'framer-motion';
 import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
 import { EyeOff } from 'lucide-react';
+import { exportContractsZip, importContractsZip, downloadBlob } from '@/lib/zipExportImport';
 
 interface Contract {
   id: string;
@@ -148,6 +150,8 @@ export default function AdminContratos() {
   const [activeTab, setActiveTab] = useState('all');
   const [dateFilter, setDateFilter] = useState<DateFilterType>('all');
   const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [zipProgress, setZipProgress] = useState<{ current: number; total: number; label: string } | null>(null);
+  const [zipImporting, setZipImporting] = useState(false);
 
   const handleExpirePromotions = async () => {
     if (!confirm(
@@ -592,6 +596,76 @@ export default function AdminContratos() {
               <Button variant="outline" size="icon" onClick={refreshContracts} className="rounded-xl hover:bg-muted/80">
                 <RefreshCw className="h-4 w-4" />
               </Button>
+              {/* Export ZIP */}
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={!!zipProgress}
+                onClick={async () => {
+                  if (contracts.length === 0) { toast.error('Nenhum contrato para exportar'); return; }
+                  setZipProgress({ current: 0, total: contracts.length, label: 'Iniciando...' });
+                  try {
+                    // Fetch full contract data with contract_html
+                    const { data: fullContracts } = await supabase
+                      .from('contracts')
+                      .select('*, contract_type:contract_types(name), contract_template:contract_templates(name), profile:profiles(full_name, email)')
+                      .order('created_at', { ascending: false });
+                    
+                    const blob = await exportContractsZip(fullContracts || [], (current, total, label) => {
+                      setZipProgress({ current, total, label });
+                    });
+                    downloadBlob(blob, `contratos_${new Date().toISOString().slice(0,10)}.zip`);
+                    toast.success(`${(fullContracts || []).length} contratos exportados como ZIP`);
+                  } catch (err: any) {
+                    toast.error('Erro ao exportar: ' + (err.message || 'Erro desconhecido'));
+                  } finally {
+                    setZipProgress(null);
+                  }
+                }}
+                className="rounded-xl hover:bg-muted/80"
+                title="Exportar Contratos ZIP"
+              >
+                {zipProgress ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
+              </Button>
+              {/* Import ZIP */}
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={zipImporting}
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = '.zip';
+                  input.onchange = async (e: any) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setZipImporting(true);
+                    setZipProgress({ current: 0, total: 1, label: 'Lendo ZIP...' });
+                    try {
+                      const result = await importContractsZip(file, (current, total, label) => {
+                        setZipProgress({ current, total, label });
+                      });
+                      if (result.failed === 0) {
+                        toast.success(`${result.imported} contratos importados com sucesso!`);
+                      } else {
+                        toast.warning(`${result.imported} importados, ${result.failed} falharam`);
+                      }
+                      if (result.errors.length > 0) console.warn('Import errors:', result.errors);
+                      refreshContracts();
+                    } catch (err: any) {
+                      toast.error('Erro ao importar: ' + (err.message || 'Arquivo inválido'));
+                    } finally {
+                      setZipImporting(false);
+                      setZipProgress(null);
+                    }
+                  };
+                  input.click();
+                }}
+                className="rounded-xl hover:bg-muted/80"
+                title="Importar Contratos ZIP"
+              >
+                {zipImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              </Button>
               <Button 
                 variant="outline" 
                 onClick={handleExpirePromotions}
@@ -612,6 +686,26 @@ export default function AdminContratos() {
             </motion.div>
           </div>
         </motion.div>
+
+        {/* ZIP Progress Bar */}
+        {zipProgress && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm p-4 space-y-2"
+          >
+            <div className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-2">
+                <Archive className="h-4 w-4 text-primary animate-pulse" />
+                <span className="font-medium truncate max-w-[300px]">{zipProgress.label}</span>
+              </span>
+              <span className="text-muted-foreground text-xs">
+                {zipProgress.current} / {zipProgress.total}
+              </span>
+            </div>
+            <Progress value={(zipProgress.current / Math.max(zipProgress.total, 1)) * 100} className="h-2" />
+          </motion.div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
