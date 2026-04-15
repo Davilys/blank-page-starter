@@ -1,34 +1,38 @@
 
 
-## Plano: Exportar CRM com campos separados + Importar com pipeline_stage no Kanban
+## Plano: Corrigir Criacao de Admin e Edicao de Permissoes
 
-### Problema
-1. O CSV exportado nao inclui `cpf` e `cnpj` como campos separados (so tem `cpf_cnpj`)
-2. O `clientParser.ts` nao reconhece `pipeline_stage`, `client_funnel_type`, `process_number`, `cpf`, `cnpj` como campos mapeáveis
-3. O edge function `import-clients` ignora o `pipeline_stage` do arquivo e sempre coloca o cliente em `protocolado`
+### Problemas Identificados
+
+1. **Login falha para admin criado**: A conta `caroline@webmarcas.net` foi criada em 14/04 como usuario normal (role `user`). Quando o "Criar Novo Admin" tentou criá-la novamente, o edge function detectou que o usuario ja existia e promoveu para admin, mas **nao atualizou a senha**. A senha original (da criacao como cliente) permaneceu, por isso "Carol@@0" nao funciona.
+
+2. **Permissoes duplicadas**: O edge function insere permissoes (linhas 82-103) E o codigo do cliente tambem insere permissoes (CreateAdminDialog linhas 92-109). Isso causa `duplicate key` quando o usuario nao tem fullAccess.
+
+3. **EditPermissionsDialog**: O delete + re-insert funciona, mas o `clients_own_only` pode conflitar se inserido duas vezes.
 
 ### Alteracoes
 
-#### 1. `src/lib/clientExporter.ts` — Adicionar `cpf` e `cnpj` separados
-- Adicionar `cpf` e `cnpj` na interface `CRMExportableClient` e em `CRM_COLUMNS`
-- Exportar esses campos separados alem de `cpf_cnpj`
+#### 1. `supabase/functions/create-admin-user/index.ts`
+- Quando o usuario ja existe, **atualizar a senha** usando `supabaseAdmin.auth.admin.updateUserById(userId, { password })`
+- Isso garante que a senha definida no formulario seja aplicada mesmo para usuarios existentes
+- Manter o upsert de permissoes no edge function (usa service_role, bypassa RLS)
 
-#### 2. `src/lib/clientParser.ts` — Novos campos no mapeamento
-- Adicionar a `SYSTEM_FIELDS`: `pipeline_stage`, `client_funnel_type`, `process_number`, `cpf`, `cnpj`
-- Adicionar aliases em `FIELD_ALIASES` para cada um desses campos
-- Adicionar esses campos na interface `ParsedClient`
+#### 2. `src/components/admin/settings/CreateAdminDialog.tsx`
+- **Remover** a insercao duplicada de permissoes no client-side (linhas 92-109)
+- **Remover** a insercao duplicada de `clients_own_only` no client-side (linhas 112-124)
+- Passar `viewOwnClientsOnly` para o edge function e deixar ele cuidar de tudo
+- O edge function ja recebe `permissions` e `fullAccess`, basta ele tambem receber e tratar `viewOwnClientsOnly`
 
-#### 3. `supabase/functions/import-clients/index.ts` — Usar pipeline_stage do arquivo
-- Adicionar `pipeline_stage`, `client_funnel_type`, `process_number` na interface `ClientToImport`
-- Ao criar/atualizar `brand_processes`, usar `client.pipeline_stage` se fornecido (com fallback para `protocolado`)
-- Validar o `pipeline_stage` contra os valores permitidos (usar lista similar ao `pipelineStage.ts`)
-- Ao criar perfil, usar `client.client_funnel_type` se fornecido (com fallback para `juridico`)
+#### 3. `supabase/functions/create-admin-user/index.ts` — Tratar `viewOwnClientsOnly`
+- Adicionar `viewOwnClientsOnly` no destructuring do body
+- Se `viewOwnClientsOnly` for true, inserir a permissao `clients_own_only` no edge function
 
-#### 4. `src/pages/admin/Clientes.tsx` — Incluir `cpf` e `cnpj` na exportacao
-- No handler `handleExportCRM`, buscar tambem os campos `cpf` e `cnpj` do profiles e incluir no CSV
+#### 4. Fix imediato: Atualizar senha da Caroline
+- Usar o edge function corrigido ou atualizar via query para que a conta funcione
 
 ### Resultado
-- O CSV exportado tera todos os campos listados pelo usuario (incluindo `cpf`, `cnpj` separados)
-- Ao reimportar, o auto-mapper reconhece `pipeline_stage`, `client_funnel_type`, `cpf`, `cnpj` etc.
-- O cliente importado sera colocado na fase correta do kanban (ex: `deferido`, `exigencia_merito`) em vez de sempre ir para `protocolado`
+- Criar novo admin funciona mesmo se o email ja existe (atualiza senha + promove)
+- Permissoes sao inseridas apenas uma vez (no edge function, com service_role)
+- Editar permissoes funciona sem erro de chave duplicada
+- Login funciona com a senha definida no formulario
 
