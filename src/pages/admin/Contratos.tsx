@@ -150,6 +150,8 @@ export default function AdminContratos() {
   const [activeTab, setActiveTab] = useState('all');
   const [dateFilter, setDateFilter] = useState<DateFilterType>('all');
   const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [zipProgress, setZipProgress] = useState<{ current: number; total: number; label: string } | null>(null);
+  const [zipImporting, setZipImporting] = useState(false);
 
   const handleExpirePromotions = async () => {
     if (!confirm(
