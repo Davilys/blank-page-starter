@@ -825,70 +825,70 @@ export default function AdminDocumentos() {
                 <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
               </motion.button>
 
-              {/* Export */}
+              {/* Export ZIP */}
               <motion.button
                 whileHover={{ scale: 1.06 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  const exportData = documents.map(d => ({
-                    name: d.name,
-                    file_url: d.file_url,
-                    document_type: d.document_type,
-                    mime_type: d.mime_type,
-                    file_size: d.file_size,
-                    user_id: d.user_id,
-                    process_id: d.process_id,
-                    protocol: d.protocol,
-                    created_at: d.created_at,
-                  }));
-                  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a'); a.href = url; a.download = `documentos_${new Date().toISOString().slice(0,10)}.json`; a.click();
-                  URL.revokeObjectURL(url);
-                  toast.success(`${exportData.length} documentos exportados`);
+                disabled={!!zipProgress}
+                onClick={async () => {
+                  if (documents.length === 0) { toast.error('Nenhum documento para exportar'); return; }
+                  setZipProgress({ current: 0, total: documents.length, label: 'Iniciando...' });
+                  try {
+                    const blob = await exportDocumentsZip(documents, (current, total, label) => {
+                      setZipProgress({ current, total, label });
+                    });
+                    downloadBlob(blob, `documentos_${new Date().toISOString().slice(0,10)}.zip`);
+                    toast.success(`${documents.length} documentos exportados como ZIP`);
+                  } catch (err: any) {
+                    toast.error('Erro ao exportar: ' + (err.message || 'Erro desconhecido'));
+                  } finally {
+                    setZipProgress(null);
+                  }
                 }}
-                className="w-9 h-9 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                title="Exportar JSON"
+                className="w-9 h-9 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                title="Exportar ZIP (com arquivos)"
               >
-                <Download className="h-4 w-4" />
+                {zipProgress ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
               </motion.button>
 
-              {/* Import JSON */}
+              {/* Import ZIP */}
               <motion.button
                 whileHover={{ scale: 1.06 }}
                 whileTap={{ scale: 0.95 }}
+                disabled={zipImporting}
                 onClick={() => {
                   const input = document.createElement('input');
                   input.type = 'file';
-                  input.accept = '.json';
+                  input.accept = '.zip';
                   input.onchange = async (e: any) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
+                    setZipImporting(true);
+                    setZipProgress({ current: 0, total: 1, label: 'Lendo ZIP...' });
                     try {
-                      const text = await file.text();
-                      const data = JSON.parse(text);
-                      const items = Array.isArray(data) ? data : (data.data || data.documents || []);
-                      if (!items.length) { toast.error('Nenhum documento encontrado no arquivo'); return; }
-                      let imported = 0, failed = 0;
-                      for (let i = 0; i < items.length; i += 50) {
-                        const batch = items.slice(i, i + 50).map((item: any) => {
-                          const { id, profiles, brand_processes, ...rest } = item;
-                          return rest;
-                        });
-                        const { error } = await supabase.from('documents').insert(batch);
-                        if (error) { failed += batch.length; } else { imported += batch.length; }
+                      const result = await importDocumentsZip(file, (current, total, label) => {
+                        setZipProgress({ current, total, label });
+                      });
+                      if (result.failed === 0) {
+                        toast.success(`${result.imported} documentos importados com sucesso!`);
+                      } else {
+                        toast.warning(`${result.imported} importados, ${result.failed} falharam`);
                       }
-                      if (failed === 0) { toast.success(`${imported} documentos importados`); }
-                      else { toast.warning(`${imported} importados, ${failed} falharam`); }
+                      if (result.errors.length > 0) console.warn('Import errors:', result.errors);
                       fetchDocuments();
-                    } catch (err: any) { toast.error('Erro ao importar: ' + (err.message || 'Arquivo inválido')); }
+                    } catch (err: any) {
+                      toast.error('Erro ao importar: ' + (err.message || 'Arquivo inválido'));
+                    } finally {
+                      setZipImporting(false);
+                      setZipProgress(null);
+                    }
                   };
                   input.click();
                 }}
-                className="w-9 h-9 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                title="Importar JSON"
+                className="w-9 h-9 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                title="Importar ZIP"
               >
-                <Upload className="h-4 w-4" />
+                {zipImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
               </motion.button>
 
               <UploadDialog processes={processes} onDone={fetchDocuments} />
