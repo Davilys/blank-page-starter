@@ -7,13 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
+import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Search, Plus, FileText, Download, Eye, Trash2, MoreVertical,
   Image, File as FileIcon, User, Filter, X, RefreshCw,
   FolderOpen, Shield, Scale, Receipt, Landmark, Award,
   Newspaper, MessageSquare, Package, HardDrive, Zap, Activity,
-  ArrowUpRight, ChevronRight, BarChart3, Loader2, Upload, FileJson
+  ArrowUpRight, ChevronRight, BarChart3, Loader2, Upload, FileJson, Archive
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -21,6 +22,7 @@ import { ptBR } from 'date-fns/locale';
 import { DocumentUploader } from '@/components/shared/DocumentUploader';
 import { DocumentPreview } from '@/components/shared/DocumentPreview';
 import { cn } from '@/lib/utils';
+import { exportDocumentsZip, importDocumentsZip, downloadBlob, type ProgressCallback } from '@/lib/zipExportImport';
 
 // ─── Types ────────────────────────────────────────
 interface Document {
@@ -633,6 +635,8 @@ export default function AdminDocumentos() {
   const [refreshing, setRefreshing] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [zipProgress, setZipProgress] = useState<{ current: number; total: number; label: string } | null>(null);
+  const [zipImporting, setZipImporting] = useState(false);
 
   useEffect(() => {
     fetchAll();
