@@ -12,7 +12,7 @@ interface DocumentForExport {
   document_type: string | null;
   mime_type: string | null;
   file_size: number | null;
-  protocol: string | null;
+  protocol?: string | null;
   user_id: string | null;
   process_id: string | null;
   created_at: string | null;
