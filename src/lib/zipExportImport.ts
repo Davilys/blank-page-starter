@@ -413,13 +413,14 @@ export async function importDocumentsZip(
 export async function importContractsZip(
   file: File,
   onProgress?: ProgressCallback
-): Promise<{ imported: number; failed: number; errors: string[] }> {
+): Promise<{ imported: number; updated: number; failed: number; errors: string[] }> {
   const zip = await JSZip.loadAsync(file);
   const manifestFile = zip.file('contracts_manifest.json');
   if (!manifestFile) throw new Error('Arquivo contracts_manifest.json não encontrado no ZIP');
 
   const rawManifest: any[] = JSON.parse(await manifestFile.async('text'));
   let imported = 0;
+  let updated = 0;
   let failed = 0;
   const errors: string[] = [];
 
