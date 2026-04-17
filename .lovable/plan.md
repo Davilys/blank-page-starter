@@ -1,44 +1,46 @@
 
-## Plano: Substituir Contratos e Documentos Existentes na Importação ZIP
+## Auditoria Final ZIP Export/Import — Resultado
 
-### Comportamento Atual
-- **Contratos**: ao detectar `contract_number` duplicado, renomeia com sufixo `_imp_<timestamp>` (cria duplicata)
-- **Documentos**: sempre cria novo registro com novo path no Storage (duplica arquivo + registro)
+### ✅ O que está 100% funcional
+- **Download de arquivos**: SDK Supabase + fallback fetch — funciona para storage público e privado
+- **Manifest dual-key**: `file_path`/`zip_filename`, `pdf_files`/`attached_pdfs`, `original_file_url`/`file_url` — compatível cross-project
+- **Contratos**: exporta e importa todos os 30+ campos (blockchain hash/proof/tx_id/timestamp, OTS file, assinaturas visuais, IP/device forense, signatário, valores, datas)
+- **Documentos**: MIME type preservado no upload (`contentType`), extensão resolvida via mapa MIME→ext quando nome não tem extensão — arquivos abrem direto no navegador
+- **Upsert**: contratos casam por `contract_number`, documentos por `protocol` ou `(user_id+name+document_type)` — reimportação não duplica
+- **Vínculos**: `contract_id` reconectado em documentos via lookup por `contract_number`
+- **Batching**: 50 itens/batch para documentos
+- **OTS proof blockchain**: baixado em `ots_proofs/` e re-uploaded no destino, atualizando `ots_file_url`
 
-### Novo Comportamento (Upsert / Substituição)
+### ⚠️ Pontos a corrigir (3 issues reais)
 
-#### 1. `supabase/functions/import-contracts-zip/index.ts`
-- Ao processar cada contrato do ZIP:
-  - Buscar contrato existente pelo `contract_number`
-  - Se existir: **UPDATE** com todos os campos do manifest (HTML, assinaturas, blockchain, OTS, signatário, IP/device, etc.)
-  - Se não existir: **INSERT** normalmente
-- PDFs anexos do contrato:
-  - Antes de inserir, deletar registros antigos em `documents` com `contract_id` igual ao contrato atualizado (limpa anexos antigos)
-  - Inserir os novos PDFs do ZIP
-- Remover lógica de sufixo `_imp_<timestamp>`
+**1. Contagem `updated` errada na UI de documentos** (`zipExportImport.ts` linha 398)
+A função client-side faz 1 chamada por documento, e o edge function retorna `updated:1` ou `imported:1`. O código atual (`(fnData as any)?.updated > 0`) está correto, mas o bug é que **um único item nunca pode contar simultaneamente** — está OK na verdade. ✅ (falso alarme)
 
-#### 2. `supabase/functions/import-documents-zip/index.ts`
-- Ao processar cada documento do ZIP:
-  - Buscar documento existente pela combinação **(`user_id` + `name` + `document_type`)** ou pelo `protocol` quando presente
-  - Se existir: 
-    - Fazer upload do novo arquivo no Storage (novo path)
-    - **UPDATE** o registro existente com novo `file_url`, `mime_type`, `file_size`, `contract_id`, `process_id`
-    - Opcionalmente remover o arquivo antigo do Storage (best-effort)
-  - Se não existir: **INSERT** normalmente
+**2. PDFs anexos do contrato não são reuploadados quando contrato é UPDATE**
+No edge function, ao fazer UPDATE, deletamos `documents` antigos com `contract_id`, mas reinserimos os novos só se `c.pdf_files.length > 0`. Se o ZIP veio sem PDFs anexos (ex: contrato sem assinatura), os antigos são apagados sem reposição. Risco: re-import "vazio" deletaria PDFs já existentes no destino.
+**Fix**: só deletar antigos se `c.pdf_files?.length > 0` (substituir só quando há novos).
 
-#### 3. `src/lib/zipExportImport.ts`
-- Adicionar contagem `updated` além de `imported`/`failed` no resultado retornado pelas edge functions
-- Atualizar UI de progresso para mostrar "X criados, Y atualizados"
+**3. Match de documento por `(user_id + name + document_type)` é frágil para PDFs de contrato**
+PDFs assinados de contrato são todos `name: "Documento do Contrato"` + `document_type: "contrato"` para o mesmo `user_id`. Múltiplos contratos do mesmo cliente colidiriam no upsert.
+**Fix**: priorizar match por `(contract_id + name)` quando `contract_id` está resolvido, antes de cair no match por `user_id+name+document_type`.
 
-#### 4. UI (`Documentos.tsx` e `Contratos.tsx`)
-- Aviso na confirmação de import: "Registros existentes (mesmo número de contrato / mesmo nome+tipo) serão **substituídos** com os dados do ZIP"
-- Toast final mostra criados vs atualizados
+**4. UI: avisos de substituição não mostram nas telas de import**
+`Documentos.tsx` e `Contratos.tsx` não exibem o aviso "registros existentes serão substituídos" antes do usuário clicar importar. Plano anterior previa isso mas ficou só no toast final.
+**Fix**: adicionar `<Alert>` no AlertDialog de confirmação de import.
 
-### Critérios de Match
-- **Contratos**: `contract_number` (campo único e estável entre instâncias)
-- **Documentos**: `user_id + name + document_type` (combinação razoável; arquivos com mesmo nome para o mesmo cliente são tratados como atualização)
+### 🔧 Correções a aplicar
+
+**A. `supabase/functions/import-contracts-zip/index.ts`**
+- Linha 138: condicionar `delete documents` a `Array.isArray(c.pdf_files) && c.pdf_files.length > 0`
+
+**B. `supabase/functions/import-documents-zip/index.ts`**
+- Adicionar 3º critério de match (prioridade máxima): se `contractId` resolvido, buscar `documents` por `(contract_id + name)` antes dos outros critérios
+
+**C. `src/pages/admin/Documentos.tsx` e `src/pages/admin/Contratos.tsx`**
+- Adicionar Alert visual no diálogo de confirmação: "⚠️ Registros existentes (mesmo número de contrato / mesmo nome) serão SUBSTITUÍDOS pelos dados do ZIP"
 
 ### Resultado
-- Reimportar o mesmo ZIP não cria duplicatas
-- Atualizações no projeto A podem ser propagadas ao B simplesmente reexportando e reimportando
-- Assinaturas, blockchain e PDFs são sempre os mais recentes do ZIP
+- Reimportar ZIP sem PDFs não apaga PDFs antigos do contrato
+- PDFs de múltiplos contratos do mesmo cliente não colidem no upsert
+- Usuário vê aviso explícito antes de confirmar substituição
+- Sistema fica 100% confiável para sincronização entre instâncias
