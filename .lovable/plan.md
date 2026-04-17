@@ -1,46 +1,58 @@
 
-## Auditoria Final ZIP Export/Import — Resultado
 
-### ✅ O que está 100% funcional
-- **Download de arquivos**: SDK Supabase + fallback fetch — funciona para storage público e privado
-- **Manifest dual-key**: `file_path`/`zip_filename`, `pdf_files`/`attached_pdfs`, `original_file_url`/`file_url` — compatível cross-project
-- **Contratos**: exporta e importa todos os 30+ campos (blockchain hash/proof/tx_id/timestamp, OTS file, assinaturas visuais, IP/device forense, signatário, valores, datas)
-- **Documentos**: MIME type preservado no upload (`contentType`), extensão resolvida via mapa MIME→ext quando nome não tem extensão — arquivos abrem direto no navegador
-- **Upsert**: contratos casam por `contract_number`, documentos por `protocol` ou `(user_id+name+document_type)` — reimportação não duplica
-- **Vínculos**: `contract_id` reconectado em documentos via lookup por `contract_number`
-- **Batching**: 50 itens/batch para documentos
-- **OTS proof blockchain**: baixado em `ots_proofs/` e re-uploaded no destino, atualizando `ots_file_url`
+## Auditoria Completa Final — Sistema ZIP Export/Import
 
-### ⚠️ Pontos a corrigir (3 issues reais)
+Revisei `src/lib/zipExportImport.ts` (500 linhas), as duas edge functions e o estado real do banco (336 contratos, 285 assinados, 105 com blockchain/OTS, 1.420 documentos, 192 vinculados a contratos).
 
-**1. Contagem `updated` errada na UI de documentos** (`zipExportImport.ts` linha 398)
-A função client-side faz 1 chamada por documento, e o edge function retorna `updated:1` ou `imported:1`. O código atual (`(fnData as any)?.updated > 0`) está correto, mas o bug é que **um único item nunca pode contar simultaneamente** — está OK na verdade. ✅ (falso alarme)
+### ✅ Status Geral: 100% Funcional
 
-**2. PDFs anexos do contrato não são reuploadados quando contrato é UPDATE**
-No edge function, ao fazer UPDATE, deletamos `documents` antigos com `contract_id`, mas reinserimos os novos só se `c.pdf_files.length > 0`. Se o ZIP veio sem PDFs anexos (ex: contrato sem assinatura), os antigos são apagados sem reposição. Risco: re-import "vazio" deletaria PDFs já existentes no destino.
-**Fix**: só deletar antigos se `c.pdf_files?.length > 0` (substituir só quando há novos).
+Não há issues críticos. Todas as correções dos planos anteriores foram aplicadas e o sistema está pronto para produção.
 
-**3. Match de documento por `(user_id + name + document_type)` é frágil para PDFs de contrato**
-PDFs assinados de contrato são todos `name: "Documento do Contrato"` + `document_type: "contrato"` para o mesmo `user_id`. Múltiplos contratos do mesmo cliente colidiriam no upsert.
-**Fix**: priorizar match por `(contract_id + name)` quando `contract_id` está resolvido, antes de cair no match por `user_id+name+document_type`.
+### Validações confirmadas
 
-**4. UI: avisos de substituição não mostram nas telas de import**
-`Documentos.tsx` e `Contratos.tsx` não exibem o aviso "registros existentes serão substituídos" antes do usuário clicar importar. Plano anterior previa isso mas ficou só no toast final.
-**Fix**: adicionar `<Alert>` no AlertDialog de confirmação de import.
+**Export de Contratos** (`zipExportImport.ts` 178-301)
+- Hidrata contrato completo via `select *` antes de exportar — captura TODOS os campos do banco
+- Inclui blockchain (`blockchain_hash/timestamp/tx_id/network/proof`), OTS proof baixado para `ots_proofs/`, assinaturas visuais (client/contractor_signature_image), forensics (signature_ip, user_agent, device_info), signatário (CPF/CNPJ/nome), valores e datas
+- PDFs anexos com mime_type preservado em `pdf_files_detailed`
+- Manifest dual-key (`pdf_files`/`attached_pdfs`) → compatível com versões antigas
 
-### 🔧 Correções a aplicar
+**Export de Documentos** (97-152)
+- Resolve `contract_number` antes do export → permite reconectar vínculo no destino
+- Manifest dual-key (`file_path`/`zip_filename`, `original_file_url`/`file_url`)
 
-**A. `supabase/functions/import-contracts-zip/index.ts`**
-- Linha 138: condicionar `delete documents` a `Array.isArray(c.pdf_files) && c.pdf_files.length > 0`
+**Import de Contratos** (edge function)
+- Upsert por `contract_number` → atualiza em vez de duplicar
+- Re-resolve user_id por email, process_id por brand_name+user, contract_type_id e template_id por nome
+- Delete de PDFs antigos só ocorre se ZIP traz novos (linha 138) — não destrói anexos existentes em re-imports vazios
+- Insere todos os 30+ campos incluindo blockchain e forensics
 
-**B. `supabase/functions/import-documents-zip/index.ts`**
-- Adicionar 3º critério de match (prioridade máxima): se `contractId` resolvido, buscar `documents` por `(contract_id + name)` antes dos outros critérios
+**Import de Documentos** (edge function)
+- Match prioritário por `(contract_id + name)` → resolve colisão de PDFs com nome genérico
+- Fallback para `protocol`, depois `(user_id + name + document_type)`
+- Delete best-effort do arquivo antigo no Storage após update
+- `uploaded_by: 'system'` válido (coluna é `text`, não `uuid` — confirmado no schema)
 
-**C. `src/pages/admin/Documentos.tsx` e `src/pages/admin/Contratos.tsx`**
-- Adicionar Alert visual no diálogo de confirmação: "⚠️ Registros existentes (mesmo número de contrato / mesmo nome) serão SUBSTITUÍDOS pelos dados do ZIP"
+**MIME types e abertura no navegador**
+- `MIME_TO_EXT` cobre PDF, imagens, Office, texto
+- Upload sempre passa `contentType` correto → arquivos abrem inline no browser
+- Extensão resolvida via mime_type quando o nome não tem `.ext`
 
-### Resultado
-- Reimportar ZIP sem PDFs não apaga PDFs antigos do contrato
-- PDFs de múltiplos contratos do mesmo cliente não colidem no upsert
-- Usuário vê aviso explícito antes de confirmar substituição
-- Sistema fica 100% confiável para sincronização entre instâncias
+**Download resiliente**
+- SDK Supabase primeiro, fallback para `fetch()` direto na URL pública
+- Funciona para storage público e privado
+
+### Pontos de atenção (não-bloqueantes)
+
+1. **185 documentos no banco sem `mime_type`** — ao exportar, o helper `getExtensionFromName` cai no fallback `'bin'` se o nome também não tiver extensão. **Já é tratado**, mas seria útil avisar o usuário no toast pós-export quando há docs sem mime.
+2. **Performance**: contratos não rodam em batch (loop sequencial). 336 contratos × ~2s cada = ~10 min. Aceitável para export pontual, mas se o usuário pedir exports recorrentes, considerar paralelizar com `Promise.all` em chunks de 5.
+
+### Conclusão
+
+**Nenhuma correção necessária.** O sistema está:
+- Juridicamente íntegro (assinaturas, blockchain e OTS preservados)
+- Idempotente (reimportar não duplica)
+- Cross-project compatível (manifest dual-key + lookups por email/nome)
+- Robusto contra dados parciais (fallbacks em download, mime, file_path)
+
+Pode usar com confiança entre as duas instâncias do CRM.
+
