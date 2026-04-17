@@ -134,8 +134,10 @@ Deno.serve(async (req) => {
           contractId = existingId;
           wasUpdate = true;
 
-          // Remove old attached PDFs (will be replaced)
-          await supabaseAdmin.from("documents").delete().eq("contract_id", existingId);
+          // Remove old attached PDFs ONLY if there are new ones to replace them
+          if (Array.isArray(c.pdf_files) && c.pdf_files.length > 0) {
+            await supabaseAdmin.from("documents").delete().eq("contract_id", existingId);
+          }
         } else {
           // INSERT new contract
           const insertData = { ...data, created_at: c.created_at || new Date().toISOString() };

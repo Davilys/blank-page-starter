@@ -53,11 +53,21 @@ Deno.serve(async (req) => {
           if (contract) contractId = contract.id;
         }
 
-        // Upsert: find existing document by (user_id + name + document_type) or by protocol
+        // Upsert: find existing by (contract_id + name) [highest priority], protocol, or (user_id + name + document_type)
         let existingId: string | null = null;
         let oldFileUrl: string | null = null;
 
-        if (doc.protocol) {
+        // Priority 1: contract-attached PDFs match by (contract_id + name) to avoid collisions
+        if (contractId) {
+          const { data: existing } = await supabaseAdmin
+            .from("documents").select("id, file_url")
+            .eq("contract_id", contractId)
+            .eq("name", doc.name)
+            .maybeSingle();
+          if (existing) { existingId = existing.id; oldFileUrl = existing.file_url; }
+        }
+
+        if (!existingId && doc.protocol) {
           const { data: existing } = await supabaseAdmin
             .from("documents").select("id, file_url")
             .eq("protocol", doc.protocol).maybeSingle();
