@@ -639,6 +639,10 @@ export default function AdminContratos() {
                   input.onchange = async (e: any) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
+                    const ok = window.confirm(
+                      '⚠️ ATENÇÃO: Contratos existentes com o mesmo número de contrato serão SUBSTITUÍDOS pelos dados do ZIP (HTML, assinaturas, blockchain e PDFs anexos).\n\nDeseja continuar?'
+                    );
+                    if (!ok) return;
                     setZipImporting(true);
                     setZipProgress({ current: 0, total: 1, label: 'Lendo ZIP...' });
                     try {

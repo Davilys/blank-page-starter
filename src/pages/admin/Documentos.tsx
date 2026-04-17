@@ -863,6 +863,10 @@ export default function AdminDocumentos() {
                   input.onchange = async (e: any) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
+                    const ok = window.confirm(
+                      '⚠️ ATENÇÃO: Documentos existentes com o mesmo protocolo, ou mesmo nome+tipo para o mesmo cliente, serão SUBSTITUÍDOS pelos arquivos do ZIP.\n\nDeseja continuar?'
+                    );
+                    if (!ok) return;
                     setZipImporting(true);
                     setZipProgress({ current: 0, total: 1, label: 'Lendo ZIP...' });
                     try {
