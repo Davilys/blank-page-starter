@@ -374,7 +374,7 @@ export async function importDocumentsZip(
 
         const { data: urlData } = supabase.storage.from('documents').getPublicUrl(uploadPath);
 
-        const { error: fnErr } = await supabase.functions.invoke('import-documents-zip', {
+        const { data: fnData, error: fnErr } = await supabase.functions.invoke('import-documents-zip', {
           body: {
             documents: [{
               name: entry.name,
@@ -395,7 +395,8 @@ export async function importDocumentsZip(
           errors.push(`Falha ao registrar no banco: ${entry.name}: ${fnErr.message}`);
           failed++;
         } else {
-          imported++;
+          if ((fnData as any)?.updated > 0) updated++;
+          else imported++;
         }
       } catch (err: any) {
         errors.push(`Erro em ${entry.name}: ${err.message}`);
@@ -404,7 +405,7 @@ export async function importDocumentsZip(
     }
   }
 
-  return { imported, failed, errors };
+  return { imported, updated, failed, errors };
 }
 
 // ─── Import Contracts from ZIP ───────────────────────
