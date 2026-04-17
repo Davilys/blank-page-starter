@@ -473,7 +473,7 @@ export async function importContractsZip(
         }
       }
 
-      const { error: fnErr } = await supabase.functions.invoke('import-contracts-zip', {
+      const { data: fnData, error: fnErr } = await supabase.functions.invoke('import-contracts-zip', {
         body: {
           contracts: [{
             ...entry,
@@ -487,7 +487,8 @@ export async function importContractsZip(
         errors.push(`Falha ao registrar contrato ${entry.contract_number || i}: ${fnErr.message}`);
         failed++;
       } else {
-        imported++;
+        if ((fnData as any)?.updated > 0) updated++;
+        else imported++;
       }
     } catch (err: any) {
       errors.push(`Erro contrato ${entry.contract_number || i}: ${err.message}`);
@@ -495,5 +496,5 @@ export async function importContractsZip(
     }
   }
 
-  return { imported, failed, errors };
+  return { imported, updated, failed, errors };
 }
