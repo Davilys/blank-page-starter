@@ -305,13 +305,14 @@ export async function exportContractsZip(
 export async function importDocumentsZip(
   file: File,
   onProgress?: ProgressCallback
-): Promise<{ imported: number; failed: number; errors: string[] }> {
+): Promise<{ imported: number; updated: number; failed: number; errors: string[] }> {
   const zip = await JSZip.loadAsync(file);
   const manifestFile = zip.file('manifest.json');
   if (!manifestFile) throw new Error('Arquivo manifest.json não encontrado no ZIP');
 
   const rawManifest: any[] = JSON.parse(await manifestFile.async('text'));
   let imported = 0;
+  let updated = 0;
   let failed = 0;
   const errors: string[] = [];
 
@@ -373,7 +374,7 @@ export async function importDocumentsZip(
 
         const { data: urlData } = supabase.storage.from('documents').getPublicUrl(uploadPath);
 
-        const { error: fnErr } = await supabase.functions.invoke('import-documents-zip', {
+        const { data: fnData, error: fnErr } = await supabase.functions.invoke('import-documents-zip', {
           body: {
             documents: [{
               name: entry.name,
@@ -394,7 +395,8 @@ export async function importDocumentsZip(
           errors.push(`Falha ao registrar no banco: ${entry.name}: ${fnErr.message}`);
           failed++;
         } else {
-          imported++;
+          if ((fnData as any)?.updated > 0) updated++;
+          else imported++;
         }
       } catch (err: any) {
         errors.push(`Erro em ${entry.name}: ${err.message}`);
@@ -403,7 +405,7 @@ export async function importDocumentsZip(
     }
   }
 
-  return { imported, failed, errors };
+  return { imported, updated, failed, errors };
 }
 
 // ─── Import Contracts from ZIP ───────────────────────
@@ -411,13 +413,14 @@ export async function importDocumentsZip(
 export async function importContractsZip(
   file: File,
   onProgress?: ProgressCallback
-): Promise<{ imported: number; failed: number; errors: string[] }> {
+): Promise<{ imported: number; updated: number; failed: number; errors: string[] }> {
   const zip = await JSZip.loadAsync(file);
   const manifestFile = zip.file('contracts_manifest.json');
   if (!manifestFile) throw new Error('Arquivo contracts_manifest.json não encontrado no ZIP');
 
   const rawManifest: any[] = JSON.parse(await manifestFile.async('text'));
   let imported = 0;
+  let updated = 0;
   let failed = 0;
   const errors: string[] = [];
 
@@ -470,7 +473,7 @@ export async function importContractsZip(
         }
       }
 
-      const { error: fnErr } = await supabase.functions.invoke('import-contracts-zip', {
+      const { data: fnData, error: fnErr } = await supabase.functions.invoke('import-contracts-zip', {
         body: {
           contracts: [{
             ...entry,
@@ -484,7 +487,8 @@ export async function importContractsZip(
         errors.push(`Falha ao registrar contrato ${entry.contract_number || i}: ${fnErr.message}`);
         failed++;
       } else {
-        imported++;
+        if ((fnData as any)?.updated > 0) updated++;
+        else imported++;
       }
     } catch (err: any) {
       errors.push(`Erro contrato ${entry.contract_number || i}: ${err.message}`);
@@ -492,5 +496,5 @@ export async function importContractsZip(
     }
   }
 
-  return { imported, failed, errors };
+  return { imported, updated, failed, errors };
 }

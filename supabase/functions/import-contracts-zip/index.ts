@@ -23,6 +23,7 @@ Deno.serve(async (req) => {
     }
 
     let imported = 0;
+    let updated = 0;
     let failed = 0;
     const errors: string[] = [];
 
@@ -62,19 +63,16 @@ Deno.serve(async (req) => {
           if (tpl) templateId = tpl.id;
         }
 
-        // Handle contract_number conflict
-        let contractNumber = c.contract_number;
-        if (contractNumber) {
+        // Detect existing contract by contract_number (upsert behavior)
+        let existingId: string | null = null;
+        if (c.contract_number) {
           const { data: existing } = await supabaseAdmin
-            .from("contracts").select("id").eq("contract_number", contractNumber).maybeSingle();
-          if (existing) {
-            contractNumber = `${contractNumber}_imp_${Date.now()}`;
-            errors.push(`Conflito de contract_number: ${c.contract_number} → renomeado para ${contractNumber}`);
-          }
+            .from("contracts").select("id").eq("contract_number", c.contract_number).maybeSingle();
+          if (existing) existingId = existing.id;
         }
 
-        const insertData: any = {
-          contract_number: contractNumber,
+        const data: any = {
+          contract_number: c.contract_number,
           subject: c.subject,
           contract_value: c.contract_value,
           start_date: c.start_date,
@@ -116,19 +114,40 @@ Deno.serve(async (req) => {
           custom_due_date: c.custom_due_date,
           suggested_classes: c.suggested_classes,
           visible_to_client: c.visible_to_client !== undefined ? c.visible_to_client : true,
-          created_at: c.created_at || new Date().toISOString(),
         };
 
         // Strip undefined
-        Object.keys(insertData).forEach(k => insertData[k] === undefined && delete insertData[k]);
+        Object.keys(data).forEach(k => data[k] === undefined && delete data[k]);
 
-        const { data: contract, error: insertErr } = await supabaseAdmin
-          .from("contracts").insert(insertData).select("id").single();
+        let contractId: string;
+        let wasUpdate = false;
 
-        if (insertErr || !contract) {
-          errors.push(`Contrato ${c.contract_number || '?'}: ${insertErr?.message || 'insert failed'}`);
-          failed++;
-          continue;
+        if (existingId) {
+          // UPDATE existing contract
+          const { error: updErr } = await supabaseAdmin
+            .from("contracts").update(data).eq("id", existingId);
+          if (updErr) {
+            errors.push(`Contrato ${c.contract_number || '?'} (update): ${updErr.message}`);
+            failed++;
+            continue;
+          }
+          contractId = existingId;
+          wasUpdate = true;
+
+          // Remove old attached PDFs (will be replaced)
+          await supabaseAdmin.from("documents").delete().eq("contract_id", existingId);
+        } else {
+          // INSERT new contract
+          const insertData = { ...data, created_at: c.created_at || new Date().toISOString() };
+          const { data: contract, error: insertErr } = await supabaseAdmin
+            .from("contracts").insert(insertData).select("id").single();
+
+          if (insertErr || !contract) {
+            errors.push(`Contrato ${c.contract_number || '?'}: ${insertErr?.message || 'insert failed'}`);
+            failed++;
+            continue;
+          }
+          contractId = contract.id;
         }
 
         // Insert associated PDF documents
@@ -140,20 +159,21 @@ Deno.serve(async (req) => {
               document_type: "contrato",
               mime_type: pdf.mime_type || 'application/pdf',
               user_id: userId,
-              contract_id: contract.id,
+              contract_id: contractId,
               uploaded_by: 'system',
             });
           }
         }
 
-        imported++;
+        if (wasUpdate) updated++;
+        else imported++;
       } catch (err: any) {
         errors.push(`Contrato ${c.contract_number || '?'}: ${err.message}`);
         failed++;
       }
     }
 
-    return new Response(JSON.stringify({ imported, failed, errors }), {
+    return new Response(JSON.stringify({ imported, updated, failed, errors }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err: any) {

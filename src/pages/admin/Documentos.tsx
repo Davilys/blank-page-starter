@@ -869,10 +869,15 @@ export default function AdminDocumentos() {
                       const result = await importDocumentsZip(file, (current, total, label) => {
                         setZipProgress({ current, total, label });
                       });
+                      const parts: string[] = [];
+                      if (result.imported > 0) parts.push(`${result.imported} criados`);
+                      if (result.updated > 0) parts.push(`${result.updated} atualizados`);
+                      if (result.failed > 0) parts.push(`${result.failed} falharam`);
+                      const summary = parts.join(', ') || 'Nenhum registro processado';
                       if (result.failed === 0) {
-                        toast.success(`${result.imported} documentos importados com sucesso!`);
+                        toast.success(`Importação concluída: ${summary}`);
                       } else {
-                        toast.warning(`${result.imported} importados, ${result.failed} falharam`);
+                        toast.warning(`Importação parcial: ${summary}`);
                       }
                       if (result.errors.length > 0) console.warn('Import errors:', result.errors);
                       fetchDocuments();

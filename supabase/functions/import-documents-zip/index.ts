@@ -23,6 +23,7 @@ Deno.serve(async (req) => {
     }
 
     let imported = 0;
+    let updated = 0;
     let failed = 0;
     const errors: string[] = [];
 
@@ -52,25 +53,70 @@ Deno.serve(async (req) => {
           if (contract) contractId = contract.id;
         }
 
-        const { error: insertErr } = await supabaseAdmin.from("documents").insert({
+        // Upsert: find existing document by (user_id + name + document_type) or by protocol
+        let existingId: string | null = null;
+        let oldFileUrl: string | null = null;
+
+        if (doc.protocol) {
+          const { data: existing } = await supabaseAdmin
+            .from("documents").select("id, file_url")
+            .eq("protocol", doc.protocol).maybeSingle();
+          if (existing) { existingId = existing.id; oldFileUrl = existing.file_url; }
+        }
+
+        if (!existingId && userId) {
+          const { data: existing } = await supabaseAdmin
+            .from("documents").select("id, file_url")
+            .eq("user_id", userId)
+            .eq("name", doc.name)
+            .eq("document_type", doc.document_type || "outro")
+            .maybeSingle();
+          if (existing) { existingId = existing.id; oldFileUrl = existing.file_url; }
+        }
+
+        const baseData: any = {
           name: doc.name,
           file_url: doc.file_url,
           document_type: doc.document_type || "outro",
           mime_type: doc.mime_type,
           file_size: doc.file_size,
           protocol: doc.protocol,
-          created_at: doc.created_at || new Date().toISOString(),
           user_id: userId,
           process_id: processId,
           contract_id: contractId,
-          uploaded_by: 'system',
-        });
+        };
 
-        if (insertErr) {
-          errors.push(`${doc.name}: ${insertErr.message}`);
-          failed++;
+        if (existingId) {
+          const { error: updErr } = await supabaseAdmin
+            .from("documents").update(baseData).eq("id", existingId);
+          if (updErr) {
+            errors.push(`${doc.name} (update): ${updErr.message}`);
+            failed++;
+          } else {
+            updated++;
+            // Best-effort delete of old file in storage
+            if (oldFileUrl) {
+              const marker = '/storage/v1/object/public/documents/';
+              const idx = oldFileUrl.indexOf(marker);
+              if (idx !== -1) {
+                const oldPath = decodeURIComponent(oldFileUrl.substring(idx + marker.length));
+                await supabaseAdmin.storage.from('documents').remove([oldPath]).catch(() => {});
+              }
+            }
+          }
         } else {
-          imported++;
+          const { error: insertErr } = await supabaseAdmin.from("documents").insert({
+            ...baseData,
+            created_at: doc.created_at || new Date().toISOString(),
+            uploaded_by: 'system',
+          });
+
+          if (insertErr) {
+            errors.push(`${doc.name}: ${insertErr.message}`);
+            failed++;
+          } else {
+            imported++;
+          }
         }
       } catch (err: any) {
         errors.push(`${doc.name}: ${err.message}`);
@@ -78,7 +124,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ imported, failed, errors }), {
+    return new Response(JSON.stringify({ imported, updated, failed, errors }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err: any) {
