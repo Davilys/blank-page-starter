@@ -13,7 +13,6 @@ function extractStoragePath(fileUrl: string): string | null {
 }
 
 async function downloadFile(fileUrl: string): Promise<Blob | null> {
-  // Try Supabase SDK first
   const storagePath = extractStoragePath(fileUrl);
   if (storagePath) {
     try {
@@ -24,8 +23,6 @@ async function downloadFile(fileUrl: string): Promise<Blob | null> {
       console.warn(`SDK download exception for ${storagePath}:`, e.message);
     }
   }
-
-  // Fallback to fetch
   try {
     const response = await fetch(fileUrl);
     if (response.ok) return await response.blob();
@@ -33,8 +30,41 @@ async function downloadFile(fileUrl: string): Promise<Blob | null> {
   } catch (e: any) {
     console.warn(`Fetch exception for ${fileUrl}:`, e.message);
   }
-
   return null;
+}
+
+const MIME_TO_EXT: Record<string, string> = {
+  'application/pdf': 'pdf',
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/svg+xml': 'svg',
+  'application/msword': 'doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.ms-excel': 'xls',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  'text/plain': 'txt',
+  'text/csv': 'csv',
+  'application/zip': 'zip',
+  'application/json': 'json',
+  'application/octet-stream': 'bin',
+};
+
+function getExtensionFromName(name: string, mimeType?: string | null): string {
+  const fromName = name.includes('.') ? name.split('.').pop()!.toLowerCase() : '';
+  if (fromName && fromName.length <= 5) return fromName;
+  if (mimeType && MIME_TO_EXT[mimeType.toLowerCase()]) return MIME_TO_EXT[mimeType.toLowerCase()];
+  return 'bin';
+}
+
+function getMimeFromExt(ext: string): string {
+  const lower = ext.toLowerCase();
+  for (const [mime, e] of Object.entries(MIME_TO_EXT)) {
+    if (e === lower) return mime;
+  }
+  return 'application/octet-stream';
 }
 
 export function downloadBlob(blob: Blob, filename: string) {
@@ -58,26 +88,10 @@ interface DocumentForExport {
   protocol?: string | null;
   user_id: string | null;
   process_id: string | null;
-  created_at: string | null;
   contract_id?: string | null;
+  created_at: string | null;
   profiles?: { full_name: string | null; email: string } | null;
   brand_processes?: { brand_name: string } | null;
-}
-
-interface DocumentManifestEntry {
-  name: string;
-  document_type: string | null;
-  mime_type: string | null;
-  file_size: number | null;
-  protocol: string | null;
-  created_at: string | null;
-  client_email: string | null;
-  brand_name: string | null;
-  // Dual-key for cross-project compatibility
-  file_path: string;
-  zip_filename: string;
-  original_file_url: string;
-  file_url: string;
 }
 
 export async function exportDocumentsZip(
@@ -85,8 +99,19 @@ export async function exportDocumentsZip(
   onProgress?: ProgressCallback
 ): Promise<Blob> {
   const zip = new JSZip();
-  const manifest: DocumentManifestEntry[] = [];
+  const manifest: any[] = [];
   const filesFolder = zip.folder('files')!;
+
+  // Resolve contract_number for documents linked to contracts
+  const contractIds = Array.from(new Set(documents.map(d => d.contract_id).filter(Boolean) as string[]));
+  const contractNumberMap: Record<string, string> = {};
+  if (contractIds.length > 0) {
+    const { data: contractsData } = await supabase
+      .from('contracts')
+      .select('id, contract_number')
+      .in('id', contractIds);
+    (contractsData || []).forEach((c: any) => { if (c.contract_number) contractNumberMap[c.id] = c.contract_number; });
+  }
 
   for (let i = 0; i < documents.length; i++) {
     const doc = documents[i];
@@ -100,7 +125,7 @@ export async function exportDocumentsZip(
       filesFolder.file(safeName, blob);
       fileAdded = true;
     } else {
-      console.error(`Não foi possível baixar o arquivo: ${doc.name} (${doc.file_url})`);
+      console.error(`Não foi possível baixar: ${doc.name} (${doc.file_url})`);
     }
 
     const filePath = fileAdded ? `files/${safeName}` : '';
@@ -114,7 +139,7 @@ export async function exportDocumentsZip(
       created_at: doc.created_at,
       client_email: (doc.profiles as any)?.email || null,
       brand_name: (doc.brand_processes as any)?.brand_name || null,
-      // Write both keys for compatibility
+      contract_number: doc.contract_id ? (contractNumberMap[doc.contract_id] || null) : null,
       file_path: filePath,
       zip_filename: filePath,
       original_file_url: doc.file_url,
@@ -141,33 +166,13 @@ interface ContractForExport {
   description: string | null;
   payment_method: string | null;
   document_type?: string | null;
-  contract_type?: { name: string } | null;
+  contract_type?: { name: string } | string | null;
   contract_template?: { name: string } | null;
   profile?: { full_name: string | null; email: string | null } | null;
   user_id: string | null;
   created_at: string | null;
-}
-
-interface ContractManifestEntry {
-  contract_number: string | null;
-  subject: string | null;
-  contract_value: number | null;
-  start_date: string | null;
-  end_date: string | null;
-  signature_status: string | null;
-  signed_at: string | null;
-  contract_html: string | null;
-  description: string | null;
-  payment_method: string | null;
-  document_type: string | null;
-  contract_type_name: string | null;
-  template_name: string | null;
-  client_email: string | null;
-  client_name: string | null;
-  created_at: string | null;
-  // Dual-key for compatibility
-  pdf_files: string[];
-  attached_pdfs: string[];
+  // Blockchain & signature fields (loaded fresh below)
+  [key: string]: any;
 }
 
 export async function exportContractsZip(
@@ -175,28 +180,48 @@ export async function exportContractsZip(
   onProgress?: ProgressCallback
 ): Promise<Blob> {
   const zip = new JSZip();
-  const manifest: ContractManifestEntry[] = [];
+  const manifest: any[] = [];
   const pdfsFolder = zip.folder('pdfs')!;
+  const otsFolder = zip.folder('ots_proofs')!;
+
+  // Hydrate full contract rows (in case caller passed partial)
+  const ids = contracts.map(c => c.id);
+  const { data: fullContracts } = await supabase
+    .from('contracts')
+    .select('*, contract_type_ref:contract_types(name), contract_template:contract_templates(name), profile:profiles!contracts_user_id_fkey(full_name, email), process:brand_processes(brand_name)')
+    .in('id', ids);
+
+  const fullMap: Record<string, any> = {};
+  (fullContracts || []).forEach((c: any) => { fullMap[c.id] = c; });
 
   for (let i = 0; i < contracts.length; i++) {
-    const c = contracts[i];
+    const original = contracts[i];
+    const c = fullMap[original.id] || original;
     onProgress?.(i + 1, contracts.length, c.contract_number || c.subject || `Contrato ${i + 1}`);
 
-    const pdfFiles: string[] = [];
+    const pdfFiles: { path: string; name: string; mime_type: string }[] = [];
+    let otsPath: string | null = null;
 
+    // Download attached PDFs/documents
     try {
       const { data: docs } = await supabase
         .from('documents')
-        .select('id, name, file_url, protocol')
+        .select('id, name, file_url, protocol, mime_type, document_type')
         .eq('contract_id', c.id);
 
       if (docs && docs.length > 0) {
         for (const doc of docs) {
           const blob = await downloadFile(doc.file_url);
           if (blob) {
-            const safeName = `${(c.contract_number || c.id).replace(/[^a-zA-Z0-9_-]/g, '_')}_${doc.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+            const ext = getExtensionFromName(doc.name, doc.mime_type);
+            const baseName = doc.name.includes('.') ? doc.name : `${doc.name}.${ext}`;
+            const safeName = `${(c.contract_number || c.id).replace(/[^a-zA-Z0-9_-]/g, '_')}_${baseName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
             pdfsFolder.file(safeName, blob);
-            pdfFiles.push(`pdfs/${safeName}`);
+            pdfFiles.push({
+              path: `pdfs/${safeName}`,
+              name: doc.name,
+              mime_type: doc.mime_type || getMimeFromExt(ext),
+            });
           }
         }
       }
@@ -204,26 +229,70 @@ export async function exportContractsZip(
       console.warn(`Erro ao buscar docs do contrato ${c.id}:`, e.message);
     }
 
+    // Download .ots blockchain proof
+    if (c.ots_file_url) {
+      const otsBlob = await downloadFile(c.ots_file_url);
+      if (otsBlob) {
+        const otsName = `${(c.contract_number || c.id).replace(/[^a-zA-Z0-9_-]/g, '_')}.ots`;
+        otsFolder.file(otsName, otsBlob);
+        otsPath = `ots_proofs/${otsName}`;
+      }
+    }
+
+    const pdfPathsLegacy = pdfFiles.map(p => p.path);
+
     manifest.push({
+      // Basic
       contract_number: c.contract_number,
       subject: c.subject,
       contract_value: c.contract_value,
       start_date: c.start_date,
       end_date: c.end_date,
-      signature_status: c.signature_status,
-      signed_at: c.signed_at,
       contract_html: c.contract_html,
       description: c.description,
       payment_method: c.payment_method,
       document_type: c.document_type || null,
-      contract_type_name: c.contract_type?.name || null,
+      contract_type: c.contract_type || null,
+      contract_type_name: c.contract_type_ref?.name || null,
       template_name: c.contract_template?.name || null,
-      client_email: (c.profile as any)?.email || null,
-      client_name: (c.profile as any)?.full_name || null,
+      // Client lookup
+      client_email: c.profile?.email || null,
+      client_name: c.profile?.full_name || null,
+      brand_name: c.process?.brand_name || null,
+      // Signature & forensic
+      signature_status: c.signature_status,
+      signed_at: c.signed_at,
+      signature_token: c.signature_token,
+      signature_expires_at: c.signature_expires_at,
+      signature_ip: c.signature_ip,
+      signature_user_agent: c.signature_user_agent,
+      ip_address: c.ip_address,
+      user_agent: c.user_agent,
+      device_info: c.device_info,
+      client_signature_image: c.client_signature_image,
+      contractor_signature_image: c.contractor_signature_image,
+      signatory_name: c.signatory_name,
+      signatory_cpf: c.signatory_cpf,
+      signatory_cnpj: c.signatory_cnpj,
+      // Blockchain
+      blockchain_hash: c.blockchain_hash,
+      blockchain_timestamp: c.blockchain_timestamp,
+      blockchain_tx_id: c.blockchain_tx_id,
+      blockchain_network: c.blockchain_network,
+      blockchain_proof: c.blockchain_proof,
+      ots_file_url: c.ots_file_url,
+      ots_file_path: otsPath,
+      // Other
+      asaas_payment_id: c.asaas_payment_id,
+      penalty_value: c.penalty_value,
+      custom_due_date: c.custom_due_date,
+      suggested_classes: c.suggested_classes,
+      visible_to_client: c.visible_to_client,
       created_at: c.created_at,
-      // Write both keys
-      pdf_files: pdfFiles,
-      attached_pdfs: pdfFiles,
+      // Files (dual-key compat)
+      pdf_files: pdfPathsLegacy,
+      attached_pdfs: pdfPathsLegacy,
+      pdf_files_detailed: pdfFiles,
     });
   }
 
@@ -246,7 +315,6 @@ export async function importDocumentsZip(
   let failed = 0;
   const errors: string[] = [];
 
-  // Normalize manifest entries for cross-project compatibility
   const manifest = rawManifest.map((entry: any) => ({
     name: entry.name,
     document_type: entry.document_type,
@@ -256,79 +324,82 @@ export async function importDocumentsZip(
     created_at: entry.created_at,
     client_email: entry.client_email,
     brand_name: entry.brand_name,
-    // Accept both field names
+    contract_number: entry.contract_number ?? null,
     file_path: entry.file_path || entry.zip_filename || '',
     original_file_url: entry.original_file_url || entry.file_url || '',
   }));
 
   // Process in batches of 50
   const BATCH_SIZE = 50;
-  for (let i = 0; i < manifest.length; i++) {
-    const entry = manifest[i];
-    onProgress?.(i + 1, manifest.length, entry.name);
+  for (let batchStart = 0; batchStart < manifest.length; batchStart += BATCH_SIZE) {
+    const batch = manifest.slice(batchStart, batchStart + BATCH_SIZE);
 
-    try {
-      let fileBlob: Blob | null = null;
+    for (let j = 0; j < batch.length; j++) {
+      const i = batchStart + j;
+      const entry = batch[j];
+      onProgress?.(i + 1, manifest.length, entry.name);
 
-      // Try from ZIP first using normalized file_path
-      if (entry.file_path) {
-        const fileData = zip.file(entry.file_path);
-        if (fileData) {
-          fileBlob = await fileData.async('blob');
+      try {
+        let fileBlob: Blob | null = null;
+
+        if (entry.file_path) {
+          const fileData = zip.file(entry.file_path);
+          if (fileData) fileBlob = await fileData.async('blob');
         }
-      }
 
-      // Fallback: re-download from original URL
-      if (!fileBlob && entry.original_file_url) {
-        fileBlob = await downloadFile(entry.original_file_url);
-      }
+        if (!fileBlob && entry.original_file_url) {
+          fileBlob = await downloadFile(entry.original_file_url);
+        }
 
-      if (!fileBlob) {
-        errors.push(`Arquivo não encontrado no ZIP para: ${entry.name} (path: ${entry.file_path})`);
+        if (!fileBlob) {
+          errors.push(`Arquivo não encontrado no ZIP: ${entry.name} (path: ${entry.file_path})`);
+          failed++;
+          continue;
+        }
+
+        const ext = getExtensionFromName(entry.name, entry.mime_type);
+        const contentType = entry.mime_type || getMimeFromExt(ext);
+        const uploadPath = `imported/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+        const { error: uploadErr } = await supabase.storage
+          .from('documents')
+          .upload(uploadPath, fileBlob, { cacheControl: '3600', upsert: false, contentType });
+
+        if (uploadErr) {
+          errors.push(`Falha no upload ${entry.name}: ${uploadErr.message}`);
+          failed++;
+          continue;
+        }
+
+        const { data: urlData } = supabase.storage.from('documents').getPublicUrl(uploadPath);
+
+        const { error: fnErr } = await supabase.functions.invoke('import-documents-zip', {
+          body: {
+            documents: [{
+              name: entry.name,
+              file_url: urlData.publicUrl,
+              document_type: entry.document_type,
+              mime_type: contentType,
+              file_size: entry.file_size,
+              protocol: entry.protocol,
+              created_at: entry.created_at,
+              client_email: entry.client_email,
+              brand_name: entry.brand_name,
+              contract_number: entry.contract_number,
+            }],
+          },
+        });
+
+        if (fnErr) {
+          errors.push(`Falha ao registrar no banco: ${entry.name}: ${fnErr.message}`);
+          failed++;
+        } else {
+          imported++;
+        }
+      } catch (err: any) {
+        errors.push(`Erro em ${entry.name}: ${err.message}`);
         failed++;
-        continue;
       }
-
-      const ext = entry.name.split('.').pop() || 'bin';
-      const uploadPath = `imported/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-
-      const { error: uploadErr } = await supabase.storage
-        .from('documents')
-        .upload(uploadPath, fileBlob, { cacheControl: '3600', upsert: false });
-
-      if (uploadErr) {
-        errors.push(`Falha no upload para ${entry.name}: ${uploadErr.message}`);
-        failed++;
-        continue;
-      }
-
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(uploadPath);
-
-      const { error: fnErr } = await supabase.functions.invoke('import-documents-zip', {
-        body: {
-          documents: [{
-            name: entry.name,
-            file_url: urlData.publicUrl,
-            document_type: entry.document_type,
-            mime_type: entry.mime_type,
-            file_size: entry.file_size,
-            protocol: entry.protocol,
-            created_at: entry.created_at,
-            client_email: entry.client_email,
-            brand_name: entry.brand_name,
-          }],
-        },
-      });
-
-      if (fnErr) {
-        errors.push(`Falha ao registrar no banco: ${entry.name}: ${fnErr.message}`);
-        failed++;
-      } else {
-        imported++;
-      }
-    } catch (err: any) {
-      errors.push(`Erro em ${entry.name}: ${err.message}`);
-      failed++;
     }
   }
 
@@ -350,70 +421,60 @@ export async function importContractsZip(
   let failed = 0;
   const errors: string[] = [];
 
-  // Normalize manifest entries for cross-project compatibility
-  const manifest = rawManifest.map((entry: any) => ({
-    contract_number: entry.contract_number,
-    subject: entry.subject,
-    contract_value: entry.contract_value,
-    start_date: entry.start_date,
-    end_date: entry.end_date,
-    signature_status: entry.signature_status,
-    signed_at: entry.signed_at,
-    contract_html: entry.contract_html,
-    description: entry.description,
-    payment_method: entry.payment_method,
-    document_type: entry.document_type,
-    contract_type_name: entry.contract_type_name,
-    template_name: entry.template_name,
-    client_email: entry.client_email,
-    client_name: entry.client_name,
-    created_at: entry.created_at,
-    // Accept both field names
-    pdf_files: entry.pdf_files || entry.attached_pdfs || [],
-  }));
-
-  for (let i = 0; i < manifest.length; i++) {
-    const entry = manifest[i];
-    onProgress?.(i + 1, manifest.length, entry.contract_number || entry.subject || `Contrato ${i + 1}`);
+  for (let i = 0; i < rawManifest.length; i++) {
+    const entry = rawManifest[i];
+    onProgress?.(i + 1, rawManifest.length, entry.contract_number || entry.subject || `Contrato ${i + 1}`);
 
     try {
-      const uploadedPdfs: { name: string; file_url: string }[] = [];
-      for (const pdfPath of entry.pdf_files) {
-        const pdfData = zip.file(pdfPath);
+      // Upload PDFs (preserve mime type)
+      const detailedPdfs: { path: string; name: string; mime_type: string }[] =
+        entry.pdf_files_detailed ||
+        (entry.pdf_files || entry.attached_pdfs || []).map((p: string) => ({
+          path: p, name: p.split('/').pop() || 'documento.pdf', mime_type: 'application/pdf',
+        }));
+
+      const uploadedPdfs: { name: string; file_url: string; mime_type: string }[] = [];
+      for (const pdf of detailedPdfs) {
+        const pdfData = zip.file(pdf.path);
         if (pdfData) {
           const blob = await pdfData.async('blob');
-          const uploadPath = `imported/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.pdf`;
+          const ext = getExtensionFromName(pdf.name, pdf.mime_type);
+          const uploadPath = `imported/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
           const { error: uploadErr } = await supabase.storage
             .from('documents')
-            .upload(uploadPath, blob, { cacheControl: '3600', upsert: false });
+            .upload(uploadPath, blob, { cacheControl: '3600', upsert: false, contentType: pdf.mime_type });
 
           if (!uploadErr) {
             const { data: urlData } = supabase.storage.from('documents').getPublicUrl(uploadPath);
-            uploadedPdfs.push({ name: pdfPath.split('/').pop() || 'documento.pdf', file_url: urlData.publicUrl });
+            uploadedPdfs.push({ name: pdf.name, file_url: urlData.publicUrl, mime_type: pdf.mime_type });
           } else {
-            errors.push(`Falha no upload do PDF ${pdfPath}: ${uploadErr.message}`);
+            errors.push(`Falha upload PDF ${pdf.path}: ${uploadErr.message}`);
           }
-        } else {
-          errors.push(`PDF não encontrado no ZIP: ${pdfPath}`);
+        }
+      }
+
+      // Upload .ots proof if present
+      let otsFileUrl: string | null = entry.ots_file_url || null;
+      if (entry.ots_file_path) {
+        const otsData = zip.file(entry.ots_file_path);
+        if (otsData) {
+          const blob = await otsData.async('blob');
+          const otsUploadPath = `ots-proofs/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.ots`;
+          const { error: otsUpErr } = await supabase.storage
+            .from('documents')
+            .upload(otsUploadPath, blob, { cacheControl: '3600', upsert: false, contentType: 'application/octet-stream' });
+          if (!otsUpErr) {
+            const { data: otsUrl } = supabase.storage.from('documents').getPublicUrl(otsUploadPath);
+            otsFileUrl = otsUrl.publicUrl;
+          }
         }
       }
 
       const { error: fnErr } = await supabase.functions.invoke('import-contracts-zip', {
         body: {
           contracts: [{
-            contract_number: entry.contract_number,
-            subject: entry.subject,
-            contract_value: entry.contract_value,
-            start_date: entry.start_date,
-            end_date: entry.end_date,
-            signature_status: entry.signature_status,
-            signed_at: entry.signed_at,
-            contract_html: entry.contract_html,
-            description: entry.description,
-            payment_method: entry.payment_method,
-            document_type: entry.document_type,
-            client_email: entry.client_email,
-            created_at: entry.created_at,
+            ...entry,
+            ots_file_url: otsFileUrl,
             pdf_files: uploadedPdfs,
           }],
         },
@@ -426,7 +487,7 @@ export async function importContractsZip(
         imported++;
       }
     } catch (err: any) {
-      errors.push(`Erro em contrato ${entry.contract_number || i}: ${err.message}`);
+      errors.push(`Erro contrato ${entry.contract_number || i}: ${err.message}`);
       failed++;
     }
   }

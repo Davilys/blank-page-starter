@@ -6,9 +6,7 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
     const supabaseAdmin = createClient(
@@ -20,8 +18,7 @@ Deno.serve(async (req) => {
     const { documents } = await req.json();
     if (!Array.isArray(documents) || documents.length === 0) {
       return new Response(JSON.stringify({ error: "No documents provided" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -33,26 +30,26 @@ Deno.serve(async (req) => {
       try {
         let userId: string | null = null;
         let processId: string | null = null;
+        let contractId: string | null = null;
 
-        // Resolve user_id by email
         if (doc.client_email) {
           const { data: profile } = await supabaseAdmin
-            .from("profiles")
-            .select("id")
-            .eq("email", doc.client_email)
-            .maybeSingle();
+            .from("profiles").select("id").eq("email", doc.client_email).maybeSingle();
           if (profile) userId = profile.id;
         }
 
-        // Resolve process_id by brand_name
         if (doc.brand_name && userId) {
           const { data: process } = await supabaseAdmin
-            .from("brand_processes")
-            .select("id")
-            .eq("brand_name", doc.brand_name)
-            .eq("user_id", userId)
-            .maybeSingle();
+            .from("brand_processes").select("id")
+            .eq("brand_name", doc.brand_name).eq("user_id", userId).maybeSingle();
           if (process) processId = process.id;
+        }
+
+        if (doc.contract_number) {
+          const { data: contract } = await supabaseAdmin
+            .from("contracts").select("id")
+            .eq("contract_number", doc.contract_number).maybeSingle();
+          if (contract) contractId = contract.id;
         }
 
         const { error: insertErr } = await supabaseAdmin.from("documents").insert({
@@ -65,6 +62,8 @@ Deno.serve(async (req) => {
           created_at: doc.created_at || new Date().toISOString(),
           user_id: userId,
           process_id: processId,
+          contract_id: contractId,
+          uploaded_by: 'system',
         });
 
         if (insertErr) {
@@ -79,14 +78,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(
-      JSON.stringify({ imported, failed, errors }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ imported, failed, errors }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (err: any) {
-    return new Response(
-      JSON.stringify({ error: err.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
