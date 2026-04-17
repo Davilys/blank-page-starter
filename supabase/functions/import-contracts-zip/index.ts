@@ -23,6 +23,7 @@ Deno.serve(async (req) => {
     }
 
     let imported = 0;
+    let updated = 0;
     let failed = 0;
     const errors: string[] = [];
 
