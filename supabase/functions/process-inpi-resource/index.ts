@@ -387,6 +387,9 @@ Você é um ADVOGADO ESPECIALISTA em PROPRIEDADE INDUSTRIAL de ELITE.
 Elabore uma PETIÇÃO DE ${tipoLabel} COMPLETA e ROBUSTA para protocolo no INPI.
 O documento deve ter NO MÍNIMO 2.500 palavras.
 
+⚠️ NÃO escreva o cabeçalho/endereçamento (RECURSO ADMINISTRATIVO, MARCA:, EXCELENTÍSSIMO SENHOR..., Processo INPI nº, Marca, Classe NCL, Titular/Requerente, Procurador). Esse bloco será injetado externamente. Inicie o texto DIRETAMENTE pela Seção "I." com a frase "O titular da marca, ...".
+⚠️ O ÚNICO documento anexado nesta petição é a PROCURAÇÃO devidamente assinada pelo titular. NÃO mencionar nem listar quaisquer outros anexos (RG, comprovante de endereço, contrato social etc.).
+
 #dados
 TITULAR: ${procuradorData.titular || 'N/I'} | CPF/CNPJ: ${procuradorData.cpf_cnpj_titular || 'N/I'}
 Marca: ${procuradorData.marca || 'N/I'} | Processo INPI: ${procuradorData.processo_inpi || 'N/I'} | NCL: ${procuradorData.ncl_class || 'N/I'}
@@ -1025,7 +1028,8 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
     // ═════════════════════════════════════════════════════
     if (resourceType === 'troca_procurador' || resourceType === 'nomeacao_procurador') {
       const { procuradorData, files } = body;
-      const systemPrompt = buildProcuradorPrompt(currentDate, procuradorData || {}, resourceType, agentStrategy, agentName);
+      const pData = procuradorData || {};
+      const systemPrompt = buildProcuradorPrompt(currentDate, pData, resourceType, agentStrategy, agentName);
       
       const userContent: any[] = [{ type: 'text', text: 'Elabore a PETIÇÃO COMPLETA.' }];
       if (files && Array.isArray(files)) {
@@ -1044,10 +1048,53 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
         return new Response(JSON.stringify({ error: `Erro IA: ${result.status}` }), { status: result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       
-      const finalContent = cleanAIContent(result.content);
+      let aiContent = cleanAIContent(result.content);
+
+      // Strip any header the AI may have written, so we can prepend the deterministic one.
+      // Find the first occurrence of "I." / "I -" / "I –" or "1." or "O titular" to keep the body.
+      const bodyMarkerRegex = /(^|\n)\s*(I\s*[\.\-–—]|1\s*[\.\-–—]\s*D[AO]|O\s+titular\s+da\s+marca)/i;
+      const bodyMatch = aiContent.match(bodyMarkerRegex);
+      if (bodyMatch && bodyMatch.index !== undefined) {
+        const offset = bodyMatch.index + (bodyMatch[1] ? bodyMatch[1].length : 0);
+        aiContent = aiContent.substring(offset).trim();
+      } else {
+        // Fallback: remove obvious header lines
+        aiContent = aiContent
+          .replace(/^\s*RECURSO ADMINISTRATIVO[^\n]*\n?/gim, '')
+          .replace(/^\s*MARCA:[^\n]*\n?/gim, '')
+          .replace(/^\s*EXCELENT[ÍI]SSIMO[\s\S]*?PROPRIEDADE\s+INDUSTRIAL\s*[–-]\s*INPI\s*\n?/gim, '')
+          .replace(/^\s*Processo\s+INPI[^\n]*\n?/gim, '')
+          .replace(/^\s*Marca:[^\n]*\n?/gim, '')
+          .replace(/^\s*Classe\s+NCL[^\n]*\n?/gim, '')
+          .replace(/^\s*Titular\/Requerente:[^\n]*\n?/gim, '')
+          .replace(/^\s*Examinador\(a\):[^\n]*\n?/gim, '')
+          .replace(/^\s*Procurador:\s*Davilys[^\n]*\n?/gim, '')
+          .trim();
+      }
+
+      // Build deterministic header from form data (no Examinador line for procurador)
+      const tipoLabel = resourceType === 'troca_procurador' ? 'PETIÇÃO DE TROCA DE PROCURADOR' : 'PETIÇÃO DE NOMEAÇÃO DE PROCURADOR';
+      const marca = (pData.marca || 'N/I').toString().trim() || 'N/I';
+      const marcaUpper = marca.toUpperCase();
+      const processo = (pData.processo_inpi || 'N/I').toString().trim() || 'N/I';
+      const nclClass = (pData.ncl_class || 'N/I').toString().trim() || 'N/I';
+      const titular = (pData.titular || 'N/I').toString().trim() || 'N/I';
+
+      const header = `RECURSO ADMINISTRATIVO – ${tipoLabel}\n\nMARCA: ${marcaUpper}\n\nEXCELENTÍSSIMO SENHOR PRESIDENTE DA DIRETORIA DE MARCAS,\nPATENTES E DESENHOS INDUSTRIAIS DO INSTITUTO NACIONAL\nDA PROPRIEDADE INDUSTRIAL – INPI\n\nProcesso INPI nº: ${processo}\nMarca: ${marca}\nClasse NCL (12ª Ed.): ${nclClass}\nTitular/Requerente: ${titular}\nProcurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79`;
+
+      const finalContent = `${header}\n\n${aiContent}`;
+
+      const extractedData = {
+        process_number: pData.processo_inpi || null,
+        brand_name: pData.marca || null,
+        ncl_class: pData.ncl_class || null,
+        holder: pData.titular || null,
+        examiner_or_opponent: null,
+      };
+
       return new Response(JSON.stringify({
         success: true,
-        extracted_data: {},
+        extracted_data: extractedData,
         resource_content: finalContent,
         resource_type: resourceType,
         resource_type_label: RESOURCE_TYPE_LABELS[resourceType]
