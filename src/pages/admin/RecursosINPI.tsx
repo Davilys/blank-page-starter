@@ -734,7 +734,17 @@ export default function RecursosINPI() {
       if (error) throw error;
       if (!data.success) throw new Error(data.error || 'Erro ao processar petição');
 
-      setExtractedData(data.extracted_data);
+      const fallbackExtracted = {
+        process_number: procuradorData.processo_inpi || null,
+        brand_name: procuradorData.marca || null,
+        ncl_class: procuradorData.ncl_class || null,
+        holder: procuradorData.titular || null,
+        examiner_or_opponent: null,
+      };
+      const finalExtracted = data.extracted_data && Object.keys(data.extracted_data).length > 0
+        ? { ...fallbackExtracted, ...data.extracted_data }
+        : fallbackExtracted;
+      setExtractedData(finalExtracted);
       setDraftContent(data.resource_content);
 
       const { data: { user } } = await supabase.auth.getUser();
