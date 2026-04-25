@@ -175,9 +175,13 @@ INSTRUÇÕES FINAIS:
       const holder = d.holder || 'N/I';
       const examinerOrOpponent = d.examiner_or_opponent || 'N/I';
       const isOposicao = resourceType === 'oposicao';
+      const isProcurador = resourceType === 'troca_procurador' || resourceType === 'nomeacao_procurador';
       const personLabel = isOposicao ? 'Oponente' : 'Examinador(a)';
 
-      const header = `RECURSO ADMINISTRATIVO – ${label}\n\nMARCA: ${brandUpper}\n\nEXCELENTÍSSIMO SENHOR PRESIDENTE DA DIRETORIA DE MARCAS,\nPATENTES E DESENHOS INDUSTRIAIS DO INSTITUTO NACIONAL\nDA PROPRIEDADE INDUSTRIAL – INPI\n\nProcesso INPI nº: ${processNum}\nMarca: ${brandLine}\nClasse NCL (12ª Ed.): ${nclClass}\nTitular/Requerente: ${holder}\n${personLabel}: ${examinerOrOpponent}\nProcurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79`;
+      // Procurador petitions do NOT include an Examinador/Oponente line
+      const personLine = isProcurador ? '' : `\n${personLabel}: ${examinerOrOpponent}`;
+
+      const header = `RECURSO ADMINISTRATIVO – ${label}\n\nMARCA: ${brandUpper}\n\nEXCELENTÍSSIMO SENHOR PRESIDENTE DA DIRETORIA DE MARCAS,\nPATENTES E DESENHOS INDUSTRIAIS DO INSTITUTO NACIONAL\nDA PROPRIEDADE INDUSTRIAL – INPI\n\nProcesso INPI nº: ${processNum}\nMarca: ${brandLine}\nClasse NCL (12ª Ed.): ${nclClass}\nTitular/Requerente: ${holder}${personLine}\nProcurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79`;
 
       // Find section I in adjusted content
       const sectionMatch = trimmed.match(/\n?\s*(I\s*[–—\-\.]\s*)/);
