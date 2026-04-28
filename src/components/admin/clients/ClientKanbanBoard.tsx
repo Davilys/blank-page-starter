@@ -11,7 +11,7 @@ import {
   Eye, MessageCircle, Mail, Phone, Building2, DollarSign, 
   ChevronDown, ChevronRight, GripVertical, Star, Calendar,
   MoreHorizontal, Trash2, UserPlus, UserCheck, CheckCircle, XCircle,
-  ArrowRight, Sparkles, Clock, Hash
+  ArrowRight, Sparkles, Clock, Hash, Shield, Crown, Infinity as InfinityIcon
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -36,6 +36,7 @@ export interface ClientWithProcess {
   priority: string | null;
   origin: string | null;
   contract_value: number | null;
+  plan_type?: 'essencial' | 'premium' | 'corporativo' | null;
   process_id: string | null;
   brand_name: string | null;
   business_area: string | null;
