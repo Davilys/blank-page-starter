@@ -34,6 +34,7 @@ import { PIPELINE_STAGES, COMMERCIAL_PIPELINE_STAGES } from './ClientKanbanBoard
 import { normalizePipelineStageId, sanitizePipelineStagesConfig } from '@/lib/pipelineStage';
 import { ServiceActionPanel } from './ServiceActionPanel';
 import { usePricing } from '@/hooks/usePricing';
+import { PLAN_CONFIG } from './ClientKanbanBoard';
 import { EmailCompose } from '@/components/admin/email/EmailCompose';
 import { CreateInvoiceDialog } from './CreateInvoiceDialog';
 import { Separator } from '@/components/ui/separator';
@@ -59,12 +60,20 @@ interface ClientInvoice { id: string; description: string; amount: number; statu
 const useServicePricingOptions = () => {
   const { pricing } = usePricing();
   return useMemo(() => [
-    { id: 'registro_avista', label: 'Registro de Marca – À Vista', value: Math.round(pricing.avista.value), description: 'Pagamento único via PIX', details: `R$ ${pricing.avista.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} à vista` },
-    { id: 'registro_boleto', label: 'Registro de Marca – Boleto', value: pricing.boleto.value, description: `${pricing.boleto.installments}x de R$ ${pricing.boleto.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, details: `${pricing.boleto.installments}x R$ ${pricing.boleto.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (boleto)` },
-    { id: 'registro_cartao', label: 'Registro de Marca – Cartão', value: pricing.cartao.value, description: `${pricing.cartao.installments}x de R$ ${pricing.cartao.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, details: `${pricing.cartao.installments}x R$ ${pricing.cartao.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (cartão)` },
-    { id: 'exigencia_avista', label: 'Exigência/Publicação – À Vista', value: 1412, description: '1 Salário Mínimo', details: 'R$ 1.412,00 à vista (1 SM)' },
-    { id: 'exigencia_parcelado', label: 'Exigência/Publicação – Parcelado', value: 2388, description: '6x de R$ 398,00', details: '6x R$ 398,00 (boleto ou cartão)' },
-    { id: 'personalizado', label: 'Valor Personalizado', value: 0, description: 'Definir valor manualmente', details: 'Informe o valor e motivo' },
+    // Essencial
+    { id: 'registro_avista',   plan: 'essencial' as const, method: 'avista',   label: 'À Vista (PIX)',          value: Math.round(pricing.avista.value),     description: 'Pagamento único via PIX',                                                                                       details: `R$ ${pricing.avista.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} à vista` },
+    { id: 'registro_boleto',   plan: 'essencial' as const, method: 'boleto',   label: 'Boleto Parcelado',       value: pricing.boleto.value,                 description: `${pricing.boleto.installments}x de R$ ${pricing.boleto.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,            details: `${pricing.boleto.installments}x R$ ${pricing.boleto.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (boleto)` },
+    { id: 'registro_cartao',   plan: 'essencial' as const, method: 'cartao',   label: 'Cartão Parcelado',       value: pricing.cartao.value,                 description: `${pricing.cartao.installments}x de R$ ${pricing.cartao.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,            details: `${pricing.cartao.installments}x R$ ${pricing.cartao.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (cartão)` },
+    // Premium
+    { id: 'premium_mensal',    plan: 'premium' as const,   method: 'cartao',   label: 'Cartão Recorrente',      value: 398,  description: 'R$ 398,00/mês · cobrança mensal automática no cartão',                            details: 'R$ 398,00/mês recorrente (cartão)' },
+    { id: 'premium_boleto',    plan: 'premium' as const,   method: 'boleto',   label: 'Boleto Mensal',          value: 398,  description: 'R$ 398,00/mês · boleto mensal',                                                  details: 'R$ 398,00/mês recorrente (boleto)' },
+    // Corporativo
+    { id: 'corporativo_cartao',plan: 'corporativo' as const,method: 'cartao',  label: 'Cartão Recorrente',      value: 1621, description: 'R$ 1.621,00/mês · cobrança mensal no cartão · marcas ilimitadas',                details: 'R$ 1.621,00/mês recorrente (cartão)' },
+    { id: 'corporativo_boleto',plan: 'corporativo' as const,method: 'boleto',  label: 'Boleto Mensal',          value: 1621, description: 'R$ 1.621,00/mês · boleto mensal · marcas ilimitadas',                            details: 'R$ 1.621,00/mês recorrente (boleto)' },
+    // Outros (fora dos planos)
+    { id: 'exigencia_avista',  plan: null,                  method: 'avista',  label: 'Exigência/Publicação – À Vista',   value: 1412, description: '1 Salário Mínimo', details: 'R$ 1.412,00 à vista (1 SM)' },
+    { id: 'exigencia_parcelado', plan: null,                method: 'cartao',  label: 'Exigência/Publicação – Parcelado', value: 2388, description: '6x de R$ 398,00',  details: '6x R$ 398,00 (boleto ou cartão)' },
+    { id: 'personalizado',     plan: null,                  method: 'avista',  label: 'Valor Personalizado',              value: 0,    description: 'Definir valor manualmente', details: 'Informe o valor e motivo' },
   ], [pricing]);
 };
 
