@@ -673,6 +673,32 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
     try {
       await supabase.from('profiles').update({ priority: editData.priority, origin: editData.origin, contract_value: editData.contract_value }).eq('id', client.id);
       if (client.process_id) await supabase.from('brand_processes').update({ pipeline_stage: editData.pipeline_stage }).eq('id', client.process_id);
+      // Persist plan_type / payment_method on the latest contract for this user
+      if (editData.plan_type || editData.payment_method) {
+        const { data: latest } = await supabase
+          .from('contracts')
+          .select('id')
+          .eq('user_id', client.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const updates: Record<string, any> = { contract_value: editData.contract_value };
+        if (editData.plan_type) updates.plan_type = editData.plan_type;
+        if (editData.payment_method) updates.payment_method = editData.payment_method;
+        if (latest?.id) {
+          await supabase.from('contracts').update(updates).eq('id', latest.id);
+        } else {
+          // No contract yet — create a minimal placeholder so the badge persists
+          await supabase.from('contracts').insert({
+            user_id: client.id,
+            contract_value: editData.contract_value,
+            plan_type: editData.plan_type,
+            payment_method: editData.payment_method,
+            contract_type: 'registro_marca',
+            signature_status: 'not_signed',
+          } as any);
+        }
+      }
       toast.success('Alterações salvas');
       onUpdate();
     } catch { toast.error('Erro ao salvar'); }
