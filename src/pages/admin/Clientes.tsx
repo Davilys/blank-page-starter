@@ -265,6 +265,7 @@ export default function AdminClientes() {
         const assignedToName = (profile as any).assigned_to ? adminNameMap[(profile as any).assigned_to] || null : null;
         // Use contract value from contracts table if available, otherwise from profile
         const contractVal = contractValueMap[profile.id]?.value || profile.contract_value;
+        const planType = (contractValueMap[profile.id]?.plan ?? null) as ClientWithProcess['plan_type'];
         
         if (userProcesses.length === 0) {
           clientsWithProcesses.push({
@@ -276,6 +277,7 @@ export default function AdminClientes() {
             priority: profile.priority,
             origin: profile.origin,
             contract_value: contractVal,
+            plan_type: planType,
             process_id: null,
             brand_name: null,
             business_area: null,
@@ -308,6 +310,7 @@ export default function AdminClientes() {
               priority: profile.priority,
               origin: profile.origin,
               contract_value: contractVal,
+              plan_type: planType,
               process_id: proc.id,
               brand_name: proc.brand_name,
               business_area: proc.business_area || null,
