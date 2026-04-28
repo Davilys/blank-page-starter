@@ -310,7 +310,9 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
   const [expandedStageAction, setExpandedStageAction] = useState<string | null>(null);
   const [sentStagesMap, setSentStagesMap] = useState<Record<string, { sent_at: string; description: string }>>({});
 
-  const [editData, setEditData] = useState({ priority: '', origin: '', contract_value: 0, pipeline_stage: '' });
+  const [editData, setEditData] = useState<{ priority: string; origin: string; contract_value: number; pipeline_stage: string; plan_type: 'essencial' | 'premium' | 'corporativo' | null; payment_method: string | null }>({ priority: '', origin: '', contract_value: 0, pipeline_stage: '', plan_type: null, payment_method: null });
+  const [pricingStep, setPricingStep] = useState<1 | 2>(1);
+  const [selectedPlan, setSelectedPlan] = useState<'essencial' | 'premium' | 'corporativo' | null>(null);
   const [editFormData, setEditFormData] = useState({
     full_name: '', email: '', phone: '', cpf: '', cnpj: '', company_name: '',
     address: '', neighborhood: '', city: '', state: '', zip_code: '',
