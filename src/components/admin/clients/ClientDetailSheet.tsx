@@ -326,7 +326,10 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
       setShowProcessDetails(false);
       setActiveTab('overview');
       setSelectedServiceBrandId(client.process_id || null);
-      setEditData({ priority: client.priority || 'medium', origin: client.origin || 'site', contract_value: client.contract_value || 0, pipeline_stage: client.pipeline_stage || 'protocolado' });
+      const initialPlan = (client as any).plan_type ?? null;
+      setEditData({ priority: client.priority || 'medium', origin: client.origin || 'site', contract_value: client.contract_value || 0, pipeline_stage: client.pipeline_stage || 'protocolado', plan_type: initialPlan, payment_method: null });
+      setSelectedPlan(initialPlan);
+      setPricingStep(initialPlan ? 2 : 1);
       setSelectedServiceType(client.pipeline_stage || 'protocolado');
       setEditFormData({
         full_name: client.full_name || '', email: client.email || '', phone: client.phone || '',
