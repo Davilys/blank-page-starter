@@ -104,6 +104,12 @@ const ORIGIN_CONFIG: Record<string, { icon: typeof MessageCircle; color: string;
   'indicacao': { icon: UserPlus, color: 'text-purple-600', bg: 'bg-purple-100', label: 'Ind' },
 };
 
+export const PLAN_CONFIG: Record<string, { label: string; icon: typeof Shield; className: string }> = {
+  essencial:   { label: 'Essencial',   icon: Shield,       className: 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30' },
+  premium:     { label: 'Premium',     icon: Crown,        className: 'bg-primary/10 text-primary border-primary/30' },
+  corporativo: { label: 'Corporativo', icon: InfinityIcon, className: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30' },
+};
+
 export function ClientKanbanBoard({ clients, onClientClick, onRefresh, filters, funnelType = 'juridico', adminUsers = [], canAssign = false, canViewFinancialValues = true, onConfigOpen, stagesVersion = 0 }: ClientKanbanBoardProps) {
   const [draggedClient, setDraggedClient] = useState<ClientWithProcess | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
