@@ -888,6 +888,7 @@ export type Database = {
           ots_file_url: string | null
           payment_method: string | null
           penalty_value: number | null
+          plan_type: string | null
           process_id: string | null
           signatory_cnpj: string | null
           signatory_cpf: string | null
@@ -933,6 +934,7 @@ export type Database = {
           ots_file_url?: string | null
           payment_method?: string | null
           penalty_value?: number | null
+          plan_type?: string | null
           process_id?: string | null
           signatory_cnpj?: string | null
           signatory_cpf?: string | null
@@ -978,6 +980,7 @@ export type Database = {
           ots_file_url?: string | null
           payment_method?: string | null
           penalty_value?: number | null
+          plan_type?: string | null
           process_id?: string | null
           signatory_cnpj?: string | null
           signatory_cpf?: string | null

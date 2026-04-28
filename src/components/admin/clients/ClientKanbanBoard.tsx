@@ -11,7 +11,7 @@ import {
   Eye, MessageCircle, Mail, Phone, Building2, DollarSign, 
   ChevronDown, ChevronRight, GripVertical, Star, Calendar,
   MoreHorizontal, Trash2, UserPlus, UserCheck, CheckCircle, XCircle,
-  ArrowRight, Sparkles, Clock, Hash
+  ArrowRight, Sparkles, Clock, Hash, Shield, Crown, Infinity as InfinityIcon
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -36,6 +36,7 @@ export interface ClientWithProcess {
   priority: string | null;
   origin: string | null;
   contract_value: number | null;
+  plan_type?: 'essencial' | 'premium' | 'corporativo' | null;
   process_id: string | null;
   brand_name: string | null;
   business_area: string | null;
@@ -101,6 +102,12 @@ const ORIGIN_CONFIG: Record<string, { icon: typeof MessageCircle; color: string;
   'site': { icon: Building2, color: 'text-blue-600', bg: 'bg-blue-100', label: 'Site' },
   'instagram': { icon: Sparkles, color: 'text-pink-600', bg: 'bg-pink-100', label: 'IG' },
   'indicacao': { icon: UserPlus, color: 'text-purple-600', bg: 'bg-purple-100', label: 'Ind' },
+};
+
+export const PLAN_CONFIG: Record<string, { label: string; icon: typeof Shield; className: string }> = {
+  essencial:   { label: 'Essencial',   icon: Shield,       className: 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30' },
+  premium:     { label: 'Premium',     icon: Crown,        className: 'bg-primary/10 text-primary border-primary/30' },
+  corporativo: { label: 'Corporativo', icon: InfinityIcon, className: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30' },
 };
 
 export function ClientKanbanBoard({ clients, onClientClick, onRefresh, filters, funnelType = 'juridico', adminUsers = [], canAssign = false, canViewFinancialValues = true, onConfigOpen, stagesVersion = 0 }: ClientKanbanBoardProps) {
@@ -594,6 +601,16 @@ export function ClientKanbanBoard({ clients, onClientClick, onRefresh, filters, 
                                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                                       {client.origin === 'whatsapp' ? 'what...' : client.origin || 'site'}
                                     </Badge>
+                                    {client.plan_type && PLAN_CONFIG[client.plan_type] && (() => {
+                                      const plan = PLAN_CONFIG[client.plan_type];
+                                      const PlanIcon = plan.icon;
+                                      return (
+                                        <Badge className={cn("text-[10px] px-1.5 py-0 gap-0.5 border", plan.className)}>
+                                          <PlanIcon className="h-2.5 w-2.5" />
+                                          {plan.label}
+                                        </Badge>
+                                      );
+                                    })()}
                                   </div>
 
                                   {/* Responsible Admin - Highlighted */}

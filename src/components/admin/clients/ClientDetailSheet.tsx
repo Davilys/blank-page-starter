@@ -34,6 +34,7 @@ import { PIPELINE_STAGES, COMMERCIAL_PIPELINE_STAGES } from './ClientKanbanBoard
 import { normalizePipelineStageId, sanitizePipelineStagesConfig } from '@/lib/pipelineStage';
 import { ServiceActionPanel } from './ServiceActionPanel';
 import { usePricing } from '@/hooks/usePricing';
+import { PLAN_CONFIG } from './ClientKanbanBoard';
 import { EmailCompose } from '@/components/admin/email/EmailCompose';
 import { CreateInvoiceDialog } from './CreateInvoiceDialog';
 import { Separator } from '@/components/ui/separator';
@@ -59,12 +60,20 @@ interface ClientInvoice { id: string; description: string; amount: number; statu
 const useServicePricingOptions = () => {
   const { pricing } = usePricing();
   return useMemo(() => [
-    { id: 'registro_avista', label: 'Registro de Marca – À Vista', value: Math.round(pricing.avista.value), description: 'Pagamento único via PIX', details: `R$ ${pricing.avista.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} à vista` },
-    { id: 'registro_boleto', label: 'Registro de Marca – Boleto', value: pricing.boleto.value, description: `${pricing.boleto.installments}x de R$ ${pricing.boleto.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, details: `${pricing.boleto.installments}x R$ ${pricing.boleto.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (boleto)` },
-    { id: 'registro_cartao', label: 'Registro de Marca – Cartão', value: pricing.cartao.value, description: `${pricing.cartao.installments}x de R$ ${pricing.cartao.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, details: `${pricing.cartao.installments}x R$ ${pricing.cartao.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (cartão)` },
-    { id: 'exigencia_avista', label: 'Exigência/Publicação – À Vista', value: 1412, description: '1 Salário Mínimo', details: 'R$ 1.412,00 à vista (1 SM)' },
-    { id: 'exigencia_parcelado', label: 'Exigência/Publicação – Parcelado', value: 2388, description: '6x de R$ 398,00', details: '6x R$ 398,00 (boleto ou cartão)' },
-    { id: 'personalizado', label: 'Valor Personalizado', value: 0, description: 'Definir valor manualmente', details: 'Informe o valor e motivo' },
+    // Essencial
+    { id: 'registro_avista',   plan: 'essencial' as const, method: 'avista',   label: 'À Vista (PIX)',          value: Math.round(pricing.avista.value),     description: 'Pagamento único via PIX',                                                                                       details: `R$ ${pricing.avista.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} à vista` },
+    { id: 'registro_boleto',   plan: 'essencial' as const, method: 'boleto',   label: 'Boleto Parcelado',       value: pricing.boleto.value,                 description: `${pricing.boleto.installments}x de R$ ${pricing.boleto.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,            details: `${pricing.boleto.installments}x R$ ${pricing.boleto.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (boleto)` },
+    { id: 'registro_cartao',   plan: 'essencial' as const, method: 'cartao',   label: 'Cartão Parcelado',       value: pricing.cartao.value,                 description: `${pricing.cartao.installments}x de R$ ${pricing.cartao.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,            details: `${pricing.cartao.installments}x R$ ${pricing.cartao.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (cartão)` },
+    // Premium
+    { id: 'premium_mensal',    plan: 'premium' as const,   method: 'cartao',   label: 'Cartão Recorrente',      value: 398,  description: 'R$ 398,00/mês · cobrança mensal automática no cartão',                            details: 'R$ 398,00/mês recorrente (cartão)' },
+    { id: 'premium_boleto',    plan: 'premium' as const,   method: 'boleto',   label: 'Boleto Mensal',          value: 398,  description: 'R$ 398,00/mês · boleto mensal',                                                  details: 'R$ 398,00/mês recorrente (boleto)' },
+    // Corporativo
+    { id: 'corporativo_cartao',plan: 'corporativo' as const,method: 'cartao',  label: 'Cartão Recorrente',      value: 1621, description: 'R$ 1.621,00/mês · cobrança mensal no cartão · marcas ilimitadas',                details: 'R$ 1.621,00/mês recorrente (cartão)' },
+    { id: 'corporativo_boleto',plan: 'corporativo' as const,method: 'boleto',  label: 'Boleto Mensal',          value: 1621, description: 'R$ 1.621,00/mês · boleto mensal · marcas ilimitadas',                            details: 'R$ 1.621,00/mês recorrente (boleto)' },
+    // Outros (fora dos planos)
+    { id: 'exigencia_avista',  plan: null,                  method: 'avista',  label: 'Exigência/Publicação – À Vista',   value: 1412, description: '1 Salário Mínimo', details: 'R$ 1.412,00 à vista (1 SM)' },
+    { id: 'exigencia_parcelado', plan: null,                method: 'cartao',  label: 'Exigência/Publicação – Parcelado', value: 2388, description: '6x de R$ 398,00',  details: '6x R$ 398,00 (boleto ou cartão)' },
+    { id: 'personalizado',     plan: null,                  method: 'avista',  label: 'Valor Personalizado',              value: 0,    description: 'Definir valor manualmente', details: 'Informe o valor e motivo' },
   ], [pricing]);
 };
 
@@ -301,7 +310,9 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
   const [expandedStageAction, setExpandedStageAction] = useState<string | null>(null);
   const [sentStagesMap, setSentStagesMap] = useState<Record<string, { sent_at: string; description: string }>>({});
 
-  const [editData, setEditData] = useState({ priority: '', origin: '', contract_value: 0, pipeline_stage: '' });
+  const [editData, setEditData] = useState<{ priority: string; origin: string; contract_value: number; pipeline_stage: string; plan_type: 'essencial' | 'premium' | 'corporativo' | null; payment_method: string | null }>({ priority: '', origin: '', contract_value: 0, pipeline_stage: '', plan_type: null, payment_method: null });
+  const [pricingStep, setPricingStep] = useState<1 | 2>(1);
+  const [selectedPlan, setSelectedPlan] = useState<'essencial' | 'premium' | 'corporativo' | null>(null);
   const [editFormData, setEditFormData] = useState({
     full_name: '', email: '', phone: '', cpf: '', cnpj: '', company_name: '',
     address: '', neighborhood: '', city: '', state: '', zip_code: '',
@@ -315,7 +326,10 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
       setShowProcessDetails(false);
       setActiveTab('overview');
       setSelectedServiceBrandId(client.process_id || null);
-      setEditData({ priority: client.priority || 'medium', origin: client.origin || 'site', contract_value: client.contract_value || 0, pipeline_stage: client.pipeline_stage || 'protocolado' });
+      const initialPlan = (client as any).plan_type ?? null;
+      setEditData({ priority: client.priority || 'medium', origin: client.origin || 'site', contract_value: client.contract_value || 0, pipeline_stage: client.pipeline_stage || 'protocolado', plan_type: initialPlan, payment_method: null });
+      setSelectedPlan(initialPlan);
+      setPricingStep(initialPlan ? 2 : 1);
       setSelectedServiceType(client.pipeline_stage || 'protocolado');
       setEditFormData({
         full_name: client.full_name || '', email: client.email || '', phone: client.phone || '',
@@ -659,6 +673,32 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
     try {
       await supabase.from('profiles').update({ priority: editData.priority, origin: editData.origin, contract_value: editData.contract_value }).eq('id', client.id);
       if (client.process_id) await supabase.from('brand_processes').update({ pipeline_stage: editData.pipeline_stage }).eq('id', client.process_id);
+      // Persist plan_type / payment_method on the latest contract for this user
+      if (editData.plan_type || editData.payment_method) {
+        const { data: latest } = await supabase
+          .from('contracts')
+          .select('id')
+          .eq('user_id', client.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const updates: Record<string, any> = { contract_value: editData.contract_value };
+        if (editData.plan_type) updates.plan_type = editData.plan_type;
+        if (editData.payment_method) updates.payment_method = editData.payment_method;
+        if (latest?.id) {
+          await supabase.from('contracts').update(updates).eq('id', latest.id);
+        } else {
+          // No contract yet — create a minimal placeholder so the badge persists
+          await supabase.from('contracts').insert({
+            user_id: client.id,
+            contract_value: editData.contract_value,
+            plan_type: editData.plan_type,
+            payment_method: editData.payment_method,
+            contract_type: 'registro_marca',
+            signature_status: 'not_signed',
+          } as any);
+        }
+      }
       toast.success('Alterações salvas');
       onUpdate();
     } catch { toast.error('Erro ao salvar'); }
@@ -3016,39 +3056,139 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         </div>
 
         {/* ─── Pricing Dialog ──────────────────────────────────────────────── */}
-        <Dialog open={showPricingDialog} onOpenChange={setShowPricingDialog}>
+        <Dialog open={showPricingDialog} onOpenChange={(o) => { setShowPricingDialog(o); if (!o) { setPricingStep(selectedPlan ? 2 : 1); } }}>
           <DialogContent className="sm:max-w-lg">
-            <DialogHeader><DialogTitle className="flex items-center gap-2"><Receipt className="h-5 w-5 text-emerald-600" />Selecionar Valor</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Receipt className="h-5 w-5 text-emerald-600" />
+                {pricingStep === 1 ? 'Selecionar Plano' : 'Forma de Pagamento'}
+              </DialogTitle>
+              <DialogDescription>
+                {pricingStep === 1
+                  ? 'Escolha o plano que o cliente assinou. Em seguida você definirá a forma de pagamento.'
+                  : selectedPlan
+                    ? `Plano selecionado: ${PLAN_CONFIG[selectedPlan].label}. Escolha como ele será cobrado.`
+                    : 'Escolha um valor avulso (exigência, publicação ou personalizado).'}
+              </DialogDescription>
+            </DialogHeader>
+
             <ScrollArea className="max-h-[60vh]">
               <div className="py-4 space-y-2 pr-3">
-                <RadioGroup value={selectedPricing} onValueChange={(v) => { setSelectedPricing(v); const opt = SERVICE_PRICING_OPTIONS.find(o => o.id === v); if (opt && v !== 'personalizado') setEditData(prev => ({ ...prev, contract_value: opt.value })); }}>
-                  {SERVICE_PRICING_OPTIONS.map(option => (
-                    <div key={option.id} className={cn('flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all', selectedPricing === option.id ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-border hover:border-emerald-300/40')}
-                      onClick={() => { setSelectedPricing(option.id); const opt = SERVICE_PRICING_OPTIONS.find(o => o.id === option.id); if (opt && option.id !== 'personalizado') setEditData(prev => ({ ...prev, contract_value: opt.value })); }}>
-                      <RadioGroupItem value={option.id} id={option.id} className="mt-1" />
-                      <div className="flex-1">
-                        <label htmlFor={option.id} className="font-medium text-sm cursor-pointer">{option.label}</label>
-                        <p className="text-xs text-muted-foreground">{option.description}</p>
-                        {option.id !== 'personalizado' && <p className="text-sm font-bold text-emerald-600 mt-0.5">R$ {option.value.toLocaleString('pt-BR')}</p>}
-                      </div>
+                {pricingStep === 1 && (
+                  <div className="space-y-2">
+                    {(['essencial','premium','corporativo'] as const).map((planKey) => {
+                      const plan = PLAN_CONFIG[planKey];
+                      const PlanIcon = plan.icon;
+                      const isActive = selectedPlan === planKey;
+                      const subtitle = planKey === 'essencial'
+                        ? 'A partir de R$ 698,97 — pagamento único'
+                        : planKey === 'premium'
+                          ? 'R$ 398/mês — recorrente'
+                          : 'R$ 1.621/mês — marcas ilimitadas';
+                      return (
+                        <button
+                          key={planKey}
+                          type="button"
+                          onClick={() => { setSelectedPlan(planKey); setEditData(prev => ({ ...prev, plan_type: planKey })); }}
+                          className={cn('w-full text-left rounded-xl border-2 p-4 transition-all', isActive ? 'border-primary bg-primary/5 shadow-sm' : 'border-border hover:border-primary/40')}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center border', plan.className)}>
+                              <PlanIcon className="h-5 w-5" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-semibold text-sm">Plano {plan.label}</p>
+                              <p className="text-xs text-muted-foreground">{subtitle}</p>
+                            </div>
+                            {isActive && <Check className="h-4 w-4 text-primary" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedPlan(null); setEditData(prev => ({ ...prev, plan_type: null })); setPricingStep(2); }}
+                        className="w-full text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+                      >
+                        Pular — definir apenas valor avulso (exigência, publicação ou personalizado)
+                      </button>
                     </div>
-                  ))}
-                </RadioGroup>
-                <AnimatePresence>
-                  {selectedPricing === 'personalizado' && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-3 pt-2 overflow-hidden">
-                      <div><Label>Valor (R$)</Label><Input type="number" placeholder="0,00" value={customValue || ''} onChange={(e) => { const v = Number(e.target.value); setCustomValue(v); setEditData(prev => ({ ...prev, contract_value: v })); }} className="mt-1" /></div>
-                      <div><Label>Motivo</Label><Textarea placeholder="Motivo do valor personalizado..." value={customValueReason} onChange={(e) => setCustomValueReason(e.target.value)} rows={2} className="mt-1 resize-none" /></div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                  </div>
+                )}
+
+                {pricingStep === 2 && (
+                  <RadioGroup
+                    value={selectedPricing}
+                    onValueChange={(v) => {
+                      setSelectedPricing(v);
+                      const opt = SERVICE_PRICING_OPTIONS.find(o => o.id === v);
+                      if (opt && v !== 'personalizado') {
+                        setEditData(prev => ({ ...prev, contract_value: opt.value, payment_method: opt.method, plan_type: opt.plan ?? prev.plan_type }));
+                      }
+                    }}
+                  >
+                    {SERVICE_PRICING_OPTIONS
+                      .filter(o => selectedPlan ? (o.plan === selectedPlan || o.id === 'personalizado') : (o.plan === null))
+                      .map(option => (
+                        <div
+                          key={option.id}
+                          className={cn('flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all', selectedPricing === option.id ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-border hover:border-emerald-300/40')}
+                          onClick={() => {
+                            setSelectedPricing(option.id);
+                            if (option.id !== 'personalizado') {
+                              setEditData(prev => ({ ...prev, contract_value: option.value, payment_method: option.method, plan_type: option.plan ?? prev.plan_type }));
+                            }
+                          }}
+                        >
+                          <RadioGroupItem value={option.id} id={option.id} className="mt-1" />
+                          <div className="flex-1">
+                            <label htmlFor={option.id} className="font-medium text-sm cursor-pointer">{option.label}</label>
+                            <p className="text-xs text-muted-foreground">{option.description}</p>
+                            {option.id !== 'personalizado' && <p className="text-sm font-bold text-emerald-600 mt-0.5">R$ {option.value.toLocaleString('pt-BR')}</p>}
+                          </div>
+                        </div>
+                      ))}
+                    <AnimatePresence>
+                      {selectedPricing === 'personalizado' && (
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-3 pt-2 overflow-hidden">
+                          <div><Label>Valor (R$)</Label><Input type="number" placeholder="0,00" value={customValue || ''} onChange={(e) => { const v = Number(e.target.value); setCustomValue(v); setEditData(prev => ({ ...prev, contract_value: v })); }} className="mt-1" /></div>
+                          <div><Label>Motivo</Label><Textarea placeholder="Motivo do valor personalizado..." value={customValueReason} onChange={(e) => setCustomValueReason(e.target.value)} rows={2} className="mt-1 resize-none" /></div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </RadioGroup>
+                )}
               </div>
             </ScrollArea>
-            <DialogFooter>
+
+            <DialogFooter className="gap-2">
+              {pricingStep === 2 && (
+                <Button variant="outline" onClick={() => setPricingStep(1)}>
+                  Voltar
+                </Button>
+              )}
               <Button variant="outline" onClick={() => setShowPricingDialog(false)}>Cancelar</Button>
-              <Button onClick={() => { setShowPricingDialog(false); handleSaveQuickChanges(); toast.success(`Valor: ${editData.contract_value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`); }} className="bg-emerald-600 hover:bg-emerald-700">
-                <Check className="h-4 w-4 mr-2" />Confirmar
-              </Button>
+              {pricingStep === 1 ? (
+                <Button
+                  onClick={() => setPricingStep(2)}
+                  disabled={!selectedPlan}
+                  className="bg-primary hover:bg-primary/90"
+                >
+                  Continuar <ArrowUpRight className="h-4 w-4 ml-1" />
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => {
+                    setShowPricingDialog(false);
+                    handleSaveQuickChanges();
+                    toast.success(`${selectedPlan ? `Plano ${PLAN_CONFIG[selectedPlan].label} · ` : ''}Valor: ${editData.contract_value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`);
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  <Check className="h-4 w-4 mr-2" />Confirmar
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>
