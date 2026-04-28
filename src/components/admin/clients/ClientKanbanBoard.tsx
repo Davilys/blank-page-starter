@@ -601,6 +601,16 @@ export function ClientKanbanBoard({ clients, onClientClick, onRefresh, filters, 
                                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                                       {client.origin === 'whatsapp' ? 'what...' : client.origin || 'site'}
                                     </Badge>
+                                    {client.plan_type && PLAN_CONFIG[client.plan_type] && (() => {
+                                      const plan = PLAN_CONFIG[client.plan_type];
+                                      const PlanIcon = plan.icon;
+                                      return (
+                                        <Badge className={cn("text-[10px] px-1.5 py-0 gap-0.5 border", plan.className)}>
+                                          <PlanIcon className="h-2.5 w-2.5" />
+                                          {plan.label}
+                                        </Badge>
+                                      );
+                                    })()}
                                   </div>
 
                                   {/* Responsible Admin - Highlighted */}
