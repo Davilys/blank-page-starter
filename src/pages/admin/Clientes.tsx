@@ -226,7 +226,7 @@ export default function AdminClientes() {
         fetchAllRows<any>('brand_processes', 'id, user_id, brand_name, business_area, pipeline_stage, status, process_number'),
         fetchAllRows<any>(
           'contracts',
-          'user_id, contract_value, payment_method',
+          'user_id, contract_value, payment_method, plan_type',
           (q) => q.order('created_at', { ascending: false })
         ),
       ]);
@@ -245,10 +245,14 @@ export default function AdminClientes() {
       }
 
       // Build contract value map (latest contract per user)
-      const contractValueMap: Record<string, { value: number; method: string | null }> = {};
+      const contractValueMap: Record<string, { value: number; method: string | null; plan: string | null }> = {};
       for (const c of contracts || []) {
-        if (c.user_id && !contractValueMap[c.user_id] && c.contract_value) {
-          contractValueMap[c.user_id] = { value: Number(c.contract_value), method: c.payment_method };
+        if (c.user_id && !contractValueMap[c.user_id]) {
+          contractValueMap[c.user_id] = {
+            value: c.contract_value ? Number(c.contract_value) : 0,
+            method: c.payment_method ?? null,
+            plan: (c as any).plan_type ?? null,
+          };
         }
       }
 
