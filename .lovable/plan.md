@@ -1,28 +1,41 @@
-# Resetar senha de administradores (apenas Admin Master)
+# Botão "Resetar Senha" no Ficheiro do Cliente
 
 ## Objetivo
-Na aba Configurações → Segurança → Usuários Administradores, adicionar um botão de "Resetar Senha" para cada admin (exceto o próprio Master). Apenas o Admin Master (`davillys@gmail.com`) pode usar essa ação. Ao confirmar, a senha do administrador será redefinida para a senha padrão `123Mudar@`.
+Adicionar um botão de **Resetar Senha** nas "Ações Rápidas" do ficheiro do cliente (que abre ao selecionar um card no Kanban da aba Clientes). Ao clicar, a senha do cliente é resetada para `123Mudar@`, permitindo que ele acesse a Área do Cliente caso tenha esquecido a senha atual.
+
+Sem alterar mais nada no projeto.
 
 ## Mudanças
 
-### 1. Nova Edge Function: `supabase/functions/reset-admin-password/index.ts`
-- Recebe `{ userId }` no body.
-- Valida o chamador via JWT (`supabase.auth.getUser` com o token Authorization).
-- Verifica se o email do chamador é `davillys@gmail.com` (Master). Se não for, retorna 403.
-- Usa `service_role` para chamar `supabaseAdmin.auth.admin.updateUserById(userId, { password: '123Mudar@' })`.
-- Retorna `{ success: true }`.
-- `verify_jwt = true` em `supabase/config.toml`.
+### 1. Edge Function `reset-admin-password` — generalizar para também resetar clientes
+Arquivo: `supabase/functions/reset-admin-password/index.ts`
 
-### 2. `supabase/config.toml`
-- Registrar a nova função `reset-admin-password` com `verify_jwt = true`.
+A função já existe e valida que o chamador é o Master Admin. Vamos:
+- Manter a mesma validação de Master Admin (`davillys@gmail.com`).
+- Aceitar opcionalmente o reset de qualquer usuário (admin ou cliente) por `userId`.
+- Continuar resetando para `123Mudar@`.
 
-### 3. `src/components/admin/settings/SecuritySettings.tsx`
-- Adicionar mutation `resetPasswordMutation` que invoca a edge function `reset-admin-password`.
-- Adicionar botão com ícone `KeyRound` ao lado dos botões "Editar Permissões" e "Remover", visível **apenas** quando `isMasterAdmin === true` e o usuário listado **não** é o próprio Master.
-- Ao clicar, abrir um `AlertDialog` de confirmação informando que a senha será redefinida para `123Mudar@`.
-- Após sucesso, mostrar `toast.success` exibindo a senha padrão e instrução para informá-la ao admin.
+Nenhuma mudança de comportamento para o reset de admins existente — só remove a restrição implícita de "apenas admins". O master admin já é o único autorizado a chamar.
 
-## Detalhes técnicos
-- O botão fica oculto para qualquer admin que não seja o Master, garantindo a regra no front. A validação real de autorização acontece na edge function (server-side), que é a fonte de verdade.
-- A senha padrão `123Mudar@` fica hardcoded na edge function (não trafega do cliente), evitando que alguém manipule o body para definir outra senha.
-- Nenhuma mudança de schema é necessária.
+### 2. `ClientDetailSheet.tsx` — adicionar botão e handler
+Arquivo: `src/components/admin/clients/ClientDetailSheet.tsx`
+
+- Importar ícone `KeyRound` do `lucide-react` e `useCanViewFinancialValues` (para `isMasterAdmin`).
+- Adicionar nova ação ao array `QUICK_ACTIONS` (linha ~1073), visível apenas se `isMasterAdmin`:
+  ```ts
+  { id: 'reset_senha', label: 'Resetar Senha', icon: KeyRound, cls: 'bg-amber-100 ... text-amber-700 ...' }
+  ```
+- Adicionar `case 'reset_senha'` em `handleQuickAction` (linha ~814) que:
+  1. Confirma com o usuário (AlertDialog ou `confirm()` simples seguindo padrão do componente).
+  2. Chama `supabase.functions.invoke('reset-admin-password', { body: { userId: client.id } })`.
+  3. Mostra toast de sucesso com a nova senha `123Mudar@` (duração 10s) ou erro.
+
+### Comportamento final
+- Apenas o **Master Admin** (`davillys@gmail.com`) vê o botão.
+- Ao clicar → confirmação → senha do cliente resetada para `123Mudar@`.
+- Cliente passa a poder logar em `/cliente/login` com seu email + `123Mudar@`.
+- Nenhum outro fluxo é alterado.
+
+## Arquivos afetados
+- `supabase/functions/reset-admin-password/index.ts` (pequeno ajuste / nenhuma mudança de assinatura)
+- `src/components/admin/clients/ClientDetailSheet.tsx` (adicionar ação + handler)
