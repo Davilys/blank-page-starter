@@ -1,86 +1,58 @@
-# Mostrar o Plano no Card do Kanban (Clientes)
+## Diagnóstico (auditoria)
 
-## Diagnóstico
+O erro "Algo deu errado" que aparece quando você deixa o CRM aberto por um tempo e volta **NÃO é um bug do código do dashboard** — é o `AdminErrorBoundary` capturando uma falha de autenticação em cascata.
 
-O card do Kanban do cliente **já tem** lógica para exibir um badge colorido com o nome do plano (Essencial/Premium/Corporativo), mas o badge só aparece quando `client.plan_type` está preenchido.
+### Causa raiz confirmada pelos logs
 
-`Clientes.tsx` lê `plan_type` da tabela `contracts` (último contrato do cliente). Verifiquei o banco e confirmei o problema:
-
-- O contrato do **Evandro** (assinado, R$699): `plan_type = NULL` ❌
-- Outros contratos recentes do template "Padrão Registro de Marca": também `NULL`
-- Todos foram criados via `CreateContractDialog` (admin), não pelo checkout do cliente.
-
-Causa: em `src/components/admin/contracts/CreateContractDialog.tsx` (linha 988, `INSERT INTO contracts`), o campo `plan_type` **não é incluído** no insert. O dialog até reconhece o tipo de template (Premium/Padrão/Corporativo) para preencher assunto e valor automaticamente, mas não grava `plan_type` na tabela.
-
-Resultado: o badge do plano nunca aparece para contratos criados pelo admin — só aparece o valor (R$ 699) e a origem (form_checkout), exatamente como no print.
-
-## Correção
-
-### 1. `CreateContractDialog.tsx` — gravar `plan_type` ao criar o contrato
-
-No INSERT da tabela `contracts` (linha ~988), adicionar `plan_type` derivado do nome do template selecionado, usando a mesma lógica que já existe no dialog para o assunto/valor automático:
-
-```ts
-const tplName = (selectedTemplate?.name || '').toLowerCase();
-let planType: 'essencial' | 'premium' | 'corporativo' | null = null;
-if (tplName.includes('registro de marca')) {
-  if (tplName.includes('corporativo')) planType = 'corporativo';
-  else if (tplName.includes('premium')) planType = 'premium';
-  else if (tplName.includes('padrão') || tplName.includes('padrao')) planType = 'essencial';
-}
-// ...
-.insert({
-  ...,
-  plan_type: planType,
-  ...
-})
+Console do preview mostra:
+```
+AuthApiError: Invalid Refresh Token: Refresh Token Not Found
+status: 400, code: refresh_token_not_found
 ```
 
-Assim, todo novo contrato criado pelo admin já nasce com o `plan_type` correto, e o badge aparecerá no card.
+Sequência do que acontece:
 
-### 2. Migration de backfill — corrigir contratos antigos
+1. Você fica com a aba aberta/inativa por um tempo (ou hiberna o computador).
+2. O JWT do Supabase expira (1h por padrão). Quando o cliente tenta renovar, o refresh token salvo no `localStorage` já não é mais válido (foi rotacionado/expirado/perdido).
+3. O Supabase dispara o erro `refresh_token_not_found` mas **não emite `SIGNED_OUT`** automaticamente nesse caso — a sessão fica em "limbo" (user = null, mas sem evento de logout).
+4. O Dashboard / hooks (`useAdminPermissions`, queries do React Query, RPC `has_role`, etc.) começam a retornar erro 401/throw, e o `AdminErrorBoundary` em `AdminLayout.tsx` (linha 668) renderiza a tela de "Algo deu errado".
+5. "Tentar novamente" só remonta os componentes — a sessão continua quebrada, então o erro volta.
 
-Atualizar contratos já assinados que estão com `plan_type=NULL` mas têm template e/ou valor reconhecíveis:
+### Pontos do código que contribuem
 
-```sql
--- Por template (mais confiável)
-UPDATE contracts SET plan_type='essencial'
-  WHERE plan_type IS NULL AND template_id IN (
-    SELECT id FROM contract_templates
-    WHERE LOWER(name) LIKE '%padrão%registro de marca%'
-       OR LOWER(name) LIKE '%padrao%registro de marca%'
-  );
+- `src/components/admin/AdminLayout.tsx` (linhas 480-496): o `onAuthStateChange` só trata `SIGNED_OUT` e `TOKEN_REFRESHED`. Não há tratamento para falha de refresh (`USER_UPDATED` com erro, ou ausência de sessão após expiração).
+- `src/components/admin/AdminLayout.tsx` (linhas 408-418): há um "fast path" via `sessionStorage.admin_verified` que mantém `isAdmin = true` mesmo com sessão quebrada — por isso o layout renderiza, mas as queries internas falham.
+- `src/integrations/supabase/client.ts`: cliente padrão sem handler global de falha de refresh.
+- Não existe nenhum mecanismo que detecte "voltei à aba após muito tempo" e revalide a sessão proativamente (visibilitychange).
 
-UPDATE contracts SET plan_type='premium'
-  WHERE plan_type IS NULL AND template_id IN (
-    SELECT id FROM contract_templates WHERE LOWER(name) LIKE '%premium%registro de marca%'
-  );
+## Plano de correção
 
-UPDATE contracts SET plan_type='corporativo'
-  WHERE plan_type IS NULL AND template_id IN (
-    SELECT id FROM contract_templates WHERE LOWER(name) LIKE '%corporativo%registro de marca%'
-  );
+### 1. Detectar e tratar refresh token inválido globalmente
+Em `src/integrations/supabase/client.ts`, adicionar um listener global `onAuthStateChange` que, ao receber `SIGNED_OUT` ou ao detectar erro de refresh, limpe o `sessionStorage` (`admin_verified`, `admin_user_id`) e faça redirect limpo para `/cliente/login` em vez de deixar a app em estado quebrado.
 
--- Fallback por valor exato (apenas registros sem template_id)
-UPDATE contracts SET plan_type='essencial'
-  WHERE plan_type IS NULL AND template_id IS NULL AND contract_value IN (699, 698.97);
-UPDATE contracts SET plan_type='premium'
-  WHERE plan_type IS NULL AND template_id IS NULL AND contract_value = 398;
-UPDATE contracts SET plan_type='corporativo'
-  WHERE plan_type IS NULL AND template_id IS NULL AND contract_value = 1621;
-```
+### 2. Revalidar sessão ao voltar para a aba
+Em `AdminLayout.tsx`, adicionar listener `visibilitychange` + `focus`: quando a aba volta a ficar visível, chamar `supabase.auth.getSession()`. Se vier `null` ou erro, limpar cache e redirecionar para login com toast amigável ("Sessão expirou, faça login novamente").
 
-Aditivos/distratos (sem template/valor de plano) permanecem NULL — correto.
+### 3. Tratar falha de refresh sem matar a UI
+No `AdminErrorBoundary` (`src/components/admin/ErrorBoundary.tsx`), inspecionar `this.state.error`: se for `AuthApiError` / `refresh_token_not_found` / `JWT expired`, mostrar mensagem específica ("Sua sessão expirou") com botão "Fazer login novamente" que executa `supabase.auth.signOut()` + redirect, em vez do genérico "Algo deu errado".
+
+### 4. Não confiar cegamente no cache de sessionStorage
+Ajustar o "fast path" em `AdminLayoutInner.checkAdmin` (linhas 412-418) para ainda verificar `supabase.auth.getSession()` em background. Se a sessão real não existir mais, invalidar o cache e redirecionar.
+
+### 5. Garantir que React Query não fique em loop de retry em 401
+Adicionar tratamento em `networkResilience.ts` / nos hooks principais: erro `401` / `JWT expired` / `refresh_token_not_found` **não deve** ser tratado como "connectivity error" e retentado — deve bubble-up para o handler de logout.
+
+## Arquivos a modificar
+
+- `src/integrations/supabase/client.ts` — listener global de auth + handler de refresh failure
+- `src/components/admin/AdminLayout.tsx` — visibilitychange/focus revalidation, fast-path mais seguro
+- `src/components/admin/ErrorBoundary.tsx` — mensagem específica para erros de auth
+- `src/lib/networkResilience.ts` — não classificar 401 como erro de conectividade
+- `src/components/cliente/ClientLayout.tsx` — aplicar o mesmo tratamento (mesma causa pode afetar área do cliente)
 
 ## Resultado esperado
 
-- Card do Evandro passa a mostrar: `MEDIUM` · `form_checkout` · **`Essencial`** (badge azul com ícone de escudo).
-- Cards de contratos Premium e Corporativo mostram seus respectivos badges.
-- Novos contratos criados pelo admin já saem com o plano correto sem ação manual.
-
-## Arquivos afetados
-
-- `src/components/admin/contracts/CreateContractDialog.tsx` — adicionar `plan_type` no INSERT
-- `supabase/migrations/...sql` — backfill dos contratos existentes
-
-Nada mais é alterado.
+- Você não verá mais "Algo deu errado" ao voltar para a aba após inatividade.
+- Quando a sessão realmente expirar, será redirecionado direto para o login com mensagem clara, em vez da tela de erro genérica.
+- Se a renovação de token funcionar (caso comum), nada será interrompido — você continua usando o sistema normalmente.
+- **Nenhuma outra funcionalidade do CRM é alterada.**
