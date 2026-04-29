@@ -200,6 +200,37 @@ export function SecuritySettings() {
         user={editingUser}
       />
 
+      {/* Reset Password Confirmation */}
+      <AlertDialog open={!!resetTarget} onOpenChange={(open) => !open && setResetTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resetar senha do administrador</AlertDialogTitle>
+            <AlertDialogDescription>
+              A senha de <strong>{resetTarget?.fullName || resetTarget?.email}</strong> será redefinida para a senha padrão{' '}
+              <code className="px-1.5 py-0.5 bg-muted rounded font-mono">123Mudar@</code>.
+              <br /><br />
+              Informe ao administrador para que ele faça login e altere a senha imediatamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetPasswordMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (resetTarget) resetPasswordMutation.mutate(resetTarget.id);
+              }}
+              disabled={resetPasswordMutation.isPending}
+            >
+              {resetPasswordMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Resetando...</>
+              ) : (
+                'Resetar Senha'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Admin Users */}
       <Card>
         <CardHeader>
