@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import {
   Trophy, Save, Loader2, Target, Sparkles, TrendingUp,
   Award, FileText, Megaphone, CreditCard, DollarSign,
