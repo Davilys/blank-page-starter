@@ -30,6 +30,7 @@ interface AwardConfig {
     monthly_goal: number;
     milestone_interval: number;
     milestone_bonus: number;
+    milestone_enabled: boolean;
   };
   cobranca: {
     tiers: {
@@ -39,6 +40,7 @@ interface AwardConfig {
     }[];
     milestone_interval: number;
     milestone_bonus: number;
+    milestone_enabled: boolean;
   };
   master_admin_email: string;
 }
@@ -57,6 +59,7 @@ const DEFAULT_CONFIG: AwardConfig = {
     monthly_goal: 50,
     milestone_interval: 10,
     milestone_bonus: 100,
+    milestone_enabled: true,
   },
   cobranca: {
     tiers: [
@@ -68,6 +71,7 @@ const DEFAULT_CONFIG: AwardConfig = {
     ],
     milestone_interval: 10,
     milestone_bonus: 50,
+    milestone_enabled: true,
   },
   master_admin_email: 'davillys@gmail.com',
 };
