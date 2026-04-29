@@ -392,11 +392,21 @@ export default function AssinarDocumento() {
         throw new Error(result.error || 'Erro ao assinar documento');
       }
 
-      // Generate and upload PDF after successful signing
+      // Generate and upload PDF after successful signing — AWAIT to ensure
+      // it completes before we mark as signed and (possibly) navigate away.
+      // Critical for distratos / procurações where there is no payment step
+      // to keep the user on the page.
       if (contract.contract_html) {
         const brandName = contract.subject || 'Documento';
-        
-        // Generate PDF with blockchain data
+
+        // Map DB document_type → renderer documentType
+        const dbType = (contract.document_type || '').toLowerCase();
+        const rendererType: 'contract' | 'procuracao' | 'distrato_multa' | 'distrato_sem_multa' =
+          dbType === 'procuracao' ? 'procuracao'
+          : dbType === 'distrato_multa' ? 'distrato_multa'
+          : dbType === 'distrato_sem_multa' ? 'distrato_sem_multa'
+          : 'contract';
+
         const signedHtml = generateSignedContractHtml(
           displayContractHtml || contract.contract_html,
           brandName,
@@ -408,23 +418,29 @@ export default function AssinarDocumento() {
             txId: result.data?.txId,
             network: result.data?.network,
             ipAddress: result.data?.ipAddress,
-          }
+          },
+          rendererType,
         );
 
-        generateAndUploadContractPdf({
-          contractId: contract.id,
-          contractHtml: signedHtml,
-          brandName,
-          documentType: contract.document_type || 'contrato',
-        }).then(uploadResult => {
+        const toastId = toast.loading('Gerando PDF assinado...');
+        try {
+          const uploadResult = await generateAndUploadContractPdf({
+            contractId: contract.id,
+            contractHtml: signedHtml,
+            brandName,
+            documentType: contract.document_type || 'contrato',
+          });
           if (uploadResult.success) {
             console.log('Signed PDF uploaded successfully:', uploadResult.publicUrl);
+            toast.success('PDF assinado salvo com sucesso!', { id: toastId });
           } else {
             console.error('Failed to upload signed PDF:', uploadResult.error);
+            toast.error('Documento assinado, mas houve falha ao salvar o PDF. Avisaremos o suporte.', { id: toastId });
           }
-        }).catch(err => {
+        } catch (err: any) {
           console.error('Error uploading signed PDF:', err);
-        });
+          toast.error('Documento assinado, mas houve falha ao salvar o PDF.', { id: toastId });
+        }
       }
 
       toast.success('Documento assinado com sucesso!');

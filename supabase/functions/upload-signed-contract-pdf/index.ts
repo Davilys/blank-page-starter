@@ -49,7 +49,12 @@ serve(async (req) => {
       );
     }
 
-    console.log('Uploading signed PDF for contract:', contractId);
+    console.log('Uploading signed PDF for contract:', contractId, {
+      documentType,
+      userId,
+      processId,
+      fileName,
+    });
 
     // Decode base64 PDF
     let pdfData: string = pdfBase64;
@@ -102,24 +107,32 @@ serve(async (req) => {
     // Calculate file size
     const fileSize = bytes.length;
 
-    // Check if document already exists for this contract
-    const { data: existingDoc } = await supabase
-      .from('documents')
-      .select('id, user_id')
-      .eq('contract_id', contractId)
-      .maybeSingle();
-
-    let documentId: string;
-
-    // Get contract data to ensure we have the correct user_id
+    // Get contract data to ensure correct user_id / process_id
     const { data: contractInfo } = await supabase
       .from('contracts')
-      .select('user_id, subject, signatory_name, blockchain_hash')
+      .select('user_id, process_id, subject, signatory_name, blockchain_hash, document_type')
       .eq('id', contractId)
       .single();
 
     const effectiveUserId = userId || contractInfo?.user_id || null;
+    const effectiveProcessId = processId || contractInfo?.process_id || null;
+    const effectiveDocType = documentType || contractInfo?.document_type || 'contrato';
     const documentName = fileName || `Contrato_Assinado_${contractInfo?.subject || contractId}.pdf`;
+
+    // Check if a contract/distrato/procuracao document already exists for this contract.
+    // We filter by contract_id + relevant doc types and use limit(1) instead of
+    // maybeSingle() to avoid errors if duplicates exist.
+    const { data: existingDocs } = await supabase
+      .from('documents')
+      .select('id, user_id')
+      .eq('contract_id', contractId)
+      .in('document_type', ['contrato', 'distrato_multa', 'distrato_sem_multa', 'procuracao'])
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    const existingDoc = existingDocs && existingDocs.length > 0 ? existingDocs[0] : null;
+
+    let documentId: string;
 
     if (existingDoc) {
       // Update existing document with the PDF URL
@@ -131,6 +144,8 @@ serve(async (req) => {
           mime_type: 'application/pdf',
           name: documentName,
           user_id: effectiveUserId, // Ensure user_id is set
+          process_id: effectiveProcessId,
+          document_type: effectiveDocType,
         })
         .eq('id', existingDoc.id)
         .select('id')
@@ -148,12 +163,12 @@ serve(async (req) => {
         .from('documents')
         .insert({
           name: documentName,
-          document_type: documentType || 'contrato',
+          document_type: effectiveDocType,
           file_url: publicUrl,
           file_size: fileSize,
           mime_type: 'application/pdf',
           user_id: effectiveUserId,
-          process_id: processId || null,
+          process_id: effectiveProcessId,
           contract_id: contractId,
           uploaded_by: 'system',
         })

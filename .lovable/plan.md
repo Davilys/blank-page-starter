@@ -1,63 +1,52 @@
-## Adicionar Plano do Cliente ao CRM
+# Correção: PDF do distrato assinado não chega na área do cliente nem nos anexos
 
-Hoje o card do cliente mostra só o valor (R$ 699). Você quer mostrar **qual plano** o cliente assinou (Essencial, Premium ou Corporativo) e poder selecionar/alterar o plano na edição de valor, com a forma de pagamento aparecendo só **depois** de escolher o plano.
+## Diagnóstico
 
-### O que será feito
+Verifiquei no banco: existem vários distratos com `signature_status = 'signed'` (ex.: contrato 20268355 assinado em 28/04), mas **nenhum** registro correspondente na tabela `documents`. Os logs das edge functions também confirmam que `upload-signed-contract-pdf` nunca foi chamada para distratos.
 
-#### 1. Banco de dados — coluna `plan_type` em `contracts`
-Migração nova adicionando:
-- `contracts.plan_type TEXT CHECK (plan_type IN ('essencial','premium','corporativo'))` (nullable).
-- Backfill automático nos contratos existentes baseado no `payment_method`/`contract_value`:
-  - `payment_method = 'avista'` ou valor entre R$ 600–800 → `essencial`
-  - valor mensal recorrente ~R$ 398 → `premium`
-  - valor mensal recorrente ~R$ 1.621 → `corporativo`
-  - resto (exigência, personalizado) → fica `null`
+Causas encontradas em `src/pages/AssinarDocumento.tsx` (função `handleSign`):
 
-#### 2. Card do Kanban (`ClientKanbanBoard.tsx`)
-- Adicionar campo `plan_type` em `ClientWithProcess`.
-- Na query de `Clientes.tsx`, trazer `plan_type` do contrato mais recente (ou via join `contracts`).
-- Renderizar **badge colorido do plano** ao lado do valor:
-  - Essencial → azul (`Shield`)
-  - Premium → roxo/primário (`Crown`) — destaque "Mais popular"
-  - Corporativo → âmbar (`Infinity`)
-- Quando não houver plano definido, não mostra badge (mantém visual atual).
+1. **Upload do PDF é "fire-and-forget"** (linha 414): `generateAndUploadContractPdf({...}).then(...)` é disparado sem `await`. A geração do PDF (html2canvas + jsPDF + base64) leva 5–15 segundos. Como distratos **não têm `payment_method`**, o handler termina imediatamente após `fetchContract()` e o usuário normalmente fecha/sai da página, abortando a Promise antes dela chegar na edge function.
 
-#### 3. Diálogo "Selecionar Valor" (`ClientDetailSheet.tsx`)
-Reformular o fluxo em **2 etapas dentro do mesmo modal**:
+2. **`documentType` errado no gerador de HTML** (linha 400): `generateSignedContractHtml(...)` é chamado com apenas 5 argumentos posicionais, omitindo o 6º parâmetro `documentType`. Resultado: o PDF do distrato sai com cabeçalho de "CONTRATO" em vez de "DISTRATO".
 
-```text
-Etapa 1 — Plano                      Etapa 2 — Forma de pagamento
-┌──────────────────────────┐        ┌──────────────────────────┐
-│ ◉ Plano Essencial        │        │ Plano selecionado: Premium│
-│   R$ 698,97 à vista       │   →    │ ◉ À vista PIX  R$ 398/mês │
-│ ○ Plano Premium          │        │ ○ Cartão 6x               │
-│   R$ 398/mês recorrente  │        │ ○ Boleto recorrente       │
-│ ○ Plano Corporativo      │        │ ○ Valor Personalizado     │
-│   R$ 1.621/mês recorrente│        └──────────────────────────┘
-└──────────────────────────┘                 [Voltar] [Confirmar]
-```
+3. **Falta de feedback ao usuário**: erros do upload caem silenciosamente em `console.error`, sem `toast`, então o cliente acha que tudo foi salvo.
 
-- Etapa 1: cards de plano (mesma estética de `PlanSelectionStep.tsx`).
-- Etapa 2: opções de pagamento filtradas pelo plano escolhido + opção "Valor Personalizado" + opção legacy "Exigência/Publicação".
-- Botão "Confirmar" salva no banco: `contract_value`, `payment_method` e `plan_type` no contrato mais recente do cliente (ou cria registro mínimo se não houver contrato).
-- Após salvar, o `onUpdate()` recarrega os clientes e o badge do plano aparece automaticamente no card do Kanban.
+## Correções a aplicar
 
-#### 4. Persistência
-- `handleSaveQuickChanges` passa a atualizar também `contracts.plan_type` (último contrato `signed`/mais recente do `user_id`). Se o cliente não tem contrato ainda, salva `plan_type` em `profiles.metadata` (jsonb) como fallback temporário até existir contrato.
-- Log de mudança (`activity_logs`) registra "Plano alterado: X → Y".
+### 1. `src/pages/AssinarDocumento.tsx` — função `handleSign`
 
-### Arquivos alterados
+- Trocar `.then(...)` por `await generateAndUploadContractPdf(...)` para garantir que o upload conclua antes de mostrar a tela de sucesso e antes de qualquer navegação.
+- Passar o 6º parâmetro `documentType` para `generateSignedContractHtml`, mapeando `contract.document_type` para um dos valores aceitos (`'contract' | 'procuracao' | 'distrato_multa' | 'distrato_sem_multa'`).
+- Mostrar `toast.error` se o upload falhar (mas manter o `signed = true`, pois a assinatura blockchain já foi gravada).
+- Mostrar um estado de loading "Gerando PDF assinado…" enquanto o upload roda, para o usuário não fechar a aba.
 
-- `supabase/migrations/<novo>.sql` — coluna + backfill
-- `src/integrations/supabase/types.ts` — regenerado automaticamente após migração
-- `src/components/admin/clients/ClientKanbanBoard.tsx` — interface + badge no card
-- `src/components/admin/clients/ClientDetailSheet.tsx` — diálogo em 2 etapas + persistência
-- `src/pages/admin/Clientes.tsx` — incluir `plan_type` na query de clientes
+### 2. `supabase/functions/upload-signed-contract-pdf/index.ts`
 
-### Resultado visual
+- Hoje o `existingDoc` lookup faz `.maybeSingle()` em `contract_id` sem filtrar por tipo. Se já existir qualquer documento ligado ao contrato, ele é sobrescrito. Ajustar para filtrar `document_type ILIKE 'contrato%' OR document_type ILIKE 'distrato%' OR document_type = 'procuracao'` e usar `.limit(1)` em vez de `.maybeSingle()` (que dá erro se houver duplicatas).
+- Garantir que o `process_id` do contrato seja preenchido no documento criado, para o anexo aparecer também na ficha do processo do cliente.
+- Logar em `console.log` o `userId`/`contractId`/`documentType` recebidos para facilitar debug futuro.
 
-No card do Kanban, abaixo do valor, aparecerá uma linha extra:
-```text
-$ R$ 699          [👑 Premium]
-```
-Cor e ícone variando por plano. Ao editar o valor pelo lápis no detalhe do cliente, primeiro escolhe o plano, depois a forma de pagamento, salva, e o badge aparece imediatamente no card.
+### 3. Reprocessar distratos já assinados sem PDF (opcional, recomendado)
+
+Criar uma rotina admin (botão "Regerar PDF assinado" no detalhe do contrato) que:
+- Busca contratos com `signature_status = 'signed'` e sem documento correspondente.
+- Reconstrói o HTML usando `generateSignedContractHtml` com os dados de blockchain já salvos no contrato.
+- Chama `upload-signed-contract-pdf` para cada um.
+
+Alternativa mais simples: um script one-shot via edge function `regenerate-signed-pdfs` que faz o mesmo em lote para todos os distratos pendentes. Posso rodar esse script após o deploy para preencher o histórico.
+
+## Arquivos afetados
+
+- `src/pages/AssinarDocumento.tsx` (handleSign + UI de loading)
+- `supabase/functions/upload-signed-contract-pdf/index.ts` (lookup mais seguro + process_id)
+- `supabase/functions/regenerate-signed-contract-pdfs/index.ts` (nova, opcional, para backfill)
+
+## Resultado esperado
+
+- Ao assinar um distrato (com ou sem multa), o PDF é gerado e enviado **antes** de a tela de sucesso aparecer.
+- O documento fica salvo em `documents` vinculado ao contrato e ao usuário, aparecendo:
+  - Na **área do cliente** (`/cliente/documentos`)
+  - Na **aba Anexos do ficheiro do cliente** no CRM admin
+- Falhas de upload viram `toast.error` visível, em vez de erro silencioso.
+- (Se aprovado o backfill) os distratos já assinados ganham seus PDFs retroativamente.
