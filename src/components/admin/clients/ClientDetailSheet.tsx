@@ -1082,6 +1082,9 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
     { id: 'excluir', label: 'Excluir', icon: Trash2, cls: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200' },
     { id: 'processo', label: 'Detalhes do Processo', icon: FileText, cls: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/60' },
     { id: 'nova_fatura', label: 'Nova Fatura', icon: Receipt, cls: 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300 hover:bg-teal-200 dark:hover:bg-teal-900/60' },
+    ...(isMasterAdmin && client?.email && client.email !== MASTER_ADMIN_EMAIL ? [
+      { id: 'reset_senha', label: 'Resetar Senha', icon: KeyRound, cls: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60' },
+    ] : []),
   ];
 
   const handleTabsWheel = (event: WheelEvent<HTMLDivElement>) => {
