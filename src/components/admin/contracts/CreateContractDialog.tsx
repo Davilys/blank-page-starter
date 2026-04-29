@@ -2217,7 +2217,15 @@ export function CreateContractDialog({ open, onOpenChange, onSuccess, leadId }: 
                         if (tName.includes('monitoramento') || tName.includes('manutencao') || tName.includes('manutenção')) {
                           autoSubject = 'PLANO DE MONITORAMENTO E MANUTENÇÃO - PÓS CERTIFICADO';
                         } else if (tName.includes('registro de marca')) {
-                          autoSubject = 'CONTRATO REGISTRO DE MARCA';
+                          if (tName.includes('corporativo')) {
+                            autoSubject = 'CONTRATO CORPORATIVO DE REGISTRO DE MARCA INPI VALOR R$1621/MES';
+                          } else if (tName.includes('premium')) {
+                            autoSubject = 'CONTRATO PREMIUM DE REGISTRO DE MARCA INPI VALOR R$398/MES';
+                          } else if (tName.includes('padrão') || tName.includes('padrao')) {
+                            autoSubject = 'CONTRATO PADRÃO DE REGISTRO DE MARCA INPI VALOR R$699,00';
+                          } else {
+                            autoSubject = 'CONTRATO REGISTRO DE MARCA';
+                          }
                         } else if (tName.includes('procuração') || tName.includes('procuracao')) {
                           autoSubject = 'PROCURAÇÃO INPI';
                         } else if (tName.includes('distrato')) {
