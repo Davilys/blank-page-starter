@@ -1,52 +1,78 @@
-# Correção: PDF do distrato assinado não chega na área do cliente nem nos anexos
+Auditoria concluída. Encontrei a causa real do erro: o PDF do distrato está sendo gerado e enviado para o Storage, mas a gravação na tabela `documents` falha por restrição do banco.
 
-## Diagnóstico
+Erro confirmado nos logs da Edge Function:
 
-Verifiquei no banco: existem vários distratos com `signature_status = 'signed'` (ex.: contrato 20268355 assinado em 28/04), mas **nenhum** registro correspondente na tabela `documents`. Os logs das edge functions também confirmam que `upload-signed-contract-pdf` nunca foi chamada para distratos.
+```text
+new row for relation "documents" violates check constraint "documents_document_type_check"
+```
 
-Causas encontradas em `src/pages/AssinarDocumento.tsx` (função `handleSign`):
+A restrição atual da tabela `documents` permite tipos como `contrato`, `procuracao`, `anexo`, etc., mas não permite `distrato_multa` nem `distrato_sem_multa`. Por isso:
 
-1. **Upload do PDF é "fire-and-forget"** (linha 414): `generateAndUploadContractPdf({...}).then(...)` é disparado sem `await`. A geração do PDF (html2canvas + jsPDF + base64) leva 5–15 segundos. Como distratos **não têm `payment_method`**, o handler termina imediatamente após `fetchContract()` e o usuário normalmente fecha/sai da página, abortando a Promise antes dela chegar na edge function.
+```text
+Assinatura OK
+PDF gerado OK
+Upload no Storage OK
+Registro em documents FALHA
+Resultado: não aparece em Anexos do CRM
+```
 
-2. **`documentType` errado no gerador de HTML** (linha 400): `generateSignedContractHtml(...)` é chamado com apenas 5 argumentos posicionais, omitindo o 6º parâmetro `documentType`. Resultado: o PDF do distrato sai com cabeçalho de "CONTRATO" em vez de "DISTRATO".
+Também confirmei que há distratos assinados recentes sem nenhum registro em `documents`, inclusive o teste recente de `DISTRATO SEM MULTA DO REGISTRO DE MARCA - WEBMARCAS`.
 
-3. **Falta de feedback ao usuário**: erros do upload caem silenciosamente em `console.error`, sem `toast`, então o cliente acha que tudo foi salvo.
+Plano de correção:
 
-## Correções a aplicar
+1. Corrigir o banco de dados
+   - Criar uma migration para atualizar o check constraint `documents_document_type_check`.
+   - Incluir explicitamente os tipos:
+     - `distrato_multa`
+     - `distrato_sem_multa`
+   - Manter todos os tipos já existentes para não quebrar documentos atuais.
 
-### 1. `src/pages/AssinarDocumento.tsx` — função `handleSign`
+2. Blindar a Edge Function `upload-signed-contract-pdf`
+   - Normalizar o tipo do documento antes de inserir em `documents`.
+   - Garantir que contratos criados como `contract` sejam salvos em `documents` como `contrato` quando necessário.
+   - Garantir que `distrato_multa` e `distrato_sem_multa` sejam salvos corretamente.
+   - Se o insert/update em `documents` falhar, retornar erro real para o frontend em vez de responder `success: true` sem `documentId`. Isso evita falso positivo.
 
-- Trocar `.then(...)` por `await generateAndUploadContractPdf(...)` para garantir que o upload conclua antes de mostrar a tela de sucesso e antes de qualquer navegação.
-- Passar o 6º parâmetro `documentType` para `generateSignedContractHtml`, mapeando `contract.document_type` para um dos valores aceitos (`'contract' | 'procuracao' | 'distrato_multa' | 'distrato_sem_multa'`).
-- Mostrar `toast.error` se o upload falhar (mas manter o `signed = true`, pois a assinatura blockchain já foi gravada).
-- Mostrar um estado de loading "Gerando PDF assinado…" enquanto o upload roda, para o usuário não fechar a aba.
+3. Corrigir a UI da Área do Cliente
+   - A página `/cliente/documentos` hoje só categoriza contrato e procuração; distratos caem como “Outros”.
+   - Ajustar para mostrar distratos com rótulo correto:
+     - “Distrato com Multa”
+     - “Distrato sem Multa”
+   - Isso melhora a visualização para o cliente, mesmo quando o documento vem da tabela `contracts`.
 
-### 2. `supabase/functions/upload-signed-contract-pdf/index.ts`
+4. Corrigir/compatibilizar Anexos no CRM
+   - A aba Anexos do ficheiro do cliente busca `documents` por `user_id`; após corrigir o banco, novos distratos assinados passarão a aparecer automaticamente.
+   - Melhorar o nome/rótulo exibido quando o documento for distrato, para ficar claro no ficheiro.
 
-- Hoje o `existingDoc` lookup faz `.maybeSingle()` em `contract_id` sem filtrar por tipo. Se já existir qualquer documento ligado ao contrato, ele é sobrescrito. Ajustar para filtrar `document_type ILIKE 'contrato%' OR document_type ILIKE 'distrato%' OR document_type = 'procuracao'` e usar `.limit(1)` em vez de `.maybeSingle()` (que dá erro se houver duplicatas).
-- Garantir que o `process_id` do contrato seja preenchido no documento criado, para o anexo aparecer também na ficha do processo do cliente.
-- Logar em `console.log` o `userId`/`contractId`/`documentType` recebidos para facilitar debug futuro.
+5. Recuperar distratos já assinados e sem anexo
+   - Criar/ajustar uma rotina de backfill para registrar em `documents` os PDFs de distratos já enviados ao Storage mas que falharam no insert.
+   - Para os casos em que o PDF existe em `storage.objects`, criar o registro correspondente em `documents` com:
+     - `contract_id`
+     - `user_id`
+     - `process_id` quando existir
+     - `document_type`
+     - `file_url`
+     - `mime_type = application/pdf`
+     - `file_size`
+   - Para casos sem PDF no Storage, deixar a rotina pronta para identificar pendências e permitir regeneração.
 
-### 3. Reprocessar distratos já assinados sem PDF (opcional, recomendado)
+6. Teste de validação
+   - Testar com distrato com multa e sem multa.
+   - Validar que após assinar:
+     - o PDF é gerado;
+     - o registro aparece em `documents`;
+     - aparece na aba Anexos do CRM;
+     - aparece na Área do Cliente;
+     - o tipo/nome do documento aparece corretamente.
 
-Criar uma rotina admin (botão "Regerar PDF assinado" no detalhe do contrato) que:
-- Busca contratos com `signature_status = 'signed'` e sem documento correspondente.
-- Reconstrói o HTML usando `generateSignedContractHtml` com os dados de blockchain já salvos no contrato.
-- Chama `upload-signed-contract-pdf` para cada um.
+Arquivos/áreas que serão alterados:
 
-Alternativa mais simples: um script one-shot via edge function `regenerate-signed-pdfs` que faz o mesmo em lote para todos os distratos pendentes. Posso rodar esse script após o deploy para preencher o histórico.
+```text
+supabase/migrations/...sql
+supabase/functions/upload-signed-contract-pdf/index.ts
+supabase/functions/regenerate-signed-contract-pdfs/index.ts ou nova rotina de backfill
+src/pages/cliente/Documentos.tsx
+src/components/admin/clients/ClientDetailSheet.tsx
+```
 
-## Arquivos afetados
-
-- `src/pages/AssinarDocumento.tsx` (handleSign + UI de loading)
-- `supabase/functions/upload-signed-contract-pdf/index.ts` (lookup mais seguro + process_id)
-- `supabase/functions/regenerate-signed-contract-pdfs/index.ts` (nova, opcional, para backfill)
-
-## Resultado esperado
-
-- Ao assinar um distrato (com ou sem multa), o PDF é gerado e enviado **antes** de a tela de sucesso aparecer.
-- O documento fica salvo em `documents` vinculado ao contrato e ao usuário, aparecendo:
-  - Na **área do cliente** (`/cliente/documentos`)
-  - Na **aba Anexos do ficheiro do cliente** no CRM admin
-- Falhas de upload viram `toast.error` visível, em vez de erro silencioso.
-- (Se aprovado o backfill) os distratos já assinados ganham seus PDFs retroativamente.
+Resultado esperado: distrato com multa e sem multa, depois de assinado, ficará salvo como PDF e visível tanto no ficheiro do cliente em Anexos quanto na área do cliente.

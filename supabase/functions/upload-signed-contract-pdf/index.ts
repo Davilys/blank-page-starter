@@ -116,7 +116,16 @@ serve(async (req) => {
 
     const effectiveUserId = userId || contractInfo?.user_id || null;
     const effectiveProcessId = processId || contractInfo?.process_id || null;
-    const effectiveDocType = documentType || contractInfo?.document_type || 'contrato';
+    // Normalize document type to a value accepted by the documents check constraint
+    const rawDocType = (documentType || contractInfo?.document_type || 'contrato').toLowerCase();
+    const ALLOWED_DOC_TYPES = new Set([
+      'contract', 'signed_contract', 'contrato', 'anexo', 'outro',
+      'procuracao', 'invoice', 'receipt', 'identity', 'power_of_attorney',
+      'other', 'distrato', 'distrato_multa', 'distrato_sem_multa',
+    ]);
+    const effectiveDocType = rawDocType === 'contract'
+      ? 'contrato'
+      : (ALLOWED_DOC_TYPES.has(rawDocType) ? rawDocType : 'contrato');
     const documentName = fileName || `Contrato_Assinado_${contractInfo?.subject || contractId}.pdf`;
 
     // Check if a contract/distrato/procuracao document already exists for this contract.
@@ -132,7 +141,8 @@ serve(async (req) => {
 
     const existingDoc = existingDocs && existingDocs.length > 0 ? existingDocs[0] : null;
 
-    let documentId: string;
+    let documentId: string = '';
+    let documentInsertError: any = null;
 
     if (existingDoc) {
       // Update existing document with the PDF URL
@@ -153,6 +163,7 @@ serve(async (req) => {
 
       if (updateError) {
         console.error('Error updating document:', updateError);
+        documentInsertError = updateError;
       } else {
         documentId = updatedDoc?.id || existingDoc.id;
         console.log('Updated document with PDF URL:', documentId);
@@ -177,7 +188,7 @@ serve(async (req) => {
 
       if (insertError) {
         console.error('Error creating document entry:', insertError);
-        // Don't fail - PDF was uploaded successfully
+        documentInsertError = insertError;
       } else {
         documentId = newDoc?.id || '';
         console.log('Created document entry:', documentId);
@@ -204,14 +215,15 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        success: true,
+        success: !documentInsertError,
         data: {
           contractId,
           documentId: documentId!,
           filePath,
           publicUrl,
           fileSize,
-        }
+        },
+        ...(documentInsertError ? { warning: 'PDF salvo no storage, mas falhou ao registrar em documents', details: documentInsertError } : {}),
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

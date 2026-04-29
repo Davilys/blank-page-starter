@@ -57,6 +57,7 @@ const TABS = [
   { key: 'all',        label: 'Todos',       icon: FolderOpen,      colorRgb: '99,102,241' },
   { key: 'contrato',   label: 'Contrato',    icon: FileSignature,   colorRgb: '59,130,246' },
   { key: 'procuracao', label: 'Procuração',  icon: Scale,           colorRgb: '139,92,246' },
+  { key: 'distrato',   label: 'Distrato',    icon: X,               colorRgb: '244,63,94'  },
   { key: 'taxa',       label: 'Taxa',        icon: BadgeDollarSign, colorRgb: '16,185,129' },
   { key: 'busca_inpi', label: 'Busca INPI',  icon: Building2,       colorRgb: '249,115,22' },
   { key: 'certificado',label: 'Certificado', icon: Award,           colorRgb: '234,179,8'  },
@@ -69,13 +70,14 @@ const TABS = [
 type TabKey = typeof TABS[number]['key'];
 
 // Types that map to "outros" bucket
-const OUTRO_TYPES = new Set(['outro', 'anexo', 'laudo', 'notificacao', 'distrato', 'imagem']);
+const OUTRO_TYPES = new Set(['outro', 'anexo', 'laudo', 'notificacao', 'imagem']);
 
 function normalizeType(raw: string | null | undefined): TabKey {
   if (!raw) return 'outro';
   const t = raw.toLowerCase().trim();
   if (t === 'contrato') return 'contrato';
   if (t === 'procuracao' || t === 'procuração') return 'procuracao';
+  if (t === 'distrato' || t === 'distrato_multa' || t === 'distrato_sem_multa') return 'distrato';
   if (t === 'taxa') return 'taxa';
   if (t === 'busca_inpi' || t === 'busca inpi') return 'busca_inpi';
   if (t === 'certificado') return 'certificado';
@@ -513,6 +515,7 @@ export default function Documentos() {
     const contractDocs: Document[] = (contracts || []).map(c => {
       let docType = 'contrato';
       if (c.document_type === 'procuracao') docType = 'procuracao';
+      if (c.document_type === 'distrato_multa' || c.document_type === 'distrato_sem_multa' || c.document_type === 'distrato') docType = 'distrato';
       return {
         id: `contract-${c.id}`,
         name: c.subject || 'Contrato sem título',
