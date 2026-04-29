@@ -98,3 +98,6 @@ verify_jwt = false
 
 [functions.firecrawl-scrape]
 verify_jwt = false
+
+[functions.reset-admin-password]
+verify_jwt = true
