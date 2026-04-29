@@ -16,6 +16,22 @@ export function isConnectivityError(error: unknown): boolean {
       : (error as { message?: string })?.message ?? '';
 
   const normalized = message.toLowerCase();
+  const code = ((error as { code?: string })?.code || '').toLowerCase();
+  const status = (error as { status?: number })?.status;
+
+  // Auth-session errors (expired/invalid refresh token, JWT expired, 401) are
+  // NOT connectivity issues — never retry them, let authRecovery handle them.
+  if (
+    status === 401 ||
+    code === 'refresh_token_not_found' ||
+    code === 'session_not_found' ||
+    normalized.includes('refresh token not found') ||
+    normalized.includes('invalid refresh token') ||
+    normalized.includes('jwt expired')
+  ) {
+    return false;
+  }
+
   return (
     normalized.includes('failed to fetch') ||
     normalized.includes('networkerror') ||
