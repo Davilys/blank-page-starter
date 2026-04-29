@@ -881,6 +881,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         }
         break;
       case 'nova_fatura': setShowNewInvoiceDialog(true); break;
+      case 'reset_senha': setShowResetPasswordDialog(true); break;
     }
   };
 
