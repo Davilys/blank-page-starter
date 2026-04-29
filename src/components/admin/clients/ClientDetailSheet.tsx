@@ -3428,6 +3428,54 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* ─── RESET CLIENT PASSWORD ─── */}
+      <AlertDialog open={showResetPasswordDialog} onOpenChange={setShowResetPasswordDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-amber-600" />
+              Resetar Senha do Cliente
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              A senha de <strong>{client?.full_name || client?.email}</strong> será redefinida para a senha padrão{' '}
+              <code className="px-1.5 py-0.5 bg-muted rounded font-mono">123Mudar@</code>.
+              <br /><br />
+              O cliente poderá acessar a Área do Cliente com seu e-mail e essa nova senha. Informe-o para que altere a senha após o login.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resettingPassword}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={resettingPassword}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!client?.id) return;
+                setResettingPassword(true);
+                try {
+                  const { data, error } = await supabase.functions.invoke('reset-admin-password', {
+                    body: { userId: client.id },
+                  });
+                  if (error) throw error;
+                  if ((data as any)?.error) throw new Error((data as any).error);
+                  toast.success(`Senha redefinida! Nova senha: 123Mudar@`, { duration: 10000 });
+                  setShowResetPasswordDialog(false);
+                } catch (err: any) {
+                  toast.error(err?.message || 'Erro ao resetar senha');
+                } finally {
+                  setResettingPassword(false);
+                }
+              }}
+            >
+              {resettingPassword ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Resetando...</>
+              ) : (
+                'Resetar Senha'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <CreateInvoiceDialog
         open={showNewInvoiceDialog}
         onOpenChange={setShowNewInvoiceDialog}
