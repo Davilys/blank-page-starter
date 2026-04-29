@@ -985,11 +985,21 @@ export function CreateContractDialog({ open, onOpenChange, onSuccess, leadId }: 
       // Get current admin user to register as contract creator
       const { data: { user: adminUser } } = await supabase.auth.getUser();
 
+      // Derive plan_type from selected template name (Registro de Marca: padrão/premium/corporativo)
+      const tplNameLc = (selectedTemplate?.name || '').toLowerCase();
+      let planType: 'essencial' | 'premium' | 'corporativo' | null = null;
+      if (tplNameLc.includes('registro de marca')) {
+        if (tplNameLc.includes('corporativo')) planType = 'corporativo';
+        else if (tplNameLc.includes('premium')) planType = 'premium';
+        else if (tplNameLc.includes('padrão') || tplNameLc.includes('padrao')) planType = 'essencial';
+      }
+
       const { data: contract, error } = await supabase.from('contracts').insert({
         user_id: userId,
         contract_number: generateContractNumber(),
         subject: contractSubject,
         contract_value: contractValue,
+        plan_type: planType,
         start_date: formData.start_date,
         end_date: formData.end_date || null,
         template_id: selectedTemplate?.id || null,
