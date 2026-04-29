@@ -62,11 +62,13 @@ interface AwardConfig {
     monthly_goal: number;
     milestone_interval: number;
     milestone_bonus: number;
+    milestone_enabled?: boolean;
   };
   cobranca: {
     tiers: { min: number; max: number; rate: number }[];
     milestone_interval: number;
     milestone_bonus: number;
+    milestone_enabled?: boolean;
   };
   master_admin_email: string;
 }
@@ -74,7 +76,7 @@ interface AwardConfig {
 const DEFAULT_CONFIG: AwardConfig = {
   enabled: true,
   registro_marca: { base_rate: 50, above_goal_avista_rate: 100, above_goal_parcelado_rate: 50, monthly_goal: 30 },
-  publicacao: { base_rate: 50, above_goal_rate: 100, monthly_goal: 50, milestone_interval: 10, milestone_bonus: 100 },
+  publicacao: { base_rate: 50, above_goal_rate: 100, monthly_goal: 50, milestone_interval: 10, milestone_bonus: 100, milestone_enabled: true },
   cobranca: {
     tiers: [
       { min: 199, max: 397, rate: 10 },
@@ -85,6 +87,7 @@ const DEFAULT_CONFIG: AwardConfig = {
     ],
     milestone_interval: 10,
     milestone_bonus: 50,
+    milestone_enabled: true,
   },
   master_admin_email: 'davillys@gmail.com',
 };
@@ -117,6 +120,9 @@ function calcPublicacaoPremium(entries: AwardEntry[], cfg: AwardConfig['publicac
 function calcPublicacaoMilestoneBonus(entries: AwardEntry[], cfg: AwardConfig['publicacao']): { bonus: number; milestones: number; nextAt: number } {
   const totalPubs = entries.reduce((s, e) => s + (e.pub_quantity || 1), 0);
   const interval = cfg.milestone_interval || 10;
+  if (cfg.milestone_enabled === false) {
+    return { bonus: 0, milestones: 0, nextAt: interval };
+  }
   const milestones = Math.floor(totalPubs / interval);
   const bonus = milestones * (cfg.milestone_bonus || 100);
   const nextAt = (milestones + 1) * interval;
@@ -126,6 +132,9 @@ function calcPublicacaoMilestoneBonus(entries: AwardEntry[], cfg: AwardConfig['p
 function calcCobrancaMilestoneBonus(entries: AwardEntry[], cfg: AwardConfig['cobranca']): { bonus: number; milestones: number; nextAt: number } {
   const totalCob = entries.length;
   const interval = cfg.milestone_interval || 10;
+  if (cfg.milestone_enabled === false) {
+    return { bonus: 0, milestones: 0, nextAt: interval };
+  }
   const milestones = Math.floor(totalCob / interval);
   const bonus = milestones * (cfg.milestone_bonus || 50);
   const nextAt = (milestones + 1) * interval;
