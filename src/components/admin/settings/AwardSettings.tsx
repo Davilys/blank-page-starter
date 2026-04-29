@@ -426,14 +426,31 @@ function CobrancaSection({
           <Separator />
 
           {/* Milestone */}
-          <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-amber-500/20">
-                <Zap className="h-4 w-4 text-amber-500" />
+          <div className={cn(
+            "rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-4 transition-opacity",
+            !config.milestone_enabled && "opacity-60"
+          )}>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-amber-500/20">
+                  <Zap className="h-4 w-4 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Bônus de Milestone</p>
+                  <p className="text-[11px] text-muted-foreground">Bônus recorrente a cada X cobranças resolvidas</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-semibold">Bônus de Milestone</p>
-                <p className="text-[11px] text-muted-foreground">Bônus recorrente a cada X cobranças resolvidas</p>
+              <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border bg-background/60">
+                <Switch
+                  checked={config.milestone_enabled}
+                  onCheckedChange={v => onChange({ ...config, milestone_enabled: v })}
+                />
+                <span className={cn(
+                  "text-xs font-medium",
+                  config.milestone_enabled ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                )}>
+                  {config.milestone_enabled ? 'Ativada' : 'Desativada'}
+                </span>
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -444,6 +461,7 @@ function CobrancaSection({
                   min={1}
                   value={config.milestone_interval}
                   onChange={e => onChange({ ...config, milestone_interval: parseInt(e.target.value) || 1 })}
+                  disabled={!config.milestone_enabled}
                 />
               </div>
               <div className="space-y-2">
@@ -456,6 +474,7 @@ function CobrancaSection({
                     value={config.milestone_bonus}
                     onChange={e => onChange({ ...config, milestone_bonus: parseFloat(e.target.value) || 0 })}
                     className="pl-10"
+                    disabled={!config.milestone_enabled}
                   />
                 </div>
               </div>
