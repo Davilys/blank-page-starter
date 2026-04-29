@@ -53,6 +53,7 @@ import { Button } from '@/components/ui/button';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAdminPermissions, type PermissionKey } from '@/hooks/useAdminPermissions';
 import { withTimeout, isConnectivityError } from '@/lib/networkResilience';
+import { isAuthSessionError, forceAuthRecovery } from '@/lib/authRecovery';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -414,6 +415,15 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
       if (ssAdmin === 'true' && ssUserId) {
         setIsAdmin(true);
         setAdminUserId(ssUserId);
+        // Background check: ensure the Supabase session is still valid. If the
+        // refresh token expired while the tab was idle, clear cache + redirect.
+        supabase.auth.getSession().then(({ data, error }) => {
+          if (error && isAuthSessionError(error)) {
+            forceAuthRecovery('AdminLayout bg-check: ' + error.message);
+          } else if (!data?.session) {
+            forceAuthRecovery('AdminLayout bg-check: no session');
+          }
+        }).catch(() => { /* ignore */ });
         return;
       }
 
@@ -461,6 +471,10 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
       setIsAdmin(true);
       setAdminUserId(user.id);
     } catch (err) {
+      if (isAuthSessionError(err)) {
+        await forceAuthRecovery('AdminLayout checkAdmin: ' + (err as Error).message);
+        return;
+      }
       if (isConnectivityError(err)) {
         const ssAdmin = sessionStorage.getItem('admin_verified');
         const ssUserId = sessionStorage.getItem('admin_user_id');
