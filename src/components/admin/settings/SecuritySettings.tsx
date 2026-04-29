@@ -6,7 +6,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Shield, UserPlus, Trash2, Loader2, Clock, User, Monitor, Settings2, RefreshCw, Eye, EyeOff, Mail, Phone, Key, Copy } from 'lucide-react';
+import { Shield, UserPlus, Trash2, Loader2, Clock, User, Monitor, Settings2, RefreshCw, Eye, EyeOff, Mail, Phone, Key, Copy, KeyRound } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -21,6 +31,7 @@ export function SecuritySettings() {
   const queryClient = useQueryClient();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<{ id: string; email: string; fullName: string } | null>(null);
+  const [resetTarget, setResetTarget] = useState<{ id: string; email: string; fullName: string } | null>(null);
   const { isMasterAdmin } = useCanViewFinancialValues();
 
   // Fetch admin users with permissions info
@@ -146,6 +157,24 @@ export function SecuritySettings() {
     },
   });
 
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const { data, error } = await supabase.functions.invoke('reset-admin-password', {
+        body: { userId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data as { success: boolean; password: string };
+    },
+    onSuccess: (data) => {
+      toast.success(`Senha redefinida! Nova senha: ${data.password}`, { duration: 10000 });
+      setResetTarget(null);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || 'Erro ao resetar senha');
+    },
+  });
+
   const refetchAdmins = () => {
     queryClient.invalidateQueries({ queryKey: ['admin-users'] });
   };
@@ -170,6 +199,37 @@ export function SecuritySettings() {
         onOpenChange={(open) => !open && setEditingUser(null)}
         user={editingUser}
       />
+
+      {/* Reset Password Confirmation */}
+      <AlertDialog open={!!resetTarget} onOpenChange={(open) => !open && setResetTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resetar senha do administrador</AlertDialogTitle>
+            <AlertDialogDescription>
+              A senha de <strong>{resetTarget?.fullName || resetTarget?.email}</strong> será redefinida para a senha padrão{' '}
+              <code className="px-1.5 py-0.5 bg-muted rounded font-mono">123Mudar@</code>.
+              <br /><br />
+              Informe ao administrador para que ele faça login e altere a senha imediatamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetPasswordMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (resetTarget) resetPasswordMutation.mutate(resetTarget.id);
+              }}
+              disabled={resetPasswordMutation.isPending}
+            >
+              {resetPasswordMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Resetando...</>
+              ) : (
+                'Resetar Senha'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Admin Users */}
       <Card>
@@ -232,6 +292,20 @@ export function SecuritySettings() {
                         )}
                         {!isMasterAdminUser && (
                           <>
+                            {isMasterAdmin && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setResetTarget({
+                                  id: admin.user_id,
+                                  email: admin.profile?.email || '',
+                                  fullName: admin.profile?.full_name || '',
+                                })}
+                                title="Resetar Senha"
+                              >
+                                <KeyRound className="h-4 w-4 text-amber-600" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
