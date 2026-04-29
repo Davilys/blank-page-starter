@@ -1,78 +1,28 @@
-Auditoria concluída. Encontrei a causa real do erro: o PDF do distrato está sendo gerado e enviado para o Storage, mas a gravação na tabela `documents` falha por restrição do banco.
+# Resetar senha de administradores (apenas Admin Master)
 
-Erro confirmado nos logs da Edge Function:
+## Objetivo
+Na aba Configurações → Segurança → Usuários Administradores, adicionar um botão de "Resetar Senha" para cada admin (exceto o próprio Master). Apenas o Admin Master (`davillys@gmail.com`) pode usar essa ação. Ao confirmar, a senha do administrador será redefinida para a senha padrão `123Mudar@`.
 
-```text
-new row for relation "documents" violates check constraint "documents_document_type_check"
-```
+## Mudanças
 
-A restrição atual da tabela `documents` permite tipos como `contrato`, `procuracao`, `anexo`, etc., mas não permite `distrato_multa` nem `distrato_sem_multa`. Por isso:
+### 1. Nova Edge Function: `supabase/functions/reset-admin-password/index.ts`
+- Recebe `{ userId }` no body.
+- Valida o chamador via JWT (`supabase.auth.getUser` com o token Authorization).
+- Verifica se o email do chamador é `davillys@gmail.com` (Master). Se não for, retorna 403.
+- Usa `service_role` para chamar `supabaseAdmin.auth.admin.updateUserById(userId, { password: '123Mudar@' })`.
+- Retorna `{ success: true }`.
+- `verify_jwt = true` em `supabase/config.toml`.
 
-```text
-Assinatura OK
-PDF gerado OK
-Upload no Storage OK
-Registro em documents FALHA
-Resultado: não aparece em Anexos do CRM
-```
+### 2. `supabase/config.toml`
+- Registrar a nova função `reset-admin-password` com `verify_jwt = true`.
 
-Também confirmei que há distratos assinados recentes sem nenhum registro em `documents`, inclusive o teste recente de `DISTRATO SEM MULTA DO REGISTRO DE MARCA - WEBMARCAS`.
+### 3. `src/components/admin/settings/SecuritySettings.tsx`
+- Adicionar mutation `resetPasswordMutation` que invoca a edge function `reset-admin-password`.
+- Adicionar botão com ícone `KeyRound` ao lado dos botões "Editar Permissões" e "Remover", visível **apenas** quando `isMasterAdmin === true` e o usuário listado **não** é o próprio Master.
+- Ao clicar, abrir um `AlertDialog` de confirmação informando que a senha será redefinida para `123Mudar@`.
+- Após sucesso, mostrar `toast.success` exibindo a senha padrão e instrução para informá-la ao admin.
 
-Plano de correção:
-
-1. Corrigir o banco de dados
-   - Criar uma migration para atualizar o check constraint `documents_document_type_check`.
-   - Incluir explicitamente os tipos:
-     - `distrato_multa`
-     - `distrato_sem_multa`
-   - Manter todos os tipos já existentes para não quebrar documentos atuais.
-
-2. Blindar a Edge Function `upload-signed-contract-pdf`
-   - Normalizar o tipo do documento antes de inserir em `documents`.
-   - Garantir que contratos criados como `contract` sejam salvos em `documents` como `contrato` quando necessário.
-   - Garantir que `distrato_multa` e `distrato_sem_multa` sejam salvos corretamente.
-   - Se o insert/update em `documents` falhar, retornar erro real para o frontend em vez de responder `success: true` sem `documentId`. Isso evita falso positivo.
-
-3. Corrigir a UI da Área do Cliente
-   - A página `/cliente/documentos` hoje só categoriza contrato e procuração; distratos caem como “Outros”.
-   - Ajustar para mostrar distratos com rótulo correto:
-     - “Distrato com Multa”
-     - “Distrato sem Multa”
-   - Isso melhora a visualização para o cliente, mesmo quando o documento vem da tabela `contracts`.
-
-4. Corrigir/compatibilizar Anexos no CRM
-   - A aba Anexos do ficheiro do cliente busca `documents` por `user_id`; após corrigir o banco, novos distratos assinados passarão a aparecer automaticamente.
-   - Melhorar o nome/rótulo exibido quando o documento for distrato, para ficar claro no ficheiro.
-
-5. Recuperar distratos já assinados e sem anexo
-   - Criar/ajustar uma rotina de backfill para registrar em `documents` os PDFs de distratos já enviados ao Storage mas que falharam no insert.
-   - Para os casos em que o PDF existe em `storage.objects`, criar o registro correspondente em `documents` com:
-     - `contract_id`
-     - `user_id`
-     - `process_id` quando existir
-     - `document_type`
-     - `file_url`
-     - `mime_type = application/pdf`
-     - `file_size`
-   - Para casos sem PDF no Storage, deixar a rotina pronta para identificar pendências e permitir regeneração.
-
-6. Teste de validação
-   - Testar com distrato com multa e sem multa.
-   - Validar que após assinar:
-     - o PDF é gerado;
-     - o registro aparece em `documents`;
-     - aparece na aba Anexos do CRM;
-     - aparece na Área do Cliente;
-     - o tipo/nome do documento aparece corretamente.
-
-Arquivos/áreas que serão alterados:
-
-```text
-supabase/migrations/...sql
-supabase/functions/upload-signed-contract-pdf/index.ts
-supabase/functions/regenerate-signed-contract-pdfs/index.ts ou nova rotina de backfill
-src/pages/cliente/Documentos.tsx
-src/components/admin/clients/ClientDetailSheet.tsx
-```
-
-Resultado esperado: distrato com multa e sem multa, depois de assinado, ficará salvo como PDF e visível tanto no ficheiro do cliente em Anexos quanto na área do cliente.
+## Detalhes técnicos
+- O botão fica oculto para qualquer admin que não seja o Master, garantindo a regra no front. A validação real de autorização acontece na edge function (server-side), que é a fonte de verdade.
+- A senha padrão `123Mudar@` fica hardcoded na edge function (não trafega do cliente), evitando que alguém manipule o body para definir outra senha.
+- Nenhuma mudança de schema é necessária.
