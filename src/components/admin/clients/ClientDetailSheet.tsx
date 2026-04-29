@@ -27,7 +27,7 @@ import {
   CheckCircle, TrendingUp, Receipt, Trash2, UserCheck,
   Bell, Send, MapPin, Hash, Globe, Briefcase, Shield,
   ChevronRight, Activity, RefreshCw, Eye, Copy, Edit2,
-  Package, BarChart3, Wallet, FileCheck, Lock, Video
+  Package, BarChart3, Wallet, FileCheck, Lock, Video, KeyRound
 } from 'lucide-react';
 import type { ClientWithProcess } from './ClientKanbanBoard';
 import { PIPELINE_STAGES, COMMERCIAL_PIPELINE_STAGES } from './ClientKanbanBoard';
@@ -39,6 +39,7 @@ import { EmailCompose } from '@/components/admin/email/EmailCompose';
 import { CreateInvoiceDialog } from './CreateInvoiceDialog';
 import { Separator } from '@/components/ui/separator';
 import { Newspaper, Gavel, Award, BellRing, Activity as ActivityIcon } from 'lucide-react';
+import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
 
 const MASTER_ADMIN_EMAIL = 'davillys@gmail.com';
 
