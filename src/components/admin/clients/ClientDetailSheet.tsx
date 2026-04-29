@@ -171,6 +171,9 @@ function fmtBytes(b?: number | null) {
 
 export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUpdate, extraActions, initialShowProcessDetails, focusProcessId }: ClientDetailSheetProps) {
   const SERVICE_PRICING_OPTIONS = useServicePricingOptions();
+  const { isMasterAdmin } = useCanViewFinancialValues();
+  const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   // If focusProcessId is provided and client has brands, override process_id/brand_name/pipeline_stage
   const client = useMemo(() => {
