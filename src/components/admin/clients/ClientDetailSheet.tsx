@@ -27,7 +27,7 @@ import {
   CheckCircle, TrendingUp, Receipt, Trash2, UserCheck,
   Bell, Send, MapPin, Hash, Globe, Briefcase, Shield,
   ChevronRight, Activity, RefreshCw, Eye, Copy, Edit2,
-  Package, BarChart3, Wallet, FileCheck, Lock, Video
+  Package, BarChart3, Wallet, FileCheck, Lock, Video, KeyRound
 } from 'lucide-react';
 import type { ClientWithProcess } from './ClientKanbanBoard';
 import { PIPELINE_STAGES, COMMERCIAL_PIPELINE_STAGES } from './ClientKanbanBoard';
@@ -39,6 +39,7 @@ import { EmailCompose } from '@/components/admin/email/EmailCompose';
 import { CreateInvoiceDialog } from './CreateInvoiceDialog';
 import { Separator } from '@/components/ui/separator';
 import { Newspaper, Gavel, Award, BellRing, Activity as ActivityIcon } from 'lucide-react';
+import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
 
 const MASTER_ADMIN_EMAIL = 'davillys@gmail.com';
 
@@ -170,6 +171,9 @@ function fmtBytes(b?: number | null) {
 
 export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUpdate, extraActions, initialShowProcessDetails, focusProcessId }: ClientDetailSheetProps) {
   const SERVICE_PRICING_OPTIONS = useServicePricingOptions();
+  const { isMasterAdmin } = useCanViewFinancialValues();
+  const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   // If focusProcessId is provided and client has brands, override process_id/brand_name/pipeline_stage
   const client = useMemo(() => {
@@ -877,6 +881,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         }
         break;
       case 'nova_fatura': setShowNewInvoiceDialog(true); break;
+      case 'reset_senha': setShowResetPasswordDialog(true); break;
     }
   };
 
@@ -1078,6 +1083,9 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
     { id: 'excluir', label: 'Excluir', icon: Trash2, cls: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200' },
     { id: 'processo', label: 'Detalhes do Processo', icon: FileText, cls: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/60' },
     { id: 'nova_fatura', label: 'Nova Fatura', icon: Receipt, cls: 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300 hover:bg-teal-200 dark:hover:bg-teal-900/60' },
+    ...(isMasterAdmin && client?.email && client.email !== MASTER_ADMIN_EMAIL ? [
+      { id: 'reset_senha', label: 'Resetar Senha', icon: KeyRound, cls: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60' },
+    ] : []),
   ];
 
   const handleTabsWheel = (event: WheelEvent<HTMLDivElement>) => {
@@ -3415,6 +3423,54 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
               }}
             >
               Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ─── RESET CLIENT PASSWORD ─── */}
+      <AlertDialog open={showResetPasswordDialog} onOpenChange={setShowResetPasswordDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-amber-600" />
+              Resetar Senha do Cliente
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              A senha de <strong>{client?.full_name || client?.email}</strong> será redefinida para a senha padrão{' '}
+              <code className="px-1.5 py-0.5 bg-muted rounded font-mono">123Mudar@</code>.
+              <br /><br />
+              O cliente poderá acessar a Área do Cliente com seu e-mail e essa nova senha. Informe-o para que altere a senha após o login.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resettingPassword}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={resettingPassword}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!client?.id) return;
+                setResettingPassword(true);
+                try {
+                  const { data, error } = await supabase.functions.invoke('reset-admin-password', {
+                    body: { userId: client.id },
+                  });
+                  if (error) throw error;
+                  if ((data as any)?.error) throw new Error((data as any).error);
+                  toast.success(`Senha redefinida! Nova senha: 123Mudar@`, { duration: 10000 });
+                  setShowResetPasswordDialog(false);
+                } catch (err: any) {
+                  toast.error(err?.message || 'Erro ao resetar senha');
+                } finally {
+                  setResettingPassword(false);
+                }
+              }}
+            >
+              {resettingPassword ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Resetando...</>
+              ) : (
+                'Resetar Senha'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
