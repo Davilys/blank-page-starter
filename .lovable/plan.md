@@ -1,41 +1,86 @@
-# Botão "Resetar Senha" no Ficheiro do Cliente
+# Mostrar o Plano no Card do Kanban (Clientes)
 
-## Objetivo
-Adicionar um botão de **Resetar Senha** nas "Ações Rápidas" do ficheiro do cliente (que abre ao selecionar um card no Kanban da aba Clientes). Ao clicar, a senha do cliente é resetada para `123Mudar@`, permitindo que ele acesse a Área do Cliente caso tenha esquecido a senha atual.
+## Diagnóstico
 
-Sem alterar mais nada no projeto.
+O card do Kanban do cliente **já tem** lógica para exibir um badge colorido com o nome do plano (Essencial/Premium/Corporativo), mas o badge só aparece quando `client.plan_type` está preenchido.
 
-## Mudanças
+`Clientes.tsx` lê `plan_type` da tabela `contracts` (último contrato do cliente). Verifiquei o banco e confirmei o problema:
 
-### 1. Edge Function `reset-admin-password` — generalizar para também resetar clientes
-Arquivo: `supabase/functions/reset-admin-password/index.ts`
+- O contrato do **Evandro** (assinado, R$699): `plan_type = NULL` ❌
+- Outros contratos recentes do template "Padrão Registro de Marca": também `NULL`
+- Todos foram criados via `CreateContractDialog` (admin), não pelo checkout do cliente.
 
-A função já existe e valida que o chamador é o Master Admin. Vamos:
-- Manter a mesma validação de Master Admin (`davillys@gmail.com`).
-- Aceitar opcionalmente o reset de qualquer usuário (admin ou cliente) por `userId`.
-- Continuar resetando para `123Mudar@`.
+Causa: em `src/components/admin/contracts/CreateContractDialog.tsx` (linha 988, `INSERT INTO contracts`), o campo `plan_type` **não é incluído** no insert. O dialog até reconhece o tipo de template (Premium/Padrão/Corporativo) para preencher assunto e valor automaticamente, mas não grava `plan_type` na tabela.
 
-Nenhuma mudança de comportamento para o reset de admins existente — só remove a restrição implícita de "apenas admins". O master admin já é o único autorizado a chamar.
+Resultado: o badge do plano nunca aparece para contratos criados pelo admin — só aparece o valor (R$ 699) e a origem (form_checkout), exatamente como no print.
 
-### 2. `ClientDetailSheet.tsx` — adicionar botão e handler
-Arquivo: `src/components/admin/clients/ClientDetailSheet.tsx`
+## Correção
 
-- Importar ícone `KeyRound` do `lucide-react` e `useCanViewFinancialValues` (para `isMasterAdmin`).
-- Adicionar nova ação ao array `QUICK_ACTIONS` (linha ~1073), visível apenas se `isMasterAdmin`:
-  ```ts
-  { id: 'reset_senha', label: 'Resetar Senha', icon: KeyRound, cls: 'bg-amber-100 ... text-amber-700 ...' }
-  ```
-- Adicionar `case 'reset_senha'` em `handleQuickAction` (linha ~814) que:
-  1. Confirma com o usuário (AlertDialog ou `confirm()` simples seguindo padrão do componente).
-  2. Chama `supabase.functions.invoke('reset-admin-password', { body: { userId: client.id } })`.
-  3. Mostra toast de sucesso com a nova senha `123Mudar@` (duração 10s) ou erro.
+### 1. `CreateContractDialog.tsx` — gravar `plan_type` ao criar o contrato
 
-### Comportamento final
-- Apenas o **Master Admin** (`davillys@gmail.com`) vê o botão.
-- Ao clicar → confirmação → senha do cliente resetada para `123Mudar@`.
-- Cliente passa a poder logar em `/cliente/login` com seu email + `123Mudar@`.
-- Nenhum outro fluxo é alterado.
+No INSERT da tabela `contracts` (linha ~988), adicionar `plan_type` derivado do nome do template selecionado, usando a mesma lógica que já existe no dialog para o assunto/valor automático:
+
+```ts
+const tplName = (selectedTemplate?.name || '').toLowerCase();
+let planType: 'essencial' | 'premium' | 'corporativo' | null = null;
+if (tplName.includes('registro de marca')) {
+  if (tplName.includes('corporativo')) planType = 'corporativo';
+  else if (tplName.includes('premium')) planType = 'premium';
+  else if (tplName.includes('padrão') || tplName.includes('padrao')) planType = 'essencial';
+}
+// ...
+.insert({
+  ...,
+  plan_type: planType,
+  ...
+})
+```
+
+Assim, todo novo contrato criado pelo admin já nasce com o `plan_type` correto, e o badge aparecerá no card.
+
+### 2. Migration de backfill — corrigir contratos antigos
+
+Atualizar contratos já assinados que estão com `plan_type=NULL` mas têm template e/ou valor reconhecíveis:
+
+```sql
+-- Por template (mais confiável)
+UPDATE contracts SET plan_type='essencial'
+  WHERE plan_type IS NULL AND template_id IN (
+    SELECT id FROM contract_templates
+    WHERE LOWER(name) LIKE '%padrão%registro de marca%'
+       OR LOWER(name) LIKE '%padrao%registro de marca%'
+  );
+
+UPDATE contracts SET plan_type='premium'
+  WHERE plan_type IS NULL AND template_id IN (
+    SELECT id FROM contract_templates WHERE LOWER(name) LIKE '%premium%registro de marca%'
+  );
+
+UPDATE contracts SET plan_type='corporativo'
+  WHERE plan_type IS NULL AND template_id IN (
+    SELECT id FROM contract_templates WHERE LOWER(name) LIKE '%corporativo%registro de marca%'
+  );
+
+-- Fallback por valor exato (apenas registros sem template_id)
+UPDATE contracts SET plan_type='essencial'
+  WHERE plan_type IS NULL AND template_id IS NULL AND contract_value IN (699, 698.97);
+UPDATE contracts SET plan_type='premium'
+  WHERE plan_type IS NULL AND template_id IS NULL AND contract_value = 398;
+UPDATE contracts SET plan_type='corporativo'
+  WHERE plan_type IS NULL AND template_id IS NULL AND contract_value = 1621;
+```
+
+Aditivos/distratos (sem template/valor de plano) permanecem NULL — correto.
+
+## Resultado esperado
+
+- Card do Evandro passa a mostrar: `MEDIUM` · `form_checkout` · **`Essencial`** (badge azul com ícone de escudo).
+- Cards de contratos Premium e Corporativo mostram seus respectivos badges.
+- Novos contratos criados pelo admin já saem com o plano correto sem ação manual.
 
 ## Arquivos afetados
-- `supabase/functions/reset-admin-password/index.ts` (pequeno ajuste / nenhuma mudança de assinatura)
-- `src/components/admin/clients/ClientDetailSheet.tsx` (adicionar ação + handler)
+
+- `src/components/admin/contracts/CreateContractDialog.tsx` — adicionar `plan_type` no INSERT
+- `supabase/migrations/...sql` — backfill dos contratos existentes
+
+Nada mais é alterado.
