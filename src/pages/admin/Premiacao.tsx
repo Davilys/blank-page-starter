@@ -438,6 +438,7 @@ export default function Premiacao() {
     setFormClientName(entry.client_name);
     setFormBrandName(entry.brand_name || '');
     setFormBrandQty(entry.brand_quantity || 1);
+    setFormPlan((entry.plan as 'essencial' | 'premium' | 'corporativo') || 'essencial');
     setFormPaymentType(entry.payment_type || 'avista');
     setFormPubType(entry.publication_type || 'deferimento');
     setFormPubQty(entry.pub_quantity || 1);
