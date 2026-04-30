@@ -50,6 +50,11 @@ interface TeamMember {
 // ---- Config type (matches AwardSettings) ----
 interface AwardConfig {
   enabled: boolean;
+  plan?: 'essencial' | 'premium' | 'corporativo';
+  plans?: {
+    premium: { rate_per_brand: number; monthly_goal: number; monthly_price: number; payment_method: 'boleto' | 'cartao' };
+    corporativo: { rate_per_brand: number; monthly_goal: number; monthly_price: number; payment_method: 'boleto' | 'cartao' };
+  };
   registro_marca: {
     base_rate: number;
     above_goal_avista_rate: number;
@@ -75,6 +80,11 @@ interface AwardConfig {
 
 const DEFAULT_CONFIG: AwardConfig = {
   enabled: true,
+  plan: 'essencial',
+  plans: {
+    premium: { rate_per_brand: 100, monthly_goal: 30, monthly_price: 398, payment_method: 'boleto' },
+    corporativo: { rate_per_brand: 200, monthly_goal: 30, monthly_price: 1621, payment_method: 'boleto' },
+  },
   registro_marca: { base_rate: 50, above_goal_avista_rate: 100, above_goal_parcelado_rate: 50, monthly_goal: 30 },
   publicacao: { base_rate: 50, above_goal_rate: 100, monthly_goal: 50, milestone_interval: 10, milestone_bonus: 100, milestone_enabled: true },
   cobranca: {
@@ -93,7 +103,14 @@ const DEFAULT_CONFIG: AwardConfig = {
 };
 
 // ---- Calculation helpers (config-aware) ----
-function calcRegistroMarcaPremium(entries: AwardEntry[], cfg: AwardConfig['registro_marca']): number {
+function calcRegistroMarcaPremium(entries: AwardEntry[], cfg: AwardConfig['registro_marca'], plan: AwardConfig['plan'] = 'essencial', plans?: AwardConfig['plans']): number {
+  // Plano Premium / Corporativo: valor fixo por marca (independe da meta e da forma de pagamento)
+  if (plan === 'premium' || plan === 'corporativo') {
+    const rate = plans?.[plan]?.rate_per_brand ?? (plan === 'premium' ? 100 : 200);
+    const totalMarcas = entries.reduce((s, e) => s + (e.brand_quantity || 1), 0);
+    return totalMarcas * rate;
+  }
+  // Plano Essencial: regra atual (base + faixa pós-meta)
   let total = 0;
   const sorted = [...entries].sort((a, b) => a.entry_date.localeCompare(b.entry_date));
   let accumulated = 0;
