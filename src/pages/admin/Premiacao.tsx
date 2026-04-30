@@ -39,6 +39,7 @@ interface AwardEntry {
   payment_date: string | null;
   payment_form: string | null;
   created_at: string;
+  plan?: 'essencial' | 'premium' | 'corporativo' | null;
 }
 
 interface TeamMember {
@@ -103,25 +104,34 @@ const DEFAULT_CONFIG: AwardConfig = {
 };
 
 // ---- Calculation helpers (config-aware) ----
-function calcRegistroMarcaPremium(entries: AwardEntry[], cfg: AwardConfig['registro_marca'], plan: AwardConfig['plan'] = 'essencial', plans?: AwardConfig['plans']): number {
-  // Plano Premium / Corporativo: valor fixo por marca (independe da meta e da forma de pagamento)
-  if (plan === 'premium' || plan === 'corporativo') {
-    const rate = plans?.[plan]?.rate_per_brand ?? (plan === 'premium' ? 100 : 200);
-    const totalMarcas = entries.reduce((s, e) => s + (e.brand_quantity || 1), 0);
-    return totalMarcas * rate;
-  }
-  // Plano Essencial: regra atual (base + faixa pós-meta)
+// Cada cadastro de Registro de Marca tem o seu próprio plano. A premiação é somada por entrada.
+// - Essencial: regra clássica (base por marca; após a meta de 30, valor diferente p/ à vista vs parcelado)
+// - Premium: R$ fixo por marca (cfg.plans.premium.rate_per_brand). Conta na meta, mas valor não muda.
+// - Corporativo: R$ fixo por marca (cfg.plans.corporativo.rate_per_brand). Idem.
+function calcRegistroMarcaPremium(entries: AwardEntry[], cfg: AwardConfig['registro_marca'], _plan?: AwardConfig['plan'], plans?: AwardConfig['plans']): number {
   let total = 0;
+  // Ordena para a regra "Essencial" aplicar a meta na ordem cronológica
   const sorted = [...entries].sort((a, b) => a.entry_date.localeCompare(b.entry_date));
+  // Acumulador da meta conta TODAS as marcas (independente do plano da entrada)
   let accumulated = 0;
+  const premiumRate = plans?.premium?.rate_per_brand ?? 100;
+  const corporativoRate = plans?.corporativo?.rate_per_brand ?? 200;
   for (const entry of sorted) {
     const qty = entry.brand_quantity || 1;
+    const entryPlan = (entry.plan || 'essencial') as 'essencial' | 'premium' | 'corporativo';
     for (let i = 0; i < qty; i++) {
       accumulated++;
-      if (accumulated <= cfg.monthly_goal) {
-        total += cfg.base_rate;
+      if (entryPlan === 'premium') {
+        total += premiumRate;
+      } else if (entryPlan === 'corporativo') {
+        total += corporativoRate;
       } else {
-        total += entry.payment_type === 'avista' ? cfg.above_goal_avista_rate : cfg.above_goal_parcelado_rate;
+        // essencial
+        if (accumulated <= cfg.monthly_goal) {
+          total += cfg.base_rate;
+        } else {
+          total += entry.payment_type === 'avista' ? cfg.above_goal_avista_rate : cfg.above_goal_parcelado_rate;
+        }
       }
     }
   }
@@ -194,6 +204,7 @@ export default function Premiacao() {
   const [formClientName, setFormClientName] = useState('');
   const [formBrandName, setFormBrandName] = useState('');
   const [formBrandQty, setFormBrandQty] = useState(1);
+  const [formPlan, setFormPlan] = useState<'essencial' | 'premium' | 'corporativo'>('essencial');
   const [formPaymentType, setFormPaymentType] = useState('avista');
   const [formPubType, setFormPubType] = useState('deferimento');
   const [formPubQty, setFormPubQty] = useState(1);
@@ -370,42 +381,11 @@ export default function Premiacao() {
     },
   });
 
-  // Salvar troca de plano (apenas master admin)
-  const savePlanMutation = useMutation({
-    mutationFn: async (newPlan: 'essencial' | 'premium' | 'corporativo') => {
-      const newConfig: AwardConfig = { ...cfg, plan: newPlan };
-      const { data: existing } = await supabase
-        .from('system_settings')
-        .select('id')
-        .eq('key', 'award_config')
-        .maybeSingle();
-      const valueToSave = JSON.parse(JSON.stringify(newConfig));
-      const { data: u } = await supabase.auth.getUser();
-      if (existing) {
-        const { error } = await supabase
-          .from('system_settings')
-          .update({ value: valueToSave, updated_at: new Date().toISOString(), updated_by: u.user?.id })
-          .eq('key', 'award_config');
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('system_settings')
-          .insert([{ key: 'award_config', value: valueToSave, updated_by: u.user?.id }]);
-        if (error) throw error;
-      }
-    },
-    onSuccess: (_, newPlan) => {
-      queryClient.invalidateQueries({ queryKey: ['award-config'] });
-      const label = newPlan === 'essencial' ? 'Essencial' : newPlan === 'premium' ? 'Premium' : 'Corporativo';
-      toast.success(`Plano alterado para ${label}`);
-    },
-    onError: (err: Error) => toast.error('Erro ao alterar plano: ' + err.message),
-  });
-
   function resetForm() {
     setFormClientName('');
     setFormBrandName('');
     setFormBrandQty(1);
+    setFormPlan('essencial');
     setFormPaymentType('avista');
     setFormPubType('deferimento');
     setFormPubQty(1);
@@ -426,6 +406,7 @@ export default function Premiacao() {
     setFormClientName(entry.client_name);
     setFormBrandName(entry.brand_name || '');
     setFormBrandQty(entry.brand_quantity || 1);
+    setFormPlan((entry.plan as 'essencial' | 'premium' | 'corporativo') || 'essencial');
     setFormPaymentType(entry.payment_type || 'avista');
     setFormPubType(entry.publication_type || 'deferimento');
     setFormPubQty(entry.pub_quantity || 1);
@@ -456,6 +437,7 @@ export default function Premiacao() {
 
     if (formType === 'registro_marca') {
       base.brand_quantity = formBrandQty;
+      base.plan = formPlan;
       base.payment_type = formPaymentType;
       if (formPaymentType === 'promocao') base.payment_form = 'promocao';
     } else if (formType === 'publicacao') {
@@ -538,8 +520,15 @@ export default function Premiacao() {
         {type === 'registro_marca' && (
           <>
             <Badge variant="secondary" className="text-[11px]">{entry.brand_quantity} marca(s)</Badge>
+            <Badge variant="outline" className="text-[11px] border-amber-500/40 text-amber-600">
+              {entry.plan === 'premium' ? 'Premium' : entry.plan === 'corporativo' ? 'Corporativo' : 'Essencial'}
+            </Badge>
             <Badge variant={entry.payment_type === 'avista' ? 'default' : 'secondary'} className="text-[11px]">
-              {entry.payment_type === 'avista' ? 'À Vista' : entry.payment_type === 'parcelado' ? 'Parcelado' : 'Promoção'}
+              {entry.payment_type === 'avista' ? 'À Vista'
+                : entry.payment_type === 'parcelado' ? 'Parcelado'
+                : entry.payment_type === 'boleto' ? 'Boleto'
+                : entry.payment_type === 'cartao' ? 'Cartão'
+                : 'Promoção'}
             </Badge>
           </>
         )}
@@ -737,18 +726,63 @@ export default function Premiacao() {
                   </div>
                 </div>
               </div>
+              {/* Plano (escolhido por cadastro) */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Plano *</Label>
+                <Select
+                  value={formPlan}
+                  onValueChange={(v) => {
+                    const next = v as 'essencial' | 'premium' | 'corporativo';
+                    setFormPlan(next);
+                    // Reset da forma de pagamento para um valor válido no plano novo
+                    if (next === 'essencial') setFormPaymentType('avista');
+                    else setFormPaymentType('boleto');
+                  }}
+                >
+                  <SelectTrigger className="h-11">
+                    <Trophy className="h-4 w-4 mr-2 text-amber-500" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="essencial">Plano Essencial</SelectItem>
+                    <SelectItem value="premium">Plano Premium — R$ 100/marca</SelectItem>
+                    <SelectItem value="corporativo">Plano Corporativo — R$ 200/marca</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  {formPlan === 'essencial' && 'Regra padrão: R$ 50/marca; após meta de 30 → R$ 100 (à vista) ou R$ 50 (parcelado).'}
+                  {formPlan === 'premium' && 'R$ 100 fixos por marca. Conta na meta de 30, mas o valor não muda após a meta.'}
+                  {formPlan === 'corporativo' && 'R$ 200 fixos por marca. Conta na meta de 30, mas o valor não muda após a meta.'}
+                </p>
+              </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Forma de Pagamento *</Label>
                 <Select value={formPaymentType} onValueChange={setFormPaymentType}>
                   <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="avista">À Vista — R$ 699,99</SelectItem>
-                    <SelectItem value="parcelado">Parcelado — R$ 1.194,00</SelectItem>
-                    <SelectItem value="promocao">Promoção — Valor Personalizado</SelectItem>
+                    {formPlan === 'essencial' && (
+                      <>
+                        <SelectItem value="avista">À Vista — R$ 699,99</SelectItem>
+                        <SelectItem value="parcelado">Parcelado — R$ 1.194,00</SelectItem>
+                        <SelectItem value="promocao">Promoção — Valor Personalizado</SelectItem>
+                      </>
+                    )}
+                    {formPlan === 'premium' && (
+                      <>
+                        <SelectItem value="boleto">Boleto — R$ 398,00/mês</SelectItem>
+                        <SelectItem value="cartao">Cartão — R$ 398,00/mês</SelectItem>
+                      </>
+                    )}
+                    {formPlan === 'corporativo' && (
+                      <>
+                        <SelectItem value="boleto">Boleto — R$ 1.621,00/mês</SelectItem>
+                        <SelectItem value="cartao">Cartão — R$ 1.621,00/mês</SelectItem>
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
-              {formPaymentType === 'promocao' && (
+              {formPlan === 'essencial' && formPaymentType === 'promocao' && (
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Valor Personalizado (R$) *</Label>
                   <div className="relative">
@@ -951,57 +985,7 @@ export default function Premiacao() {
           </div>
         </div>
 
-        {/* Plan Selector + Summary */}
-        <Card className="overflow-hidden border-amber-500/20">
-          <div className="h-1 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400" />
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                  <Sparkles className="h-5 w-5 text-amber-500" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Plano de Premiação Ativo</p>
-                  <p className="text-base font-bold capitalize">
-                    {cfg.plan === 'premium' ? 'Plano Premium' : cfg.plan === 'corporativo' ? 'Plano Corporativo' : 'Plano Essencial'}
-                  </p>
-                  {cfg.plan === 'premium' && (
-                    <p className="text-xs text-muted-foreground">
-                      R$ {cfg.plans?.premium.rate_per_brand ?? 100}/marca · Mensalidade R$ {(cfg.plans?.premium.monthly_price ?? 398).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ({cfg.plans?.premium.payment_method === 'cartao' ? 'Cartão' : 'Boleto'})
-                    </p>
-                  )}
-                  {cfg.plan === 'corporativo' && (
-                    <p className="text-xs text-muted-foreground">
-                      R$ {cfg.plans?.corporativo.rate_per_brand ?? 200}/marca · Mensalidade R$ {(cfg.plans?.corporativo.monthly_price ?? 1621).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ({cfg.plans?.corporativo.payment_method === 'cartao' ? 'Cartão' : 'Boleto'})
-                    </p>
-                  )}
-                  {(cfg.plan === 'essencial' || !cfg.plan) && (
-                    <p className="text-xs text-muted-foreground">Regra padrão: R$ {cfg.registro_marca.base_rate}/marca · meta {cfg.registro_marca.monthly_goal}</p>
-                  )}
-                </div>
-              </div>
-              {isMaster ? (
-                <Select
-                  value={cfg.plan ?? 'essencial'}
-                  onValueChange={(v) => savePlanMutation.mutate(v as 'essencial' | 'premium' | 'corporativo')}
-                  disabled={savePlanMutation.isPending}
-                >
-                  <SelectTrigger className="w-full sm:w-[220px] h-10">
-                    <Trophy className="h-4 w-4 mr-2 text-amber-500" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="essencial">Plano Essencial</SelectItem>
-                    <SelectItem value="premium">Plano Premium (R$ 100/marca)</SelectItem>
-                    <SelectItem value="corporativo">Plano Corporativo (R$ 200/marca)</SelectItem>
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Badge variant="outline" className="text-xs">Apenas o Master Admin pode trocar o plano</Badge>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        {/* O plano agora é escolhido por cadastro, dentro do diálogo "Novo Cadastro" */}
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -1263,7 +1247,14 @@ export default function Premiacao() {
                       <td className="p-3">{entry.brand_quantity}</td>
                       <td className="p-3">
                         <Badge variant={entry.payment_type === 'avista' ? 'default' : 'secondary'} className="text-xs">
-                          {entry.payment_type === 'avista' ? 'À Vista' : entry.payment_type === 'parcelado' ? 'Parcelado' : 'Promoção'}
+                          {entry.payment_type === 'avista' ? 'À Vista'
+                            : entry.payment_type === 'parcelado' ? 'Parcelado'
+                            : entry.payment_type === 'boleto' ? 'Boleto'
+                            : entry.payment_type === 'cartao' ? 'Cartão'
+                            : 'Promoção'}
+                        </Badge>
+                        <Badge variant="outline" className="ml-1 text-[10px] border-amber-500/40 text-amber-600">
+                          {entry.plan === 'premium' ? 'Premium' : entry.plan === 'corporativo' ? 'Corporativo' : 'Essencial'}
                         </Badge>
                       </td>
                       <td className="p-3 text-xs text-muted-foreground">{getUserName(entry.responsible_user_id)}</td>
