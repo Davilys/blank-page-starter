@@ -520,8 +520,15 @@ export default function Premiacao() {
         {type === 'registro_marca' && (
           <>
             <Badge variant="secondary" className="text-[11px]">{entry.brand_quantity} marca(s)</Badge>
+            <Badge variant="outline" className="text-[11px] border-amber-500/40 text-amber-600">
+              {entry.plan === 'premium' ? 'Premium' : entry.plan === 'corporativo' ? 'Corporativo' : 'Essencial'}
+            </Badge>
             <Badge variant={entry.payment_type === 'avista' ? 'default' : 'secondary'} className="text-[11px]">
-              {entry.payment_type === 'avista' ? 'À Vista' : entry.payment_type === 'parcelado' ? 'Parcelado' : 'Promoção'}
+              {entry.payment_type === 'avista' ? 'À Vista'
+                : entry.payment_type === 'parcelado' ? 'Parcelado'
+                : entry.payment_type === 'boleto' ? 'Boleto'
+                : entry.payment_type === 'cartao' ? 'Cartão'
+                : 'Promoção'}
             </Badge>
           </>
         )}
