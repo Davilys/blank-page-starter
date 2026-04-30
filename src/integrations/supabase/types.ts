@@ -134,6 +134,7 @@ export type Database = {
           payment_date: string | null
           payment_form: string | null
           payment_type: string | null
+          plan: string
           pub_quantity: number | null
           publication_type: string | null
           responsible_user_id: string
@@ -154,6 +155,7 @@ export type Database = {
           payment_date?: string | null
           payment_form?: string | null
           payment_type?: string | null
+          plan?: string
           pub_quantity?: number | null
           publication_type?: string | null
           responsible_user_id: string
@@ -174,6 +176,7 @@ export type Database = {
           payment_date?: string | null
           payment_form?: string | null
           payment_type?: string | null
+          plan?: string
           pub_quantity?: number | null
           publication_type?: string | null
           responsible_user_id?: string

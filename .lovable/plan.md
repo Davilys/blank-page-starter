@@ -1,76 +1,89 @@
-# Plano: Seletor de Plano de Premiação (Essencial / Premium / Corporativo)
 
-## Objetivo
+# Corrigir seletor de plano: por cadastro, não global
 
-Adicionar na aba **Premiação** (`/admin/premiacao`) e em **Configurações → Premiação** um seletor de plano que define como a premiação de **Registro de Marca** é calculada. A premiação por Publicação e Cobrança continua igual nos três planos.
+## O que está errado hoje
 
-## Regras de cada plano
+O seletor de plano (Essencial / Premium / Corporativo) foi colocado como um "plano global" no topo da aba Premiação e em Configurações, definindo um único plano para toda a contagem. **Isso não é o que você quer.**
 
-| Plano | Valor por marca | Meta mensal | Comportamento após a meta | Forma de pagamento (do plano em si) |
-|---|---|---|---|---|
-| **Essencial** | Mantém a regra atual (R$ 50 base; após meta: R$ 100 à vista / R$ 50 parcelado) | 30 | Igual ao atual | — (sistema vigente) |
-| **Premium** | **R$ 100 fixo por marca** | 30 (continua contando após meta) | Continua **R$ 100** por marca acima da meta | Boleto ou Cartão — **R$ 398,00 mensal** |
-| **Corporativo** | **R$ 200 fixo por marca** | 30 (continua contando após meta) | Continua **R$ 200** por marca acima da meta | Boleto ou Cartão — **R$ 1.621,00 mensal** |
+## O que será feito
 
-Observações:
-- Premium e Corporativo ignoram o campo "à vista vs parcelado" da entrada — o valor é sempre fixo.
-- A meta de 30 continua existindo apenas como referência visual de progresso (a contagem segue, mas o valor unitário não muda).
-- Publicações e Cobranças permanecem inalteradas independentemente do plano selecionado.
+O plano passa a ser uma propriedade **de cada cadastro individual** de Registro de Marca. No diálogo "Novo Cadastro" (e "Editar Registro"), quando o tipo for **Registro de Marca**, aparece primeiro o seletor de Plano e, em seguida, a Forma de Pagamento — cuja lista muda conforme o plano escolhido.
 
-## Mudanças
+### Fluxo no diálogo "Novo Cadastro" → Registro de Marca
 
-### 1. Tipo `AwardConfig` (em `Premiacao.tsx` e `AwardSettings.tsx`)
-
-Adicionar:
-```ts
-plan: 'essencial' | 'premium' | 'corporativo';   // plano ativo
-plan_payment_method?: 'boleto' | 'cartao';       // forma de pagamento do plano (Premium/Corporativo)
-plans: {
-  essencial: { /* mantém estrutura atual de registro_marca */ },
-  premium:   { rate_per_brand: 100, monthly_goal: 30, monthly_price: 398 },
-  corporativo:{ rate_per_brand: 200, monthly_goal: 30, monthly_price: 1621 },
-}
 ```
-`DEFAULT_CONFIG.plan = 'essencial'`. Persistido na mesma chave `system_settings.award_config`, mantendo retrocompatibilidade (se o campo `plan` não existir, assume `'essencial'`).
+TIPO *                  [ Registro de Marca ▾ ]
+NOME DO CLIENTE *       [ ... ]
+NOME DA MARCA *         [ ... ]
+QTD MARCAS *  [ 1 ]     DATA PGTO *  [ __/__/____ ]
 
-### 2. Cálculo `calcRegistroMarcaPremium`
+PLANO *                 [ Plano Essencial ▾ ]   ← NOVO, vem antes
+                          • Plano Essencial
+                          • Plano Premium
+                          • Plano Corporativo
 
-Adaptar para receber também o plano:
-- Se `plan === 'essencial'` → comportamento atual (já implementado).
-- Se `plan === 'premium'` → `total = totalMarcas * 100`.
-- Se `plan === 'corporativo'` → `total = totalMarcas * 200`.
+FORMA DE PAGAMENTO *    [ ... ▾ ]                ← opções dependem do plano
+```
 
-A meta de 30 continua sendo usada apenas para exibir progresso na UI.
+### Opções de "Forma de Pagamento" por plano
 
-### 3. UI — `src/pages/admin/Premiacao.tsx`
+- **Essencial** (mantém o atual):
+  - À Vista — R$ 699,99
+  - Parcelado — R$ 1.194,00
+  - Promoção — Valor Personalizado
+- **Premium**:
+  - Boleto — R$ 398,00/mês
+  - Cartão — R$ 398,00/mês
+- **Corporativo**:
+  - Boleto — R$ 1.621,00/mês
+  - Cartão — R$ 1.621,00/mês
 
-No topo (próximo aos filtros de período/usuário) adicionar um **Select de Plano** com 3 opções (Essencial / Premium / Corporativo). Trocar o plano:
-- Atualiza `system_settings.award_config.plan` (apenas Master Admin pode trocar; demais visualizam read-only).
-- Recalcula imediatamente os totais via `useQuery` invalidate.
+### Cálculo da premiação por entrada
 
-Card de resumo do plano vigente mostrando: nome do plano, valor por marca, meta, e (se Premium/Corporativo) preço mensal + forma de pagamento.
+`calcRegistroMarcaPremium` passa a olhar o campo `plan` de **cada entrada** (não mais um plano global):
 
-### 4. UI — `src/components/admin/settings/AwardSettings.tsx`
+- Entrada com `plan = 'essencial'` → mantém regra atual (R$ 50/marca; após meta de 30: R$ 100 à vista / R$ 50 parcelado).
+- Entrada com `plan = 'premium'` → R$ 100 fixos por marca, sempre (também conta na meta de 30, mas o valor não muda após a meta).
+- Entrada com `plan = 'corporativo'` → R$ 200 fixos por marca, sempre.
 
-Nova seção **"Plano de Premiação"** acima do bloco "Registro de Marca":
-- Select com Essencial / Premium / Corporativo.
-- Quando Premium ou Corporativo selecionado:
-  - Mostrar campos: `rate_per_brand`, `monthly_goal`, `monthly_price`, e radio `plan_payment_method` (Boleto / Cartão).
-  - Esconder ou desabilitar a seção "Registro de Marca" antiga (regras de à vista / parcelado / acima da meta) já que não se aplicam.
-- Quando Essencial: comportamento atual permanece visível e editável.
+A meta única de 30 marcas continua sendo a mesma; ela soma todas as marcas independentemente do plano.
 
-Salvar tudo no mesmo `system_settings.award_config` (botão Salvar já existente).
+### Remover o seletor "global"
 
-### 5. Persistência
+- Remover do topo da página `/admin/premiacao` o card "PLANO DE PREMIAÇÃO ATIVO" e o `<Select>` de plano global.
+- Remover de **Configurações → Premiação** a seção "Plano de Premiação" que escolhia um plano único. Em seu lugar, deixar apenas os parâmetros editáveis de cada plano (valor por marca, mensalidade) caso o Master Admin queira alterar os defaults — sem `plan` ativo.
 
-Não requer migration — `system_settings.value` é JSONB. Apenas adicionar novos campos ao objeto serializado.
+### Persistência
 
-## Arquivos a modificar
+A tabela `award_entries` já tem coluna livre? Vou usar uma nova coluna `plan` (text). Como o projeto é Lovable Cloud / Supabase, será necessário criar uma **migration** adicionando `plan text not null default 'essencial'` em `award_entries`. Entradas antigas ficam automaticamente como `essencial` (preservando os cálculos existentes).
 
-- `src/pages/admin/Premiacao.tsx` — tipo, DEFAULT_CONFIG, cálculo, UI do seletor, card de resumo.
-- `src/components/admin/settings/AwardSettings.tsx` — tipo, DEFAULT_CONFIG, nova seção "Plano de Premiação", lógica condicional dos campos.
+O campo `payment_type` continua existindo e passa a aceitar também `'boleto'` e `'cartao'` (são apenas strings; o cálculo do Premium/Corporativo ignora esse campo de qualquer forma).
+
+## Detalhes técnicos
+
+**Arquivos a alterar:**
+- `src/pages/admin/Premiacao.tsx`
+  - Adicionar estado `formPlan` no formulário do diálogo.
+  - Renderizar `<Select>` de Plano dentro do bloco `formType === 'registro_marca'`, **antes** do Select de Forma de Pagamento.
+  - Tornar as opções do Select "Forma de Pagamento" dependentes de `formPlan`.
+  - Resetar `formPaymentType` quando `formPlan` muda (para evitar valor inválido).
+  - Passar `formPlan` no `insert`/`update` do `award_entries`.
+  - Refatorar `calcRegistroMarcaPremium(entries, cfg)` para iterar e aplicar a regra conforme `entry.plan` de cada entrada.
+  - Remover o card "PLANO DE PREMIAÇÃO ATIVO", o `<Select>` global e a `savePlanMutation`.
+  - Exibir badge do plano na lista de entradas (Essencial/Premium/Corporativo) ao lado do badge de Forma de Pagamento.
+- `src/components/admin/settings/AwardSettings.tsx`
+  - Remover o seletor de "plano ativo".
+  - Manter apenas os blocos de parâmetros (`rate_per_brand`, `monthly_price`) caso o Master Admin queira editar os defaults usados como referência informativa. (Opcional — se preferir, removo a seção inteira; me avise.)
+- `src/integrations/supabase/types.ts` — atualizado automaticamente após a migration.
+
+**Migration necessária:**
+```sql
+alter table public.award_entries
+  add column if not exists plan text not null default 'essencial'
+  check (plan in ('essencial','premium','corporativo'));
+```
 
 ## Fora de escopo
 
-- Cobrança real do plano (R$ 398 / R$ 1.621) via Asaas — apenas exibição informativa.
-- Histórico de troca de plano (pode ser adicionado depois se necessário).
+- Cobrança real das mensalidades de Premium/Corporativo via Asaas.
+- Histórico de mudança de plano por cliente.
