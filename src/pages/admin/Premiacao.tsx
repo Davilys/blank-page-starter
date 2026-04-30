@@ -756,13 +756,29 @@ export default function Premiacao() {
                 <Select value={formPaymentType} onValueChange={setFormPaymentType}>
                   <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="avista">À Vista — R$ 699,99</SelectItem>
-                    <SelectItem value="parcelado">Parcelado — R$ 1.194,00</SelectItem>
-                    <SelectItem value="promocao">Promoção — Valor Personalizado</SelectItem>
+                    {formPlan === 'essencial' && (
+                      <>
+                        <SelectItem value="avista">À Vista — R$ 699,99</SelectItem>
+                        <SelectItem value="parcelado">Parcelado — R$ 1.194,00</SelectItem>
+                        <SelectItem value="promocao">Promoção — Valor Personalizado</SelectItem>
+                      </>
+                    )}
+                    {formPlan === 'premium' && (
+                      <>
+                        <SelectItem value="boleto">Boleto — R$ 398,00/mês</SelectItem>
+                        <SelectItem value="cartao">Cartão — R$ 398,00/mês</SelectItem>
+                      </>
+                    )}
+                    {formPlan === 'corporativo' && (
+                      <>
+                        <SelectItem value="boleto">Boleto — R$ 1.621,00/mês</SelectItem>
+                        <SelectItem value="cartao">Cartão — R$ 1.621,00/mês</SelectItem>
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
-              {formPaymentType === 'promocao' && (
+              {formPlan === 'essencial' && formPaymentType === 'promocao' && (
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Valor Personalizado (R$) *</Label>
                   <div className="relative">
