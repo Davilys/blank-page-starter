@@ -15,10 +15,16 @@ import {
   Award, FileText, Megaphone, CreditCard, DollarSign,
   Zap, BarChart3, RefreshCw, Eye, Calculator, Gift, Star
 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // ─── Types ────────────────────────────────────────
 interface AwardConfig {
   enabled: boolean;
+  plan: 'essencial' | 'premium' | 'corporativo';
+  plans: {
+    premium: { rate_per_brand: number; monthly_goal: number; monthly_price: number; payment_method: 'boleto' | 'cartao' };
+    corporativo: { rate_per_brand: number; monthly_goal: number; monthly_price: number; payment_method: 'boleto' | 'cartao' };
+  };
   registro_marca: {
     base_rate: number;
     above_goal_avista_rate: number;
@@ -48,6 +54,11 @@ interface AwardConfig {
 
 const DEFAULT_CONFIG: AwardConfig = {
   enabled: true,
+  plan: 'essencial',
+  plans: {
+    premium: { rate_per_brand: 100, monthly_goal: 30, monthly_price: 398, payment_method: 'boleto' },
+    corporativo: { rate_per_brand: 200, monthly_goal: 30, monthly_price: 1621, payment_method: 'boleto' },
+  },
   registro_marca: {
     base_rate: 50,
     above_goal_avista_rate: 100,
