@@ -115,36 +115,22 @@ function PlanoSection({
                 <Trophy className="h-5 w-5 text-amber-500" />
               </div>
               <div>
-                <CardTitle className="text-lg">Plano de Premiação</CardTitle>
-                <CardDescription>Selecione o plano vigente que define o valor por marca registrada</CardDescription>
+                <CardTitle className="text-lg">Planos de Premiação</CardTitle>
+                <CardDescription>Defina o valor por marca e a mensalidade dos planos Premium e Corporativo. O plano é escolhido em cada cadastro novo na aba Premiação.</CardDescription>
               </div>
             </div>
             <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 gap-1">
-              <Sparkles className="h-3 w-3" /> Plano Ativo
+              <Sparkles className="h-3 w-3" /> Configuração
             </Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-5">
-          <div className="space-y-2">
-            <Label>Plano vigente</Label>
-            <Select value={plan} onValueChange={(v) => onChange({ plan: v as AwardConfig['plan'], plans })}>
-              <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="essencial">Plano Essencial (regra padrão)</SelectItem>
-                <SelectItem value="premium">Plano Premium (R$ 100/marca · R$ 398/mês)</SelectItem>
-                <SelectItem value="corporativo">Plano Corporativo (R$ 200/marca · R$ 1.621/mês)</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-[11px] text-muted-foreground">
-              No Premium e Corporativo, cada marca registrada vale o mesmo valor antes e depois da meta. Publicações e Cobranças não são afetadas.
-            </p>
-          </div>
+          <p className="text-[11px] text-muted-foreground">
+            O plano agora é selecionado por cadastro, dentro do diálogo "Novo Cadastro" na aba Premiação. Os valores abaixo são usados como referência no cálculo das premiações.
+          </p>
 
           {/* Plano Premium */}
-          <div className={cn(
-            "rounded-xl border p-4 space-y-4 transition-opacity",
-            plan !== 'premium' && "opacity-60"
-          )}>
+          <div className="rounded-xl border p-4 space-y-4">
             <div className="flex items-center gap-2">
               <Star className="h-4 w-4 text-violet-500" />
               <p className="text-sm font-semibold">Plano Premium</p>
@@ -185,10 +171,7 @@ function PlanoSection({
           </div>
 
           {/* Plano Corporativo */}
-          <div className={cn(
-            "rounded-xl border p-4 space-y-4 transition-opacity",
-            plan !== 'corporativo' && "opacity-60"
-          )}>
+          <div className="rounded-xl border p-4 space-y-4">
             <div className="flex items-center gap-2">
               <Award className="h-4 w-4 text-emerald-500" />
               <p className="text-sm font-semibold">Plano Corporativo</p>
