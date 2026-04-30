@@ -768,6 +768,12 @@ export function AwardSettings() {
       </motion.div>
 
       {/* Sections */}
+      <PlanoSection
+        plan={config.plan}
+        plans={config.plans}
+        onChange={({ plan, plans }) => setConfig(prev => ({ ...prev, plan, plans }))}
+      />
+
       <RegistroMarcaSection
         config={config.registro_marca}
         onChange={v => setConfig(prev => ({ ...prev, registro_marca: v }))}
