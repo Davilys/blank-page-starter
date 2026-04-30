@@ -417,6 +417,7 @@ export default function Premiacao() {
     setFormClientName('');
     setFormBrandName('');
     setFormBrandQty(1);
+    setFormPlan('essencial');
     setFormPaymentType('avista');
     setFormPubType('deferimento');
     setFormPubQty(1);
