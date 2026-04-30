@@ -204,6 +204,7 @@ export default function Premiacao() {
   const [formClientName, setFormClientName] = useState('');
   const [formBrandName, setFormBrandName] = useState('');
   const [formBrandQty, setFormBrandQty] = useState(1);
+  const [formPlan, setFormPlan] = useState<'essencial' | 'premium' | 'corporativo'>('essencial');
   const [formPaymentType, setFormPaymentType] = useState('avista');
   const [formPubType, setFormPubType] = useState('deferimento');
   const [formPubQty, setFormPubQty] = useState(1);
