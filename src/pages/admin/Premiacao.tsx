@@ -469,6 +469,7 @@ export default function Premiacao() {
 
     if (formType === 'registro_marca') {
       base.brand_quantity = formBrandQty;
+      base.plan = formPlan;
       base.payment_type = formPaymentType;
       if (formPaymentType === 'promocao') base.payment_form = 'promocao';
     } else if (formType === 'publicacao') {
