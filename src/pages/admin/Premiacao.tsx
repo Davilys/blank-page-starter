@@ -751,6 +751,35 @@ export default function Premiacao() {
                   </div>
                 </div>
               </div>
+              {/* Plano (escolhido por cadastro) */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Plano *</Label>
+                <Select
+                  value={formPlan}
+                  onValueChange={(v) => {
+                    const next = v as 'essencial' | 'premium' | 'corporativo';
+                    setFormPlan(next);
+                    // Reset da forma de pagamento para um valor válido no plano novo
+                    if (next === 'essencial') setFormPaymentType('avista');
+                    else setFormPaymentType('boleto');
+                  }}
+                >
+                  <SelectTrigger className="h-11">
+                    <Trophy className="h-4 w-4 mr-2 text-amber-500" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="essencial">Plano Essencial</SelectItem>
+                    <SelectItem value="premium">Plano Premium — R$ 100/marca</SelectItem>
+                    <SelectItem value="corporativo">Plano Corporativo — R$ 200/marca</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  {formPlan === 'essencial' && 'Regra padrão: R$ 50/marca; após meta de 30 → R$ 100 (à vista) ou R$ 50 (parcelado).'}
+                  {formPlan === 'premium' && 'R$ 100 fixos por marca. Conta na meta de 30, mas o valor não muda após a meta.'}
+                  {formPlan === 'corporativo' && 'R$ 200 fixos por marca. Conta na meta de 30, mas o valor não muda após a meta.'}
+                </p>
+              </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Forma de Pagamento *</Label>
                 <Select value={formPaymentType} onValueChange={setFormPaymentType}>
