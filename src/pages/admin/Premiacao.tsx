@@ -381,38 +381,6 @@ export default function Premiacao() {
     },
   });
 
-  // Salvar troca de plano (apenas master admin)
-  const savePlanMutation = useMutation({
-    mutationFn: async (newPlan: 'essencial' | 'premium' | 'corporativo') => {
-      const newConfig: AwardConfig = { ...cfg, plan: newPlan };
-      const { data: existing } = await supabase
-        .from('system_settings')
-        .select('id')
-        .eq('key', 'award_config')
-        .maybeSingle();
-      const valueToSave = JSON.parse(JSON.stringify(newConfig));
-      const { data: u } = await supabase.auth.getUser();
-      if (existing) {
-        const { error } = await supabase
-          .from('system_settings')
-          .update({ value: valueToSave, updated_at: new Date().toISOString(), updated_by: u.user?.id })
-          .eq('key', 'award_config');
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('system_settings')
-          .insert([{ key: 'award_config', value: valueToSave, updated_by: u.user?.id }]);
-        if (error) throw error;
-      }
-    },
-    onSuccess: (_, newPlan) => {
-      queryClient.invalidateQueries({ queryKey: ['award-config'] });
-      const label = newPlan === 'essencial' ? 'Essencial' : newPlan === 'premium' ? 'Premium' : 'Corporativo';
-      toast.success(`Plano alterado para ${label}`);
-    },
-    onError: (err: Error) => toast.error('Erro ao alterar plano: ' + err.message),
-  });
-
   function resetForm() {
     setFormClientName('');
     setFormBrandName('');
