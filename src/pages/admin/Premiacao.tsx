@@ -1247,7 +1247,14 @@ export default function Premiacao() {
                       <td className="p-3">{entry.brand_quantity}</td>
                       <td className="p-3">
                         <Badge variant={entry.payment_type === 'avista' ? 'default' : 'secondary'} className="text-xs">
-                          {entry.payment_type === 'avista' ? 'À Vista' : entry.payment_type === 'parcelado' ? 'Parcelado' : 'Promoção'}
+                          {entry.payment_type === 'avista' ? 'À Vista'
+                            : entry.payment_type === 'parcelado' ? 'Parcelado'
+                            : entry.payment_type === 'boleto' ? 'Boleto'
+                            : entry.payment_type === 'cartao' ? 'Cartão'
+                            : 'Promoção'}
+                        </Badge>
+                        <Badge variant="outline" className="ml-1 text-[10px] border-amber-500/40 text-amber-600">
+                          {entry.plan === 'premium' ? 'Premium' : entry.plan === 'corporativo' ? 'Corporativo' : 'Essencial'}
                         </Badge>
                       </td>
                       <td className="p-3 text-xs text-muted-foreground">{getUserName(entry.responsible_user_id)}</td>
