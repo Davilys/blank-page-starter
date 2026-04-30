@@ -330,7 +330,7 @@ export default function Premiacao() {
   const publicacaoEntries = filteredEntries.filter(e => e.entry_type === 'publicacao');
   const cobrancaEntries = filteredEntries.filter(e => e.entry_type === 'cobranca');
 
-  const totalRegistroPremium = calcRegistroMarcaPremium(registroEntries, cfg.registro_marca);
+  const totalRegistroPremium = calcRegistroMarcaPremium(registroEntries, cfg.registro_marca, cfg.plan, cfg.plans);
   const totalPublicacaoPremium = calcPublicacaoPremium(publicacaoEntries, cfg.publicacao);
   const totalCobrancaPremium = calcCobrancaPremium(cobrancaEntries, cfg.cobranca);
   const pubMilestone = calcPublicacaoMilestoneBonus(publicacaoEntries, cfg.publicacao);
@@ -450,7 +450,7 @@ export default function Premiacao() {
       const cob = userEntries.filter(e => e.entry_type === 'cobranca');
       const userPubMilestone = calcPublicacaoMilestoneBonus(pub, cfg.publicacao);
       const userCobMilestone = calcCobrancaMilestoneBonus(cob, cfg.cobranca);
-      const basePremium = calcRegistroMarcaPremium(reg, cfg.registro_marca) + calcPublicacaoPremium(pub, cfg.publicacao) + calcCobrancaPremium(cob, cfg.cobranca);
+      const basePremium = calcRegistroMarcaPremium(reg, cfg.registro_marca, cfg.plan, cfg.plans) + calcPublicacaoPremium(pub, cfg.publicacao) + calcCobrancaPremium(cob, cfg.cobranca);
       map.set(member.id, {
         registro: reg.reduce((s, e) => s + (e.brand_quantity || 1), 0),
         publicacao: pub.reduce((s, e) => s + (e.pub_quantity || 1), 0),
