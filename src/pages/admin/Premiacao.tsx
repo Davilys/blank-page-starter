@@ -978,57 +978,7 @@ export default function Premiacao() {
           </div>
         </div>
 
-        {/* Plan Selector + Summary */}
-        <Card className="overflow-hidden border-amber-500/20">
-          <div className="h-1 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400" />
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                  <Sparkles className="h-5 w-5 text-amber-500" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Plano de Premiação Ativo</p>
-                  <p className="text-base font-bold capitalize">
-                    {cfg.plan === 'premium' ? 'Plano Premium' : cfg.plan === 'corporativo' ? 'Plano Corporativo' : 'Plano Essencial'}
-                  </p>
-                  {cfg.plan === 'premium' && (
-                    <p className="text-xs text-muted-foreground">
-                      R$ {cfg.plans?.premium.rate_per_brand ?? 100}/marca · Mensalidade R$ {(cfg.plans?.premium.monthly_price ?? 398).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ({cfg.plans?.premium.payment_method === 'cartao' ? 'Cartão' : 'Boleto'})
-                    </p>
-                  )}
-                  {cfg.plan === 'corporativo' && (
-                    <p className="text-xs text-muted-foreground">
-                      R$ {cfg.plans?.corporativo.rate_per_brand ?? 200}/marca · Mensalidade R$ {(cfg.plans?.corporativo.monthly_price ?? 1621).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ({cfg.plans?.corporativo.payment_method === 'cartao' ? 'Cartão' : 'Boleto'})
-                    </p>
-                  )}
-                  {(cfg.plan === 'essencial' || !cfg.plan) && (
-                    <p className="text-xs text-muted-foreground">Regra padrão: R$ {cfg.registro_marca.base_rate}/marca · meta {cfg.registro_marca.monthly_goal}</p>
-                  )}
-                </div>
-              </div>
-              {isMaster ? (
-                <Select
-                  value={cfg.plan ?? 'essencial'}
-                  onValueChange={(v) => savePlanMutation.mutate(v as 'essencial' | 'premium' | 'corporativo')}
-                  disabled={savePlanMutation.isPending}
-                >
-                  <SelectTrigger className="w-full sm:w-[220px] h-10">
-                    <Trophy className="h-4 w-4 mr-2 text-amber-500" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="essencial">Plano Essencial</SelectItem>
-                    <SelectItem value="premium">Plano Premium (R$ 100/marca)</SelectItem>
-                    <SelectItem value="corporativo">Plano Corporativo (R$ 200/marca)</SelectItem>
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Badge variant="outline" className="text-xs">Apenas o Master Admin pode trocar o plano</Badge>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        {/* O plano agora é escolhido por cadastro, dentro do diálogo "Novo Cadastro" */}
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
