@@ -50,6 +50,11 @@ interface TeamMember {
 // ---- Config type (matches AwardSettings) ----
 interface AwardConfig {
   enabled: boolean;
+  plan?: 'essencial' | 'premium' | 'corporativo';
+  plans?: {
+    premium: { rate_per_brand: number; monthly_goal: number; monthly_price: number; payment_method: 'boleto' | 'cartao' };
+    corporativo: { rate_per_brand: number; monthly_goal: number; monthly_price: number; payment_method: 'boleto' | 'cartao' };
+  };
   registro_marca: {
     base_rate: number;
     above_goal_avista_rate: number;
@@ -75,6 +80,11 @@ interface AwardConfig {
 
 const DEFAULT_CONFIG: AwardConfig = {
   enabled: true,
+  plan: 'essencial',
+  plans: {
+    premium: { rate_per_brand: 100, monthly_goal: 30, monthly_price: 398, payment_method: 'boleto' },
+    corporativo: { rate_per_brand: 200, monthly_goal: 30, monthly_price: 1621, payment_method: 'boleto' },
+  },
   registro_marca: { base_rate: 50, above_goal_avista_rate: 100, above_goal_parcelado_rate: 50, monthly_goal: 30 },
   publicacao: { base_rate: 50, above_goal_rate: 100, monthly_goal: 50, milestone_interval: 10, milestone_bonus: 100, milestone_enabled: true },
   cobranca: {
@@ -93,7 +103,14 @@ const DEFAULT_CONFIG: AwardConfig = {
 };
 
 // ---- Calculation helpers (config-aware) ----
-function calcRegistroMarcaPremium(entries: AwardEntry[], cfg: AwardConfig['registro_marca']): number {
+function calcRegistroMarcaPremium(entries: AwardEntry[], cfg: AwardConfig['registro_marca'], plan: AwardConfig['plan'] = 'essencial', plans?: AwardConfig['plans']): number {
+  // Plano Premium / Corporativo: valor fixo por marca (independe da meta e da forma de pagamento)
+  if (plan === 'premium' || plan === 'corporativo') {
+    const rate = plans?.[plan]?.rate_per_brand ?? (plan === 'premium' ? 100 : 200);
+    const totalMarcas = entries.reduce((s, e) => s + (e.brand_quantity || 1), 0);
+    return totalMarcas * rate;
+  }
+  // Plano Essencial: regra atual (base + faixa pós-meta)
   let total = 0;
   const sorted = [...entries].sort((a, b) => a.entry_date.localeCompare(b.entry_date));
   let accumulated = 0;
@@ -313,7 +330,7 @@ export default function Premiacao() {
   const publicacaoEntries = filteredEntries.filter(e => e.entry_type === 'publicacao');
   const cobrancaEntries = filteredEntries.filter(e => e.entry_type === 'cobranca');
 
-  const totalRegistroPremium = calcRegistroMarcaPremium(registroEntries, cfg.registro_marca);
+  const totalRegistroPremium = calcRegistroMarcaPremium(registroEntries, cfg.registro_marca, cfg.plan, cfg.plans);
   const totalPublicacaoPremium = calcPublicacaoPremium(publicacaoEntries, cfg.publicacao);
   const totalCobrancaPremium = calcCobrancaPremium(cobrancaEntries, cfg.cobranca);
   const pubMilestone = calcPublicacaoMilestoneBonus(publicacaoEntries, cfg.publicacao);
@@ -351,6 +368,38 @@ export default function Premiacao() {
       queryClient.invalidateQueries({ queryKey: ['award-entries'] });
       toast.success('Registro excluído!');
     },
+  });
+
+  // Salvar troca de plano (apenas master admin)
+  const savePlanMutation = useMutation({
+    mutationFn: async (newPlan: 'essencial' | 'premium' | 'corporativo') => {
+      const newConfig: AwardConfig = { ...cfg, plan: newPlan };
+      const { data: existing } = await supabase
+        .from('system_settings')
+        .select('id')
+        .eq('key', 'award_config')
+        .maybeSingle();
+      const valueToSave = JSON.parse(JSON.stringify(newConfig));
+      const { data: u } = await supabase.auth.getUser();
+      if (existing) {
+        const { error } = await supabase
+          .from('system_settings')
+          .update({ value: valueToSave, updated_at: new Date().toISOString(), updated_by: u.user?.id })
+          .eq('key', 'award_config');
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('system_settings')
+          .insert([{ key: 'award_config', value: valueToSave, updated_by: u.user?.id }]);
+        if (error) throw error;
+      }
+    },
+    onSuccess: (_, newPlan) => {
+      queryClient.invalidateQueries({ queryKey: ['award-config'] });
+      const label = newPlan === 'essencial' ? 'Essencial' : newPlan === 'premium' ? 'Premium' : 'Corporativo';
+      toast.success(`Plano alterado para ${label}`);
+    },
+    onError: (err: Error) => toast.error('Erro ao alterar plano: ' + err.message),
   });
 
   function resetForm() {
@@ -433,7 +482,7 @@ export default function Premiacao() {
       const cob = userEntries.filter(e => e.entry_type === 'cobranca');
       const userPubMilestone = calcPublicacaoMilestoneBonus(pub, cfg.publicacao);
       const userCobMilestone = calcCobrancaMilestoneBonus(cob, cfg.cobranca);
-      const basePremium = calcRegistroMarcaPremium(reg, cfg.registro_marca) + calcPublicacaoPremium(pub, cfg.publicacao) + calcCobrancaPremium(cob, cfg.cobranca);
+      const basePremium = calcRegistroMarcaPremium(reg, cfg.registro_marca, cfg.plan, cfg.plans) + calcPublicacaoPremium(pub, cfg.publicacao) + calcCobrancaPremium(cob, cfg.cobranca);
       map.set(member.id, {
         registro: reg.reduce((s, e) => s + (e.brand_quantity || 1), 0),
         publicacao: pub.reduce((s, e) => s + (e.pub_quantity || 1), 0),
@@ -901,6 +950,58 @@ export default function Premiacao() {
             )}
           </div>
         </div>
+
+        {/* Plan Selector + Summary */}
+        <Card className="overflow-hidden border-amber-500/20">
+          <div className="h-1 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400" />
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                  <Sparkles className="h-5 w-5 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Plano de Premiação Ativo</p>
+                  <p className="text-base font-bold capitalize">
+                    {cfg.plan === 'premium' ? 'Plano Premium' : cfg.plan === 'corporativo' ? 'Plano Corporativo' : 'Plano Essencial'}
+                  </p>
+                  {cfg.plan === 'premium' && (
+                    <p className="text-xs text-muted-foreground">
+                      R$ {cfg.plans?.premium.rate_per_brand ?? 100}/marca · Mensalidade R$ {(cfg.plans?.premium.monthly_price ?? 398).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ({cfg.plans?.premium.payment_method === 'cartao' ? 'Cartão' : 'Boleto'})
+                    </p>
+                  )}
+                  {cfg.plan === 'corporativo' && (
+                    <p className="text-xs text-muted-foreground">
+                      R$ {cfg.plans?.corporativo.rate_per_brand ?? 200}/marca · Mensalidade R$ {(cfg.plans?.corporativo.monthly_price ?? 1621).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ({cfg.plans?.corporativo.payment_method === 'cartao' ? 'Cartão' : 'Boleto'})
+                    </p>
+                  )}
+                  {(cfg.plan === 'essencial' || !cfg.plan) && (
+                    <p className="text-xs text-muted-foreground">Regra padrão: R$ {cfg.registro_marca.base_rate}/marca · meta {cfg.registro_marca.monthly_goal}</p>
+                  )}
+                </div>
+              </div>
+              {isMaster ? (
+                <Select
+                  value={cfg.plan ?? 'essencial'}
+                  onValueChange={(v) => savePlanMutation.mutate(v as 'essencial' | 'premium' | 'corporativo')}
+                  disabled={savePlanMutation.isPending}
+                >
+                  <SelectTrigger className="w-full sm:w-[220px] h-10">
+                    <Trophy className="h-4 w-4 mr-2 text-amber-500" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="essencial">Plano Essencial</SelectItem>
+                    <SelectItem value="premium">Plano Premium (R$ 100/marca)</SelectItem>
+                    <SelectItem value="corporativo">Plano Corporativo (R$ 200/marca)</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Badge variant="outline" className="text-xs">Apenas o Master Admin pode trocar o plano</Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>

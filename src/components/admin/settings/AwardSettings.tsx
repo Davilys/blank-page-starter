@@ -15,10 +15,16 @@ import {
   Award, FileText, Megaphone, CreditCard, DollarSign,
   Zap, BarChart3, RefreshCw, Eye, Calculator, Gift, Star
 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // ─── Types ────────────────────────────────────────
 interface AwardConfig {
   enabled: boolean;
+  plan: 'essencial' | 'premium' | 'corporativo';
+  plans: {
+    premium: { rate_per_brand: number; monthly_goal: number; monthly_price: number; payment_method: 'boleto' | 'cartao' };
+    corporativo: { rate_per_brand: number; monthly_goal: number; monthly_price: number; payment_method: 'boleto' | 'cartao' };
+  };
   registro_marca: {
     base_rate: number;
     above_goal_avista_rate: number;
@@ -48,6 +54,11 @@ interface AwardConfig {
 
 const DEFAULT_CONFIG: AwardConfig = {
   enabled: true,
+  plan: 'essencial',
+  plans: {
+    premium: { rate_per_brand: 100, monthly_goal: 30, monthly_price: 398, payment_method: 'boleto' },
+    corporativo: { rate_per_brand: 200, monthly_goal: 30, monthly_price: 1621, payment_method: 'boleto' },
+  },
   registro_marca: {
     base_rate: 50,
     above_goal_avista_rate: 100,
@@ -78,6 +89,149 @@ const DEFAULT_CONFIG: AwardConfig = {
 };
 
 // ─── Section Components ───────────────────────────
+
+function PlanoSection({
+  plan,
+  plans,
+  onChange,
+}: {
+  plan: AwardConfig['plan'];
+  plans: AwardConfig['plans'];
+  onChange: (next: { plan: AwardConfig['plan']; plans: AwardConfig['plans'] }) => void;
+}) {
+  const updatePremium = (patch: Partial<AwardConfig['plans']['premium']>) =>
+    onChange({ plan, plans: { ...plans, premium: { ...plans.premium, ...patch } } });
+  const updateCorp = (patch: Partial<AwardConfig['plans']['corporativo']>) =>
+    onChange({ plan, plans: { ...plans, corporativo: { ...plans.corporativo, ...patch } } });
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+      <Card className="overflow-hidden border-amber-500/30">
+        <div className="h-1 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400" />
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                <Trophy className="h-5 w-5 text-amber-500" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Plano de Premiação</CardTitle>
+                <CardDescription>Selecione o plano vigente que define o valor por marca registrada</CardDescription>
+              </div>
+            </div>
+            <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 gap-1">
+              <Sparkles className="h-3 w-3" /> Plano Ativo
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="space-y-2">
+            <Label>Plano vigente</Label>
+            <Select value={plan} onValueChange={(v) => onChange({ plan: v as AwardConfig['plan'], plans })}>
+              <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="essencial">Plano Essencial (regra padrão)</SelectItem>
+                <SelectItem value="premium">Plano Premium (R$ 100/marca · R$ 398/mês)</SelectItem>
+                <SelectItem value="corporativo">Plano Corporativo (R$ 200/marca · R$ 1.621/mês)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              No Premium e Corporativo, cada marca registrada vale o mesmo valor antes e depois da meta. Publicações e Cobranças não são afetadas.
+            </p>
+          </div>
+
+          {/* Plano Premium */}
+          <div className={cn(
+            "rounded-xl border p-4 space-y-4 transition-opacity",
+            plan !== 'premium' && "opacity-60"
+          )}>
+            <div className="flex items-center gap-2">
+              <Star className="h-4 w-4 text-violet-500" />
+              <p className="text-sm font-semibold">Plano Premium</p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Valor por marca (R$)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+                  <Input type="number" step="0.01" className="pl-10" value={plans.premium.rate_per_brand}
+                    onChange={e => updatePremium({ rate_per_brand: parseFloat(e.target.value) || 0 })} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Meta mensal (marcas)</Label>
+                <Input type="number" min={1} value={plans.premium.monthly_goal}
+                  onChange={e => updatePremium({ monthly_goal: parseInt(e.target.value) || 1 })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Mensalidade do plano (R$)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+                  <Input type="number" step="0.01" className="pl-10" value={plans.premium.monthly_price}
+                    onChange={e => updatePremium({ monthly_price: parseFloat(e.target.value) || 0 })} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Forma de pagamento</Label>
+                <Select value={plans.premium.payment_method} onValueChange={v => updatePremium({ payment_method: v as 'boleto' | 'cartao' })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="boleto">Boleto</SelectItem>
+                    <SelectItem value="cartao">Cartão</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Plano Corporativo */}
+          <div className={cn(
+            "rounded-xl border p-4 space-y-4 transition-opacity",
+            plan !== 'corporativo' && "opacity-60"
+          )}>
+            <div className="flex items-center gap-2">
+              <Award className="h-4 w-4 text-emerald-500" />
+              <p className="text-sm font-semibold">Plano Corporativo</p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Valor por marca (R$)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+                  <Input type="number" step="0.01" className="pl-10" value={plans.corporativo.rate_per_brand}
+                    onChange={e => updateCorp({ rate_per_brand: parseFloat(e.target.value) || 0 })} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Meta mensal (marcas)</Label>
+                <Input type="number" min={1} value={plans.corporativo.monthly_goal}
+                  onChange={e => updateCorp({ monthly_goal: parseInt(e.target.value) || 1 })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Mensalidade do plano (R$)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+                  <Input type="number" step="0.01" className="pl-10" value={plans.corporativo.monthly_price}
+                    onChange={e => updateCorp({ monthly_price: parseFloat(e.target.value) || 0 })} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Forma de pagamento</Label>
+                <Select value={plans.corporativo.payment_method} onValueChange={v => updateCorp({ payment_method: v as 'boleto' | 'cartao' })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="boleto">Boleto</SelectItem>
+                    <SelectItem value="cartao">Cartão</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
 
 function RegistroMarcaSection({
   config,
@@ -614,6 +768,12 @@ export function AwardSettings() {
       </motion.div>
 
       {/* Sections */}
+      <PlanoSection
+        plan={config.plan}
+        plans={config.plans}
+        onChange={({ plan, plans }) => setConfig(prev => ({ ...prev, plan, plans }))}
+      />
+
       <RegistroMarcaSection
         config={config.registro_marca}
         onChange={v => setConfig(prev => ({ ...prev, registro_marca: v }))}
