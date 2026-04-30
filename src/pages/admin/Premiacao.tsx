@@ -39,6 +39,7 @@ interface AwardEntry {
   payment_date: string | null;
   payment_form: string | null;
   created_at: string;
+  plan?: 'essencial' | 'premium' | 'corporativo' | null;
 }
 
 interface TeamMember {
@@ -103,25 +104,34 @@ const DEFAULT_CONFIG: AwardConfig = {
 };
 
 // ---- Calculation helpers (config-aware) ----
-function calcRegistroMarcaPremium(entries: AwardEntry[], cfg: AwardConfig['registro_marca'], plan: AwardConfig['plan'] = 'essencial', plans?: AwardConfig['plans']): number {
-  // Plano Premium / Corporativo: valor fixo por marca (independe da meta e da forma de pagamento)
-  if (plan === 'premium' || plan === 'corporativo') {
-    const rate = plans?.[plan]?.rate_per_brand ?? (plan === 'premium' ? 100 : 200);
-    const totalMarcas = entries.reduce((s, e) => s + (e.brand_quantity || 1), 0);
-    return totalMarcas * rate;
-  }
-  // Plano Essencial: regra atual (base + faixa pós-meta)
+// Cada cadastro de Registro de Marca tem o seu próprio plano. A premiação é somada por entrada.
+// - Essencial: regra clássica (base por marca; após a meta de 30, valor diferente p/ à vista vs parcelado)
+// - Premium: R$ fixo por marca (cfg.plans.premium.rate_per_brand). Conta na meta, mas valor não muda.
+// - Corporativo: R$ fixo por marca (cfg.plans.corporativo.rate_per_brand). Idem.
+function calcRegistroMarcaPremium(entries: AwardEntry[], cfg: AwardConfig['registro_marca'], _plan?: AwardConfig['plan'], plans?: AwardConfig['plans']): number {
   let total = 0;
+  // Ordena para a regra "Essencial" aplicar a meta na ordem cronológica
   const sorted = [...entries].sort((a, b) => a.entry_date.localeCompare(b.entry_date));
+  // Acumulador da meta conta TODAS as marcas (independente do plano da entrada)
   let accumulated = 0;
+  const premiumRate = plans?.premium?.rate_per_brand ?? 100;
+  const corporativoRate = plans?.corporativo?.rate_per_brand ?? 200;
   for (const entry of sorted) {
     const qty = entry.brand_quantity || 1;
+    const entryPlan = (entry.plan || 'essencial') as 'essencial' | 'premium' | 'corporativo';
     for (let i = 0; i < qty; i++) {
       accumulated++;
-      if (accumulated <= cfg.monthly_goal) {
-        total += cfg.base_rate;
+      if (entryPlan === 'premium') {
+        total += premiumRate;
+      } else if (entryPlan === 'corporativo') {
+        total += corporativoRate;
       } else {
-        total += entry.payment_type === 'avista' ? cfg.above_goal_avista_rate : cfg.above_goal_parcelado_rate;
+        // essencial
+        if (accumulated <= cfg.monthly_goal) {
+          total += cfg.base_rate;
+        } else {
+          total += entry.payment_type === 'avista' ? cfg.above_goal_avista_rate : cfg.above_goal_parcelado_rate;
+        }
       }
     }
   }
