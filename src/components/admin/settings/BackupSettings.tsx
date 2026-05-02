@@ -16,6 +16,7 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BackupImportSection } from './BackupImportSection';
+import { PerfexImportSection } from './PerfexImportSection';
 import { ALL_BACKUP_TABLES, fetchAllFromTable } from '@/lib/backupTables';
 
 export function BackupSettings() {
