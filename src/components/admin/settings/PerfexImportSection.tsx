@@ -52,6 +52,23 @@ export function PerfexImportSection() {
   const [parseStats, setParseStats] = useState<{ customers: number; contracts: number; files: number } | null>(null);
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
 
+  const handleDirectDownload = async () => {
+    setParseStats(null);
+    setParsing(true);
+    try {
+      const res = await supabase.functions.invoke('parse-perfex-dump', { body: {} });
+      if (res.error) throw new Error(res.error.message);
+      if ((res.data as any)?.error) throw new Error((res.data as any).error);
+      setParseStats(res.data.stats);
+      setUploadedFile('crm.webmarcas.net/u973561543_perfexcrm.sql');
+      toast.success(`Dump processado: ${res.data.stats.customers} clientes, ${res.data.stats.contracts} contratos, ${res.data.stats.files} arquivos`);
+    } catch (e) {
+      toast.error(`Falha: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setParsing(false);
+    }
+  };
+
   const handleUpload = async (file: File) => {
     if (!file) return;
     const okExt = /\.(zip|sql|sql\.gz|gz)$/i.test(file.name);
@@ -240,7 +257,19 @@ export function PerfexImportSection() {
             <p className="text-xs text-muted-foreground">
               Envie um arquivo <code className="bg-muted px-1 rounded">.zip</code>, <code className="bg-muted px-1 rounded">.sql</code> ou <code className="bg-muted px-1 rounded">.sql.gz</code> do dump do Perfex CRM. Será processado e usado nas 3 fases abaixo.
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant="default"
+                disabled={uploading || parsing}
+                onClick={handleDirectDownload}
+              >
+                {parsing ? (
+                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Processando...</>
+                ) : (
+                  <>Baixar do CRM antigo e processar</>
+                )}
+              </Button>
               <input
                 type="file"
                 id="perfex-dump-upload"
@@ -260,7 +289,7 @@ export function PerfexImportSection() {
                 ) : parsing ? (
                   <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Processando...</>
                 ) : (
-                  <><Upload className="h-4 w-4 mr-1" />Selecionar Arquivo</>
+                  <><Upload className="h-4 w-4 mr-1" />Ou enviar arquivo manual</>
                 )}
               </Button>
               {uploadedFile && !uploading && !parsing && (
