@@ -303,6 +303,7 @@ export function BackupSettings() {
 
       {/* Import / Restore */}
       <BackupImportSection />
+      <PerfexImportSection />
 
       {/* Import History */}
       <SettingsCard
