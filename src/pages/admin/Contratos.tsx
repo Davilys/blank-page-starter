@@ -652,8 +652,52 @@ export default function AdminContratos() {
                   input.onchange = async (e: any) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
+                    // Pre-scan the ZIP to show a safe preview before any change
+                    setZipProgress({ current: 0, total: 1, label: 'Analisando ZIP...' });
+                    let JSZipMod: any;
+                    try {
+                      JSZipMod = (await import('jszip')).default;
+                    } catch (err: any) {
+                      toast.error('Erro ao carregar leitor de ZIP');
+                      setZipProgress(null);
+                      return;
+                    }
+                    let manifest: any[] = [];
+                    try {
+                      const z = await JSZipMod.loadAsync(file);
+                      const m = z.file('contracts_manifest.json');
+                      if (!m) throw new Error('contracts_manifest.json ausente no ZIP');
+                      manifest = JSON.parse(await m.async('text'));
+                    } catch (err: any) {
+                      toast.error('ZIP inválido: ' + (err.message || 'erro'));
+                      setZipProgress(null);
+                      return;
+                    }
+                    // Look up which contract_numbers already exist
+                    const numbers = Array.from(new Set(manifest.map((e: any) => e.contract_number).filter(Boolean)));
+                    let existingCount = 0;
+                    if (numbers.length > 0) {
+                      // chunk to avoid URL length issues
+                      for (let i = 0; i < numbers.length; i += 200) {
+                        const slice = numbers.slice(i, i + 200);
+                        const { data: ex } = await supabase
+                          .from('contracts')
+                          .select('contract_number')
+                          .in('contract_number', slice as string[]);
+                        existingCount += (ex || []).length;
+                      }
+                    }
+                    const total = manifest.length;
+                    const willUpdate = existingCount;
+                    const willCreate = total - willUpdate;
+                    setZipProgress(null);
                     const ok = window.confirm(
-                      '⚠️ ATENÇÃO: Contratos existentes com o mesmo número de contrato serão SUBSTITUÍDOS pelos dados do ZIP (HTML, assinaturas, blockchain e PDFs anexos).\n\nDeseja continuar?'
+                      `⚠️ Prévia da importação\n\n` +
+                      `• Total no ZIP: ${total}\n` +
+                      `• Serão CRIADOS: ${willCreate}\n` +
+                      `• SUBSTITUIRÃO contratos existentes (mesmo número): ${willUpdate}\n\n` +
+                      `A substituição altera HTML, assinaturas, blockchain e PDFs anexos dos contratos atuais.\n\n` +
+                      `Deseja continuar?`
                     );
                     if (!ok) return;
                     setZipImporting(true);
