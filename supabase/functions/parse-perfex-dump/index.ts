@@ -1,8 +1,5 @@
-// Parse Perfex SQL dump uploaded to Storage and produce NDJSON.gz files.
-// Accepts: .sql, .sql.gz, .zip (containing one .sql).
-// Output schemas match exactly what import-perfex-customers / -contracts / -files expect.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-// @ts-ignore deno
+// @ts-ignore
 import { unzipSync, gzipSync } from 'https://esm.sh/fflate@0.8.2';
 
 const corsHeaders = {
@@ -12,18 +9,12 @@ const corsHeaders = {
 
 const BUCKET = 'perfex-import';
 const MASTER_EMAIL = 'davillys@gmail.com';
+const DEFAULT_DUMP_URL = 'https://crm.webmarcas.net/u973561543_perfexcrm.sql';
 
 function digits(s: string | null | undefined): string {
   return (s || '').replace(/\D+/g, '');
 }
 
-function unescapeSqlString(s: string): string {
-  // values come already with surrounding quotes stripped and backslash escapes resolved by parser
-  return s;
-}
-
-// Tolerant SQL row iterator for `INSERT INTO `table` (cols) VALUES (...),(...);`
-// Word-boundary aware: tblcontracts must NOT match tblcontracts_types / tblcontract_comments.
 function* iterRows(sql: string, table: string): Generator<string[]> {
   const re = new RegExp(`INSERT INTO \\\`${table}\\\`\\s*\\(([^)]+)\\)\\s*VALUES\\s*`, 'gi');
   let m: RegExpExecArray | null;
@@ -52,7 +43,6 @@ function* iterRows(sql: string, table: string): Generator<string[]> {
       yield row.map(v => v === 'NULL' ? '' : v);
       while (i < sql.length && /\s/.test(sql[i])) i++;
       if (sql[i] === ',') { i++; continue; }
-      if (sql[i] === ';') { break; }
       break;
     }
   }
@@ -76,7 +66,7 @@ function rowsAsObjects(sql: string, table: string): Record<string, string>[] {
   return out;
 }
 
-async function readDumpFromUpload(bytes: Uint8Array, name: string): Promise<string> {
+async function readDump(bytes: Uint8Array, name: string): Promise<string> {
   const lower = name.toLowerCase();
   if (lower.endsWith('.zip')) {
     const files = unzipSync(bytes);
@@ -96,7 +86,6 @@ function toIso(dt: string): string | null {
   if (!dt || dt === '0000-00-00' || dt === '0000-00-00 00:00:00') return null;
   const t = dt.trim();
   if (!t) return null;
-  // MySQL datetime "YYYY-MM-DD HH:MM:SS" -> ISO
   if (/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/.test(t)) {
     return t.includes(' ') ? t.replace(' ', 'T') + 'Z' : t;
   }
@@ -109,39 +98,63 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('No auth');
-    const supabase = createClient(
+
+    const supabaseAuth = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
       { global: { headers: { Authorization: authHeader } } },
     );
-
-    const { data: userData } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+    const { data: userData } = await supabaseAuth.auth.getUser();
     if (userData.user?.email !== MASTER_EMAIL) {
       return new Response(JSON.stringify({ error: 'Apenas Master Admin' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const { storagePath } = await req.json();
-    if (!storagePath) throw new Error('storagePath obrigatório');
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
 
-    const { data: blob, error: dlErr } = await supabase.storage.from(BUCKET).download(storagePath);
-    if (dlErr || !blob) throw new Error(`Falha ao baixar dump: ${dlErr?.message}`);
-    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const body = await req.json().catch(() => ({} as any));
+    const { storagePath, sourceUrl } = body;
 
-    const sql = await readDumpFromUpload(bytes, storagePath);
+    let bytes: Uint8Array;
+    let nameForExt: string;
 
-    // Parse raw tables
+    if (storagePath) {
+      const { data: blob, error: dlErr } = await supabase.storage.from(BUCKET).download(storagePath);
+      if (dlErr || !blob) throw new Error(`Falha ao baixar dump do Storage: ${dlErr?.message}`);
+      bytes = new Uint8Array(await blob.arrayBuffer());
+      nameForExt = storagePath;
+    } else {
+      const url = sourceUrl || DEFAULT_DUMP_URL;
+      console.log(`Baixando dump direto de ${url}`);
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`Falha ao baixar ${url}: HTTP ${r.status}`);
+      bytes = new Uint8Array(await r.arrayBuffer());
+      nameForExt = url;
+      // persist raw for reference
+      await supabase.storage.from(BUCKET).upload(
+        `uploads/latest-perfex-${Date.now()}.sql`, bytes,
+        { contentType: 'application/sql', upsert: true },
+      ).catch((e) => console.warn('persist raw failed:', e));
+    }
+
+    console.log(`Dump bytes: ${bytes.length}`);
+    const sql = await readDump(bytes, nameForExt);
+    console.log(`SQL chars: ${sql.length}`);
+
     const contactsRaw = rowsAsObjects(sql, 'tblcontacts');
     const clientsRaw = rowsAsObjects(sql, 'tblclients');
     const contractsRaw = rowsAsObjects(sql, 'tblcontracts');
     const filesRaw = rowsAsObjects(sql, 'tblfiles');
 
-    // Build lookups
+    console.log(`raw counts: contacts=${contactsRaw.length} clients=${clientsRaw.length} contracts=${contractsRaw.length} files=${filesRaw.length}`);
+
     const clientByUserid = new Map<string, Record<string, string>>();
     for (const c of clientsRaw) if (c.userid) clientByUserid.set(c.userid, c);
 
-    // Primary contact per userid (is_primary='1' wins; fall back to first seen)
     const primaryContactByUserid = new Map<string, Record<string, string>>();
     for (const ct of contactsRaw) {
       if (!ct.userid || !ct.email) continue;
@@ -149,8 +162,6 @@ Deno.serve(async (req) => {
       if (!existing || ct.is_primary === '1') primaryContactByUserid.set(ct.userid, ct);
     }
 
-    // ===== CUSTOMERS =====
-    // One customer record per contact (each contact becomes a user in our system)
     const customers: any[] = [];
     const seenEmails = new Set<string>();
     for (const ct of contactsRaw) {
@@ -180,11 +191,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ===== CONTRACTS (signed only) =====
     const contracts: any[] = [];
     let contractsSkippedNoClient = 0;
+    let contractsSkippedUnsigned = 0;
     for (const co of contractsRaw) {
-      if (co.signed !== '1' && co.marked_as_signed !== '1') continue;
+      const isSigned = co.signed === '1' || co.marked_as_signed === '1';
+      if (!isSigned) { contractsSkippedUnsigned++; continue; }
       if (co.trash === '1') continue;
       const userid = co.client;
       const ct = primaryContactByUserid.get(userid);
@@ -211,9 +223,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ===== FILES =====
-    // For rel_type='customer': rel_id is the userid (client). Lookup primary contact email.
-    // For rel_type='contract': rel_id is the contract id. Lookup contract -> client -> primary contact email.
     const contractById = new Map<string, Record<string, string>>();
     for (const co of contractsRaw) if (co.id) contractById.set(co.id, co);
 
@@ -276,7 +285,7 @@ Deno.serve(async (req) => {
         contacts: contactsRaw.length,
         clients: clientsRaw.length,
         contracts_total: contractsRaw.length,
-        contracts_unsigned_skipped: contractsRaw.length - contracts.length - contractsSkippedNoClient,
+        contracts_skipped_unsigned: contractsSkippedUnsigned,
         contracts_skipped_no_client: contractsSkippedNoClient,
         files_total: filesRaw.length,
       },
