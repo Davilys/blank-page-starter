@@ -5,6 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const APP_URL = 'https://webmarcas1.lovable.app';
 const MASTER_EMAIL = 'davillys@gmail.com';
 
 interface CustomerRecord {
@@ -26,21 +27,24 @@ interface CustomerRecord {
   business_area?: string | null;
 }
 
-async function loadNdjsonFromStorage(supabase: ReturnType<typeof createClient>, fileName: string): Promise<string[]> {
-  const path = `generated/${fileName}`;
-  const { data: blob, error } = await supabase.storage.from('perfex-import').download(path);
-  if (error || !blob) {
-    throw new Error(`Arquivo gerado ausente: ${path}. Execute o parse do dump primeiro.`);
-  }
-  const buf = new Uint8Array(await blob.arrayBuffer());
-  // validate gzip header (1f 8b)
-  if (buf.length < 2 || buf[0] !== 0x1f || buf[1] !== 0x8b) {
-    throw new Error(`Arquivo ${path} não é gzip válido (primeiros bytes: ${buf[0]?.toString(16)} ${buf[1]?.toString(16)}). Reexecute o parse.`);
-  }
+async function fetchNdjsonGz(url: string): Promise<string[]> {
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`);
+  const ct = res.headers.get('content-type') || '';
+  if (ct.includes('text/html')) throw new Error(`URL ${url} returned HTML, not gzip`);
   const ds = new DecompressionStream('gzip');
-  const stream = new Blob([buf]).stream().pipeThrough(ds);
-  const text = await new Response(stream).text();
+  const decompressed = res.body!.pipeThrough(ds);
+  const text = await new Response(decompressed).text();
   return text.split('\n').filter(l => l.trim());
+}
+
+async function loadNdjson(supabase: ReturnType<typeof createClient>, fileName: string, fallbackUrl: string): Promise<string[]> {
+  const storagePath = `generated/${fileName}`;
+  const { data: signed } = await supabase.storage.from('perfex-import').createSignedUrl(storagePath, 60);
+  if (signed?.signedUrl) {
+    try { return await fetchNdjsonGz(signed.signedUrl); } catch (_) { /* fall through */ }
+  }
+  return fetchNdjsonGz(fallbackUrl);
 }
 
 async function findExisting(supabase: ReturnType<typeof createClient>, c: CustomerRecord) {
@@ -88,7 +92,7 @@ Deno.serve(async (req) => {
     const limit = parseInt(url.searchParams.get('limit') || '30');
     const dryRun = url.searchParams.get('dryRun') === '1' || url.searchParams.get('dryRun') === 'true';
 
-    const lines = await loadNdjsonFromStorage(supabase, 'customers.ndjson.gz');
+    const lines = await loadNdjson(supabase, 'customers.ndjson.gz', `${APP_URL}/perfex-data/customers.ndjson.gz`);
     const total = lines.length;
     const slice = lines.slice(offset, offset + limit);
 
@@ -113,9 +117,7 @@ Deno.serve(async (req) => {
 
         let userId: string;
         const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
-          email,
-          password: '123Mudar@',
-          email_confirm: true,
+          email, password: '123Mudar@', email_confirm: true,
           user_metadata: { full_name: c.full_name || email },
         });
         if (authErr) {
@@ -126,39 +128,24 @@ Deno.serve(async (req) => {
           } else {
             errors++; errorDetails.push(`${email}: ${authErr.message}`); continue;
           }
-        } else {
-          userId = authData!.user!.id;
-        }
+        } else { userId = authData!.user!.id; }
 
         await supabase.from('profiles').upsert({
-          id: userId,
-          email,
-          full_name: c.full_name || null,
-          phone: c.phone || null,
+          id: userId, email,
+          full_name: c.full_name || null, phone: c.phone || null,
           company_name: c.company_name || null,
-          cpf: c.cpf || null,
-          cnpj: c.cnpj || null,
-          cpf_cnpj: c.cpf_cnpj || null,
-          address: c.address || null,
-          neighborhood: c.neighborhood || null,
-          city: c.city || null,
-          state: c.state || null,
-          zip_code: c.zip_code || null,
-          origin: 'import_perfex',
-          client_funnel_type: 'juridico',
-          created_by: user.id,
-          assigned_to: user.id,
+          cpf: c.cpf || null, cnpj: c.cnpj || null, cpf_cnpj: c.cpf_cnpj || null,
+          address: c.address || null, neighborhood: c.neighborhood || null,
+          city: c.city || null, state: c.state || null, zip_code: c.zip_code || null,
+          origin: 'import_perfex', client_funnel_type: 'juridico',
+          created_by: user.id, assigned_to: user.id,
         });
-
         await supabase.from('user_roles').insert({ user_id: userId, role: 'user' }).then(() => {}).catch(() => {});
-
         const brandName = c.brand_name || c.company_name || c.full_name || email;
         await supabase.from('brand_processes').insert({
-          user_id: userId,
-          brand_name: brandName,
+          user_id: userId, brand_name: brandName,
           business_area: c.business_area || null,
-          status: 'em_andamento',
-          pipeline_stage: 'protocolado',
+          status: 'em_andamento', pipeline_stage: 'protocolado',
         }).then(() => {}).catch(() => {});
 
         imported++;
@@ -169,7 +156,6 @@ Deno.serve(async (req) => {
 
     const nextOffset = offset + slice.length;
     const done = nextOffset >= total;
-
     return new Response(JSON.stringify({
       imported, skipped, errors,
       errorDetails: errorDetails.slice(0, 30),
