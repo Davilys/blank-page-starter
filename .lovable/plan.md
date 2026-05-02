@@ -1,79 +1,73 @@
-## Diagnóstico
+Vou tratar isso como auditoria antes de mexer/importar. O erro atual não é de cliente/arquivo em si; é uma falha no pipeline de dados gerados.
 
-Baixei o dump real (`https://crm.webmarcas.net/u973561543_perfexcrm.sql`, 70 MB) e inspecionei a estrutura. O parser atual está com bugs que fazem tudo zerar:
+Diagnóstico já confirmado:
+- As funções `import-perfex-customers` e `import-perfex-contracts` estão tentando descompactar `customers.ndjson.gz` / `contracts.ndjson.gz`.
+- No Storage do bucket `perfex-import` não existem os arquivos `generated/customers.ndjson.gz`, `generated/contracts.ndjson.gz`, `generated/files.ndjson.gz` nem o SQL enviado; a consulta retornou 0 objetos.
+- Como não encontra os arquivos no Storage, as funções caem no fallback `APP_URL/perfex-data/*.ndjson.gz`.
+- Esse fallback aponta para o preview Lovable, que retorna redirect/HTML de auth, não gzip. Por isso o erro exato é `TypeError: invalid gzip header`.
+- Resultado atual no banco: 0 clientes importados com `origin='import_perfex'`, 0 documentos com `uploaded_by='import_perfex'`, 0 contratos com marcador Perfex.
 
-### Quantos registros REAIS existem no dump deste projeto
+Plano de correção e teste antes de importar:
 
-| Tabela | INSERTs encontrados |
-|---|---|
-| `tblcontacts` (clientes-pessoa) | 16 |
-| `tblclients` (empresas) | 18 |
-| `tblcontracts` | **1.683** |
-| `tblfiles` | 30 |
+1. Tornar o parser independente do upload manual quebrado
+- Atualizar `parse-perfex-dump` para aceitar também `sourceUrl`.
+- Quando chamado sem `storagePath`, ele vai baixar diretamente de:
+  `https://crm.webmarcas.net/u973561543_perfexcrm.sql`
+- Manter suporte a upload `.sql`, `.sql.gz` e `.zip`, mas não depender disso para este caso.
+- Salvar o SQL baixado no bucket `perfex-import/uploads/latest-perfex.sql` e gerar os arquivos:
+  - `generated/customers.ndjson.gz`
+  - `generated/contracts.ndjson.gz`
+  - `generated/files.ndjson.gz`
+  - `generated/mapping.json`
 
-Observação: a imagem do outro projeto mostra 2.808 clientes / 8.226 arquivos — eram dumps **diferentes** (CRMs distintos). Para este dump específico do `webmarcas.net`, o esperado é em torno de 16-18 clientes, ~1.500 contratos assinados e 30 arquivos. O número alto da imagem não pode ser reproduzido aqui — os dados não existem.
+2. Remover o fallback inválido que causa `invalid gzip header`
+- Atualizar `import-perfex-customers`, `import-perfex-contracts` e `import-perfex-files` para ler somente do Storage `perfex-import/generated/*`.
+- Se o arquivo gerado não existir, retornar erro claro: “Execute o parse do dump antes de importar”, em vez de tentar o preview Lovable.
+- Adicionar validação dos primeiros bytes gzip antes de descompactar, para detectar arquivo errado com mensagem compreensível.
 
-### Bugs encontrados no parser/importers atuais
+3. Auditar o parser com o dump real antes de importar
+- Executar/testar `parse-perfex-dump` usando o URL real do SQL.
+- Confirmar que ele gera estatísticas coerentes no retorno: clientes, contratos assinados e arquivos.
+- Consultar o Storage para confirmar que os 4 arquivos gerados foram criados.
+- Testar uma leitura pequena dos NDJSON gerados antes de rodar qualquer importação real.
 
-1. **Tabela inexistente**: o parser procura `tblwebmarcas_customers` que não existe neste dump.
-2. **Regex sem word-boundary**: `tblcontracts` casa também `tblcontracts_types`, `tblcontract_comments`, `tblcontract_renewals` — embaralha resultados.
-3. **Mapping de contratos quebrado**: o parser exporta linhas brutas do Perfex (com colunas `client`, `acceptance_email`, `signed='1'`...), mas `import-perfex-contracts` lê `client_email`, `perfex_id`, `signed` (boolean), `signed_at`, `signatory_name`, `content_html` — campos que **nunca são preenchidos**. Resultado: 0 importados.
-4. **Mapping de arquivos quebrado**: o parser exporta linhas brutas de `tblfiles`, mas `import-perfex-files` lê `f.client_email` que nunca é populado. Resultado: 0 importados.
-5. **Contas erradas**: cada `INSERT INTO` neste dump é single-row (uma linha por statement). O contador atual conta certo, mas a falta de transformação faz tudo virar lixo no JSON.
-6. **Path de download dos arquivos**: precisa incluir variação `uploads/{rel_type}/{rel_id}/{attachment_key}` (formato real do Perfex).
+4. Corrigir importadores para modo de teste/dry-run
+- Adicionar parâmetro `dryRun=true` nas 3 funções de importação.
+- Em dry-run, elas só leem e validam os registros do lote, resolvem clientes/mapeamentos e retornam contadores, sem inserir no banco nem subir arquivos.
+- Usar dry-run com `limit` pequeno para provar que:
+  - clientes são lidos corretamente;
+  - contratos encontram email/cliente esperado;
+  - arquivos têm caminhos e candidatos de download válidos.
 
-## Plano de correção
+5. Melhorar download dos arquivos legados
+- Manter os caminhos já usados e acrescentar variações mais próximas do Perfex:
+  - `/uploads/clients/{rel_id}/{file_name}`
+  - `/uploads/customer/{rel_id}/{file_name}`
+  - `/uploads/customer_files/{rel_id}/{file_name}`
+  - `/uploads/contracts/{rel_id}/{file_name}`
+  - `/uploads/contract/{rel_id}/{file_name}`
+  - `/uploads/contract_files/{rel_id}/{file_name}`
+  - `/download/file/{attachment_key}` quando houver chave
+- Validar status, tamanho e tipo básico para evitar salvar página HTML como arquivo.
 
-Reescrever **2 edge functions** (sem mexer em UI nem em outras funções):
+6. Atualizar o painel Admin para evitar execução fora de ordem
+- Adicionar botão “Baixar e processar dump do CRM antigo” usando o URL oficial.
+- Exibir status real dos arquivos gerados e estatísticas do parse.
+- Desabilitar as fases 1/2/3 enquanto o parse não estiver concluído.
+- Mostrar mensagem clara se os arquivos gerados não existirem.
 
-### 1. `parse-perfex-dump/index.ts` — reescrita
+7. Teste final antes de concluir
+- Fazer deploy das 4 Edge Functions atualizadas.
+- Rodar teste real do parser com o dump do CRM.
+- Rodar dry-run dos 3 importadores.
+- Verificar logs das Edge Functions depois dos testes.
+- Só depois deixar o importador pronto para execução real no painel.
 
-- Remover referência a `tblwebmarcas_customers`.
-- Adicionar word-boundary no regex (`tblcontracts\\b` via verificação de char seguinte).
-- **Construir `customers.ndjson.gz` a partir de `tblcontacts` JOIN `tblclients` (por `userid`)**, com schema que `import-perfex-customers` espera:
-  ```
-  { perfex_id, email, full_name, phone, company_name, cpf, cnpj, address, city, state, zip_code, brand_name }
-  ```
-  CPF/CNPJ vêm de `tblclients.vat` (11 ou 14 dígitos).
-- **Construir `contracts.ndjson.gz` (apenas `signed=1`)** com schema esperado pelo importer:
-  ```
-  { perfex_id, perfex_client_id, client_email, subject, description, content_html,
-    contract_value, start_date, end_date, signed: true,
-    signed_at, signature_ip, signatory_name, signatory_email, hash, date_added }
-  ```
-  Resolver `client_email` via lookup `userid → contacts.email` (primary contact).
-- **Construir `files.ndjson.gz`** com schema esperado:
-  ```
-  { perfex_id, rel_id, rel_type, file_name, filetype, attachment_key, client_email, date_added }
-  ```
-  Para `rel_type='customer'` resolver email via `userid` direto.
-  Para `rel_type='contract'` resolver email via `tblcontracts.client → tblcontacts.userid → email`.
-- Mostrar nas estatísticas finais quantos contratos sem cliente foram descartados.
+Arquivos que serão alterados:
+- `supabase/functions/parse-perfex-dump/index.ts`
+- `supabase/functions/import-perfex-customers/index.ts`
+- `supabase/functions/import-perfex-contracts/index.ts`
+- `supabase/functions/import-perfex-files/index.ts`
+- `src/components/admin/settings/PerfexImportSection.tsx`
 
-### 2. `import-perfex-files/index.ts` — pequeno ajuste
-
-Adicionar mais 2 variantes de path para baixar os arquivos do servidor antigo:
-```
-https://crm.webmarcas.net/uploads/{rel_type}/{rel_id}/{file_name}
-https://crm.webmarcas.net/uploads/{rel_type}_files/{rel_id}/{file_name}
-https://crm.webmarcas.net/uploads/{rel_type}s/{rel_id}/{file_name}
-+ https://crm.webmarcas.net/download/file/{attachment_key}      (novo)
-+ https://crm.webmarcas.net/uploads/companylogo/{file_name}      (novo, fallback)
-```
-
-### O que NÃO muda
-
-- UI (`PerfexImportSection.tsx`) — fluxo está correto.
-- `import-perfex-customers/index.ts` — schema esperado já é o que o novo parser produzirá.
-- `import-perfex-contracts/index.ts` — idem.
-- Migration / bucket / RLS — já está OK.
-- Qualquer outra parte do app.
-
-## Resultado esperado após correção
-
-Para o dump atual:
-- **Clientes**: ~16 novos importados (já que muitos podem já existir no CRM).
-- **Contratos assinados**: ~1.500 importados (vinculados via email).
-- **Arquivos**: até 30 baixados do servidor antigo (alguns podem 404 se já foram removidos do Hostinger).
-
-O fluxo na UI continua o mesmo: upload do `.sql` → parse mostra estatísticas reais → executar fases 1 → 2 → 3.
+Não vou alterar outras áreas do sistema nem mexer em clientes/contratos/documentos fora do fluxo Perfex.

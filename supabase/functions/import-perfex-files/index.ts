@@ -5,7 +5,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const APP_URL = 'https://id-preview--6c60bdcc-40b1-49c5-b46b-40ac18ae182b.lovable.app';
 const PERFEX_BASE = 'https://crm.webmarcas.net/uploads';
 const MASTER_EMAIL = 'davillys@gmail.com';
 
@@ -20,30 +19,37 @@ interface FileRecord {
   attachment_key?: string | null;
 }
 
-async function fetchNdjsonGz(url: string): Promise<string[]> {
-  const res = await fetch(url, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`);
+async function loadNdjsonFromStorage(supabase: ReturnType<typeof createClient>, fileName: string): Promise<string[]> {
+  const path = `generated/${fileName}`;
+  const { data: blob, error } = await supabase.storage.from('perfex-import').download(path);
+  if (error || !blob) {
+    throw new Error(`Arquivo gerado ausente: ${path}. Execute o parse do dump primeiro.`);
+  }
+  const buf = new Uint8Array(await blob.arrayBuffer());
+  if (buf.length < 2 || buf[0] !== 0x1f || buf[1] !== 0x8b) {
+    throw new Error(`Arquivo ${path} não é gzip válido. Reexecute o parse.`);
+  }
   const ds = new DecompressionStream('gzip');
-  const decompressed = res.body!.pipeThrough(ds);
-  const text = await new Response(decompressed).text();
+  const stream = new Blob([buf]).stream().pipeThrough(ds);
+  const text = await new Response(stream).text();
   return text.split('\n').filter(l => l.trim());
 }
 
-async function loadNdjson(supabase: ReturnType<typeof createClient>, fileName: string, fallbackUrl: string): Promise<string[]> {
-  const storagePath = `generated/${fileName}`;
-  const { data: signed, error: signedError } = await supabase.storage
-    .from('perfex-import')
-    .createSignedUrl(storagePath, 60);
-
-  if (signed?.signedUrl) {
-    return fetchNdjsonGz(signed.signedUrl);
+function buildCandidates(f: FileRecord): string[] {
+  const c: string[] = [];
+  const variants = ['', 's', '_files'];
+  for (const v of variants) {
+    c.push(`${PERFEX_BASE}/${f.rel_type}${v}/${f.rel_id}/${f.file_name}`);
   }
-
-  if (signedError) {
-    console.warn(`Storage signed URL failed for ${storagePath}: ${signedError.message}`);
+  // common Perfex paths
+  c.push(`${PERFEX_BASE}/clients/${f.rel_id}/${f.file_name}`);
+  c.push(`${PERFEX_BASE}/contracts/${f.rel_id}/${f.file_name}`);
+  if (f.attachment_key) {
+    c.push(`https://crm.webmarcas.net/download/file/${f.attachment_key}`);
+    c.push(`https://crm.webmarcas.net/download.php?key=${f.attachment_key}`);
   }
-
-  return fetchNdjsonGz(fallbackUrl);
+  c.push(`${PERFEX_BASE}/companylogo/${f.file_name}`);
+  return [...new Set(c)];
 }
 
 Deno.serve(async (req) => {
@@ -70,14 +76,16 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url);
     const offset = parseInt(url.searchParams.get('offset') || '0');
-    const limit = parseInt(url.searchParams.get('limit') || '20');
+    const limit = parseInt(url.searchParams.get('limit') || '10');
+    const dryRun = url.searchParams.get('dryRun') === '1' || url.searchParams.get('dryRun') === 'true';
 
-    const lines = await loadNdjson(supabase, 'files.ndjson.gz', `${APP_URL}/perfex-data/files.ndjson.gz`);
+    const lines = await loadNdjsonFromStorage(supabase, 'files.ndjson.gz');
     const total = lines.length;
     const slice = lines.slice(offset, offset + limit);
 
     let imported = 0, skipped = 0, errors = 0, notFound = 0;
     const errorDetails: string[] = [];
+    const samples: any[] = [];
 
     for (const line of slice) {
       let f: FileRecord;
@@ -91,29 +99,29 @@ Deno.serve(async (req) => {
           .from('profiles').select('id').eq('email', email).maybeSingle();
         if (!profile) { skipped++; continue; }
 
+        const candidates = buildCandidates(f);
+
+        if (dryRun) {
+          samples.push({ file: f.file_name, rel_type: f.rel_type, rel_id: f.rel_id, email, client_found: true, candidates_count: candidates.length, first_candidate: candidates[0] });
+          imported++;
+          continue;
+        }
+
         const storagePath = `imported/perfex/${f.rel_type}/${f.rel_id}/${f.file_name}`;
         const { data: existingDoc } = await supabase
           .from('documents').select('id').eq('user_id', profile.id)
           .like('file_url', `%${storagePath}%`).maybeSingle();
         if (existingDoc) { skipped++; continue; }
 
-        const candidates = [
-          `${PERFEX_BASE}/${f.rel_type}/${f.rel_id}/${f.file_name}`,
-          `${PERFEX_BASE}/${f.rel_type}_files/${f.rel_id}/${f.file_name}`,
-          `${PERFEX_BASE}/${f.rel_type}s/${f.rel_id}/${f.file_name}`,
-        ];
-        if (f.attachment_key) {
-          candidates.push(`https://crm.webmarcas.net/download/file/${f.attachment_key}`);
-          candidates.push(`https://crm.webmarcas.net/download.php?key=${f.attachment_key}`);
-        }
-        candidates.push(`${PERFEX_BASE}/companylogo/${f.file_name}`);
-
         let bytes: ArrayBuffer | null = null;
+        let usedUrl = '';
         for (const u of candidates) {
           try {
             const r = await fetch(u, { signal: AbortSignal.timeout(15000) });
-            if (r.ok) {
+            const ct = r.headers.get('content-type') || '';
+            if (r.ok && !ct.includes('text/html')) {
               bytes = await r.arrayBuffer();
+              usedUrl = u;
               break;
             }
           } catch { /* try next */ }
@@ -160,10 +168,11 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       imported, skipped, errors, notFound,
       errorDetails: errorDetails.slice(0, 30),
-      total, processed: nextOffset, nextOffset, done,
+      samples: dryRun ? samples.slice(0, 10) : undefined,
+      total, processed: nextOffset, nextOffset, done, dryRun,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (err) {
     console.error('import-perfex-files error:', err);
-    return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
