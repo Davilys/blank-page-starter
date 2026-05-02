@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SettingsCard } from './SettingsCard';
 import { toast } from 'sonner';
-import { Loader2, Users, FileText, FolderArchive, AlertTriangle, ShieldCheck, DatabaseBackup, Upload, FileArchive } from 'lucide-react';
+import { Loader2, Users, FileText, FolderArchive, AlertTriangle, ShieldCheck, DatabaseBackup, CheckCircle2 } from 'lucide-react';
 
 type Phase = 'customers' | 'contracts' | 'files';
 
@@ -46,73 +46,6 @@ export function PerfexImportSection() {
     files: { ...initialState },
   });
   const [errorModal, setErrorModal] = useState<{ phase: Phase; details: string[] } | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [parsing, setParsing] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [parseStats, setParseStats] = useState<{ customers: number; contracts: number; files: number } | null>(null);
-  const [uploadedFile, setUploadedFile] = useState<string | null>(null);
-
-  const handleDirectDownload = async () => {
-    setParseStats(null);
-    setParsing(true);
-    try {
-      const res = await supabase.functions.invoke('parse-perfex-dump', { body: {} });
-      if (res.error) throw new Error(res.error.message);
-      if ((res.data as any)?.error) throw new Error((res.data as any).error);
-      setParseStats(res.data.stats);
-      setUploadedFile('crm.webmarcas.net/u973561543_perfexcrm.sql');
-      toast.success(`Dump processado: ${res.data.stats.customers} clientes, ${res.data.stats.contracts} contratos, ${res.data.stats.files} arquivos`);
-    } catch (e) {
-      toast.error(`Falha: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setParsing(false);
-    }
-  };
-
-  const handleUpload = async (file: File) => {
-    if (!file) return;
-    const okExt = /\.(zip|sql|sql\.gz|gz)$/i.test(file.name);
-    if (!okExt) { toast.error('Use .zip, .sql ou .sql.gz'); return; }
-
-    setUploading(true);
-    setUploadProgress(0);
-    setParseStats(null);
-    try {
-      const path = `uploads/${Date.now()}-${file.name}`;
-      const session = await supabase.auth.getSession();
-      const token = session.data.session?.access_token;
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100));
-        };
-        xhr.onload = () => xhr.status < 300 ? resolve() : reject(new Error(`Upload ${xhr.status}: ${xhr.responseText}`));
-        xhr.onerror = () => reject(new Error('Network error'));
-        xhr.open('POST', `${SUPABASE_URL}/storage/v1/object/perfex-import/${path}`);
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-        xhr.setRequestHeader('x-upsert', 'true');
-        xhr.send(file);
-      });
-
-      setUploadedFile(path);
-      toast.success('Upload concluído. Processando dump...');
-
-      setUploading(false);
-      setParsing(true);
-      const res = await supabase.functions.invoke('parse-perfex-dump', {
-        body: { storagePath: path },
-      });
-      if (res.error) throw new Error(res.error.message);
-      setParseStats(res.data.stats);
-      toast.success(`Dump processado: ${res.data.stats.customers} clientes, ${res.data.stats.contracts} contratos, ${res.data.stats.files} arquivos`);
-    } catch (e) {
-      toast.error(`Falha: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setUploading(false);
-      setParsing(false);
-    }
-  };
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -249,64 +182,11 @@ export function PerfexImportSection() {
         description="Migra clientes, contratos assinados e arquivos do CRM antigo (crm.webmarcas.net). Apenas Master Admin."
       >
         <div className="space-y-4">
-          <div className="border-2 border-dashed rounded-lg p-4 space-y-3 bg-muted/30">
-            <div className="flex items-center gap-2">
-              <FileArchive className="h-5 w-5 text-primary" />
-              <span className="font-semibold text-sm">Upload do Dump SQL</span>
+          <div className="border rounded-lg p-3 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800 flex items-start gap-2 text-sm">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />
+            <div className="text-emerald-900 dark:text-emerald-200">
+              <strong>Dados Perfex prontos.</strong> Os arquivos NDJSON do dump (clientes, contratos e arquivos) já estão embutidos no projeto. Não é necessário enviar SQL nem rodar parse — basta executar as 3 fases abaixo na ordem.
             </div>
-            <p className="text-xs text-muted-foreground">
-              Envie um arquivo <code className="bg-muted px-1 rounded">.zip</code>, <code className="bg-muted px-1 rounded">.sql</code> ou <code className="bg-muted px-1 rounded">.sql.gz</code> do dump do Perfex CRM. Será processado e usado nas 3 fases abaixo.
-            </p>
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button
-                size="sm"
-                variant="default"
-                disabled={uploading || parsing}
-                onClick={handleDirectDownload}
-              >
-                {parsing ? (
-                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Processando...</>
-                ) : (
-                  <>Baixar do CRM antigo e processar</>
-                )}
-              </Button>
-              <input
-                type="file"
-                id="perfex-dump-upload"
-                accept=".zip,.sql,.gz"
-                className="hidden"
-                disabled={uploading || parsing}
-                onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
-              />
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={uploading || parsing}
-                onClick={() => document.getElementById('perfex-dump-upload')?.click()}
-              >
-                {uploading ? (
-                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Enviando {uploadProgress}%</>
-                ) : parsing ? (
-                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Processando...</>
-                ) : (
-                  <><Upload className="h-4 w-4 mr-1" />Ou enviar arquivo manual</>
-                )}
-              </Button>
-              {uploadedFile && !uploading && !parsing && (
-                <span className="text-xs text-muted-foreground truncate">{uploadedFile.split('/').pop()}</span>
-              )}
-            </div>
-            {(uploading || parsing) && uploadProgress > 0 && uploadProgress < 100 && (
-              <Progress value={uploadProgress} className="h-1.5" />
-            )}
-            {parseStats && (
-              <div className="flex flex-wrap gap-2 text-xs">
-                <Badge variant="default" className="bg-green-600">✓ Dump pronto</Badge>
-                <Badge variant="secondary">{parseStats.customers} clientes</Badge>
-                <Badge variant="secondary">{parseStats.contracts} contratos</Badge>
-                <Badge variant="secondary">{parseStats.files} arquivos</Badge>
-              </div>
-            )}
           </div>
 
           <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-sm">
