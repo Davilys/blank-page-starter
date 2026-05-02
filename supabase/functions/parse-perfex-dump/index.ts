@@ -15,11 +15,27 @@ function digits(s: string | null | undefined): string {
   return (s || '').replace(/\D+/g, '');
 }
 
-function* iterRows(sql: string, table: string): Generator<string[]> {
-  const re = new RegExp(`INSERT INTO \\\`${table}\\\`\\s*\\(([^)]+)\\)\\s*VALUES\\s*`, 'gi');
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(sql)) !== null) {
-    let i = m.index + m[0].length;
+function findTableInsertStart(sql: string, table: string, fromIdx: number): { headerEnd: number; cols: string[]; nextSearchFrom: number } | null {
+  const marker = `INSERT INTO \`${table}\``;
+  const at = sql.indexOf(marker, fromIdx);
+  if (at < 0) return null;
+  const openParen = sql.indexOf('(', at);
+  const closeParen = sql.indexOf(')', openParen);
+  const cols = sql.substring(openParen + 1, closeParen).split(',').map(s => s.trim().replace(/`/g, ''));
+  const valuesIdx = sql.indexOf('VALUES', closeParen);
+  if (valuesIdx < 0) return null;
+  let i = valuesIdx + 'VALUES'.length;
+  while (i < sql.length && /\s/.test(sql[i])) i++;
+  return { headerEnd: i, cols, nextSearchFrom: at + marker.length };
+}
+
+function* iterTableRows(sql: string, table: string): Generator<{ cols: string[]; row: string[] }> {
+  let cursor = 0;
+  while (true) {
+    const found = findTableInsertStart(sql, table, cursor);
+    if (!found) return;
+    let i = found.headerEnd;
+    const cols = found.cols;
     while (i < sql.length) {
       while (i < sql.length && /\s/.test(sql[i])) i++;
       if (sql[i] !== '(') break;
@@ -27,6 +43,7 @@ function* iterRows(sql: string, table: string): Generator<string[]> {
       const row: string[] = [];
       let cur = '';
       let inStr = false;
+      let touched = false;
       while (i < sql.length) {
         const ch = sql[i];
         if (inStr) {
@@ -35,38 +52,33 @@ function* iterRows(sql: string, table: string): Generator<string[]> {
           if (ch === "'") { inStr = false; i++; continue; }
           cur += ch; i++; continue;
         }
-        if (ch === "'") { inStr = true; i++; continue; }
-        if (ch === ',') { row.push(cur.trim()); cur = ''; i++; continue; }
-        if (ch === ')') { row.push(cur.trim()); i++; break; }
+        if (ch === "'") { inStr = true; touched = true; i++; continue; }
+        if (ch === ',') {
+          row.push(!touched && cur.trim() === 'NULL' ? '' : cur.trim());
+          cur = ''; touched = false; i++; continue;
+        }
+        if (ch === ')') {
+          row.push(!touched && cur.trim() === 'NULL' ? '' : cur.trim());
+          i++; break;
+        }
         cur += ch; i++;
       }
-      yield row.map(v => v === 'NULL' ? '' : v);
+      yield { cols, row };
       while (i < sql.length && /\s/.test(sql[i])) i++;
       if (sql[i] === ',') { i++; continue; }
       break;
     }
+    cursor = i;
   }
 }
 
-function getCols(sql: string, table: string): string[] {
-  const m = new RegExp(`INSERT INTO \\\`${table}\\\`\\s*\\(([^)]+)\\)`, 'i').exec(sql);
-  if (!m) return [];
-  return m[1].split(',').map(s => s.trim().replace(/`/g, ''));
+function rowToObj(cols: string[], row: string[]): Record<string, string> {
+  const o: Record<string, string> = {};
+  for (let i = 0; i < cols.length; i++) o[cols[i]] = row[i] ?? '';
+  return o;
 }
 
-function rowsAsObjects(sql: string, table: string): Record<string, string>[] {
-  const cols = getCols(sql, table);
-  if (!cols.length) return [];
-  const out: Record<string, string>[] = [];
-  for (const row of iterRows(sql, table)) {
-    const obj: Record<string, string> = {};
-    cols.forEach((c, idx) => obj[c] = row[idx] ?? '');
-    out.push(obj);
-  }
-  return out;
-}
-
-async function readDump(bytes: Uint8Array, name: string): Promise<string> {
+async function readDumpToString(bytes: Uint8Array, name: string): Promise<string> {
   const lower = name.toLowerCase();
   if (lower.endsWith('.zip')) {
     const files = unzipSync(bytes);
@@ -90,6 +102,15 @@ function toIso(dt: string): string | null {
     return t.includes(' ') ? t.replace(' ', 'T') + 'Z' : t;
   }
   return t;
+}
+
+async function uploadGz(supabase: any, path: string, lines: string[]) {
+  const enc = new TextEncoder();
+  const gz = gzipSync(enc.encode(lines.join('\n')));
+  const { error } = await supabase.storage.from(BUCKET).upload(path, gz, {
+    contentType: 'application/gzip', upsert: true,
+  });
+  if (error) throw new Error(`Upload ${path}: ${error.message}`);
 }
 
 Deno.serve(async (req) => {
@@ -134,160 +155,175 @@ Deno.serve(async (req) => {
       if (!r.ok) throw new Error(`Falha ao baixar ${url}: HTTP ${r.status}`);
       bytes = new Uint8Array(await r.arrayBuffer());
       nameForExt = url;
-      // persist raw for reference
-      await supabase.storage.from(BUCKET).upload(
-        `uploads/latest-perfex-${Date.now()}.sql`, bytes,
-        { contentType: 'application/sql', upsert: true },
-      ).catch((e) => console.warn('persist raw failed:', e));
     }
 
     console.log(`Dump bytes: ${bytes.length}`);
-    const sql = await readDump(bytes, nameForExt);
-    console.log(`SQL chars: ${sql.length}`);
+    let sql: string | null = await readDumpToString(bytes, nameForExt);
+    // free original bytes
+    // @ts-ignore
+    bytes = null;
+    console.log(`SQL chars: ${sql!.length}`);
 
-    const contactsRaw = rowsAsObjects(sql, 'tblcontacts');
-    const clientsRaw = rowsAsObjects(sql, 'tblclients');
-    const contractsRaw = rowsAsObjects(sql, 'tblcontracts');
-    const filesRaw = rowsAsObjects(sql, 'tblfiles');
-
-    console.log(`raw counts: contacts=${contactsRaw.length} clients=${clientsRaw.length} contracts=${contractsRaw.length} files=${filesRaw.length}`);
-
-    const clientByUserid = new Map<string, Record<string, string>>();
-    for (const c of clientsRaw) if (c.userid) clientByUserid.set(c.userid, c);
-
-    const primaryContactByUserid = new Map<string, Record<string, string>>();
-    for (const ct of contactsRaw) {
-      if (!ct.userid || !ct.email) continue;
-      const existing = primaryContactByUserid.get(ct.userid);
-      if (!existing || ct.is_primary === '1') primaryContactByUserid.set(ct.userid, ct);
+    // ===== PASS 1: tblclients (small) — store minimal fields =====
+    const clientByUserid = new Map<string, { company: string; vat: string; phonenumber: string; address: string; city: string; state: string; zip: string }>();
+    let clientsCount = 0;
+    for (const { cols, row } of iterTableRows(sql!, 'tblclients')) {
+      const o = rowToObj(cols, row);
+      clientsCount++;
+      if (o.userid) {
+        clientByUserid.set(o.userid, {
+          company: o.company || '',
+          vat: o.vat || '',
+          phonenumber: o.phonenumber || '',
+          address: o.address || o.billing_street || '',
+          city: o.city || o.billing_city || '',
+          state: o.state || o.billing_state || '',
+          zip: o.zip || o.billing_zip || '',
+        });
+      }
     }
+    console.log(`clients parsed=${clientsCount} mapped=${clientByUserid.size}`);
 
-    const customers: any[] = [];
+    // ===== PASS 2: tblcontacts — build primary map + emit customers NDJSON =====
+    const primaryByUserid = new Map<string, { email: string; firstname: string; lastname: string }>();
     const seenEmails = new Set<string>();
-    for (const ct of contactsRaw) {
-      const email = (ct.email || '').toLowerCase().trim();
-      if (!email || seenEmails.has(email)) continue;
+    const mapping: Record<string, string> = {};
+    const customerLines: string[] = [];
+    let contactsCount = 0;
+    for (const { cols, row } of iterTableRows(sql!, 'tblcontacts')) {
+      const o = rowToObj(cols, row);
+      contactsCount++;
+      const email = (o.email || '').toLowerCase().trim();
+      if (!o.userid || !email) continue;
+      const ex = primaryByUserid.get(o.userid);
+      if (!ex || o.is_primary === '1') {
+        primaryByUserid.set(o.userid, { email, firstname: o.firstname || '', lastname: o.lastname || '' });
+      }
+      if (seenEmails.has(email)) continue;
       seenEmails.add(email);
-      const cli = clientByUserid.get(ct.userid) || {};
-      const vat = digits(cli.vat || '');
-      customers.push({
+      const cli = clientByUserid.get(o.userid);
+      const vat = digits(cli?.vat || '');
+      const cust = {
         source: 'perfex',
-        perfex_id: parseInt(ct.id) || 0,
-        perfex_client_id: parseInt(ct.userid) || 0,
+        perfex_id: parseInt(o.id) || 0,
+        perfex_client_id: parseInt(o.userid) || 0,
         email,
-        full_name: `${ct.firstname || ''} ${ct.lastname || ''}`.trim() || cli.company || email,
-        phone: ct.phonenumber || cli.phonenumber || null,
-        company_name: cli.company || null,
+        full_name: `${o.firstname || ''} ${o.lastname || ''}`.trim() || cli?.company || email,
+        phone: o.phonenumber || cli?.phonenumber || null,
+        company_name: cli?.company || null,
         cpf: vat.length === 11 ? vat : null,
         cnpj: vat.length === 14 ? vat : null,
         cpf_cnpj: vat || null,
-        address: cli.address || cli.billing_street || null,
+        address: cli?.address || null,
         neighborhood: null,
-        city: cli.city || cli.billing_city || null,
-        state: cli.state || cli.billing_state || null,
-        zip_code: cli.zip || cli.billing_zip || null,
-        brand_name: cli.company || null,
+        city: cli?.city || null,
+        state: cli?.state || null,
+        zip_code: cli?.zip || null,
+        brand_name: cli?.company || null,
         business_area: null,
-      });
+      };
+      customerLines.push(JSON.stringify(cust));
+      if (cust.perfex_client_id) mapping[String(cust.perfex_client_id)] = email;
     }
+    console.log(`contacts=${contactsCount} unique customers=${customerLines.length}`);
 
-    const contracts: any[] = [];
-    let contractsSkippedNoClient = 0;
-    let contractsSkippedUnsigned = 0;
-    for (const co of contractsRaw) {
-      const isSigned = co.signed === '1' || co.marked_as_signed === '1';
-      if (!isSigned) { contractsSkippedUnsigned++; continue; }
-      if (co.trash === '1') continue;
-      const userid = co.client;
-      const ct = primaryContactByUserid.get(userid);
-      const email = ct ? (ct.email || '').toLowerCase().trim() : '';
-      if (!email) { contractsSkippedNoClient++; continue; }
+    await uploadGz(supabase, 'generated/customers.ndjson.gz', customerLines);
+    {
+      const enc = new TextEncoder();
+      const { error } = await supabase.storage.from(BUCKET).upload(
+        'generated/mapping.json', enc.encode(JSON.stringify(mapping)),
+        { contentType: 'application/json', upsert: true },
+      );
+      if (error) throw new Error(`Upload mapping: ${error.message}`);
+    }
+    const customersTotal = customerLines.length;
+    customerLines.length = 0;
+    seenEmails.clear();
+    clientByUserid.clear();
 
-      contracts.push({
-        perfex_id: parseInt(co.id) || 0,
-        perfex_client_id: parseInt(userid) || 0,
+    // ===== PASS 3: tblcontracts =====
+    const contractClientById = new Map<string, string>();
+    const contractLines: string[] = [];
+    let contractsTotal = 0, skippedUnsigned = 0, skippedNoClient = 0;
+    for (const { cols, row } of iterTableRows(sql!, 'tblcontracts')) {
+      const o = rowToObj(cols, row);
+      contractsTotal++;
+      if (o.id && o.client) contractClientById.set(o.id, o.client);
+      const isSigned = o.signed === '1' || o.marked_as_signed === '1';
+      if (!isSigned) { skippedUnsigned++; continue; }
+      if (o.trash === '1') continue;
+      const ct = primaryByUserid.get(o.client);
+      const email = ct ? ct.email : '';
+      if (!email) { skippedNoClient++; continue; }
+      contractLines.push(JSON.stringify({
+        perfex_id: parseInt(o.id) || 0,
+        perfex_client_id: parseInt(o.client) || 0,
         client_email: email,
-        subject: co.subject || `Contrato Perfex #${co.id}`,
-        description: co.description || '',
-        content_html: co.content || '',
-        contract_value: co.contract_value ? parseFloat(co.contract_value) : null,
-        start_date: toIso(co.datestart),
-        end_date: toIso(co.dateend),
+        subject: o.subject || `Contrato Perfex #${o.id}`,
+        description: o.description || '',
+        content_html: o.content || '',
+        contract_value: o.contract_value ? parseFloat(o.contract_value) : null,
+        start_date: toIso(o.datestart),
+        end_date: toIso(o.dateend),
         signed: true,
-        signed_at: toIso(co.acceptance_date) || toIso(co.dateadded),
-        signature_ip: co.acceptance_ip || null,
-        signatory_name: `${co.acceptance_firstname || ''} ${co.acceptance_lastname || ''}`.trim() || null,
-        signatory_email: co.acceptance_email || email,
-        date_added: toIso(co.dateadded),
-        hash: co.hash || null,
-      });
+        signed_at: toIso(o.acceptance_date) || toIso(o.dateadded),
+        signature_ip: o.acceptance_ip || null,
+        signatory_name: `${o.acceptance_firstname || ''} ${o.acceptance_lastname || ''}`.trim() || null,
+        signatory_email: o.acceptance_email || email,
+        date_added: toIso(o.dateadded),
+        hash: o.hash || null,
+      }));
     }
+    console.log(`contracts total=${contractsTotal} kept=${contractLines.length} skipUnsigned=${skippedUnsigned} skipNoClient=${skippedNoClient}`);
+    await uploadGz(supabase, 'generated/contracts.ndjson.gz', contractLines);
+    const contractsKept = contractLines.length;
+    contractLines.length = 0;
 
-    const contractById = new Map<string, Record<string, string>>();
-    for (const co of contractsRaw) if (co.id) contractById.set(co.id, co);
-
-    const files: any[] = [];
-    for (const f of filesRaw) {
-      const relType = f.rel_type;
+    // ===== PASS 4: tblfiles =====
+    const fileLines: string[] = [];
+    let filesTotal = 0;
+    for (const { cols, row } of iterTableRows(sql!, 'tblfiles')) {
+      const o = rowToObj(cols, row);
+      filesTotal++;
+      const relType = o.rel_type;
       if (relType !== 'customer' && relType !== 'contract') continue;
       let email = '';
       if (relType === 'customer') {
-        const ct = primaryContactByUserid.get(f.rel_id);
-        email = ct ? (ct.email || '').toLowerCase().trim() : '';
+        const ct = primaryByUserid.get(o.rel_id);
+        email = ct ? ct.email : '';
       } else {
-        const co = contractById.get(f.rel_id);
-        if (co) {
-          const ct = primaryContactByUserid.get(co.client);
-          email = ct ? (ct.email || '').toLowerCase().trim() : '';
+        const userid = contractClientById.get(o.rel_id);
+        if (userid) {
+          const ct = primaryByUserid.get(userid);
+          email = ct ? ct.email : '';
         }
       }
-      files.push({
-        perfex_id: parseInt(f.id) || 0,
-        rel_id: parseInt(f.rel_id) || 0,
+      fileLines.push(JSON.stringify({
+        perfex_id: parseInt(o.id) || 0,
+        rel_id: parseInt(o.rel_id) || 0,
         rel_type: relType,
-        file_name: f.file_name,
-        filetype: f.filetype || null,
-        attachment_key: f.attachment_key || null,
+        file_name: o.file_name,
+        filetype: o.filetype || null,
+        attachment_key: o.attachment_key || null,
         client_email: email || null,
-        date_added: toIso(f.dateadded),
-      });
+        date_added: toIso(o.dateadded),
+      }));
     }
+    await uploadGz(supabase, 'generated/files.ndjson.gz', fileLines);
+    const filesKept = fileLines.length;
 
-    const mapping: Record<string, string> = {};
-    for (const c of customers) if (c.perfex_client_id) mapping[String(c.perfex_client_id)] = c.email;
-
-    const enc = new TextEncoder();
-    const toGz = (lines: string[]) => gzipSync(enc.encode(lines.join('\n')));
-
-    const uploads = [
-      { path: 'generated/customers.ndjson.gz', body: toGz(customers.map(c => JSON.stringify(c))) },
-      { path: 'generated/contracts.ndjson.gz', body: toGz(contracts.map(c => JSON.stringify(c))) },
-      { path: 'generated/files.ndjson.gz',     body: toGz(files.map(c => JSON.stringify(c))) },
-      { path: 'generated/mapping.json',        body: enc.encode(JSON.stringify(mapping)) },
-    ];
-
-    for (const u of uploads) {
-      const { error } = await supabase.storage.from(BUCKET).upload(u.path, u.body, {
-        contentType: u.path.endsWith('.json') ? 'application/json' : 'application/gzip',
-        upsert: true,
-      });
-      if (error) throw new Error(`Upload ${u.path}: ${error.message}`);
-    }
+    sql = null;
 
     return new Response(JSON.stringify({
       success: true,
-      stats: {
-        customers: customers.length,
-        contracts: contracts.length,
-        files: files.length,
-      },
+      stats: { customers: customersTotal, contracts: contractsKept, files: filesKept },
       raw_counts: {
-        contacts: contactsRaw.length,
-        clients: clientsRaw.length,
-        contracts_total: contractsRaw.length,
-        contracts_skipped_unsigned: contractsSkippedUnsigned,
-        contracts_skipped_no_client: contractsSkippedNoClient,
-        files_total: filesRaw.length,
+        contacts: contactsCount,
+        clients: clientsCount,
+        contracts_total: contractsTotal,
+        contracts_skipped_unsigned: skippedUnsigned,
+        contracts_skipped_no_client: skippedNoClient,
+        files_total: filesTotal,
       },
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
