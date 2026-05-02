@@ -1,89 +1,61 @@
+# Importação Legado Perfex CRM
 
-# Corrigir seletor de plano: por cadastro, não global
+Adicionar um sistema completo de importação do dump SQL do Perfex CRM (https://crm.webmarcas.net/u973561543_perfexcrm.sql) ao painel admin, sem alterar nenhuma feature existente. Apenas **adiciona** arquivos novos e faz **dois pequenos acréscimos** em um arquivo existente (`BackupSettings.tsx`).
 
-## O que está errado hoje
+Restrito ao Master Admin (`davillys@gmail.com`), igual ao que funcionou no outro projeto.
 
-O seletor de plano (Essencial / Premium / Corporativo) foi colocado como um "plano global" no topo da aba Premiação e em Configurações, definindo um único plano para toda a contagem. **Isso não é o que você quer.**
+## O que será criado
 
-## O que será feito
+### 1. Migration (storage + RPC auxiliar)
+Cria um bucket privado `perfex-import` com 4 RLS policies (SELECT/INSERT/UPDATE/DELETE) restritas ao email master, e garante a RPC `get_auth_user_id_by_email` (idempotente — já existe no projeto, mas o `CREATE OR REPLACE` é seguro).
 
-O plano passa a ser uma propriedade **de cada cadastro individual** de Registro de Marca. No diálogo "Novo Cadastro" (e "Editar Registro"), quando o tipo for **Registro de Marca**, aparece primeiro o seletor de Plano e, em seguida, a Forma de Pagamento — cuja lista muda conforme o plano escolhido.
+### 2. Quatro Edge Functions (deploy automático)
+- `parse-perfex-dump` — recebe o ZIP/SQL/SQL.GZ, faz parse tolerante dos `INSERT INTO` das tabelas Perfex (`tblwebmarcas_customers`, `tblcontacts`, `tblclients`, `tblcontracts`, `tblfiles`), mescla por email/CPF/CNPJ e gera 4 arquivos em `perfex-import/generated/`: `customers.ndjson.gz`, `contracts.ndjson.gz` (apenas signed=1), `files.ndjson.gz`, `mapping.json`.
+- `import-perfex-customers` — paginado por offset/limit. Dedupe por email→cpf→cnpj. Cria auth user com senha padrão `123Mudar@`, faz upsert em `profiles` com `origin='import_perfex'`, `client_funnel_type='juridico'`, `created_by/assigned_to=master`, insere role `user` em `user_roles` e cria um `brand_processes` inicial em `protocolado`.
+- `import-perfex-contracts` — paginado. Resolve cliente por email; idempotência via marcador `[PERFEX_ID:N]` no `description`. Insere em `contracts` com `signature_status` conforme signed, `contract_type='registro_marca'`, `visible_to_client=true`.
+- `import-perfex-files` — paginado. Resolve cliente por email, baixa de `https://crm.webmarcas.net/uploads/` em 3 variantes de path, faz upload no bucket `documents` em `imported/perfex/{rel_type}/{rel_id}/{file_name}`, linka `contract_id` via marcador `[PERFEX_ID]`. Idempotente por `file_url`.
 
-### Fluxo no diálogo "Novo Cadastro" → Registro de Marca
+Todas as 4 functions:
+- Usam `createClient` de `https://esm.sh/@supabase/supabase-js@2`
+- `corsHeaders` manual (NÃO importam de `@supabase/supabase-js/cors`)
+- Validam Master Admin (`user.email === 'davillys@gmail.com'`)
+- As 3 import functions usam `createSignedUrl(60s)` primeiro, com fallback para URL pública
+- `parse-perfex-dump` usa `fflate` para zip/gzip
 
-```
-TIPO *                  [ Registro de Marca ▾ ]
-NOME DO CLIENTE *       [ ... ]
-NOME DA MARCA *         [ ... ]
-QTD MARCAS *  [ 1 ]     DATA PGTO *  [ __/__/____ ]
+### 3. Componente novo `PerfexImportSection.tsx`
+Renderiza somente se `user.email === 'davillys@gmail.com'`. Possui:
+- Box de upload com XHR + barra de progresso (aceita `.zip`, `.sql`, `.sql.gz`)
+- Dispara `parse-perfex-dump` ao concluir upload e mostra estatísticas
+- Três fases sequenciais (Clientes → Contratos → Arquivos) com `Progress`, badges (importados/pulados/erros/notFound/missingClient) e modal com detalhes de erro
+- Loop de paginação chamando cada edge function por `fetch` direto com offset/limit incremental
 
-PLANO *                 [ Plano Essencial ▾ ]   ← NOVO, vem antes
-                          • Plano Essencial
-                          • Plano Premium
-                          • Plano Corporativo
+### 4. Integração mínima em `BackupSettings.tsx`
+Apenas duas linhas adicionadas:
+- `import { PerfexImportSection } from './PerfexImportSection';`
+- `<PerfexImportSection />` logo abaixo de `<BackupImportSection />`
 
-FORMA DE PAGAMENTO *    [ ... ▾ ]                ← opções dependem do plano
-```
+Nada mais é alterado. Nenhum cliente, contrato, arquivo ou configuração existente é tocado pela aplicação dessa feature — ela só **adiciona** capacidade de importar.
 
-### Opções de "Forma de Pagamento" por plano
+## Detalhes técnicos relevantes
 
-- **Essencial** (mantém o atual):
-  - À Vista — R$ 699,99
-  - Parcelado — R$ 1.194,00
-  - Promoção — Valor Personalizado
-- **Premium**:
-  - Boleto — R$ 398,00/mês
-  - Cartão — R$ 398,00/mês
-- **Corporativo**:
-  - Boleto — R$ 1.621,00/mês
-  - Cartão — R$ 1.621,00/mês
+- `supabase/config.toml` recebe entradas para as 4 funções com `verify_jwt = false` (validação é feita dentro de cada função via `getClaims` + checagem do email).
+- Bucket `documents` já existe e é público — perfeito para os arquivos importados.
+- `APP_URL` constante nas 3 import functions será setada para `https://id-preview--6c60bdcc-40b1-49c5-b46b-40ac18ae182b.lovable.app` (URL atual do projeto). Após publicar o domínio definitivo, basta atualizar essa constante.
+- Não modifico `src/integrations/supabase/client.ts` nem `src/integrations/supabase/types.ts`.
+- Schema das tabelas-alvo (`profiles`, `user_roles`, `brand_processes`, `contracts`, `documents`) já existe e suporta os campos usados.
 
-### Cálculo da premiação por entrada
+## O que NÃO será alterado
 
-`calcRegistroMarcaPremium` passa a olhar o campo `plan` de **cada entrada** (não mais um plano global):
+- Nenhuma página, componente, função ou tabela existente.
+- Nenhuma rota, layout ou navegação.
+- Nenhuma config de outras edge functions.
+- Nenhum cliente, contrato ou arquivo já cadastrado é modificado pela importação (são apenas inserções idempotentes — duplicatas são puladas).
 
-- Entrada com `plan = 'essencial'` → mantém regra atual (R$ 50/marca; após meta de 30: R$ 100 à vista / R$ 50 parcelado).
-- Entrada com `plan = 'premium'` → R$ 100 fixos por marca, sempre (também conta na meta de 30, mas o valor não muda após a meta).
-- Entrada com `plan = 'corporativo'` → R$ 200 fixos por marca, sempre.
+## Passo manual após deploy
 
-A meta única de 30 marcas continua sendo a mesma; ela soma todas as marcas independentemente do plano.
+O painel aparecerá em **Admin → Configurações → aba Backup → "Importação Legado Perfex CRM"** (somente para `davillys@gmail.com`). Fluxo:
+1. Upload do dump SQL do Perfex (`.zip`, `.sql` ou `.sql.gz`) — pode também baixar primeiro de `https://crm.webmarcas.net/u973561543_perfexcrm.sql` e subir.
+2. Aguardar o parse exibir as estatísticas.
+3. Executar as 3 fases na ordem: **1) Clientes → 2) Contratos → 3) Arquivos**.
 
-### Remover o seletor "global"
-
-- Remover do topo da página `/admin/premiacao` o card "PLANO DE PREMIAÇÃO ATIVO" e o `<Select>` de plano global.
-- Remover de **Configurações → Premiação** a seção "Plano de Premiação" que escolhia um plano único. Em seu lugar, deixar apenas os parâmetros editáveis de cada plano (valor por marca, mensalidade) caso o Master Admin queira alterar os defaults — sem `plan` ativo.
-
-### Persistência
-
-A tabela `award_entries` já tem coluna livre? Vou usar uma nova coluna `plan` (text). Como o projeto é Lovable Cloud / Supabase, será necessário criar uma **migration** adicionando `plan text not null default 'essencial'` em `award_entries`. Entradas antigas ficam automaticamente como `essencial` (preservando os cálculos existentes).
-
-O campo `payment_type` continua existindo e passa a aceitar também `'boleto'` e `'cartao'` (são apenas strings; o cálculo do Premium/Corporativo ignora esse campo de qualquer forma).
-
-## Detalhes técnicos
-
-**Arquivos a alterar:**
-- `src/pages/admin/Premiacao.tsx`
-  - Adicionar estado `formPlan` no formulário do diálogo.
-  - Renderizar `<Select>` de Plano dentro do bloco `formType === 'registro_marca'`, **antes** do Select de Forma de Pagamento.
-  - Tornar as opções do Select "Forma de Pagamento" dependentes de `formPlan`.
-  - Resetar `formPaymentType` quando `formPlan` muda (para evitar valor inválido).
-  - Passar `formPlan` no `insert`/`update` do `award_entries`.
-  - Refatorar `calcRegistroMarcaPremium(entries, cfg)` para iterar e aplicar a regra conforme `entry.plan` de cada entrada.
-  - Remover o card "PLANO DE PREMIAÇÃO ATIVO", o `<Select>` global e a `savePlanMutation`.
-  - Exibir badge do plano na lista de entradas (Essencial/Premium/Corporativo) ao lado do badge de Forma de Pagamento.
-- `src/components/admin/settings/AwardSettings.tsx`
-  - Remover o seletor de "plano ativo".
-  - Manter apenas os blocos de parâmetros (`rate_per_brand`, `monthly_price`) caso o Master Admin queira editar os defaults usados como referência informativa. (Opcional — se preferir, removo a seção inteira; me avise.)
-- `src/integrations/supabase/types.ts` — atualizado automaticamente após a migration.
-
-**Migration necessária:**
-```sql
-alter table public.award_entries
-  add column if not exists plan text not null default 'essencial'
-  check (plan in ('essencial','premium','corporativo'));
-```
-
-## Fora de escopo
-
-- Cobrança real das mensalidades de Premium/Corporativo via Asaas.
-- Histórico de mudança de plano por cliente.
+Senha padrão dos clientes importados: `123Mudar@` (eles podem trocar via "Esqueci minha senha").
