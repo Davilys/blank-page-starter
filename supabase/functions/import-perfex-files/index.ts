@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 const APP_URL = 'https://webmarcas1.lovable.app';
-const PERFEX_BASE = 'https://crm.webmarcas.net/uploads';
+const PERFEX_HOST = 'https://crm.webmarcas.net';
 const MASTER_EMAIL = 'davillys@gmail.com';
 
 interface FileRecord {
@@ -40,18 +40,113 @@ async function loadNdjson(supabase: ReturnType<typeof createClient>, fileName: s
   return fetchNdjsonGz(fallbackUrl);
 }
 
+// ── Perfex session management ────────────────────────────────────────────────
+// Parses Set-Cookie headers into a single cookie string.
+function parseCookies(headers: Headers, jar: Map<string, string>) {
+  const setCookies = (headers as any).getSetCookie?.() ?? [];
+  for (const sc of setCookies) {
+    const [pair] = sc.split(';');
+    const eq = pair.indexOf('=');
+    if (eq > 0) jar.set(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim());
+  }
+}
+function jarToHeader(jar: Map<string, string>): string {
+  return [...jar.entries()].map(([k, v]) => `${k}=${v}`).join('; ');
+}
+
+async function perfexLogin(): Promise<{ jar: Map<string, string> } | null> {
+  const email = Deno.env.get('PERFEX_LOGIN_EMAIL');
+  const password = Deno.env.get('PERFEX_LOGIN_PASSWORD');
+  if (!email || !password) {
+    console.error('PERFEX_LOGIN_EMAIL / PERFEX_LOGIN_PASSWORD not set');
+    return null;
+  }
+  const jar = new Map<string, string>();
+  // 1) GET login page → cookies + csrf token
+  const getRes = await fetch(`${PERFEX_HOST}/admin/authentication`, {
+    headers: { 'User-Agent': 'Mozilla/5.0 WebMarcasImporter' },
+    redirect: 'manual',
+  });
+  parseCookies(getRes.headers, jar);
+  const html = await getRes.text();
+  const csrfMatch = html.match(/name="csrf_token_name"\s+value="([^"]+)"/);
+  const csrfToken = csrfMatch?.[1] ?? jar.get('csrf_cookie_name');
+  if (!csrfToken) {
+    console.error('Could not extract csrf_token from Perfex login page');
+    return null;
+  }
+  // 2) POST login
+  const form = new URLSearchParams();
+  form.set('csrf_token_name', csrfToken);
+  form.set('email', email);
+  form.set('password', password);
+  form.set('remember', '1');
+  const postRes = await fetch(`${PERFEX_HOST}/admin/authentication`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Cookie': jarToHeader(jar),
+      'User-Agent': 'Mozilla/5.0 WebMarcasImporter',
+      'Referer': `${PERFEX_HOST}/admin/authentication`,
+    },
+    body: form.toString(),
+    redirect: 'manual',
+  });
+  parseCookies(postRes.headers, jar);
+  // Successful login → 302/303 to /admin
+  if (postRes.status >= 300 && postRes.status < 400) {
+    console.log('Perfex login OK, status', postRes.status, 'cookies:', jar.size);
+    return { jar };
+  }
+  console.error('Perfex login failed, status', postRes.status);
+  return null;
+}
+
+// Folder name used by Perfex for download/file/{folder}/{rel_id}/{file_name}
+function folderForRelType(relType: string): string {
+  const map: Record<string, string> = {
+    customer: 'customer',
+    client: 'customer',
+    contract: 'contract',
+    lead: 'lead',
+    project: 'project',
+    task: 'task',
+    expense: 'expense',
+    invoice: 'invoice',
+    estimate: 'estimate',
+    proposal: 'proposal',
+    ticket: 'ticket',
+    company: 'company',
+  };
+  return map[relType] || relType;
+}
+
 function buildCandidates(f: FileRecord): string[] {
+  const folder = folderForRelType(f.rel_type);
   const c: string[] = [
-    `${PERFEX_BASE}/${f.rel_type}/${f.rel_id}/${f.file_name}`,
-    `${PERFEX_BASE}/${f.rel_type}_files/${f.rel_id}/${f.file_name}`,
-    `${PERFEX_BASE}/${f.rel_type}s/${f.rel_id}/${f.file_name}`,
-    `${PERFEX_BASE}/clients/${f.rel_id}/${f.file_name}`,
-    `${PERFEX_BASE}/contracts/${f.rel_id}/${f.file_name}`,
+    `${PERFEX_HOST}/download/file/${folder}/${f.rel_id}/${f.file_name}`,
+    `${PERFEX_HOST}/download/preview_image/${folder}/${f.file_name}`,
+    `${PERFEX_HOST}/uploads/${folder}/${f.rel_id}/${f.file_name}`,
+    `${PERFEX_HOST}/uploads/${folder}_files/${f.rel_id}/${f.file_name}`,
+    `${PERFEX_HOST}/uploads/${folder}s/${f.rel_id}/${f.file_name}`,
   ];
   if (f.attachment_key) {
-    c.push(`https://crm.webmarcas.net/download/file/${f.attachment_key}`);
+    c.push(`${PERFEX_HOST}/download/file_by_id/${f.perfex_id}`);
   }
   return [...new Set(c)];
+}
+
+function inferDocumentType(f: FileRecord): string {
+  if (f.rel_type === 'contract') return 'contrato';
+  const n = (f.file_name || '').toLowerCase();
+  if (n.includes('procura')) return 'procuracao';
+  if (n.includes('distrato')) return 'distrato';
+  if (n.includes('certificado')) return 'certificado';
+  if (n.includes('rpi')) return 'rpi';
+  if (n.includes('parecer')) return 'parecer';
+  if (n.includes('comprovante') || n.includes('boleto') || n.includes('nf') || n.includes('fatura')) return 'comprovante';
+  if (n.includes('busca') || n.includes('inpi')) return 'busca_inpi';
+  return 'anexo';
 }
 
 Deno.serve(async (req) => {
@@ -84,6 +179,15 @@ Deno.serve(async (req) => {
     const total = lines.length;
     const slice = lines.slice(offset, offset + limit);
 
+    // Login once per invocation, reuse for all downloads in this batch
+    const session = dryRun ? null : await perfexLogin();
+    if (!dryRun && !session) {
+      return new Response(JSON.stringify({ error: 'Perfex login failed — verifique PERFEX_LOGIN_EMAIL/PERFEX_LOGIN_PASSWORD' }), {
+        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const cookieHeader = session ? jarToHeader(session.jar) : '';
+
     let imported = 0, skipped = 0, errors = 0, notFound = 0;
     const errorDetails: string[] = [];
     const samples: any[] = [];
@@ -112,17 +216,33 @@ Deno.serve(async (req) => {
         if (existingDoc) { skipped++; continue; }
 
         let bytes: ArrayBuffer | null = null;
+        let triedUrls: string[] = [];
         for (const u of candidates) {
+          triedUrls.push(u);
           try {
-            const r = await fetch(u, { signal: AbortSignal.timeout(15000) });
+            const r = await fetch(u, {
+              headers: {
+                'Cookie': cookieHeader,
+                'User-Agent': 'Mozilla/5.0 WebMarcasImporter',
+                'Referer': PERFEX_HOST + '/admin',
+              },
+              redirect: 'follow',
+              signal: AbortSignal.timeout(20000),
+            });
             const ct = r.headers.get('content-type') || '';
+            // Reject HTML (login page) and zero-byte responses
             if (r.ok && !ct.includes('text/html')) {
               bytes = await r.arrayBuffer();
+              if (bytes.byteLength < 100) { bytes = null; continue; }
               break;
             }
           } catch { /* try next */ }
         }
-        if (!bytes) { notFound++; continue; }
+        if (!bytes) {
+          notFound++;
+          if (errorDetails.length < 30) errorDetails.push(`${f.file_name} [${f.rel_type}/${f.rel_id}]: not found in any of ${triedUrls.length} URLs`);
+          continue;
+        }
 
         const { error: upErr } = await supabase.storage.from('documents').upload(
           storagePath, bytes,
@@ -144,7 +264,8 @@ Deno.serve(async (req) => {
           user_id: profile.id, contract_id: contractId,
           name: f.file_name, file_url: publicUrl.publicUrl,
           mime_type: f.filetype, uploaded_by: 'import_perfex',
-          document_type: f.rel_type === 'contract' ? 'contrato' : 'documento',
+          document_type: inferDocumentType(f),
+          file_size: bytes.byteLength,
         });
         imported++;
       } catch (e) {
