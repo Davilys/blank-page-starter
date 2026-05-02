@@ -17,6 +17,7 @@ interface FileRecord {
   filetype: string | null;
   client_email: string | null;
   date_added: string | null;
+  attachment_key?: string | null;
 }
 
 async function fetchNdjsonGz(url: string): Promise<string[]> {
@@ -101,6 +102,11 @@ Deno.serve(async (req) => {
           `${PERFEX_BASE}/${f.rel_type}_files/${f.rel_id}/${f.file_name}`,
           `${PERFEX_BASE}/${f.rel_type}s/${f.rel_id}/${f.file_name}`,
         ];
+        if (f.attachment_key) {
+          candidates.push(`https://crm.webmarcas.net/download/file/${f.attachment_key}`);
+          candidates.push(`https://crm.webmarcas.net/download.php?key=${f.attachment_key}`);
+        }
+        candidates.push(`${PERFEX_BASE}/companylogo/${f.file_name}`);
 
         let bytes: ArrayBuffer | null = null;
         for (const u of candidates) {
