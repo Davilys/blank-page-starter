@@ -1,81 +1,61 @@
-Auditoria concluída: o erro não está no upload manual do usuário, está na estratégia aplicada aqui.
+## Diagnóstico
 
-Causa raiz encontrada
-- No projeto atual, eu deixei o fluxo dependente da Edge Function `parse-perfex-dump` para baixar e processar `https://crm.webmarcas.net/u973561543_perfexcrm.sql` dentro do Supabase.
-- Esse parse do SQL completo dentro da Edge Function estoura limite de recurso/memória (`WORKER_RESOURCE_LIMIT`). Por isso só foi gerado `generated/customers.ndjson.gz` e `generated/mapping.json` no bucket `perfex-import`; faltam `generated/contracts.ndjson.gz` e `generated/files.ndjson.gz`.
-- O banco confirma o estado quebrado/incompleto: há apenas 28 `profiles` com `origin='import_perfex'`, 0 contratos Perfex e 0 documentos Perfex.
-- No projeto semelhante `SITE WEBMARCAS` a solução que deu certo não dependia de parse pesado na Edge Function. Ele já tinha os arquivos prontos em `public/perfex-data/`:
-  - `customers.ndjson.gz`
-  - `contracts.ndjson.gz`
-  - `files.ndjson.gz`
-  - `mapping.json`
-- O projeto atual não possui a pasta `public/perfex-data`, então os importadores não têm os dados finais completos para consumir.
+Auditoria do banco mostrou:
 
-Correção proposta para ficar igual ao SITE WEBMARCAS
+| Item | Quantidade |
+|---|---|
+| Perfis (clientes) | 2.890 |
+| Contratos do Perfex importados | 1.512 |
+| Documentos do Perfex importados | **0** |
+| Logs da função `import-perfex-files` | **nenhum** |
 
-1. Copiar os dados estáticos do projeto que funcionou
-- Copiar de `SITE WEBMARCAS/public/perfex-data/` para este projeto:
-  - `public/perfex-data/customers.ndjson.gz`
-  - `public/perfex-data/contracts.ndjson.gz`
-  - `public/perfex-data/files.ndjson.gz`
-  - `public/perfex-data/mapping.json`
-- Isso elimina a necessidade de fazer upload manual e também elimina o gargalo de parse do SQL de 70MB em Edge Function.
+**Conclusão:** Fases 1 (clientes) e 2 (contratos) rodaram, mas a **Fase 3 (arquivos) nunca foi executada**. Por isso a aba "Anexos" do cliente no admin está vazia e a área do cliente (`/cliente/documentos`) não mostra os arquivos antigos. Os contratos importados estão lá, mas sem o PDF assinado anexado.
 
-2. Ajustar os importadores para usar os arquivos estáticos como fonte principal
-- Atualizar:
-  - `supabase/functions/import-perfex-customers/index.ts`
-  - `supabase/functions/import-perfex-contracts/index.ts`
-  - `supabase/functions/import-perfex-files/index.ts`
-- Eles passarão a ler primeiro `https://<app>/perfex-data/*.ndjson.gz`, como no projeto SITE WEBMARCAS.
-- Manter leitura do bucket `perfex-import/generated/*` apenas como fallback opcional, se existir.
-- Remover a dependência obrigatória de `parse-perfex-dump` antes das fases 1/2/3.
+## O que será feito
 
-3. Corrigir a URL base do app no projeto atual
-- O projeto SITE WEBMARCAS usava `APP_URL = 'https://webmarcas1.lovable.app'`.
-- Aqui será usado o domínio correto do projeto atual. Como ainda não há domínio publicado/customizado, a fonte estática deve usar um URL robusto do Supabase Storage ou do app publicado/preview configurado, evitando redirect HTML que causa `invalid gzip header`.
-- A validação do gzip será mantida: se baixar HTML/redirect em vez de `.gz`, a função retorna erro claro.
+### 1. Robustecer `import-perfex-files` antes de rodar
+A função atual tenta baixar de `crm.webmarcas.net/uploads/...` testando 5 padrões de pasta. Antes de processar 8 mil+ arquivos, vou:
+- Adicionar log estruturado por arquivo (sucesso / 404 / mime errado).
+- Aumentar candidatos de URL (incluir variações com subpastas por ano/mês comuns no Perfex: `uploads/contracts/{id}/`, `uploads/clients/{id}/`, `files/`).
+- Mapear `document_type` corretamente para baterem com as abas da área do cliente:
+  - `rel_type = 'contract'` → `document_type = 'contrato'` + `contract_id` vinculado
+  - `rel_type = 'customer'` → `document_type = 'anexo'`
+  - extensão `.pdf` com nome contendo "procuracao" → `procuracao`
+  - extensão `.pdf` com nome contendo "distrato" → `distrato`
+- Garantir `user_id = profile.id` (já está) — isso é o que faz o documento aparecer tanto em `/cliente/documentos` quanto na aba **Anexos** do `ClientDetailSheet` no admin (ambas filtram por `user_id`).
 
-4. Simplificar a UI para não exigir upload manual
-- Atualizar `src/components/admin/settings/PerfexImportSection.tsx` para deixar claro que os dados do Perfex já estão embutidos em `public/perfex-data`.
-- Remover ou rebaixar o botão de upload/parse manual.
-- Mostrar status “Dados Perfex prontos” e liberar as fases diretamente:
-  1. Importar Clientes
-  2. Importar Contratos Assinados
-  3. Baixar Arquivos do Servidor Antigo
-- Manter visível apenas para Master Admin.
+### 2. Anexar PDFs assinados aos contratos do Perfex
+Para cada arquivo que pertence a um contrato (`rel_type = 'contract'`):
+- Buscar o contrato pelo marcador `[PERFEX_ID:{rel_id}]` no campo `description` (já existe).
+- Inserir em `documents` com `contract_id` preenchido e `document_type = 'contrato'`.
+- Isso fará o PDF aparecer:
+  - Na aba **Contrato** da página `/cliente/documentos`.
+  - Na aba **Anexos** do admin no detalhe do cliente.
+  - Na visualização do contrato (que já busca documents por `contract_id`).
 
-5. Manter idempotência e segurança
-- Não criar migrations.
-- Não alterar schema.
-- Continuar pulando duplicados por email/CPF/CNPJ.
-- Continuar usando service role somente dentro das Edge Functions.
-- Continuar exigindo JWT e email Master (`davillys@gmail.com`) no código.
-- Não sobrescrever clientes/contratos/documentos existentes.
+### 3. Executar a importação em lotes paginados
+A função já é paginada (`limit=10`, `offset` controlado). Vou executá-la diretamente via `curl_edge_functions` em lotes até `done=true`, sem depender do botão da UI (que pode falhar por timeout do navegador). Isso evita problemas de sessão/aba fechada.
 
-6. Teste antes de liberar importação real
-- Após a alteração, fazer deploy das 3 Edge Functions de importação.
-- Rodar chamadas de validação/dry-run com lotes pequenos:
-  - `import-perfex-customers?offset=0&limit=5&dryRun=true`
-  - `import-perfex-contracts?offset=0&limit=5&dryRun=true`
-  - `import-perfex-files?offset=0&limit=5&dryRun=true`
-- Confirmar que cada função consegue abrir o `.ndjson.gz`, contar registros e retornar amostras sem inserir nada.
-- Só depois deixar o painel pronto para execução real.
+Estimativa: ~8.000 arquivos / 10 por chamada = ~800 chamadas. Cada chamada leva ~30-60s (downloads remotos). Vou rodar em sequência reportando progresso.
 
-Arquivos a alterar/copiar
-- Copiar do projeto SITE WEBMARCAS:
-  - `public/perfex-data/customers.ndjson.gz`
-  - `public/perfex-data/contracts.ndjson.gz`
-  - `public/perfex-data/files.ndjson.gz`
-  - `public/perfex-data/mapping.json`
-- Editar neste projeto:
-  - `supabase/functions/import-perfex-customers/index.ts`
-  - `supabase/functions/import-perfex-contracts/index.ts`
-  - `supabase/functions/import-perfex-files/index.ts`
-  - `src/components/admin/settings/PerfexImportSection.tsx`
-  - Opcional: desativar/remover uso prático de `supabase/functions/parse-perfex-dump/index.ts` na UI para não repetir o erro de limite.
+### 4. Validação final
+Após concluir:
+- Query: `SELECT COUNT(*) FROM documents WHERE uploaded_by='import_perfex'` deve ser > 0.
+- Query: `SELECT COUNT(*) FROM documents WHERE uploaded_by='import_perfex' AND contract_id IS NOT NULL` mostra quantos PDFs assinados foram vinculados.
+- Visual: abrir `/admin/clientes` → escolher cliente → aba **Anexos** deve listar os arquivos.
+- Visual: logar como cliente em `/cliente/documentos` deve ver os arquivos nas abas certas.
 
-Resultado esperado
-- O painel deixará de depender de upload manual ou parse pesado.
-- As fases passarão a consumir os mesmos arquivos estáticos que fizeram o outro projeto funcionar.
-- O estado “zerado” será resolvido porque `contracts.ndjson.gz` e `files.ndjson.gz` existirão no projeto atual.
-- A importação poderá ser executada de forma idempotente, sem duplicar e sem alterar dados existentes.
+## Arquivos alterados
+
+- `supabase/functions/import-perfex-files/index.ts` — mais candidatos de URL, melhor mapeamento de `document_type`, logs detalhados.
+
+## Arquivos NÃO alterados (já estão corretos)
+
+- `src/pages/cliente/Documentos.tsx` — já filtra por `user_id` e exibe por `document_type`.
+- `src/components/admin/clients/ClientDetailSheet.tsx` — aba Anexos já carrega `documents` por `user_id`.
+- Schema do banco — nenhuma migração necessária.
+
+## Riscos
+
+- Alguns arquivos do Perfex podem ter sido apagados do servidor `crm.webmarcas.net`. Esses serão contados em `notFound` e listados nos logs — você decide se quer pedir o backup do `uploads/` para nova tentativa.
+- Tempo total: pode levar 30-60 minutos de execução em background.
