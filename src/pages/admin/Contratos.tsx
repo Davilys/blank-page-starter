@@ -324,43 +324,56 @@ export default function AdminContratos() {
         return;
       }
 
-      const { data, error } = await supabase
-        .from('contracts')
-        .select(`
-          id,
-          contract_number,
-          subject,
-          contract_value,
-          start_date,
-          end_date,
-          signature_status,
-          signature_expires_at,
-          signed_at,
-          visible_to_client,
-          user_id,
-          created_at,
-          contract_type_id,
-          description,
-          payment_method,
-          asaas_payment_id,
-          template_id,
-          document_type,
-          contract_type:contract_types(name),
-          contract_template:contract_templates(name),
-          profile:profiles(full_name, phone)
-        `)
-        .order('created_at', { ascending: false });
+      // Paginate to bypass Supabase's default 1000-row cap
+      const PAGE_SIZE = 1000;
+      const all: Contract[] = [];
+      let from = 0;
+      // Hard safety stop at 50k rows
+      for (let page = 0; page < 50; page++) {
+        const to = from + PAGE_SIZE - 1;
+        const { data, error } = await supabase
+          .from('contracts')
+          .select(`
+            id,
+            contract_number,
+            subject,
+            contract_value,
+            start_date,
+            end_date,
+            signature_status,
+            signature_expires_at,
+            signed_at,
+            visible_to_client,
+            user_id,
+            created_at,
+            contract_type_id,
+            description,
+            payment_method,
+            asaas_payment_id,
+            template_id,
+            document_type,
+            contract_type:contract_types(name),
+            contract_template:contract_templates(name),
+            profile:profiles(full_name, phone)
+          `)
+          .order('created_at', { ascending: false })
+          .range(from, to);
 
-      if (error) throw error;
+        if (error) throw error;
+        const batch = (data || []) as unknown as Contract[];
+        all.push(...batch);
+        if (batch.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
 
       // Retry if empty result on first attempt (auth hydration race)
-      if ((!data || data.length === 0) && retryCount < 2) {
+      if (all.length === 0 && retryCount < 2) {
         setTimeout(() => fetchContracts(retryCount + 1), 800);
         setLoading(false);
         return;
       }
 
-      setContracts(data || []);
+      setContracts(all);
     } catch (error) {
       console.error('Error fetching contracts:', error);
       toast.error('Erro ao carregar contratos');

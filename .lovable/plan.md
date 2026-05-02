@@ -1,61 +1,41 @@
-## Diagnóstico
+Auditoria feita em modo leitura: os contratos pendentes não foram apagados. Existem 59 contratos com `signature_status = 'not_signed'`, todos criados até 30/04/2026. O que aconteceu é que a importação do ZIP criou muitos contratos assinados em 02/05 e a tela de contratos provavelmente está trazendo só o primeiro lote padrão do Supabase, ordenado pelos mais recentes, então os pendentes antigos ficaram fora da listagem.
 
-Auditoria do banco mostrou:
+Números atuais encontrados:
+- Total de contratos: 3.251
+- Pendentes ainda existentes: 59
+- Assinados: 3.192
+- Criados em 02/05/2026: 2.864
+- Criados em 02/05/2026 com marcador `[PERFEX_ID:...]`: 2.863
+- Documento criado hoje vinculado a contrato: 1
 
-| Item | Quantidade |
-|---|---|
-| Perfis (clientes) | 2.890 |
-| Contratos do Perfex importados | 1.512 |
-| Documentos do Perfex importados | **0** |
-| Logs da função `import-perfex-files` | **nenhum** |
+Plano proposto para resolver sem risco de apagar contratos pendentes:
 
-**Conclusão:** Fases 1 (clientes) e 2 (contratos) rodaram, mas a **Fase 3 (arquivos) nunca foi executada**. Por isso a aba "Anexos" do cliente no admin está vazia e a área do cliente (`/cliente/documentos`) não mostra os arquivos antigos. Os contratos importados estão lá, mas sem o PDF assinado anexado.
+1. Corrigir a tela de contratos para os pendentes voltarem a aparecer
+   - Alterar a busca em `src/pages/admin/Contratos.tsx` para não depender do limite padrão de 1000 linhas do Supabase.
+   - Carregar os contratos em páginas/lotes ou buscar por filtros no servidor.
+   - Garantir que o filtro “Pendente” consulte corretamente todos os contratos, não apenas os primeiros carregados.
+   - Manter contadores confiáveis de Total, Assinados e Pendentes.
 
-## O que será feito
+2. Criar proteção contra novas importações substituírem dados sem controle
+   - Alterar a importação de ZIP para mostrar uma prévia antes de executar: quantos contratos serão criados, quantos seriam atualizados/substituídos e quantos têm conflito por `contract_number`.
+   - Adicionar opção segura de importação, por exemplo:
+     - “Criar apenas novos”
+     - “Atualizar existentes somente após confirmação explícita”
+   - Melhorar o aviso atual para deixar claro que a substituição pode alterar contratos já existentes.
 
-### 1. Robustecer `import-perfex-files` antes de rodar
-A função atual tenta baixar de `crm.webmarcas.net/uploads/...` testando 5 padrões de pasta. Antes de processar 8 mil+ arquivos, vou:
-- Adicionar log estruturado por arquivo (sucesso / 404 / mime errado).
-- Aumentar candidatos de URL (incluir variações com subpastas por ano/mês comuns no Perfex: `uploads/contracts/{id}/`, `uploads/clients/{id}/`, `files/`).
-- Mapear `document_type` corretamente para baterem com as abas da área do cliente:
-  - `rel_type = 'contract'` → `document_type = 'contrato'` + `contract_id` vinculado
-  - `rel_type = 'customer'` → `document_type = 'anexo'`
-  - extensão `.pdf` com nome contendo "procuracao" → `procuracao`
-  - extensão `.pdf` com nome contendo "distrato" → `distrato`
-- Garantir `user_id = profile.id` (já está) — isso é o que faz o documento aparecer tanto em `/cliente/documentos` quanto na aba **Anexos** do `ClientDetailSheet` no admin (ambas filtram por `user_id`).
+3. Preparar restauração seletiva para voltar a visão/data até 01/05/2026
+   - Separar os contratos importados em 02/05/2026, especialmente os 2.863 com `[PERFEX_ID:...]`.
+   - Validar dependências antes de qualquer alteração: `documents`, `contract_attachments`, `contract_comments`, `contract_notes`, `contract_tasks`, `contract_renewal_history` e logs de assinatura.
+   - Como a auditoria indicou que os pendentes continuam no banco, a primeira ação recomendada é corrigir a listagem. Se você ainda quiser “voltar” removendo a importação de 02/05, farei uma exclusão seletiva apenas dos registros importados hoje e marcados como Perfex, preservando os 59 pendentes antigos.
 
-### 2. Anexar PDFs assinados aos contratos do Perfex
-Para cada arquivo que pertence a um contrato (`rel_type = 'contract'`):
-- Buscar o contrato pelo marcador `[PERFEX_ID:{rel_id}]` no campo `description` (já existe).
-- Inserir em `documents` com `contract_id` preenchido e `document_type = 'contrato'`.
-- Isso fará o PDF aparecer:
-  - Na aba **Contrato** da página `/cliente/documentos`.
-  - Na aba **Anexos** do admin no detalhe do cliente.
-  - Na visualização do contrato (que já busca documents por `contract_id`).
+4. Tratar o caso do contrato criado/importado hoje sem marcador Perfex
+   - Há 1 contrato criado hoje sem `[PERFEX_ID:...]`, com número `20264514`.
+   - Antes de remover qualquer coisa, vou tratar esse item separadamente para evitar apagar um contrato legítimo criado hoje fora da importação.
 
-### 3. Executar a importação em lotes paginados
-A função já é paginada (`limit=10`, `offset` controlado). Vou executá-la diretamente via `curl_edge_functions` em lotes até `done=true`, sem depender do botão da UI (que pode falhar por timeout do navegador). Isso evita problemas de sessão/aba fechada.
+5. Resultado esperado
+   - Os 59 contratos pendentes voltam a aparecer normalmente na área administrativa.
+   - A importação de 02/05 deixa de “esconder” contratos antigos na tela.
+   - Novas importações ZIP não substituem contratos existentes sem uma etapa clara de prévia/confirmação.
+   - Se aprovado como parte da restauração, os contratos importados em 02/05 podem ser removidos seletivamente, voltando a base operacional à visão anterior a 01/05/2026 sem afetar os pendentes preservados.
 
-Estimativa: ~8.000 arquivos / 10 por chamada = ~800 chamadas. Cada chamada leva ~30-60s (downloads remotos). Vou rodar em sequência reportando progresso.
-
-### 4. Validação final
-Após concluir:
-- Query: `SELECT COUNT(*) FROM documents WHERE uploaded_by='import_perfex'` deve ser > 0.
-- Query: `SELECT COUNT(*) FROM documents WHERE uploaded_by='import_perfex' AND contract_id IS NOT NULL` mostra quantos PDFs assinados foram vinculados.
-- Visual: abrir `/admin/clientes` → escolher cliente → aba **Anexos** deve listar os arquivos.
-- Visual: logar como cliente em `/cliente/documentos` deve ver os arquivos nas abas certas.
-
-## Arquivos alterados
-
-- `supabase/functions/import-perfex-files/index.ts` — mais candidatos de URL, melhor mapeamento de `document_type`, logs detalhados.
-
-## Arquivos NÃO alterados (já estão corretos)
-
-- `src/pages/cliente/Documentos.tsx` — já filtra por `user_id` e exibe por `document_type`.
-- `src/components/admin/clients/ClientDetailSheet.tsx` — aba Anexos já carrega `documents` por `user_id`.
-- Schema do banco — nenhuma migração necessária.
-
-## Riscos
-
-- Alguns arquivos do Perfex podem ter sido apagados do servidor `crm.webmarcas.net`. Esses serão contados em `notFound` e listados nos logs — você decide se quer pedir o backup do `uploads/` para nova tentativa.
-- Tempo total: pode levar 30-60 minutos de execução em background.
+Observação importante: reverter código pelo histórico do Lovable não restaura automaticamente dados já alterados no Supabase. Para os dados, o caminho seguro é a restauração seletiva descrita acima ou, se você tiver backup/PITR habilitado no Supabase, uma restauração nativa do banco para um ponto no tempo.
