@@ -1453,6 +1453,27 @@ export type Database = {
           },
         ]
       }
+      email_sync_state: {
+        Row: {
+          account_id: string
+          folder: string
+          last_synced_at: string
+          last_uid: number
+        }
+        Insert: {
+          account_id: string
+          folder: string
+          last_synced_at?: string
+          last_uid?: number
+        }
+        Update: {
+          account_id?: string
+          folder?: string
+          last_synced_at?: string
+          last_uid?: number
+        }
+        Relationships: []
+      }
       email_templates: {
         Row: {
           body: string
