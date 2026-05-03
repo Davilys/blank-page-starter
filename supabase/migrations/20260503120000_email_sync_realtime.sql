@@ -32,3 +32,29 @@ BEGIN
     EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public.email_inbox';
   END IF;
 END$$;
+
+-- Schedule sync every 2 minutes
+DO $$
+DECLARE
+  existing_jobid bigint;
+BEGIN
+  SELECT jobid INTO existing_jobid FROM cron.job WHERE jobname = 'cron-sync-all-emails';
+  IF existing_jobid IS NOT NULL THEN
+    PERFORM cron.unschedule(existing_jobid);
+  END IF;
+
+  PERFORM cron.schedule(
+    'cron-sync-all-emails',
+    '*/2 * * * *',
+    $cron$
+    SELECT net.http_post(
+      url := 'https://scpbqsvwojhbxihyqbdz.supabase.co/functions/v1/cron-sync-all-emails',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNjcGJxc3Z3b2poYnhpaHlxYmR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NjcyNTUsImV4cCI6MjA5MDA0MzI1NX0.FTZt4yiL6dVsYT9cQnqrABgS0sMXYl23wf4ZtzP-GAE'
+      ),
+      body := '{}'::jsonb
+    );
+    $cron$
+  );
+END$$;
