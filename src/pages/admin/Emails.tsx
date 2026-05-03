@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 
 export type EmailFolder =
-  | 'inbox' | 'sent' | 'drafts' | 'templates' | 'settings'
+  | 'inbox' | 'sent' | 'drafts' | 'spam' | 'templates' | 'settings'
   | 'scheduled' | 'automated' | 'starred' | 'archived' | 'trash'
   | 'campaigns' | 'sequences' | 'automations'
   | 'filter-clients' | 'filter-leads' | 'filter-legal' | 'filter-financial' | 'filter-support';
@@ -231,7 +231,7 @@ export default function Emails() {
     }
 
     const listFolder = currentFolder.startsWith('filter-') ? 'inbox' : currentFolder;
-    const validListFolders = ['inbox', 'sent', 'drafts', 'starred', 'archived', 'trash', 'scheduled', 'automated'] as const;
+    const validListFolders = ['inbox', 'sent', 'drafts', 'spam', 'starred', 'archived', 'trash', 'scheduled', 'automated'] as const;
     type ValidFolder = typeof validListFolders[number];
     const folderToShow: ValidFolder = validListFolders.includes(listFolder as ValidFolder) ? listFolder as ValidFolder : 'inbox';
 
@@ -247,7 +247,7 @@ export default function Emails() {
 
   const getFolderLabel = () => {
     const map: Record<string, string> = {
-      inbox: 'Caixa de Entrada', sent: 'Enviados', drafts: 'Rascunhos',
+      inbox: 'Caixa de Entrada', sent: 'Enviados', drafts: 'Rascunhos', spam: 'Spam',
       templates: 'Templates', settings: 'Configurações', scheduled: 'Programados',
       automated: 'Automáticos', starred: 'Favoritos', archived: 'Arquivados',
       trash: 'Lixeira', campaigns: 'Campanhas', sequences: 'Sequências',
