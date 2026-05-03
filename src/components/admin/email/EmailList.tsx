@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 interface EmailListProps {
-  folder: 'inbox' | 'sent' | 'drafts' | 'starred' | 'archived' | 'trash' | 'scheduled' | 'automated';
+  folder: 'inbox' | 'sent' | 'drafts' | 'spam' | 'starred' | 'archived' | 'trash' | 'scheduled' | 'automated';
   onSelectEmail: (email: Email) => void;
   accountId?: string | null;
   accountEmail?: string;
@@ -97,12 +97,11 @@ export function EmailList({ folder, onSelectEmail, accountId, accountEmail }: Em
         })) as Email[];
       }
 
-      if (folder === 'trash' || folder === 'scheduled' || folder === 'automated') {
-        // These folders have no backend data yet — return empty
+      if (folder === 'scheduled' || folder === 'automated') {
         return [] as Email[];
       }
 
-      const folderFilter = folder === 'inbox' ? 'inbox' : folder === 'sent' ? 'sent' : 'drafts';
+      const folderFilter = folder; // 'inbox' | 'sent' | 'drafts' | 'spam' | 'trash'
 
       // Fetch from email_inbox (IMAP synced) for both inbox and sent
       const { data: imapEmails, error: imapError } = await supabase
@@ -204,6 +203,23 @@ export function EmailList({ folder, onSelectEmail, accountId, accountEmail }: Em
     };
   }, [accountId, queryClient]);
 
+  // Realtime: listen for new/updated emails on this account
+  useEffect(() => {
+    if (!accountId) return;
+    const channel = supabase
+      .channel(`email-inbox-${accountId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'email_inbox', filter: `account_id=eq.${accountId}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['emails'] });
+          queryClient.invalidateQueries({ queryKey: ['email-stats'] });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [accountId, queryClient]);
+
   const filteredEmails = emails?.filter(email =>
     email.subject.toLowerCase().includes(search.toLowerCase()) ||
     email.from_email.toLowerCase().includes(search.toLowerCase()) ||
@@ -211,7 +227,7 @@ export function EmailList({ folder, onSelectEmail, accountId, accountEmail }: Em
   );
 
   const folderLabels: Record<string, string> = {
-    inbox: 'Caixa de Entrada', sent: 'Enviados', drafts: 'Rascunhos',
+    inbox: 'Caixa de Entrada', sent: 'Enviados', drafts: 'Rascunhos', spam: 'Spam',
     starred: 'Favoritos', archived: 'Arquivados', trash: 'Lixeira',
     scheduled: 'Programados', automated: 'Automáticos',
   };
