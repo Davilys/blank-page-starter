@@ -6,7 +6,7 @@ import {
   Inbox, Send, FileText, Layout, Settings, PenSquare, Clock,
   Star, Archive, Trash2, Zap, BarChart3, Users, Briefcase,
   Scale, DollarSign, HeadphonesIcon, ChevronDown, ChevronRight,
-  Mail, Filter, Layers, AtSign
+  Mail, Filter, Layers, AtSign, AlertOctagon
 } from 'lucide-react';
 import { useState } from 'react';
 import type { EmailFolder, EmailAccount } from '@/pages/admin/Emails';
@@ -37,6 +37,7 @@ const mainFolders: { id: EmailFolder; label: string; icon: React.ComponentType<{
   { id: 'automated', label: 'Automáticos', icon: Zap, badge: 'automated' },
   { id: 'starred', label: 'Favoritos', icon: Star },
   { id: 'archived', label: 'Arquivados', icon: Archive },
+  { id: 'spam', label: 'Spam', icon: AlertOctagon },
   { id: 'trash', label: 'Lixeira', icon: Trash2 },
 ];
 
