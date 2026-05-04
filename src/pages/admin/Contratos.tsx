@@ -25,6 +25,15 @@ import { motion } from 'framer-motion';
 import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
 import { EyeOff } from 'lucide-react';
 import { exportContractsZip, importContractsZip, downloadBlob } from '@/lib/zipExportImport';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from '@/components/ui/pagination';
 
 interface Contract {
   id: string;
@@ -152,6 +161,8 @@ export default function AdminContratos() {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [zipProgress, setZipProgress] = useState<{ current: number; total: number; label: string } | null>(null);
   const [zipImporting, setZipImporting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 50;
 
   const handleExpirePromotions = async () => {
     if (!confirm(
@@ -561,6 +572,34 @@ export default function AdminContratos() {
   });
 
   const { canViewFinancialValues, isLoading: finLoading } = useCanViewFinancialValues();
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, signatureFilter, dateFilter, activeTab, selectedMonth]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredContracts.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedContracts = filteredContracts.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE
+  );
+  const rangeStart = filteredContracts.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(safePage * PAGE_SIZE, filteredContracts.length);
+
+  const getPageNumbers = (): (number | 'ellipsis')[] => {
+    const pages: (number | 'ellipsis')[] = [];
+    const window = 2;
+    const add = (n: number) => { if (!pages.includes(n)) pages.push(n); };
+    add(1);
+    if (safePage - window > 2) pages.push('ellipsis');
+    for (let i = Math.max(2, safePage - window); i <= Math.min(totalPages - 1, safePage + window); i++) {
+      add(i);
+    }
+    if (safePage + window < totalPages - 1) pages.push('ellipsis');
+    if (totalPages > 1) add(totalPages);
+    return pages;
+  };
   const totalValue = filteredContracts.reduce((sum, c) => sum + (c.contract_value || 0), 0);
   const signedCount = filteredContracts.filter(c => c.signature_status === 'signed').length;
   const pendingCount = filteredContracts.filter(c => c.signature_status !== 'signed').length;
@@ -920,15 +959,10 @@ export default function AdminContratos() {
                 </TableRow>
               ) : (
                 <>
-                  {filteredContracts.map((contract, index) => (
+                  {paginatedContracts.map((contract, index) => (
                     <TableRow
                       key={contract.id}
                       className="group border-b border-border/30 hover:bg-muted/20 transition-colors duration-200"
-                      style={{
-                        animation: `fadeInRow 0.3s ease forwards`,
-                        animationDelay: `${Math.min(index * 0.03, 0.5)}s`,
-                        opacity: 0,
-                      }}
                     >
                       <TableCell className="font-mono text-xs text-muted-foreground">
                         {contract.contract_number || '-'}
@@ -1055,6 +1089,49 @@ export default function AdminContratos() {
             </TableBody>
           </Table>
         </motion.div>
+
+        {filteredContracts.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 px-2">
+            <p className="text-xs text-muted-foreground">
+              Exibindo <span className="font-medium text-foreground">{rangeStart}</span>–<span className="font-medium text-foreground">{rangeEnd}</span> de <span className="font-medium text-foreground">{filteredContracts.length}</span> contratos
+            </p>
+            {totalPages > 1 && (
+              <Pagination className="mx-0 w-auto justify-end">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(e) => { e.preventDefault(); if (safePage > 1) setCurrentPage(safePage - 1); }}
+                      className={safePage === 1 ? 'pointer-events-none opacity-50' : ''}
+                    />
+                  </PaginationItem>
+                  {getPageNumbers().map((p, idx) => (
+                    <PaginationItem key={`${p}-${idx}`}>
+                      {p === 'ellipsis' ? (
+                        <PaginationEllipsis />
+                      ) : (
+                        <PaginationLink
+                          href="#"
+                          isActive={p === safePage}
+                          onClick={(e) => { e.preventDefault(); setCurrentPage(p); }}
+                        >
+                          {p}
+                        </PaginationLink>
+                      )}
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => { e.preventDefault(); if (safePage < totalPages) setCurrentPage(safePage + 1); }}
+                      className={safePage === totalPages ? 'pointer-events-none opacity-50' : ''}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            )}
+          </div>
+        )}
       </div>
 
       <ContractDetailSheet
