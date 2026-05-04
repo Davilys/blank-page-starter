@@ -563,42 +563,17 @@ export default function AdminContratos() {
     }
   };
 
-  const filteredContracts = contracts.filter(contract => {
-    const clientName = contract.profile?.full_name || '';
-    const matchesSearch = 
-      contract.contract_number?.toLowerCase().includes(search.toLowerCase()) ||
-      contract.subject?.toLowerCase().includes(search.toLowerCase()) ||
-      clientName.toLowerCase().includes(search.toLowerCase());
-    
-    const matchesSignature = 
-      signatureFilter === 'all' ||
-      (signatureFilter === 'signed' && contract.signature_status === 'signed') ||
-      (signatureFilter === 'not_signed' && contract.signature_status !== 'signed');
-
-    const matchesTab = getContractTabMatch(contract, activeTab);
-
-    let matchesDate = true;
-    if (dateFilter !== 'all' && contract.created_at) {
-      const contractDate = new Date(contract.created_at);
-      if (dateFilter === 'today') {
-        matchesDate = isToday(contractDate);
-      } else if (dateFilter === 'week') {
-        matchesDate = isThisWeek(contractDate, { locale: ptBR });
-      } else if (dateFilter === 'month') {
-        matchesDate = contractDate.getMonth() === selectedMonth.getMonth() && 
-                      contractDate.getFullYear() === selectedMonth.getFullYear();
-      }
-    }
-    
-    return matchesSearch && matchesSignature && matchesTab && matchesDate;
-  });
+  // Apply tab filter client-side on the current page only
+  // (tab matching depends on combined text from joined tables; keeps logic simple)
+  const visibleContracts = contracts.filter(c => getContractTabMatch(c, activeTab));
 
   const { canViewFinancialValues, isLoading: finLoading } = useCanViewFinancialValues();
-  const totalValue = filteredContracts.reduce((sum, c) => sum + (c.contract_value || 0), 0);
-  const signedCount = filteredContracts.filter(c => c.signature_status === 'signed').length;
-  const pendingCount = filteredContracts.filter(c => c.signature_status !== 'signed').length;
-  const signedPct = filteredContracts.length > 0 ? (signedCount / filteredContracts.length) * 100 : 0;
-  const pendingPct = filteredContracts.length > 0 ? (pendingCount / filteredContracts.length) * 100 : 0;
+  const totalValue = stats.totalValue;
+  const signedCount = stats.signed;
+  const pendingCount = stats.pending;
+  const signedPct = stats.total > 0 ? (signedCount / stats.total) * 100 : 0;
+  const pendingPct = stats.total > 0 ? (pendingCount / stats.total) * 100 : 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   return (
     <>
