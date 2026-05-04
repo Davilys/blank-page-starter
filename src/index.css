@@ -10,6 +10,29 @@
     --background: 210 40% 98%;
     --foreground: 222 47% 11%;
 
+    /* WebMarcas Premium Tokens (conversion landing) */
+    --wm-primary: #0F2D6E;
+    --wm-primary-light: #1A4BA0;
+    --wm-accent: #FF6B00;
+    --wm-accent-hover: #E55C00;
+    --wm-success: #1DB954;
+    --wm-danger: #E53935;
+    --wm-warning: #F59E0B;
+    --wm-bg: #F4F6FB;
+    --wm-bg-card: #FFFFFF;
+    --wm-text-primary: #0D1B2A;
+    --wm-text-secondary: #4A5568;
+    --wm-text-muted: #718096;
+    --wm-border: #E2E8F0;
+    --wm-shadow-sm: 0 1px 3px rgba(15,45,110,0.10);
+    --wm-shadow-md: 0 4px 16px rgba(15,45,110,0.10);
+    --wm-shadow-lg: 0 8px 32px rgba(15,45,110,0.15);
+    --wm-shadow-glow: 0 0 24px rgba(255,107,0,0.25);
+    --wm-radius-md: 12px;
+    --wm-radius-lg: 20px;
+    --wm-radius-xl: 32px;
+    --urgency-h: 0px;
+
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
 
