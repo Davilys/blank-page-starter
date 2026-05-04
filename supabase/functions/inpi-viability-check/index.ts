@@ -158,7 +158,6 @@ async function suggestClassesWithAI(businessArea: string): Promise<{ classes: nu
       method: 'POST',
       headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'openai/gpt-5.2',
         messages: [
           { role: 'system', content: `Você é um especialista em propriedade intelectual e classificação NCL (Nice) do INPI Brasil com 20 anos de experiência.
 
@@ -196,6 +195,7 @@ JSON: {"classes":[n1,n2,n3],"descriptions":["Classe XX – descrição específi
         temperature: 0.3,
         max_completion_tokens: 800,
       }),
+      // model set below
     });
 
     if (!response.ok) {
