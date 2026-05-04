@@ -1058,6 +1058,49 @@ export default function AdminContratos() {
             </TableBody>
           </Table>
         </motion.div>
+
+        {/* Pagination */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-2 pt-1">
+          <div className="text-xs text-muted-foreground">
+            {totalCount > 0 ? (
+              <>Mostrando <span className="font-medium text-foreground">{(page - 1) * pageSize + 1}</span>–<span className="font-medium text-foreground">{Math.min(page * pageSize, totalCount)}</span> de <span className="font-medium text-foreground">{totalCount}</span></>
+            ) : 'Nenhum contrato'}
+          </div>
+          <div className="flex items-center gap-2">
+            <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+              <SelectTrigger className="w-[110px] h-9 rounded-xl border-border/50 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="25">25 / pág.</SelectItem>
+                <SelectItem value="50">50 / pág.</SelectItem>
+                <SelectItem value="100">100 / pág.</SelectItem>
+                <SelectItem value="200">200 / pág.</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 rounded-xl"
+              disabled={page <= 1 || loading}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-xs text-muted-foreground tabular-nums px-2">
+              Página <span className="font-medium text-foreground">{page}</span> de <span className="font-medium text-foreground">{totalPages}</span>
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 rounded-xl"
+              disabled={page >= totalPages || loading}
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </div>
 
       <ContractDetailSheet
