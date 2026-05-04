@@ -1109,7 +1109,7 @@ export default function AdminDocumentos() {
                   </tr>
                 ) : (
                   <AnimatePresence initial={false}>
-                    {filteredDocs.map((doc, i) => (
+                    {paginatedDocs.map((doc, i) => (
                       <DocRow
                         key={doc.id}
                         doc={doc}
@@ -1123,6 +1123,33 @@ export default function AdminDocumentos() {
               </tbody>
             </table>
           </div>
+
+          {!loading && filteredDocs.length > PAGE_SIZE && (
+            <div className="flex items-center justify-between px-5 py-3 border-t border-border/20 flex-wrap gap-2">
+              <span className="text-[11px] text-muted-foreground">
+                Exibindo {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filteredDocs.length)} de {filteredDocs.length}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  className="h-7 px-2 text-xs rounded border border-border/40 disabled:opacity-40 hover:bg-muted/40"
+                >
+                  Anterior
+                </button>
+                <span className="text-xs px-2 text-muted-foreground">
+                  Página {safePage} de {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                  className="h-7 px-2 text-xs rounded border border-border/40 disabled:opacity-40 hover:bg-muted/40"
+                >
+                  Próximo
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Footer */}
           <div className="px-5 py-3 border-t border-border/20 flex items-center justify-between">
