@@ -158,7 +158,7 @@ async function suggestClassesWithAI(businessArea: string): Promise<{ classes: nu
       method: 'POST',
       headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'openai/gpt-5.2',
+        model: 'google/gemini-2.5-flash',
         messages: [
           { role: 'system', content: `Você é um especialista em propriedade intelectual e classificação NCL (Nice) do INPI Brasil com 20 anos de experiência.
 
@@ -409,7 +409,7 @@ async function searchINPI(brandName: string, mainClass: number): Promise<{
           method: 'POST',
           headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: 'openai/gpt-5.2',
+            model: 'google/gemini-2.5-flash',
             messages: [
               {
                 role: 'system',
@@ -484,7 +484,7 @@ NÃO invente dados. Extraia APENAS do conteúdo fornecido.`
       method: 'POST',
       headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'openai/gpt-5.2',
+        model: 'google/gemini-2.5-flash',
         messages: [
           {
             role: 'system',
@@ -554,7 +554,7 @@ async function searchCNPJ(brandName: string): Promise<{
       method: 'POST',
       headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'openai/gpt-5.2',
+        model: 'google/gemini-2.5-flash',
         messages: [
           {
             role: 'system',
@@ -698,7 +698,7 @@ ${classDescriptions.join('\n')}
       method: 'POST',
       headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'openai/gpt-5.2',
+        model: 'google/gemini-2.5-flash',
         messages: [
           {
             role: 'system',
@@ -739,7 +739,7 @@ Use separadores ━━━ entre seções. Use emojis nos títulos das seções. 
           }
         ],
         temperature: 0.3,
-        max_completion_tokens: 3000,
+        max_completion_tokens: 1800,
       }),
     });
 

@@ -29,7 +29,7 @@ function INPISearchAnimation({ brandName }: { brandName: string }) {
   ];
 
   useEffect(() => {
-    const totalDuration = 5000;
+    const totalDuration = 9000;
     const phaseInterval = totalDuration / phases.length;
     let elapsed = 0;
 
