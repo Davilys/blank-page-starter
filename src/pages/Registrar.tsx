@@ -1,9 +1,7 @@
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { CheckoutProgress } from "@/components/cliente/checkout/CheckoutProgress";
 import { ViabilityStep } from "@/components/cliente/checkout/ViabilityStep";
 import { PersonalDataStep, type PersonalData } from "@/components/cliente/checkout/PersonalDataStep";
@@ -12,34 +10,24 @@ import { PlanSelectionStep } from "@/components/cliente/checkout/PlanSelectionSt
 import { PaymentStep } from "@/components/cliente/checkout/PaymentStep";
 import { ContractStep } from "@/components/cliente/checkout/ContractStep";
 import { toast } from "sonner";
-import { Moon, Sun, Award } from "lucide-react";
-import { useTheme } from "@/contexts/ThemeContext";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { Shield, Star, Lock, CheckCircle } from "lucide-react";
 import SocialProofNotification from "@/components/SocialProofNotification";
 import type { ViabilityResult } from "@/lib/api/viability";
 import type { PlanType } from "@/hooks/useContractTemplate";
-import logo from "@/assets/webmarcas-logo.png";
 import WhatsAppButton from "@/components/layout/WhatsAppButton";
+import UrgencyBar from "@/components/layout/UrgencyBar";
+import MinimalHeader from "@/components/registrar/MinimalHeader";
+import StickyMobileCta from "@/components/registrar/StickyMobileCta";
 
-// Dynamic text options for typing effect
-const dynamicTexts = [
-  "seja exclusivo",
-  "proteja seu negócio", 
-  "garanta seu futuro",
-  "destaque-se",
-  "cresça com segurança",
-];
+const PricingSection = lazy(() => import("@/components/sections/PricingSection"));
+const TestimonialsSection = lazy(() => import("@/components/sections/TestimonialsSection"));
+const FAQSection = lazy(() => import("@/components/sections/FAQSection"));
 
 export default function Registrar() {
   const navigate = useNavigate();
-  const { theme, toggleTheme } = useTheme();
-  const { t } = useLanguage();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Phrase animation state
-  const [phraseIndex, setPhraseIndex] = useState(0);
-  
+
   const [viabilityData, setViabilityData] = useState<{
     brandName: string;
     businessArea: string;
@@ -56,14 +44,6 @@ export default function Registrar() {
   const [suggestedClasses, setSuggestedClasses] = useState<number[]>([]);
   const [suggestedClassDescriptions, setSuggestedClassDescriptions] = useState<string[]>([]);
   const [selectedClasses, setSelectedClasses] = useState<number[]>([]);
-
-  // Phrase rotation effect
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPhraseIndex((prev) => (prev + 1) % dynamicTexts.length);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Pre-fill personal data if user is logged in and check for viability data
   useEffect(() => {
@@ -243,79 +223,46 @@ export default function Registrar() {
     <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Background decorative elements */}
       <div className="absolute inset-0 bg-hero-gradient" />
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-accent/5 rounded-full blur-3xl" />
-      <div className="absolute top-1/2 right-1/3 w-64 h-64 bg-primary/3 rounded-full blur-2xl" />
+      <div className="hidden md:block absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+      <div className="hidden md:block absolute bottom-1/4 right-1/4 w-80 h-80 bg-accent/5 rounded-full blur-3xl" />
 
       {/* Social Proof Notifications */}
       <SocialProofNotification />
 
-      {/* Header with logo and theme toggle */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            <a href="/" className="flex items-center gap-2 group">
-              <img src={logo} alt="WebMarcas" className="h-10 transition-transform group-hover:scale-105" />
-              <span className="font-display text-xl font-bold hidden sm:inline">
-                Web<span className="gradient-text">Marcas</span>
-              </span>
-            </a>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              className="w-9 h-9 rounded-lg"
-              aria-label="Alternar tema"
-            >
-              {theme === "light" ? (
-                <Moon className="w-5 h-5" />
-              ) : (
-                <Sun className="w-5 h-5" />
-              )}
-            </Button>
-          </div>
-        </div>
-      </header>
+      <UrgencyBar />
+      <MinimalHeader />
 
       {/* Main content */}
-      <main className="relative z-10 w-full max-w-2xl mx-auto px-4 pt-24 pb-8">
-        {/* Badge */}
-        <div className="flex justify-center mb-6 animate-fade-in">
-          <div className="inline-flex items-center gap-2 badge-premium">
-            <Award className="w-4 h-4" />
-            <span>{t("hero.badge")}</span>
+      <main className="relative z-10 w-full max-w-2xl mx-auto px-4 pt-20 md:pt-24 pb-28 md:pb-12">
+        {step === 1 && (
+          <div className="text-center mb-6 md:mb-8 animate-fade-in">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium mb-5"
+                 style={{ background: "rgba(15,45,110,0.08)", color: "var(--wm-primary)" }}>
+              <Shield className="w-3.5 h-3.5" />
+              <span>Plataforma oficial parceira INPI</span>
+            </div>
+            <h1 className="wm-font-display text-[2rem] sm:text-4xl md:text-5xl font-bold leading-[1.1] mb-4 text-foreground">
+              Proteja sua marca antes que <span className="wm-underline-accent wm-accent-text">alguém registre</span> primeiro
+            </h1>
+            <p className="wm-font-body text-base sm:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
+              Consulta gratuita de viabilidade no INPI + laudo técnico em minutos. 100% online, sem burocracia.
+            </p>
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs sm:text-[13px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> +5.000 marcas registradas</span>
+              <span className="inline-flex items-center gap-1"><Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" /> 4.9/5 satisfação</span>
+              <span className="inline-flex items-center gap-1"><Lock className="w-3.5 h-3.5 text-primary" /> Pagamento seguro</span>
+            </div>
+            <p className="mt-3 text-[11px] text-muted-foreground/80 italic">
+              Garantimos protocolo do pedido e prioridade — sem prometer aprovação do INPI.
+            </p>
           </div>
-        </div>
-
-        {/* Dynamic Title */}
-        <div className="text-center mb-8">
-          <h1 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold leading-tight mb-4">
-            {t("hero.title")}{" "}
-            <span className="inline-block overflow-hidden h-[1.2em] align-bottom relative">
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={phraseIndex}
-                  initial={{ y: '100%', opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: '-100%', opacity: 0 }}
-                  transition={{ duration: 0.5, ease: "easeInOut" }}
-                  className="inline-block gradient-text"
-                >
-                  {dynamicTexts[phraseIndex]}
-                </motion.span>
-              </AnimatePresence>
-            </span>
-          </h1>
-          <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-            {t("hero.subtitle")}
-          </p>
-        </div>
+        )}
 
         {/* Progress bar */}
         <CheckoutProgress currentStep={step} />
 
         {/* Form card */}
-        <Card className="shadow-xl border border-border bg-card/95 backdrop-blur-sm">
+        <Card id="wm-viability-form" className="shadow-xl border border-border bg-card/95 backdrop-blur-sm">
           <CardContent className="p-6 md:p-8">
             {step === 1 && (
               <ViabilityStep onNext={handleViabilityNext} />
@@ -408,7 +355,28 @@ export default function Registrar() {
           {" "}e{" "}
           <a href="/privacidade" className="underline hover:text-primary transition-colors">Política de Privacidade</a>.
         </p>
+
+        {step === 1 && (
+          <Suspense fallback={null}>
+            <div className="mt-16 -mx-4">
+              <PricingSection />
+              <TestimonialsSection />
+              <FAQSection />
+            </div>
+            <div className="text-center my-12">
+              <button
+                onClick={() => document.getElementById("wm-viability-form")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                className="wm-cta px-8 py-4 text-base inline-flex items-center gap-2"
+              >
+                Começar consulta gratuita →
+              </button>
+              <p className="mt-3 text-xs text-muted-foreground">Leva menos de 2 minutos · 100% gratuito</p>
+            </div>
+          </Suspense>
+        )}
       </main>
+
+      {step === 1 && <StickyMobileCta />}
 
       {/* WhatsApp Floating Button */}
       <WhatsAppButton />

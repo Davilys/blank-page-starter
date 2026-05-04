@@ -1,6 +1,7 @@
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import WhatsAppButton from "@/components/layout/WhatsAppButton";
+import UrgencyBar from "@/components/layout/UrgencyBar";
 import SocialProofNotification from "@/components/SocialProofNotification";
 import HeroSection from "@/components/sections/HeroSection";
 import BenefitsSection from "@/components/sections/BenefitsSection";
@@ -15,6 +16,7 @@ import BlogPreviewSection from "@/components/sections/BlogPreviewSection";
 const Index = () => {
   return (
     <div className="min-h-screen bg-background">
+      <UrgencyBar />
       <Header />
       <main className="mobile-compact">
         <HeroSection />
