@@ -153,6 +153,24 @@ export default function AdminContratos() {
   const [zipProgress, setZipProgress] = useState<{ current: number; total: number; label: string } | null>(null);
   const [zipImporting, setZipImporting] = useState(false);
 
+  // Pagination & server-side stats
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [totalCount, setTotalCount] = useState(0);
+  const [stats, setStats] = useState({ total: 0, signed: 0, pending: 0, totalValue: 0 });
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Debounce search input
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, signatureFilter, activeTab, dateFilter, selectedMonth, pageSize]);
+
   const handleExpirePromotions = async () => {
     if (!confirm(
       'Deseja atualizar contratos promocionais não assinados?\n\n' +
