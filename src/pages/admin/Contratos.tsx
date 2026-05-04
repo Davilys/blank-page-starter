@@ -295,29 +295,51 @@ export default function AdminContratos() {
     }
   };
 
+  // Compute date range for current dateFilter
+  const dateRange = useMemo(() => {
+    if (dateFilter === 'today') return { from: startOfDay(new Date()), to: endOfDay(new Date()) };
+    if (dateFilter === 'week') return { from: startOfWeek(new Date(), { locale: ptBR }), to: endOfWeek(new Date(), { locale: ptBR }) };
+    if (dateFilter === 'month') return { from: startOfMonth(selectedMonth), to: endOfMonth(selectedMonth) };
+    return null;
+  }, [dateFilter, selectedMonth]);
+
+  // Build a base filtered query (used both for page fetch and stat counts)
+  const buildBaseQuery = (selectExpr: string, opts?: { count?: 'exact'; head?: boolean }) => {
+    let q: any = supabase.from('contracts').select(selectExpr, opts as any);
+    if (debouncedSearch) {
+      const s = debouncedSearch.replace(/[%_]/g, ' ');
+      q = q.or(`contract_number.ilike.%${s}%,subject.ilike.%${s}%`);
+    }
+    if (signatureFilter === 'signed') q = q.eq('signature_status', 'signed');
+    else if (signatureFilter === 'not_signed') q = q.neq('signature_status', 'signed');
+    if (dateRange) {
+      q = q.gte('created_at', dateRange.from.toISOString()).lte('created_at', dateRange.to.toISOString());
+    }
+    return q;
+  };
+
   // Wait for auth session before fetching
   useEffect(() => {
     let mounted = true;
-
-    // Always listen for auth state — covers both immediate session and delayed hydration
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session && mounted) {
-        fetchContracts();
-      }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session && mounted) { fetchContracts(); fetchStats(); }
     });
-
-    // Also try immediately in case session is already available
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session && mounted) {
-        fetchContracts();
-      }
+      if (session && mounted) { fetchContracts(); fetchStats(); }
     });
 
-    // Realtime subscription — auto-refresh when contracts change
+    // Realtime — incremental updates only, no global refetch
     const realtimeSub = supabase
       .channel('contracts-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'contracts' }, () => {
-        if (mounted) fetchContracts();
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'contracts' }, (payload: any) => {
+        if (!mounted) return;
+        setContracts(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'contracts' }, () => {
+        if (mounted) { fetchStats(); if (page === 1) fetchContracts(); }
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'contracts' }, () => {
+        if (mounted) { fetchStats(); fetchContracts(); }
       })
       .subscribe();
 
@@ -326,72 +348,36 @@ export default function AdminContratos() {
       subscription.unsubscribe();
       realtimeSub.unsubscribe();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchContracts = async (retryCount = 0) => {
+  // Refetch when filters/page change
+  useEffect(() => {
+    fetchContracts();
+    fetchStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, signatureFilter, dateFilter, selectedMonth, page, pageSize]);
+
+  const fetchContracts = async () => {
     setLoading(true);
     try {
-      // Ensure session is active before querying
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        if (retryCount < 3) {
-          setTimeout(() => fetchContracts(retryCount + 1), 600);
-        } else {
-          setLoading(false);
-        }
-        return;
-      }
-
-      // Paginate to bypass Supabase's default 1000-row cap
-      const PAGE_SIZE = 1000;
-      const all: Contract[] = [];
-      let from = 0;
-      // Hard safety stop at 50k rows
-      for (let page = 0; page < 50; page++) {
-        const to = from + PAGE_SIZE - 1;
-        const { data, error } = await supabase
-          .from('contracts')
-          .select(`
-            id,
-            contract_number,
-            subject,
-            contract_value,
-            start_date,
-            end_date,
-            signature_status,
-            signature_expires_at,
-            signed_at,
-            visible_to_client,
-            user_id,
-            created_at,
-            contract_type_id,
-            description,
-            payment_method,
-            asaas_payment_id,
-            template_id,
-            document_type,
-            contract_type:contract_types(name),
-            contract_template:contract_templates(name),
-            profile:profiles(full_name, phone)
-          `)
-          .order('created_at', { ascending: false })
-          .range(from, to);
-
-        if (error) throw error;
-        const batch = (data || []) as unknown as Contract[];
-        all.push(...batch);
-        if (batch.length < PAGE_SIZE) break;
-        from += PAGE_SIZE;
-      }
-
-      // Retry if empty result on first attempt (auth hydration race)
-      if (all.length === 0 && retryCount < 2) {
-        setTimeout(() => fetchContracts(retryCount + 1), 800);
-        setLoading(false);
-        return;
-      }
-
-      setContracts(all);
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      const selectExpr = `
+        id, contract_number, subject, contract_value, start_date, end_date,
+        signature_status, signature_expires_at, signed_at, visible_to_client,
+        user_id, created_at, contract_type_id, description, payment_method,
+        asaas_payment_id, template_id, document_type,
+        contract_type:contract_types(name),
+        contract_template:contract_templates(name),
+        profile:profiles(full_name, phone)
+      `;
+      const { data, error, count } = await buildBaseQuery(selectExpr, { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(from, to);
+      if (error) throw error;
+      setContracts((data || []) as unknown as Contract[]);
+      if (typeof count === 'number') setTotalCount(count);
     } catch (error) {
       console.error('Error fetching contracts:', error);
       toast.error('Erro ao carregar contratos');
@@ -400,8 +386,37 @@ export default function AdminContratos() {
     }
   };
 
-  // Wrapper without args — safe to pass directly to onClick handlers and callbacks
-  const refreshContracts = () => fetchContracts(0);
+  const fetchStats = async () => {
+    try {
+      const [totalRes, signedRes, pendingRes, valueRes] = await Promise.all([
+        buildBaseQuery('id', { count: 'exact', head: true }),
+        (() => {
+          let q: any = supabase.from('contracts').select('id', { count: 'exact', head: true }).eq('signature_status', 'signed');
+          if (debouncedSearch) { const s = debouncedSearch.replace(/[%_]/g, ' '); q = q.or(`contract_number.ilike.%${s}%,subject.ilike.%${s}%`); }
+          if (dateRange) q = q.gte('created_at', dateRange.from.toISOString()).lte('created_at', dateRange.to.toISOString());
+          return q;
+        })(),
+        (() => {
+          let q: any = supabase.from('contracts').select('id', { count: 'exact', head: true }).neq('signature_status', 'signed');
+          if (debouncedSearch) { const s = debouncedSearch.replace(/[%_]/g, ' '); q = q.or(`contract_number.ilike.%${s}%,subject.ilike.%${s}%`); }
+          if (dateRange) q = q.gte('created_at', dateRange.from.toISOString()).lte('created_at', dateRange.to.toISOString());
+          return q;
+        })(),
+        buildBaseQuery('contract_value'),
+      ]);
+      const totalValue = ((valueRes.data as any[]) || []).reduce((s, r) => s + (Number(r.contract_value) || 0), 0);
+      setStats({
+        total: totalRes.count || 0,
+        signed: signedRes.count || 0,
+        pending: pendingRes.count || 0,
+        totalValue,
+      });
+    } catch (e) {
+      console.error('Error fetching stats:', e);
+    }
+  };
+
+  const refreshContracts = () => { fetchContracts(); fetchStats(); };
 
   const handleRevertPromotion = async (contract: Contract) => {
     // Only allow reverting contracts that are not signed and not paid
