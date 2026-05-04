@@ -637,6 +637,8 @@ export default function AdminDocumentos() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [zipProgress, setZipProgress] = useState<{ current: number; total: number; label: string } | null>(null);
   const [zipImporting, setZipImporting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 50;
 
   useEffect(() => {
     fetchAll();
@@ -713,6 +715,17 @@ export default function AdminDocumentos() {
       return matchSearch && matchClient && matchTab;
     });
   }, [documents, search, clientFilter, activeTab]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, clientFilter, activeTab]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredDocs.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedDocs = useMemo(
+    () => filteredDocs.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [filteredDocs, safePage],
+  );
 
   const getTabCount = (tab: typeof FILTER_TABS[0]) => {
     if (tab.types.length === 0) return documents.length;
