@@ -287,28 +287,25 @@ export default function Registrar() {
           </div>
         </div>
 
-        {/* Dynamic Title */}
+        {/* Title */}
         <div className="text-center mb-8">
-          <h1 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold leading-tight mb-4">
-            {t("hero.title")}{" "}
-            <span className="inline-block overflow-hidden h-[1.2em] align-bottom relative">
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={phraseIndex}
-                  initial={{ y: '100%', opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: '-100%', opacity: 0 }}
-                  transition={{ duration: 0.5, ease: "easeInOut" }}
-                  className="inline-block gradient-text"
-                >
-                  {dynamicTexts[phraseIndex]}
-                </motion.span>
-              </AnimatePresence>
-            </span>
-          </h1>
-          <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-            {t("hero.subtitle")}
-          </p>
+          <motion.h1
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="font-display text-3xl sm:text-4xl md:text-5xl font-bold leading-tight mb-4"
+          >
+            Proteja sua marca antes que{" "}
+            <span className="gradient-text">alguém registre primeiro</span>
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.15 }}
+            className="text-lg text-muted-foreground max-w-xl mx-auto"
+          >
+            Consulta de viabilidade gratuita no INPI + análise técnica em minutos. Processo 100% online conduzido por especialistas.
+          </motion.p>
         </div>
 
         {/* Progress bar */}
