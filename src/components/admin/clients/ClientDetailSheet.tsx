@@ -617,19 +617,30 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
     setUploading(true);
     let uploaded = 0;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { toast.error('Usuário não autenticado'); setUploading(false); return; }
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session?.access_token) { toast.error('Usuário não autenticado'); setUploading(false); return; }
       for (const file of fileArray) {
-        const ext = file.name.split('.').pop() || 'bin';
-        const sanitized = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 80);
-        const fileName = `clients/${client.id}/${Date.now()}_${sanitized}.${ext}`;
-        console.log('[FileUpload] Uploading:', fileName, 'size:', file.size, 'type:', file.type);
-        const { error: uploadError } = await supabase.storage.from('documents').upload(fileName, file, { upsert: false });
-        if (uploadError) { console.error('[FileUpload] Storage error:', uploadError); toast.error(`Erro upload: ${uploadError.message}`); continue; }
-        const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(fileName);
-        console.log('[FileUpload] Public URL:', publicUrl);
-        const { error: dbError } = await supabase.from('documents').insert({ user_id: client.id, name: file.name, file_url: publicUrl, document_type: 'anexo', uploaded_by: user.id, file_size: file.size, mime_type: file.type });
-        if (dbError) { console.error('[FileUpload] DB insert error:', dbError); toast.error(`Erro ao salvar registro: ${dbError.message}`); } else { uploaded++; }
+        console.log('[FileUpload] Uploading via secure function:', file.name, 'size:', file.size, 'type:', file.type);
+        const body = new FormData();
+        body.append('file', file);
+        body.append('clientId', client.id);
+
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-upload-client-document`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body,
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const message = result?.error || `Falha no upload (${response.status})`;
+          console.error('[FileUpload] Secure upload error:', result);
+          toast.error(`Erro upload: ${message}`);
+          continue;
+        }
+        uploaded++;
       }
       if (uploaded > 0) { toast.success(`${uploaded} arquivo(s) enviado(s)`); await fetchClientData(); } else { toast.warning('Nenhum arquivo foi enviado com sucesso'); }
     } catch (err: any) { console.error('[FileUpload] Unexpected error:', err); toast.error(`Erro inesperado: ${err.message}`); }
