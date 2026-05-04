@@ -611,24 +611,39 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
     console.log('[FileUpload] Called with files:', files?.length, 'client:', client?.id);
     if (!files || files.length === 0) { toast.error('Nenhum arquivo selecionado'); return; }
     if (!client) { toast.error('Cliente não carregado'); return; }
-    // Clone files array immediately to avoid FileList being cleared by input reset
     const fileArray = Array.from(files);
     console.log('[FileUpload] Cloned file array length:', fileArray.length, 'names:', fileArray.map(f => f.name));
     setUploading(true);
     let uploaded = 0;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { toast.error('Usuário não autenticado'); setUploading(false); return; }
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData.session?.user;
+      if (!user || !sessionData.session) {
+        toast.error('Sessão expirada. Faça login novamente.');
+        setUploading(false);
+        return;
+      }
       for (const file of fileArray) {
         const ext = file.name.split('.').pop() || 'bin';
         const sanitized = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 80);
-        const fileName = `clients/${client.id}/${Date.now()}_${sanitized}.${ext}`;
+        // Path begins with admin's auth.uid() to satisfy storage RLS fallback policies
+        const fileName = `${user.id}/clients/${client.id}/${Date.now()}_${sanitized}.${ext}`;
         console.log('[FileUpload] Uploading:', fileName, 'size:', file.size, 'type:', file.type);
-        const { error: uploadError } = await supabase.storage.from('documents').upload(fileName, file, { upsert: false });
+        const { error: uploadError } = await supabase.storage
+          .from('documents')
+          .upload(fileName, file, { upsert: false, contentType: file.type || 'application/octet-stream' });
         if (uploadError) { console.error('[FileUpload] Storage error:', uploadError); toast.error(`Erro upload: ${uploadError.message}`); continue; }
         const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(fileName);
         console.log('[FileUpload] Public URL:', publicUrl);
-        const { error: dbError } = await supabase.from('documents').insert({ user_id: client.id, name: file.name, file_url: publicUrl, document_type: 'anexo', uploaded_by: user.id, file_size: file.size, mime_type: file.type });
+        const { error: dbError } = await supabase.from('documents').insert({
+          user_id: client.id,
+          name: file.name,
+          file_url: publicUrl,
+          document_type: 'anexo',
+          uploaded_by: user.id,
+          file_size: file.size,
+          mime_type: file.type,
+        });
         if (dbError) { console.error('[FileUpload] DB insert error:', dbError); toast.error(`Erro ao salvar registro: ${dbError.message}`); } else { uploaded++; }
       }
       if (uploaded > 0) { toast.success(`${uploaded} arquivo(s) enviado(s)`); await fetchClientData(); } else { toast.warning('Nenhum arquivo foi enviado com sucesso'); }
@@ -637,8 +652,13 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
   };
 
   const handleDeleteDocument = async (doc: ClientDocument) => {
-    const urlParts = doc.file_url.split('/storage/v1/object/public/documents/');
-    if (urlParts[1]) await supabase.storage.from('documents').remove([urlParts[1]]);
+    // Extract storage path robustly from public URL
+    const marker = '/storage/v1/object/public/documents/';
+    const idx = doc.file_url.indexOf(marker);
+    if (idx >= 0) {
+      const path = decodeURIComponent(doc.file_url.substring(idx + marker.length).split('?')[0]);
+      await supabase.storage.from('documents').remove([path]);
+    }
     const { error } = await supabase.from('documents').delete().eq('id', doc.id);
     if (error) { toast.error('Erro ao excluir arquivo'); return; }
     toast.success('Arquivo excluído');
