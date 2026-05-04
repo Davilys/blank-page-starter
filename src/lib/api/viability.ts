@@ -56,9 +56,6 @@ export interface ViabilityResult {
 }
 
 export async function checkViability(brandName: string, businessArea: string): Promise<ViabilityResult> {
-  // Add artificial delay of 3 seconds for more realistic UX
-  await new Promise(resolve => setTimeout(resolve, 3000));
-  
   const { data, error } = await supabase.functions.invoke('inpi-viability-check', {
     body: { brandName, businessArea },
   });

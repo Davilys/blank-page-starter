@@ -1,50 +1,48 @@
-## Diagnóstico
+## Diagnóstico — quanto está demorando hoje
 
-A página `/admin/contratos` realmente **não tem paginação visual**. O `.range()` que existe no código (linha 360) só serve para contornar o limite de 1000 linhas do Supabase — ele baixa **todos os contratos** (até 50.000) em loop e renderiza **todas as linhas** ao mesmo tempo na tabela, com animações Framer Motion por linha. Isso é a causa direta da lentidão.
+Analisei os logs reais da edge function `inpi-viability-check` (consulta da marca "zarro colezione"):
 
-Confirmado:
-- `fetchContracts` faz loop `for (page = 0; page < 50)` puxando 1000 em 1000 (linhas 327-367).
-- `filteredContracts.map(...)` renderiza tudo de uma vez (linha 923).
-- Cada `<TableRow>` tem `animationDelay` calculado por índice (linha 927-931).
+```
+20:24:40  INÍCIO
+20:24:43  Classes NCL via IA (3s)        ← gpt-5.2
+20:24:45  Buscas paralelas INPI/CNPJ/Web (2s)
+20:24:47  Início do laudo via IA
+20:25:08  FIM                            ← análise final levou 21s (gpt-5.2)
+─────────────────────────────────────
+Total na edge function: ~28s
++ Delay artificial no frontend:  3s
+= Tempo total visto pelo usuário: ~31s
+```
 
-## Plano de correção
+**Gargalos identificados:**
+1. **Geração do laudo final** — `openai/gpt-5.2` com `max_completion_tokens: 3000` → 21s (75% do tempo total)
+2. **Sugestão de classes NCL** — `openai/gpt-5.2` → 3s
+3. **Delay artificial** de 3000ms em `src/lib/api/viability.ts` (linha `await new Promise(resolve => setTimeout(resolve, 3000))`)
+4. **Animação do HUD** no `ViabilityStep.tsx` configurada para 5000ms (`totalDuration = 5000`)
 
-Manter o fetch atual (já funciona e alimenta os filtros/stats no cliente), mas adicionar **paginação client-side** sobre `filteredContracts` — solução mais leve e sem risco de quebrar busca, abas, filtros de data, status cards e realtime.
+Meta: cair de ~28-31s para **≤14s** (metade), idealmente próximo dos 9s antigos.
 
-### Mudanças em `src/pages/admin/Contratos.tsx`
+## Mudanças propostas
 
-1. **Estado de paginação**
-   - `const [currentPage, setCurrentPage] = useState(1)`
-   - `const PAGE_SIZE = 50`
+### 1. `supabase/functions/inpi-viability-check/index.ts`
+- **`generateFinalAnalysis`** (linha ~697): trocar `openai/gpt-5.2` por `google/gemini-2.5-flash` (3-5x mais rápido, qualidade equivalente para laudo estruturado). Reduzir `max_completion_tokens` de 3000 → 1800 (laudo continua completo). Estimativa: 21s → ~6s.
+- **`suggestClassesWithAI`** (linha ~157): trocar `openai/gpt-5.2` por `google/gemini-2.5-flash`. Estimativa: 3s → ~1s.
+- Manter todos os prompts, validações, fallbacks e estrutura JSON exatamente como estão.
 
-2. **Slice da lista filtrada**
-   - `paginatedContracts = filteredContracts.slice((currentPage-1)*PAGE_SIZE, currentPage*PAGE_SIZE)`
-   - `totalPages = Math.ceil(filteredContracts.length / PAGE_SIZE)`
-   - Trocar `filteredContracts.map(...)` por `paginatedContracts.map(...)` apenas no render da tabela (mantém stats agregadas usando a lista completa).
+### 2. `src/lib/api/viability.ts`
+- Remover o `await new Promise(resolve => setTimeout(resolve, 3000))` artificial. A animação visual já cobre a sensação de progresso.
 
-3. **Reset automático**
-   - `useEffect(() => setCurrentPage(1), [search, signatureFilter, dateFilter, activeTab, selectedMonth])` — volta para página 1 sempre que filtros mudam.
-   - Clamp se `currentPage > totalPages` após filtro.
+### 3. `src/components/cliente/checkout/ViabilityStep.tsx`
+- Ajustar `totalDuration` de `5000` para `9000` ms (alinhado com o novo tempo real da edge function, evita a barra travar em 98% esperando).
 
-4. **UI de paginação** (rodapé da tabela)
-   - Usar componentes `Pagination`, `PaginationContent`, `PaginationItem`, `PaginationPrevious`, `PaginationNext`, `PaginationLink`, `PaginationEllipsis` já existentes em `src/components/ui/pagination.tsx`.
-   - Mostrar: "Exibindo X–Y de Z contratos" + Anterior / 1 … N / Próximo.
-   - Janela inteligente: primeira, última, atual ±2.
+## Resultado esperado
 
-5. **Performance de render**
-   - Remover o `animationDelay` por índice no `<TableRow>` (linhas 927-931). Manter só transição de hover. Com 50 linhas por página o ganho de remover o cálculo escalonado é significativo.
+| Etapa | Antes | Depois |
+|---|---|---|
+| Classes NCL (IA) | 3s | ~1s |
+| Buscas paralelas | 2s | 2s |
+| Laudo final (IA) | 21s | ~6s |
+| Delay frontend | 3s | 0s |
+| **Total** | **~29s** | **~9s** |
 
-6. **Não mexer**
-   - Mantém o loop de fetch (necessário para filtros e contadores corretos).
-   - Mantém realtime e refetch.
-   - Não altera `ContractDetailSheet`, `EditContractDialog` nem stats cards.
-
-### Resultado esperado
-- DOM cai de ~3.250 linhas para 50 por vez.
-- Renderização inicial e troca de aba/filtro ficam instantâneas.
-- Stats no topo continuam refletindo o conjunto filtrado completo.
-
-### Arquivos alterados
-- `src/pages/admin/Contratos.tsx` (única alteração)
-
-Posso implementar?
+Sem mudanças visuais, sem mudar fluxo, sem mudar conteúdo do laudo — apenas trocando o modelo de IA pelo Gemini Flash (mais rápido) e removendo o delay artificial.
