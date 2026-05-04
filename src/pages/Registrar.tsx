@@ -1,9 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { CheckoutProgress } from "@/components/cliente/checkout/CheckoutProgress";
 import { ViabilityStep } from "@/components/cliente/checkout/ViabilityStep";
 import { PersonalDataStep, type PersonalData } from "@/components/cliente/checkout/PersonalDataStep";
@@ -12,8 +10,7 @@ import { PlanSelectionStep } from "@/components/cliente/checkout/PlanSelectionSt
 import { PaymentStep } from "@/components/cliente/checkout/PaymentStep";
 import { ContractStep } from "@/components/cliente/checkout/ContractStep";
 import { toast } from "sonner";
-import { Award, Shield, Clock, Star, Lock, CheckCircle } from "lucide-react";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { Shield, Star, Lock, CheckCircle } from "lucide-react";
 import SocialProofNotification from "@/components/SocialProofNotification";
 import type { ViabilityResult } from "@/lib/api/viability";
 import type { PlanType } from "@/hooks/useContractTemplate";
@@ -26,24 +23,11 @@ const PricingSection = lazy(() => import("@/components/sections/PricingSection")
 const TestimonialsSection = lazy(() => import("@/components/sections/TestimonialsSection"));
 const FAQSection = lazy(() => import("@/components/sections/FAQSection"));
 
-// Dynamic text options for typing effect
-const dynamicTexts = [
-  "seja exclusivo",
-  "proteja seu negócio", 
-  "garanta seu futuro",
-  "destaque-se",
-  "cresça com segurança",
-];
-
 export default function Registrar() {
   const navigate = useNavigate();
-  const { t } = useLanguage();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Phrase animation state
-  const [phraseIndex, setPhraseIndex] = useState(0);
-  
+
   const [viabilityData, setViabilityData] = useState<{
     brandName: string;
     businessArea: string;
@@ -60,14 +44,6 @@ export default function Registrar() {
   const [suggestedClasses, setSuggestedClasses] = useState<number[]>([]);
   const [suggestedClassDescriptions, setSuggestedClassDescriptions] = useState<string[]>([]);
   const [selectedClasses, setSelectedClasses] = useState<number[]>([]);
-
-  // Phrase rotation effect
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPhraseIndex((prev) => (prev + 1) % dynamicTexts.length);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Pre-fill personal data if user is logged in and check for viability data
   useEffect(() => {
