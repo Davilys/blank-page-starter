@@ -445,6 +445,21 @@ export function ViabilityStep({ onNext }: ViabilityStepProps) {
         </div>
       </motion.div>
 
+      {/* CTA logo abaixo do resultado */}
+      {result.level !== 'blocked' && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}>
+          <Button
+            size="lg"
+            onClick={() => onNext(brandName, businessArea, result)}
+            className="w-full h-14 text-base font-bold rounded-xl text-white bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600 hover:from-emerald-600 hover:via-green-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/40 hover:shadow-emerald-500/60 transition-all duration-300 hover:-translate-y-0.5 ring-2 ring-emerald-400/30 hover:ring-emerald-400/60"
+          >
+            <Sparkles className="w-5 h-5 mr-2" />
+            REGISTRE AGORA SUA MARCA
+            <ArrowRight className="w-5 h-5 ml-2" />
+          </Button>
+        </motion.div>
+      )}
+
       {/* INPI Results */}
       {result.inpiData && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="rounded-xl border border-border/40 p-4">
@@ -522,8 +537,12 @@ export function ViabilityStep({ onNext }: ViabilityStepProps) {
       {/* Actions */}
       <div className="space-y-3">
         {result.level !== 'blocked' && (
-          <Button className="w-full h-14 text-base font-semibold rounded-xl shadow-[var(--shadow-button)]" size="lg" onClick={() => onNext(brandName, businessArea, result)}>
-            <Sparkles className="w-5 h-5 mr-2" />Continuar com o Registro<ArrowRight className="w-5 h-5 ml-2" />
+          <Button
+            size="lg"
+            onClick={() => onNext(brandName, businessArea, result)}
+            className="w-full h-14 text-base font-bold rounded-xl text-white bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600 hover:from-emerald-600 hover:via-green-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/40 hover:shadow-emerald-500/60 transition-all duration-300 hover:-translate-y-0.5 ring-2 ring-emerald-400/30 hover:ring-emerald-400/60"
+          >
+            <Sparkles className="w-5 h-5 mr-2" />REGISTRE AGORA SUA MARCA<ArrowRight className="w-5 h-5 ml-2" />
           </Button>
         )}
         <Button variant="outline" className="w-full h-11 rounded-xl" onClick={resetSearch}>Fazer nova consulta</Button>
