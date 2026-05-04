@@ -698,7 +698,7 @@ ${classDescriptions.join('\n')}
       method: 'POST',
       headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'openai/gpt-5.2',
+        model: 'google/gemini-2.5-flash',
         messages: [
           {
             role: 'system',
@@ -739,7 +739,7 @@ Use separadores ━━━ entre seções. Use emojis nos títulos das seções. 
           }
         ],
         temperature: 0.3,
-        max_completion_tokens: 3000,
+        max_completion_tokens: 1800,
       }),
     });
 
