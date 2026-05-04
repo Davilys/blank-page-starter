@@ -31,9 +31,9 @@ export function CheckoutProgress({ currentStep }: CheckoutProgressProps) {
         </span>
       </div>
 
-      <div className="flex items-center justify-between relative">
+      <div className="flex items-start relative">
         {/* Background connector line */}
-        <div className="absolute left-0 right-0 top-5 h-0.5 bg-border mx-[20px] z-0" />
+        <div className="absolute left-5 right-5 top-5 h-0.5 bg-border z-0" />
 
         {steps.map((s, index) => {
           const isCompleted = currentStep > s.number;
@@ -41,8 +41,14 @@ export function CheckoutProgress({ currentStep }: CheckoutProgressProps) {
           const isPending = currentStep < s.number;
 
           return (
-            <div key={s.number} className="flex items-center flex-1 z-10">
-              <div className="flex flex-col items-center group">
+            <div
+              key={s.number}
+              className={cn(
+                "flex items-start z-10",
+                index < steps.length - 1 ? "flex-1" : "flex-none"
+              )}
+            >
+              <div className="flex flex-col items-center group w-10 shrink-0">
                 <motion.div
                   initial={false}
                   animate={{
@@ -51,7 +57,7 @@ export function CheckoutProgress({ currentStep }: CheckoutProgressProps) {
                   transition={{ type: "spring", stiffness: 400, damping: 20 }}
                   className={cn(
                     "relative w-10 h-10 rounded-full flex items-center justify-center transition-all duration-500 shadow-sm",
-                    isCompleted && "bg-primary text-primary-foreground shadow-[var(--shadow-button)]",
+                    isCompleted && "bg-[hsl(85_90%_55%)] text-black shadow-[0_0_18px_hsl(85_95%_60%/0.7)] ring-2 ring-[hsl(85_95%_70%/0.6)]",
                     isCurrent && "bg-primary text-primary-foreground shadow-[var(--shadow-button)] ring-4 ring-primary/20",
                     isPending && "bg-muted text-muted-foreground"
                   )}
@@ -78,8 +84,8 @@ export function CheckoutProgress({ currentStep }: CheckoutProgressProps) {
                 </motion.div>
 
                 <span className={cn(
-                  "text-xs mt-2 hidden sm:block transition-all duration-300 whitespace-nowrap",
-                  isCompleted && "text-primary font-medium",
+                  "text-xs mt-2 hidden sm:block transition-all duration-300 whitespace-nowrap text-center",
+                  isCompleted && "text-[hsl(85_70%_40%)] font-medium",
                   isCurrent && "text-foreground font-semibold",
                   isPending && "text-muted-foreground"
                 )}>
@@ -88,10 +94,10 @@ export function CheckoutProgress({ currentStep }: CheckoutProgressProps) {
               </div>
 
               {index < steps.length - 1 && (
-                <div className="flex-1 mx-1 h-0.5 relative overflow-hidden">
+                <div className="flex-1 mt-5 h-0.5 relative overflow-hidden">
                   <div className="absolute inset-0 bg-border" />
                   <motion.div
-                    className="absolute inset-0 bg-primary origin-left"
+                    className="absolute inset-0 bg-[hsl(85_90%_55%)] origin-left shadow-[0_0_8px_hsl(85_95%_60%/0.6)]"
                     initial={false}
                     animate={{ scaleX: currentStep > s.number ? 1 : 0 }}
                     transition={{ duration: 0.5, ease: "easeInOut" }}
