@@ -1,55 +1,41 @@
-# Auditoria — /admin/contratos
+Auditoria feita em modo leitura: os contratos pendentes não foram apagados. Existem 59 contratos com `signature_status = 'not_signed'`, todos criados até 30/04/2026. O que aconteceu é que a importação do ZIP criou muitos contratos assinados em 02/05 e a tela de contratos provavelmente está trazendo só o primeiro lote padrão do Supabase, ordenado pelos mais recentes, então os pendentes antigos ficaram fora da listagem.
 
-Confirmado: **falta paginação**. A página é a principal causa da lentidão.
+Números atuais encontrados:
+- Total de contratos: 3.251
+- Pendentes ainda existentes: 59
+- Assinados: 3.192
+- Criados em 02/05/2026: 2.864
+- Criados em 02/05/2026 com marcador `[PERFEX_ID:...]`: 2.863
+- Documento criado hoje vinculado a contrato: 1
 
-## O que está acontecendo hoje (`src/pages/admin/Contratos.tsx`)
+Plano proposto para resolver sem risco de apagar contratos pendentes:
 
-1. `fetchContracts` baixa **todos os contratos** em loop de 1.000 em 1.000 (até 50.000). Hoje são 3.251 → 4 round-trips ao Supabase, sempre, no load inicial.
-2. Cada linha vem com 4 joins (`contract_types`, `contract_templates`, `profiles`, etc.).
-3. Filtros (busca, status, aba, data) rodam **no client**, sobre o array inteiro.
-4. A tabela renderiza **todas as linhas filtradas de uma vez**, cada uma com `motion` + animação escalonada e `group-hover` complexo.
-5. Realtime em `contracts` dispara `fetchContracts()` completo a cada mudança — recarrega os 3.251 de novo.
-6. Não há `LIMIT`, nem `OFFSET`, nem controle de página, nem virtualização.
+1. Corrigir a tela de contratos para os pendentes voltarem a aparecer
+   - Alterar a busca em `src/pages/admin/Contratos.tsx` para não depender do limite padrão de 1000 linhas do Supabase.
+   - Carregar os contratos em páginas/lotes ou buscar por filtros no servidor.
+   - Garantir que o filtro “Pendente” consulte corretamente todos os contratos, não apenas os primeiros carregados.
+   - Manter contadores confiáveis de Total, Assinados e Pendentes.
 
-Resultado: ~3 mil linhas no DOM + animações + refetch total a cada evento realtime. Trava em qualquer máquina.
+2. Criar proteção contra novas importações substituírem dados sem controle
+   - Alterar a importação de ZIP para mostrar uma prévia antes de executar: quantos contratos serão criados, quantos seriam atualizados/substituídos e quantos têm conflito por `contract_number`.
+   - Adicionar opção segura de importação, por exemplo:
+     - “Criar apenas novos”
+     - “Atualizar existentes somente após confirmação explícita”
+   - Melhorar o aviso atual para deixar claro que a substituição pode alterar contratos já existentes.
 
-## Plano de correção
+3. Preparar restauração seletiva para voltar a visão/data até 01/05/2026
+   - Separar os contratos importados em 02/05/2026, especialmente os 2.863 com `[PERFEX_ID:...]`.
+   - Validar dependências antes de qualquer alteração: `documents`, `contract_attachments`, `contract_comments`, `contract_notes`, `contract_tasks`, `contract_renewal_history` e logs de assinatura.
+   - Como a auditoria indicou que os pendentes continuam no banco, a primeira ação recomendada é corrigir a listagem. Se você ainda quiser “voltar” removendo a importação de 02/05, farei uma exclusão seletiva apenas dos registros importados hoje e marcados como Perfex, preservando os 59 pendentes antigos.
 
-### 1. Paginação server-side (principal)
-- Carregar **50 contratos por página** com `.range(from, to)` e `count: 'exact'` do Supabase.
-- Estado novo: `page`, `pageSize`, `totalCount`.
-- Mover filtros para a query:
-  - Busca (`contract_number`, `subject`) via `.or(...ilike...)` no servidor.
-  - `signatureFilter` via `.eq('signature_status', ...)`.
-  - Filtro de data (`today` / `week` / `month`) via `.gte` / `.lte` em `created_at`.
-  - Aba de tipo de contrato via `.ilike` em template/type quando possível; quando depender de combinação textual (ex.: "padrão + registro de marca"), aplicar como filtro adicional sobre a página atual (mantendo paginação).
-- Adicionar componente de paginação (`@/components/ui/pagination` já existe) com Anterior / 1 2 3 ... / Próxima e seletor de itens por página (25 / 50 / 100).
-- Debounce de 300ms no campo de busca antes de refazer a query.
+4. Tratar o caso do contrato criado/importado hoje sem marcador Perfex
+   - Há 1 contrato criado hoje sem `[PERFEX_ID:...]`, com número `20264514`.
+   - Antes de remover qualquer coisa, vou tratar esse item separadamente para evitar apagar um contrato legítimo criado hoje fora da importação.
 
-### 2. Stats reais (não dependentes da página atual)
-Hoje os cards "Total / Assinados / Pendentes / Valor Total" usam `filteredContracts` (array completo). Com paginação isso quebra.
-- Criar uma query leve agregada (uma única chamada) que retorne, para o conjunto filtrado:
-  - `total`, `signed_count`, `pending_count`, `sum(contract_value)`.
-- Pode ser feito com um RPC `contracts_stats(filters jsonb)` ou com 4 queries `count` em paralelo (`head: true, count: 'exact'`). Vou usar a opção das 4 queries em paralelo para evitar nova migration.
+5. Resultado esperado
+   - Os 59 contratos pendentes voltam a aparecer normalmente na área administrativa.
+   - A importação de 02/05 deixa de “esconder” contratos antigos na tela.
+   - Novas importações ZIP não substituem contratos existentes sem uma etapa clara de prévia/confirmação.
+   - Se aprovado como parte da restauração, os contratos importados em 02/05 podem ser removidos seletivamente, voltando a base operacional à visão anterior a 01/05/2026 sem afetar os pendentes preservados.
 
-### 3. Realtime sem refetch total
-- Em vez de `fetchContracts()` no evento realtime, apenas:
-  - se for `INSERT` ou `DELETE`: refazer só a contagem + a página atual.
-  - se for `UPDATE` de um contrato visível na página: atualizar aquela linha localmente via `setContracts(prev => prev.map(...))`.
-- Eliminar o "tempestade" de refetch completo.
-
-### 4. Reduzir custo de render
-- Tirar a animação escalonada por linha (`animationDelay: index * 0.03`) — com 50 linhas continua suave, mas o custo principal era com milhares.
-- Manter `motion` só no container, não em cada `<tr>`.
-
-### 5. Export ZIP continua puxando tudo
-O botão "Exportar ZIP" precisa de todos mesmo. Mantém como está (já faz fetch próprio com `select('*')`), só deixar claro no tooltip que pode demorar.
-
-## Arquivos alterados
-- `src/pages/admin/Contratos.tsx` — paginação, filtros server-side, stats em paralelo, realtime incremental, remoção da animação por linha.
-
-## Resultado esperado
-- Load inicial: 1 query de 50 linhas + 4 counts pequenos em paralelo. Página abre praticamente instantânea mesmo com 10 mil contratos.
-- Busca/filtro/aba: 1 query rápida por mudança (com debounce).
-- Realtime: sem refetch global.
-- DOM: no máximo ~50 linhas, sem travas de rolagem.
+Observação importante: reverter código pelo histórico do Lovable não restaura automaticamente dados já alterados no Supabase. Para os dados, o caminho seguro é a restauração seletiva descrita acima ou, se você tiver backup/PITR habilitado no Supabase, uma restauração nativa do banco para um ponto no tempo.
