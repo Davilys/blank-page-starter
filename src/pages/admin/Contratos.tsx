@@ -25,6 +25,15 @@ import { motion } from 'framer-motion';
 import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
 import { EyeOff } from 'lucide-react';
 import { exportContractsZip, importContractsZip, downloadBlob } from '@/lib/zipExportImport';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from '@/components/ui/pagination';
 
 interface Contract {
   id: string;
@@ -152,6 +161,8 @@ export default function AdminContratos() {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [zipProgress, setZipProgress] = useState<{ current: number; total: number; label: string } | null>(null);
   const [zipImporting, setZipImporting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 50;
 
   const handleExpirePromotions = async () => {
     if (!confirm(
@@ -561,6 +572,34 @@ export default function AdminContratos() {
   });
 
   const { canViewFinancialValues, isLoading: finLoading } = useCanViewFinancialValues();
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, signatureFilter, dateFilter, activeTab, selectedMonth]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredContracts.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedContracts = filteredContracts.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE
+  );
+  const rangeStart = filteredContracts.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(safePage * PAGE_SIZE, filteredContracts.length);
+
+  const getPageNumbers = (): (number | 'ellipsis')[] => {
+    const pages: (number | 'ellipsis')[] = [];
+    const window = 2;
+    const add = (n: number) => { if (!pages.includes(n)) pages.push(n); };
+    add(1);
+    if (safePage - window > 2) pages.push('ellipsis');
+    for (let i = Math.max(2, safePage - window); i <= Math.min(totalPages - 1, safePage + window); i++) {
+      add(i);
+    }
+    if (safePage + window < totalPages - 1) pages.push('ellipsis');
+    if (totalPages > 1) add(totalPages);
+    return pages;
+  };
   const totalValue = filteredContracts.reduce((sum, c) => sum + (c.contract_value || 0), 0);
   const signedCount = filteredContracts.filter(c => c.signature_status === 'signed').length;
   const pendingCount = filteredContracts.filter(c => c.signature_status !== 'signed').length;
