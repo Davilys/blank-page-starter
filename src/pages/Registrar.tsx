@@ -12,7 +12,7 @@ import { PlanSelectionStep } from "@/components/cliente/checkout/PlanSelectionSt
 import { PaymentStep } from "@/components/cliente/checkout/PaymentStep";
 import { ContractStep } from "@/components/cliente/checkout/ContractStep";
 import { toast } from "sonner";
-import { Moon, Sun, Award } from "lucide-react";
+import { Moon, Sun, Award, Users, Zap, ShieldCheck, BadgeCheck } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import SocialProofNotification from "@/components/SocialProofNotification";
@@ -399,6 +399,31 @@ export default function Registrar() {
         </Card>
 
         {/* Footer text */}
+        {/* Trust badges row */}
+        <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { icon: Users, label: "+11.000 marcas" },
+            { icon: Zap, label: "Protocolo em 48h" },
+            { icon: ShieldCheck, label: "Certificado Blockchain" },
+            { icon: BadgeCheck, label: "INPI Oficial" },
+          ].map((item, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.1 + i * 0.08 }}
+              className="flex items-center gap-2.5 px-3 py-3 rounded-xl bg-card/95 border border-border shadow-sm hover:shadow-md hover:border-primary/40 transition-all"
+            >
+              <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary shrink-0">
+                <item.icon className="w-4 h-4" />
+              </div>
+              <span className="text-xs sm:text-sm font-semibold text-foreground leading-tight">
+                {item.label}
+              </span>
+            </motion.div>
+          ))}
+        </div>
+
         <p className="text-center text-xs text-muted-foreground mt-6">
           Ao continuar, você concorda com nossos{" "}
           <a href="/termos" className="underline hover:text-primary transition-colors">Termos de Uso</a>
