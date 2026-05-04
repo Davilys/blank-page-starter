@@ -1089,6 +1089,49 @@ export default function AdminContratos() {
             </TableBody>
           </Table>
         </motion.div>
+
+        {filteredContracts.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 px-2">
+            <p className="text-xs text-muted-foreground">
+              Exibindo <span className="font-medium text-foreground">{rangeStart}</span>–<span className="font-medium text-foreground">{rangeEnd}</span> de <span className="font-medium text-foreground">{filteredContracts.length}</span> contratos
+            </p>
+            {totalPages > 1 && (
+              <Pagination className="mx-0 w-auto justify-end">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(e) => { e.preventDefault(); if (safePage > 1) setCurrentPage(safePage - 1); }}
+                      className={safePage === 1 ? 'pointer-events-none opacity-50' : ''}
+                    />
+                  </PaginationItem>
+                  {getPageNumbers().map((p, idx) => (
+                    <PaginationItem key={`${p}-${idx}`}>
+                      {p === 'ellipsis' ? (
+                        <PaginationEllipsis />
+                      ) : (
+                        <PaginationLink
+                          href="#"
+                          isActive={p === safePage}
+                          onClick={(e) => { e.preventDefault(); setCurrentPage(p); }}
+                        >
+                          {p}
+                        </PaginationLink>
+                      )}
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => { e.preventDefault(); if (safePage < totalPages) setCurrentPage(safePage + 1); }}
+                      className={safePage === totalPages ? 'pointer-events-none opacity-50' : ''}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            )}
+          </div>
+        )}
       </div>
 
       <ContractDetailSheet
