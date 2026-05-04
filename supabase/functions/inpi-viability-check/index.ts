@@ -409,7 +409,7 @@ async function searchINPI(brandName: string, mainClass: number): Promise<{
           method: 'POST',
           headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: 'openai/gpt-5.2',
+            model: 'google/gemini-2.5-flash',
             messages: [
               {
                 role: 'system',
@@ -484,7 +484,7 @@ NÃO invente dados. Extraia APENAS do conteúdo fornecido.`
       method: 'POST',
       headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'openai/gpt-5.2',
+        model: 'google/gemini-2.5-flash',
         messages: [
           {
             role: 'system',
@@ -554,7 +554,7 @@ async function searchCNPJ(brandName: string): Promise<{
       method: 'POST',
       headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'openai/gpt-5.2',
+        model: 'google/gemini-2.5-flash',
         messages: [
           {
             role: 'system',
