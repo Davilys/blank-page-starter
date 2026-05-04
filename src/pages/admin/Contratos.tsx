@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -10,10 +10,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   Search, Plus, RefreshCw, FileSignature, MoreHorizontal, 
   Eye, Trash2, Download, Send, Filter, CheckCircle, XCircle, Loader2, Timer, Edit,
-  TrendingUp, DollarSign, FileText, PenTool, RotateCcw, Archive, Upload
+  TrendingUp, DollarSign, FileText, PenTool, RotateCcw, Archive, Upload, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { format, isToday, isThisWeek, isThisMonth } from 'date-fns';
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ContractDetailSheet } from '@/components/admin/contracts/ContractDetailSheet';
 import { CreateContractDialog } from '@/components/admin/contracts/CreateContractDialog';
@@ -153,6 +153,24 @@ export default function AdminContratos() {
   const [zipProgress, setZipProgress] = useState<{ current: number; total: number; label: string } | null>(null);
   const [zipImporting, setZipImporting] = useState(false);
 
+  // Pagination & server-side stats
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [totalCount, setTotalCount] = useState(0);
+  const [stats, setStats] = useState({ total: 0, signed: 0, pending: 0, totalValue: 0 });
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Debounce search input
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, signatureFilter, activeTab, dateFilter, selectedMonth, pageSize]);
+
   const handleExpirePromotions = async () => {
     if (!confirm(
       'Deseja atualizar contratos promocionais não assinados?\n\n' +
@@ -277,29 +295,51 @@ export default function AdminContratos() {
     }
   };
 
+  // Compute date range for current dateFilter
+  const dateRange = useMemo(() => {
+    if (dateFilter === 'today') return { from: startOfDay(new Date()), to: endOfDay(new Date()) };
+    if (dateFilter === 'week') return { from: startOfWeek(new Date(), { locale: ptBR }), to: endOfWeek(new Date(), { locale: ptBR }) };
+    if (dateFilter === 'month') return { from: startOfMonth(selectedMonth), to: endOfMonth(selectedMonth) };
+    return null;
+  }, [dateFilter, selectedMonth]);
+
+  // Build a base filtered query (used both for page fetch and stat counts)
+  const buildBaseQuery = (selectExpr: string, opts?: { count?: 'exact'; head?: boolean }) => {
+    let q: any = supabase.from('contracts').select(selectExpr, opts as any);
+    if (debouncedSearch) {
+      const s = debouncedSearch.replace(/[%_]/g, ' ');
+      q = q.or(`contract_number.ilike.%${s}%,subject.ilike.%${s}%`);
+    }
+    if (signatureFilter === 'signed') q = q.eq('signature_status', 'signed');
+    else if (signatureFilter === 'not_signed') q = q.neq('signature_status', 'signed');
+    if (dateRange) {
+      q = q.gte('created_at', dateRange.from.toISOString()).lte('created_at', dateRange.to.toISOString());
+    }
+    return q;
+  };
+
   // Wait for auth session before fetching
   useEffect(() => {
     let mounted = true;
-
-    // Always listen for auth state — covers both immediate session and delayed hydration
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session && mounted) {
-        fetchContracts();
-      }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session && mounted) { fetchContracts(); fetchStats(); }
     });
-
-    // Also try immediately in case session is already available
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session && mounted) {
-        fetchContracts();
-      }
+      if (session && mounted) { fetchContracts(); fetchStats(); }
     });
 
-    // Realtime subscription — auto-refresh when contracts change
+    // Realtime — incremental updates only, no global refetch
     const realtimeSub = supabase
       .channel('contracts-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'contracts' }, () => {
-        if (mounted) fetchContracts();
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'contracts' }, (payload: any) => {
+        if (!mounted) return;
+        setContracts(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'contracts' }, () => {
+        if (mounted) { fetchStats(); if (page === 1) fetchContracts(); }
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'contracts' }, () => {
+        if (mounted) { fetchStats(); fetchContracts(); }
       })
       .subscribe();
 
@@ -308,72 +348,36 @@ export default function AdminContratos() {
       subscription.unsubscribe();
       realtimeSub.unsubscribe();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchContracts = async (retryCount = 0) => {
+  // Refetch when filters/page change
+  useEffect(() => {
+    fetchContracts();
+    fetchStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, signatureFilter, dateFilter, selectedMonth, page, pageSize]);
+
+  const fetchContracts = async () => {
     setLoading(true);
     try {
-      // Ensure session is active before querying
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        if (retryCount < 3) {
-          setTimeout(() => fetchContracts(retryCount + 1), 600);
-        } else {
-          setLoading(false);
-        }
-        return;
-      }
-
-      // Paginate to bypass Supabase's default 1000-row cap
-      const PAGE_SIZE = 1000;
-      const all: Contract[] = [];
-      let from = 0;
-      // Hard safety stop at 50k rows
-      for (let page = 0; page < 50; page++) {
-        const to = from + PAGE_SIZE - 1;
-        const { data, error } = await supabase
-          .from('contracts')
-          .select(`
-            id,
-            contract_number,
-            subject,
-            contract_value,
-            start_date,
-            end_date,
-            signature_status,
-            signature_expires_at,
-            signed_at,
-            visible_to_client,
-            user_id,
-            created_at,
-            contract_type_id,
-            description,
-            payment_method,
-            asaas_payment_id,
-            template_id,
-            document_type,
-            contract_type:contract_types(name),
-            contract_template:contract_templates(name),
-            profile:profiles(full_name, phone)
-          `)
-          .order('created_at', { ascending: false })
-          .range(from, to);
-
-        if (error) throw error;
-        const batch = (data || []) as unknown as Contract[];
-        all.push(...batch);
-        if (batch.length < PAGE_SIZE) break;
-        from += PAGE_SIZE;
-      }
-
-      // Retry if empty result on first attempt (auth hydration race)
-      if (all.length === 0 && retryCount < 2) {
-        setTimeout(() => fetchContracts(retryCount + 1), 800);
-        setLoading(false);
-        return;
-      }
-
-      setContracts(all);
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      const selectExpr = `
+        id, contract_number, subject, contract_value, start_date, end_date,
+        signature_status, signature_expires_at, signed_at, visible_to_client,
+        user_id, created_at, contract_type_id, description, payment_method,
+        asaas_payment_id, template_id, document_type,
+        contract_type:contract_types(name),
+        contract_template:contract_templates(name),
+        profile:profiles(full_name, phone)
+      `;
+      const { data, error, count } = await buildBaseQuery(selectExpr, { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(from, to);
+      if (error) throw error;
+      setContracts((data || []) as unknown as Contract[]);
+      if (typeof count === 'number') setTotalCount(count);
     } catch (error) {
       console.error('Error fetching contracts:', error);
       toast.error('Erro ao carregar contratos');
@@ -382,8 +386,37 @@ export default function AdminContratos() {
     }
   };
 
-  // Wrapper without args — safe to pass directly to onClick handlers and callbacks
-  const refreshContracts = () => fetchContracts(0);
+  const fetchStats = async () => {
+    try {
+      const [totalRes, signedRes, pendingRes, valueRes] = await Promise.all([
+        buildBaseQuery('id', { count: 'exact', head: true }),
+        (() => {
+          let q: any = supabase.from('contracts').select('id', { count: 'exact', head: true }).eq('signature_status', 'signed');
+          if (debouncedSearch) { const s = debouncedSearch.replace(/[%_]/g, ' '); q = q.or(`contract_number.ilike.%${s}%,subject.ilike.%${s}%`); }
+          if (dateRange) q = q.gte('created_at', dateRange.from.toISOString()).lte('created_at', dateRange.to.toISOString());
+          return q;
+        })(),
+        (() => {
+          let q: any = supabase.from('contracts').select('id', { count: 'exact', head: true }).neq('signature_status', 'signed');
+          if (debouncedSearch) { const s = debouncedSearch.replace(/[%_]/g, ' '); q = q.or(`contract_number.ilike.%${s}%,subject.ilike.%${s}%`); }
+          if (dateRange) q = q.gte('created_at', dateRange.from.toISOString()).lte('created_at', dateRange.to.toISOString());
+          return q;
+        })(),
+        buildBaseQuery('contract_value'),
+      ]);
+      const totalValue = ((valueRes.data as any[]) || []).reduce((s, r) => s + (Number(r.contract_value) || 0), 0);
+      setStats({
+        total: totalRes.count || 0,
+        signed: signedRes.count || 0,
+        pending: pendingRes.count || 0,
+        totalValue,
+      });
+    } catch (e) {
+      console.error('Error fetching stats:', e);
+    }
+  };
+
+  const refreshContracts = () => { fetchContracts(); fetchStats(); };
 
   const handleRevertPromotion = async (contract: Contract) => {
     // Only allow reverting contracts that are not signed and not paid
@@ -530,42 +563,17 @@ export default function AdminContratos() {
     }
   };
 
-  const filteredContracts = contracts.filter(contract => {
-    const clientName = contract.profile?.full_name || '';
-    const matchesSearch = 
-      contract.contract_number?.toLowerCase().includes(search.toLowerCase()) ||
-      contract.subject?.toLowerCase().includes(search.toLowerCase()) ||
-      clientName.toLowerCase().includes(search.toLowerCase());
-    
-    const matchesSignature = 
-      signatureFilter === 'all' ||
-      (signatureFilter === 'signed' && contract.signature_status === 'signed') ||
-      (signatureFilter === 'not_signed' && contract.signature_status !== 'signed');
-
-    const matchesTab = getContractTabMatch(contract, activeTab);
-
-    let matchesDate = true;
-    if (dateFilter !== 'all' && contract.created_at) {
-      const contractDate = new Date(contract.created_at);
-      if (dateFilter === 'today') {
-        matchesDate = isToday(contractDate);
-      } else if (dateFilter === 'week') {
-        matchesDate = isThisWeek(contractDate, { locale: ptBR });
-      } else if (dateFilter === 'month') {
-        matchesDate = contractDate.getMonth() === selectedMonth.getMonth() && 
-                      contractDate.getFullYear() === selectedMonth.getFullYear();
-      }
-    }
-    
-    return matchesSearch && matchesSignature && matchesTab && matchesDate;
-  });
+  // Apply tab filter client-side on the current page only
+  // (tab matching depends on combined text from joined tables; keeps logic simple)
+  const visibleContracts = contracts.filter(c => getContractTabMatch(c, activeTab));
 
   const { canViewFinancialValues, isLoading: finLoading } = useCanViewFinancialValues();
-  const totalValue = filteredContracts.reduce((sum, c) => sum + (c.contract_value || 0), 0);
-  const signedCount = filteredContracts.filter(c => c.signature_status === 'signed').length;
-  const pendingCount = filteredContracts.filter(c => c.signature_status !== 'signed').length;
-  const signedPct = filteredContracts.length > 0 ? (signedCount / filteredContracts.length) * 100 : 0;
-  const pendingPct = filteredContracts.length > 0 ? (pendingCount / filteredContracts.length) * 100 : 0;
+  const totalValue = stats.totalValue;
+  const signedCount = stats.signed;
+  const pendingCount = stats.pending;
+  const signedPct = stats.total > 0 ? (signedCount / stats.total) * 100 : 0;
+  const pendingPct = stats.total > 0 ? (pendingCount / stats.total) * 100 : 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   return (
     <>
@@ -778,7 +786,7 @@ export default function AdminContratos() {
           <StatCard
             icon={FileText}
             label="Total"
-            value={filteredContracts.length}
+            value={stats.total}
             subtitle="contratos encontrados"
             color="hsl(210, 100%, 40%)"
             gradient="bg-gradient-to-br from-primary to-primary/70"
@@ -788,7 +796,7 @@ export default function AdminContratos() {
             icon={CheckCircle}
             label="Assinados"
             value={signedCount}
-            subtitle={`de ${filteredContracts.length} contratos`}
+            subtitle={`de ${stats.total} contratos`}
             color="hsl(152, 76%, 45%)"
             gradient="bg-gradient-to-br from-emerald-500 to-emerald-600"
             delay={0.2}
@@ -907,7 +915,7 @@ export default function AdminContratos() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : filteredContracts.length === 0 ? (
+              ) : visibleContracts.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={10} className="text-center py-16">
                     <div className="flex flex-col items-center gap-3">
@@ -920,15 +928,10 @@ export default function AdminContratos() {
                 </TableRow>
               ) : (
                 <>
-                  {filteredContracts.map((contract, index) => (
+                  {visibleContracts.map((contract, index) => (
                     <TableRow
                       key={contract.id}
                       className="group border-b border-border/30 hover:bg-muted/20 transition-colors duration-200"
-                      style={{
-                        animation: `fadeInRow 0.3s ease forwards`,
-                        animationDelay: `${Math.min(index * 0.03, 0.5)}s`,
-                        opacity: 0,
-                      }}
                     >
                       <TableCell className="font-mono text-xs text-muted-foreground">
                         {contract.contract_number || '-'}
@@ -1055,6 +1058,49 @@ export default function AdminContratos() {
             </TableBody>
           </Table>
         </motion.div>
+
+        {/* Pagination */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-2 pt-1">
+          <div className="text-xs text-muted-foreground">
+            {totalCount > 0 ? (
+              <>Mostrando <span className="font-medium text-foreground">{(page - 1) * pageSize + 1}</span>–<span className="font-medium text-foreground">{Math.min(page * pageSize, totalCount)}</span> de <span className="font-medium text-foreground">{totalCount}</span></>
+            ) : 'Nenhum contrato'}
+          </div>
+          <div className="flex items-center gap-2">
+            <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+              <SelectTrigger className="w-[110px] h-9 rounded-xl border-border/50 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="25">25 / pág.</SelectItem>
+                <SelectItem value="50">50 / pág.</SelectItem>
+                <SelectItem value="100">100 / pág.</SelectItem>
+                <SelectItem value="200">200 / pág.</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 rounded-xl"
+              disabled={page <= 1 || loading}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-xs text-muted-foreground tabular-nums px-2">
+              Página <span className="font-medium text-foreground">{page}</span> de <span className="font-medium text-foreground">{totalPages}</span>
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 rounded-xl"
+              disabled={page >= totalPages || loading}
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </div>
 
       <ContractDetailSheet
