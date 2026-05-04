@@ -451,7 +451,7 @@ export function ViabilityStep({ onNext }: ViabilityStepProps) {
           <Button
             size="lg"
             onClick={() => onNext(brandName, businessArea, result)}
-            className="w-full h-14 text-base font-bold rounded-xl text-white bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600 hover:from-emerald-600 hover:via-green-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/40 hover:shadow-emerald-500/60 transition-all duration-300 hover:-translate-y-0.5 ring-2 ring-emerald-400/30 hover:ring-emerald-400/60"
+            className="w-full h-14 text-base font-bold rounded-xl text-white bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600 hover:from-emerald-600 hover:via-green-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/40 hover:shadow-emerald-500/60 transition-all duration-300 hover:-translate-y-0.5 ring-2 ring-emerald-400/30 hover:ring-emerald-400/60 animate-pulse"
           >
             <Sparkles className="w-5 h-5 mr-2" />
             REGISTRE AGORA SUA MARCA
@@ -540,7 +540,7 @@ export function ViabilityStep({ onNext }: ViabilityStepProps) {
           <Button
             size="lg"
             onClick={() => onNext(brandName, businessArea, result)}
-            className="w-full h-14 text-base font-bold rounded-xl text-white bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600 hover:from-emerald-600 hover:via-green-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/40 hover:shadow-emerald-500/60 transition-all duration-300 hover:-translate-y-0.5 ring-2 ring-emerald-400/30 hover:ring-emerald-400/60"
+            className="w-full h-14 text-base font-bold rounded-xl text-white bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600 hover:from-emerald-600 hover:via-green-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/40 hover:shadow-emerald-500/60 transition-all duration-300 hover:-translate-y-0.5 ring-2 ring-emerald-400/30 hover:ring-emerald-400/60 animate-pulse"
           >
             <Sparkles className="w-5 h-5 mr-2" />REGISTRE AGORA SUA MARCA<ArrowRight className="w-5 h-5 ml-2" />
           </Button>
