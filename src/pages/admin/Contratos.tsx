@@ -786,7 +786,7 @@ export default function AdminContratos() {
           <StatCard
             icon={FileText}
             label="Total"
-            value={filteredContracts.length}
+            value={stats.total}
             subtitle="contratos encontrados"
             color="hsl(210, 100%, 40%)"
             gradient="bg-gradient-to-br from-primary to-primary/70"
@@ -796,7 +796,7 @@ export default function AdminContratos() {
             icon={CheckCircle}
             label="Assinados"
             value={signedCount}
-            subtitle={`de ${filteredContracts.length} contratos`}
+            subtitle={`de ${stats.total} contratos`}
             color="hsl(152, 76%, 45%)"
             gradient="bg-gradient-to-br from-emerald-500 to-emerald-600"
             delay={0.2}
@@ -915,7 +915,7 @@ export default function AdminContratos() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : filteredContracts.length === 0 ? (
+              ) : visibleContracts.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={10} className="text-center py-16">
                     <div className="flex flex-col items-center gap-3">
@@ -928,15 +928,10 @@ export default function AdminContratos() {
                 </TableRow>
               ) : (
                 <>
-                  {filteredContracts.map((contract, index) => (
+                  {visibleContracts.map((contract, index) => (
                     <TableRow
                       key={contract.id}
                       className="group border-b border-border/30 hover:bg-muted/20 transition-colors duration-200"
-                      style={{
-                        animation: `fadeInRow 0.3s ease forwards`,
-                        animationDelay: `${Math.min(index * 0.03, 0.5)}s`,
-                        opacity: 0,
-                      }}
                     >
                       <TableCell className="font-mono text-xs text-muted-foreground">
                         {contract.contract_number || '-'}
