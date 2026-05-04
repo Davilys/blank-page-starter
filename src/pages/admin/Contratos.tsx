@@ -959,15 +959,10 @@ export default function AdminContratos() {
                 </TableRow>
               ) : (
                 <>
-                  {filteredContracts.map((contract, index) => (
+                  {paginatedContracts.map((contract, index) => (
                     <TableRow
                       key={contract.id}
                       className="group border-b border-border/30 hover:bg-muted/20 transition-colors duration-200"
-                      style={{
-                        animation: `fadeInRow 0.3s ease forwards`,
-                        animationDelay: `${Math.min(index * 0.03, 0.5)}s`,
-                        opacity: 0,
-                      }}
                     >
                       <TableCell className="font-mono text-xs text-muted-foreground">
                         {contract.contract_number || '-'}
