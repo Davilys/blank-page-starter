@@ -13,8 +13,8 @@ const steps: Step[] = [
   { number: 2, label: "Dados Pessoais", icon: User },
   { number: 3, label: "Dados da Marca", icon: Building2 },
   { number: 4, label: "Planos", icon: Sparkles },
-  { number: 5, label: "Pagamento", icon: CreditCard },
-  { number: 6, label: "Contrato", icon: FileSignature },
+  { number: 5, label: "Contrato", icon: FileSignature },
+  { number: 6, label: "Pagamento", icon: CreditCard },
 ];
 
 interface CheckoutProgressProps {
