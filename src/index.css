@@ -389,6 +389,58 @@
     @apply py-12 md:py-20 lg:py-28;
   }
 
+  /* WebMarcas premium utilities (conversion landing) */
+  .wm-font-display { font-family: 'Sora', 'Space Grotesk', 'Inter', sans-serif; letter-spacing: -0.02em; }
+  .wm-font-body { font-family: 'DM Sans', 'Inter', sans-serif; }
+  .wm-glass {
+    background: hsla(0, 0%, 100%, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--wm-border);
+    border-radius: var(--wm-radius-xl);
+    box-shadow: var(--wm-shadow-lg);
+  }
+  .dark .wm-glass {
+    background: hsla(240, 10%, 10%, 0.6);
+    border-color: hsla(0,0%,100%,0.08);
+  }
+  .wm-cta {
+    background: var(--wm-accent);
+    color: #fff;
+    font-weight: 700;
+    border-radius: 9999px;
+    transition: all 250ms ease;
+    box-shadow: var(--wm-shadow-md);
+    min-height: 48px;
+  }
+  .wm-cta:hover {
+    background: var(--wm-accent-hover);
+    box-shadow: var(--wm-shadow-glow);
+    transform: translateY(-2px);
+  }
+  .wm-cta-ghost {
+    background: transparent;
+    border: 1.5px solid var(--wm-border);
+    color: var(--wm-text-primary);
+    font-weight: 600;
+    border-radius: 9999px;
+    min-height: 48px;
+  }
+  .dark .wm-cta-ghost { color: hsl(var(--foreground)); }
+  .wm-accent-text { color: var(--wm-accent); }
+  .wm-underline-accent {
+    background-image: linear-gradient(to right, var(--wm-accent), var(--wm-accent));
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    background-size: 100% 8px;
+    padding-bottom: 2px;
+  }
+  @keyframes wm-float {
+    0%, 100% { transform: translateY(0) rotate(-2deg); }
+    50% { transform: translateY(-8px) rotate(-2deg); }
+  }
+  .animate-wm-float { animation: wm-float 3s ease-in-out infinite; }
+
   /* Mobile compact spacing */
   .mobile-compact > section {
     @apply py-8 md:py-16 lg:py-24;
