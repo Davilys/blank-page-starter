@@ -293,10 +293,10 @@ export default function Registrar() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="font-display text-3xl sm:text-4xl md:text-5xl font-bold leading-tight mb-4"
+            className="font-display text-3xl sm:text-4xl md:text-5xl font-bold leading-tight mb-4 text-center mx-auto max-w-3xl text-balance"
           >
-            Proteja sua marca antes que{" "}
-            <span className="gradient-text">alguém registre primeiro</span>
+            <span className="block">Proteja sua marca antes que</span>
+            <span className="block gradient-text">alguém registre primeiro</span>
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 10 }}
