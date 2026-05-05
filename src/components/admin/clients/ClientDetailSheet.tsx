@@ -2708,6 +2708,103 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
 
                 {/* ─── FINANCIAL TAB ─────────────────────────────────────── */}
                 <TabsContent value="financial" className="mt-0 space-y-4">
+                  {/* ───── ASAAS PAYMENTS (TODAS as cobranças por CPF/email) ───── */}
+                  <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-semibold">Cobranças Asaas</span>
+                        {asaasCustomerIds.length > 1 && (
+                          <Badge className="text-[9px] h-4 px-1 bg-primary/15 text-primary border-primary/30 border">
+                            {asaasCustomerIds.length} contas
+                          </Badge>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost" size="sm" className="h-7 px-2"
+                        onClick={() => client && loadAsaasPayments(client.id)}
+                        disabled={loadingAsaasPayments}
+                      >
+                        {loadingAsaasPayments
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <RefreshCw className="h-3.5 w-3.5" />}
+                        <span className="text-[11px] ml-1">Atualizar</span>
+                      </Button>
+                    </div>
+
+                    {asaasTotals && (
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="rounded-lg bg-background/60 p-2">
+                          <p className="text-[10px] text-muted-foreground uppercase">Pago</p>
+                          <p className="font-bold text-sm text-emerald-500">{asaasTotals.pago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                          <p className="text-[10px] text-muted-foreground">{asaasTotals.count_pago} cobrança(s)</p>
+                        </div>
+                        <div className="rounded-lg bg-background/60 p-2">
+                          <p className="text-[10px] text-muted-foreground uppercase">Em aberto</p>
+                          <p className="font-bold text-sm text-amber-500">{asaasTotals.aberto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                          <p className="text-[10px] text-muted-foreground">{asaasTotals.count_aberto} cobrança(s)</p>
+                        </div>
+                        <div className="rounded-lg bg-background/60 p-2">
+                          <p className="text-[10px] text-muted-foreground uppercase">Vencido</p>
+                          <p className="font-bold text-sm text-red-500">{asaasTotals.vencido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                          <p className="text-[10px] text-muted-foreground">{asaasTotals.count_vencido} cobrança(s)</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {!loadingAsaasPayments && asaasCustomerIds.length === 0 && (
+                      <p className="text-[11px] text-muted-foreground italic text-center py-2">
+                        Nenhuma conta Asaas localizada para CPF/CNPJ ou email deste cliente.
+                      </p>
+                    )}
+
+                    {asaasPayments.length > 0 && (() => {
+                      const groups: Array<{ key: 'vencido'|'aberto'|'pago'; label: string; tone: string }> = [
+                        { key: 'vencido', label: 'Vencidas', tone: 'text-red-500' },
+                        { key: 'aberto', label: 'Em aberto', tone: 'text-amber-500' },
+                        { key: 'pago', label: 'Pagas', tone: 'text-emerald-500' },
+                      ];
+                      return groups.map(g => {
+                        const list = asaasPayments.filter((p: any) => p.classification === g.key);
+                        if (list.length === 0) return null;
+                        return (
+                          <div key={g.key} className="space-y-1 pt-2 border-t border-primary/10">
+                            <p className={cn('text-[11px] font-semibold uppercase tracking-wider', g.tone)}>
+                              {g.label} ({list.length})
+                            </p>
+                            {list.slice(0, 50).map((p: any) => (
+                              <div key={p.asaas_id} className="flex items-center justify-between text-xs p-2 rounded-lg bg-background/60 border border-border">
+                                <div className="min-w-0">
+                                  <p className="truncate font-medium">{p.description || `Cobrança ${p.billing_type || ''}`.trim() || 'Cobrança Asaas'}</p>
+                                  <p className="text-[10px] text-muted-foreground">
+                                    Venc.: {p.due_date ? format(new Date(p.due_date + 'T12:00:00'), 'dd/MM/yyyy') : '—'}
+                                    {p.payment_date && ` · Pago: ${format(new Date(p.payment_date + 'T12:00:00'), 'dd/MM/yyyy')}`}
+                                  </p>
+                                </div>
+                                <div className="text-right shrink-0 ml-2 flex items-center gap-2">
+                                  {p.invoice_url && (
+                                    <a href={p.invoice_url} target="_blank" rel="noreferrer" className="text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+                                      <ExternalLink className="h-3 w-3" />
+                                    </a>
+                                  )}
+                                  <div>
+                                    <p className={cn('font-bold', g.tone)}>
+                                      {Number(p.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </p>
+                                    <Badge className="text-[9px] h-4 px-1 border bg-background/60">{p.status}</Badge>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            {list.length > 50 && (
+                              <p className="text-[10px] text-muted-foreground italic text-center">+{list.length - 50} cobranças adicionais</p>
+                            )}
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+
                   {/* ───── ASAAS SYNC ───── */}
                   {(asaasOverdue.length > 0 || asaasRenegs.length > 0 || loadingAsaas) && (
                     <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
