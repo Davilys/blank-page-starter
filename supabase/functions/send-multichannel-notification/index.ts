@@ -286,9 +286,9 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const payload: NotificationPayload = await req.json();
     const { event_type, data } = payload;
-    // Normalize channels: filter out 'email' (handled separately) and ensure valid set
+    // Normalize channels: ensure valid set (crm/sms/whatsapp/email)
     const rawChannels = payload.channels || ['crm', 'sms', 'whatsapp'];
-    const channels = rawChannels.filter(c => ['crm', 'sms', 'whatsapp'].includes(c)) as Array<'crm' | 'sms' | 'whatsapp'>;
+    const channels = rawChannels.filter(c => ['crm', 'sms', 'whatsapp', 'email'].includes(c)) as Array<'crm' | 'sms' | 'whatsapp' | 'email'>;
 
     if (!event_type) {
       return new Response(JSON.stringify({ error: 'event_type é obrigatório' }), {
