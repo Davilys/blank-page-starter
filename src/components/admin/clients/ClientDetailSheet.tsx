@@ -195,6 +195,10 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
   const [appointments, setAppointments] = useState<ClientAppointment[]>([]);
   const [documents, setDocuments] = useState<ClientDocument[]>([]);
   const [invoices, setInvoices] = useState<ClientInvoice[]>([]);
+  const [asaasOverdue, setAsaasOverdue] = useState<any[]>([]);
+  const [asaasRenegs, setAsaasRenegs] = useState<any[]>([]);
+  const [asaasRenegParcelas, setAsaasRenegParcelas] = useState<any[]>([]);
+  const [loadingAsaas, setLoadingAsaas] = useState(false);
   const [profileData, setProfileData] = useState<any>(null);
   const [clientBrands, setClientBrands] = useState<any[]>([]);
   const [expandedBrandId, setExpandedBrandId] = useState<string | null>(null);
@@ -460,6 +464,38 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
       setDocuments(docsRes.data || []);
       setInvoices(invoicesRes.data || []);
       setProfileData(profileRes.data);
+      // ── Asaas: cobranças vencidas + renegociações + parcelas
+      try {
+        setLoadingAsaas(true);
+        const cpf = (profileRes.data as any)?.cpf_cnpj || (profileRes.data as any)?.cpf || (profileRes.data as any)?.cnpj || null;
+        const asaasId = (profileRes.data as any)?.asaas_customer_id || null;
+        const filters: string[] = [];
+        if (asaasId) filters.push(`asaas_customer_id.eq.${asaasId}`);
+        if (cpf) filters.push(`cliente_cpf_cnpj.eq.${cpf}`);
+        if (filters.length > 0) {
+          const orExpr = filters.join(',');
+          const [overdueRes, renegRes] = await Promise.all([
+            supabase.from('cobrancas_vencidas').select('*').or(orExpr).order('data_vencimento', { ascending: true }),
+            supabase.from('renegociacoes').select('*').or(orExpr).order('created_at', { ascending: false }),
+          ]);
+          setAsaasOverdue(overdueRes.data || []);
+          const renegs = renegRes.data || [];
+          setAsaasRenegs(renegs);
+          if (renegs.length > 0) {
+            const { data: parcelas } = await supabase
+              .from('parcelas_renegociadas')
+              .select('*')
+              .in('renegociacao_id', renegs.map((r: any) => r.id))
+              .order('numero_parcela', { ascending: true });
+            setAsaasRenegParcelas(parcelas || []);
+          } else {
+            setAsaasRenegParcelas([]);
+          }
+        } else {
+          setAsaasOverdue([]); setAsaasRenegs([]); setAsaasRenegParcelas([]);
+        }
+      } catch (e) { console.warn('asaas fetch failed', e); }
+      finally { setLoadingAsaas(false); }
       setClientBrands(brandsRes.data || (client.brands ? client.brands.map(b => ({ ...b, business_area: null, status: null, created_at: null, updated_at: null, ncl_classes: null })) : []));
       setProcessPublicacoes(pubsRes.data || []);
       if (contractRes.data && contractRes.data.length > 0) {
@@ -2650,6 +2686,106 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
 
                 {/* ─── FINANCIAL TAB ─────────────────────────────────────── */}
                 <TabsContent value="financial" className="mt-0 space-y-4">
+                  {/* ───── ASAAS SYNC ───── */}
+                  {(asaasOverdue.length > 0 || asaasRenegs.length > 0 || loadingAsaas) && (
+                    <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-amber-500" />
+                          <span className="text-sm font-semibold">Sincronização Asaas</span>
+                        </div>
+                        {loadingAsaas && <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-500" />}
+                      </div>
+
+                      {/* Resumo Asaas */}
+                      {(() => {
+                        const totalVencido = asaasOverdue.reduce((a, p) => a + Number(p.valor || 0), 0);
+                        const totalReneg = asaasRenegs.reduce((a, r) => a + Number(r.valor_renegociado || 0), 0);
+                        const parcelasAbertas = asaasRenegParcelas.filter((p: any) => !['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(p.status));
+                        const totalAbertas = parcelasAbertas.reduce((a, p) => a + Number(p.valor || 0), 0);
+                        return (
+                          <div className="grid grid-cols-3 gap-2 text-center">
+                            <div className="rounded-lg bg-background/60 p-2">
+                              <p className="text-[10px] text-muted-foreground uppercase">Vencidas (60+d)</p>
+                              <p className="font-bold text-sm text-red-500">{totalVencido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                              <p className="text-[10px] text-muted-foreground">{asaasOverdue.length} parcela(s)</p>
+                            </div>
+                            <div className="rounded-lg bg-background/60 p-2">
+                              <p className="text-[10px] text-muted-foreground uppercase">Renegociado</p>
+                              <p className="font-bold text-sm text-primary">{totalReneg.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                              <p className="text-[10px] text-muted-foreground">{asaasRenegs.length} acordo(s)</p>
+                            </div>
+                            <div className="rounded-lg bg-background/60 p-2">
+                              <p className="text-[10px] text-muted-foreground uppercase">Em aberto</p>
+                              <p className="font-bold text-sm text-amber-500">{totalAbertas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                              <p className="text-[10px] text-muted-foreground">{parcelasAbertas.length} boleto(s)</p>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Parcelas vencidas */}
+                      {asaasOverdue.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Parcelas vencidas</p>
+                          {asaasOverdue.map((p: any) => (
+                            <div key={p.id} className="flex items-center justify-between text-xs p-2 rounded-lg bg-background/60 border border-red-500/20">
+                              <div className="min-w-0">
+                                <p className="truncate font-medium">{p.descricao || 'Cobrança Asaas'}</p>
+                                <p className="text-[10px] text-muted-foreground">Venc.: {p.data_vencimento ? format(new Date(p.data_vencimento), 'dd/MM/yyyy') : '—'} · {p.dias_atraso || 0} dias</p>
+                              </div>
+                              <div className="text-right shrink-0 ml-2">
+                                <p className="font-bold text-red-500">{Number(p.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                <Badge className="text-[9px] h-4 px-1 bg-red-500/15 text-red-400 border-red-500/30 border">{p.status}</Badge>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Renegociações + parcelas em aberto */}
+                      {asaasRenegs.map((r: any) => {
+                        const parcelas = asaasRenegParcelas.filter((p: any) => p.renegociacao_id === r.id);
+                        return (
+                          <div key={r.id} className="space-y-1 pt-2 border-t border-amber-500/20">
+                            <div className="flex items-center justify-between">
+                              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                                Renegociação {format(new Date(r.created_at), 'dd/MM/yyyy')}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">
+                                Original {Number(r.valor_original_total).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} +10% = {Number(r.valor_renegociado).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              </p>
+                            </div>
+                            {parcelas.map((p: any) => {
+                              const paid = ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(p.status);
+                              return (
+                                <div key={p.id} className="flex items-center justify-between text-xs p-2 rounded-lg bg-background/60 border border-border">
+                                  <div className="min-w-0">
+                                    <p className="truncate font-medium">Parcela {p.numero_parcela}/5</p>
+                                    <p className="text-[10px] text-muted-foreground">Venc.: {format(new Date(p.data_vencimento), 'dd/MM/yyyy')}</p>
+                                  </div>
+                                  <div className="text-right shrink-0 ml-2 flex items-center gap-2">
+                                    {p.invoice_url && (
+                                      <a href={p.invoice_url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                                        <ExternalLink className="h-3 w-3" />
+                                      </a>
+                                    )}
+                                    <div>
+                                      <p className={cn('font-bold', paid ? 'text-emerald-500' : 'text-amber-500')}>
+                                        {Number(p.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                      </p>
+                                      <Badge className={cn('text-[9px] h-4 px-1 border', paid ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-amber-500/15 text-amber-400 border-amber-500/30')}>{p.status}</Badge>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   {/* Summary card */}
                   <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
                     <div className="flex items-center gap-2 mb-3">
