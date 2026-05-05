@@ -429,6 +429,7 @@ export default function AdminNotificacoes() {
   const [activeTab, setActiveTab] = useState<'history' | 'templates' | 'agendamentos' | 'relatorios'>('history');
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
+  const [channelFilter, setChannelFilter] = useState<'all' | 'crm' | 'whatsapp' | 'email'>('all');
   const [realtimePulse, setRealtimePulse] = useState(false);
 
   const [dialogOpen, setDialogOpen] = useState(false);
