@@ -119,3 +119,6 @@ verify_jwt = true
 
 [functions.asaas-debtors-api]
 verify_jwt = false
+
+[functions.find-or-create-client-from-asaas]
+verify_jwt = false

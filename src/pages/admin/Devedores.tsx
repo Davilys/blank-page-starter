@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, RefreshCw, Loader2, Zap, AlertTriangle, Users, DollarSign, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import type { ClientWithProcess } from "@/components/admin/clients/ClientKanbanBoard";
+
+const ClientDetailSheet = lazy(() =>
+  import("@/components/admin/clients/ClientDetailSheet").then((m) => ({ default: m.ClientDetailSheet }))
+);
 
 interface Debtor {
   key: string;
@@ -72,6 +77,8 @@ export default function Devedores() {
   const [selected, setSelected] = useState<Debtor | null>(null);
   const [observacao, setObservacao] = useState("");
   const [renegLoading, setRenegLoading] = useState(false);
+  const [openClient, setOpenClient] = useState<ClientWithProcess | null>(null);
+  const [loadingClient, setLoadingClient] = useState<string | null>(null);
 
   const fetchDebtors = async () => {
     setLoading(true);
@@ -139,6 +146,57 @@ export default function Devedores() {
   const totalOriginal = debtors.reduce((s, d) => s + d.total_original, 0);
   const totalComAcrescimo = debtors.reduce((s, d) => s + d.novo_total, 0);
 
+  const openClientFile = async (d: Debtor) => {
+    setLoadingClient(d.key);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      if (!token) throw new Error("Sessão expirada.");
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/find-or-create-client-from-asaas`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          asaas_customer_id: d.asaas_customer_id,
+          cliente_nome: d.cliente_nome,
+          cliente_cpf_cnpj: d.cliente_cpf_cnpj,
+          cliente_email: d.cliente_email,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      const p = json.profile;
+      const client: ClientWithProcess = {
+        id: p.id,
+        full_name: p.full_name,
+        email: p.email,
+        phone: p.phone,
+        company_name: p.company_name,
+        priority: p.priority,
+        origin: p.origin,
+        contract_value: p.contract_value,
+        process_id: null,
+        brand_name: null,
+        business_area: null,
+        pipeline_stage: null,
+        process_status: null,
+        cpf_cnpj: p.cpf_cnpj,
+        created_by: p.created_by,
+        assigned_to: p.assigned_to,
+      };
+      setOpenClient(client);
+      if (json.created) toast.success("Cliente criado automaticamente a partir dos dados do Asaas.");
+    } catch (e: any) {
+      toast.error(`Falha ao abrir ficheiro do cliente: ${e.message}`);
+    } finally {
+      setLoadingClient(null);
+    }
+  };
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -201,7 +259,17 @@ export default function Devedores() {
                   )}
                   {debtors.map((d) => (
                     <TableRow key={d.key}>
-                      <TableCell className="font-medium">{d.cliente_nome || "—"}</TableCell>
+                      <TableCell className="font-medium">
+                        <button
+                          type="button"
+                          onClick={() => openClientFile(d)}
+                          disabled={loadingClient === d.key}
+                          className="text-left hover:text-primary hover:underline transition-colors inline-flex items-center gap-2 disabled:opacity-50"
+                        >
+                          {loadingClient === d.key && <Loader2 className="h-3 w-3 animate-spin" />}
+                          {d.cliente_nome || "—"}
+                        </button>
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{d.cliente_cpf_cnpj || "—"}</TableCell>
                       <TableCell className="text-center">
                         <Badge variant="destructive">{d.qtd_parcelas}</Badge>
@@ -319,6 +387,17 @@ export default function Devedores() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {openClient && (
+        <Suspense fallback={null}>
+          <ClientDetailSheet
+            client={openClient}
+            open={!!openClient}
+            onOpenChange={(o) => !o && setOpenClient(null)}
+            onUpdate={() => { fetchDebtors(); }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
