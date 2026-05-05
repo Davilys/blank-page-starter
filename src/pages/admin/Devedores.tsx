@@ -258,17 +258,16 @@ export default function Devedores() {
                     </TableRow>
                   )}
                   {debtors.map((d) => (
-                    <TableRow key={d.key}>
+                    <TableRow
+                      key={d.key}
+                      onClick={() => openClientFile(d)}
+                      className="cursor-pointer"
+                    >
                       <TableCell className="font-medium">
-                        <button
-                          type="button"
-                          onClick={() => openClientFile(d)}
-                          disabled={loadingClient === d.key}
-                          className="text-left hover:text-primary hover:underline transition-colors inline-flex items-center gap-2 disabled:opacity-50"
-                        >
+                        <span className="inline-flex items-center gap-2 hover:text-primary hover:underline transition-colors">
                           {loadingClient === d.key && <Loader2 className="h-3 w-3 animate-spin" />}
                           {d.cliente_nome || "—"}
-                        </button>
+                        </span>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{d.cliente_cpf_cnpj || "—"}</TableCell>
                       <TableCell className="text-center">
@@ -276,7 +275,7 @@ export default function Devedores() {
                       </TableCell>
                       <TableCell className="text-right">{fmtBRL(d.total_original)}</TableCell>
                       <TableCell className="text-right font-semibold text-emerald-600">{fmtBRL(d.novo_total)}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <Button size="sm" onClick={() => setSelected(d)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
                           Renegociar
                         </Button>
@@ -308,9 +307,31 @@ export default function Devedores() {
                     <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nenhuma renegociação ainda.</TableCell></TableRow>
                   )}
                   {history.map((h) => (
-                    <TableRow key={h.id}>
+                    <TableRow
+                      key={h.id}
+                      onClick={() => openClientFile({
+                        key: h.id,
+                        cliente_nome: h.cliente_nome,
+                        cliente_cpf_cnpj: h.cliente_cpf_cnpj,
+                        cliente_email: null,
+                        asaas_customer_id: "",
+                        parcelas: [],
+                        qtd_parcelas: 0,
+                        total_original: 0,
+                        acrescimo: 0,
+                        novo_total: 0,
+                        valor_parcela: 0,
+                        datas_parcelas: [],
+                      } as Debtor)}
+                      className="cursor-pointer"
+                    >
                       <TableCell className="text-sm">{new Date(h.created_at).toLocaleDateString("pt-BR")}</TableCell>
-                      <TableCell>{h.cliente_nome || h.cliente_cpf_cnpj || "—"}</TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center gap-2 hover:text-primary hover:underline transition-colors">
+                          {loadingClient === h.id && <Loader2 className="h-3 w-3 animate-spin" />}
+                          {h.cliente_nome || h.cliente_cpf_cnpj || "—"}
+                        </span>
+                      </TableCell>
                       <TableCell className="text-right">{fmtBRL(h.valor_original_total)}</TableCell>
                       <TableCell className="text-right text-amber-600">{fmtBRL(h.valor_acrescimo)}</TableCell>
                       <TableCell className="text-right font-semibold">{fmtBRL(h.valor_renegociado)}</TableCell>
