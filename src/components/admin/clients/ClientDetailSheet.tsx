@@ -335,6 +335,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
   useEffect(() => {
     if (client && open) {
       fetchClientData();
+      loadAsaasPayments(client.id);
       setShowProcessDetails(false);
       setActiveTab('overview');
       setSelectedServiceBrandId(client.process_id || null);
