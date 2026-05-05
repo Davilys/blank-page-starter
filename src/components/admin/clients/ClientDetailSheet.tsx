@@ -555,6 +555,23 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
     finally { setLoading(false); }
   };
 
+  // ─── Asaas: lista TODAS as cobranças (pagas/abertas/vencidas) por CPF/email ──
+  const loadAsaasPayments = async (clientId: string) => {
+    try {
+      setLoadingAsaasPayments(true);
+      const { data, error } = await supabase.functions.invoke('list-asaas-payments-for-client', {
+        body: { client_id: clientId },
+      });
+      if (error) throw error;
+      setAsaasPayments((data as any)?.items || []);
+      setAsaasTotals((data as any)?.totals || null);
+      setAsaasCustomerIds((data as any)?.customer_ids || []);
+    } catch (e) {
+      console.warn('loadAsaasPayments failed', e);
+      setAsaasPayments([]); setAsaasTotals(null); setAsaasCustomerIds([]);
+    } finally { setLoadingAsaasPayments(false); }
+  };
+
   // ─── Note CRUD ────────────────────────────────────────────────────────────
   const handleAddNote = async () => {
     if (!newNote.trim() || !client) return;
