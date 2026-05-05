@@ -199,6 +199,10 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
   const [asaasRenegs, setAsaasRenegs] = useState<any[]>([]);
   const [asaasRenegParcelas, setAsaasRenegParcelas] = useState<any[]>([]);
   const [loadingAsaas, setLoadingAsaas] = useState(false);
+  const [asaasPayments, setAsaasPayments] = useState<any[]>([]);
+  const [asaasTotals, setAsaasTotals] = useState<{ pago: number; aberto: number; vencido: number; count_pago: number; count_aberto: number; count_vencido: number } | null>(null);
+  const [asaasCustomerIds, setAsaasCustomerIds] = useState<string[]>([]);
+  const [loadingAsaasPayments, setLoadingAsaasPayments] = useState(false);
   const [profileData, setProfileData] = useState<any>(null);
   const [clientBrands, setClientBrands] = useState<any[]>([]);
   const [expandedBrandId, setExpandedBrandId] = useState<string | null>(null);
