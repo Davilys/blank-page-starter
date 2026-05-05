@@ -411,6 +411,52 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
+    // ── EMAIL (via send-email + log em email_logs) ────────────────────────────
+    if (channels.includes('email')) {
+      if (!resolvedEmail) {
+        results.email = { success: false, error: 'E-mail não informado', attempts: 0, skipped: true, skip_reason: 'sem email' };
+        await logDispatch(supabase, event_type, 'email', 'failed', rawPayload,
+          undefined, undefined, resolvedUserId, 'E-mail não informado', undefined, 0);
+      } else {
+        const subject = getTitulo(event_type, safeData);
+        const htmlBody = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6">${
+          message.replace(/\n/g, '<br/>').replace(URL_REGEX, (u) => `<a href="${u}" style="color:#7c3aed;text-decoration:underline">${u}</a>`)
+        }</div>`;
+        let emailRes: { success: boolean; response?: string; error?: string } = { success: false };
+        try {
+          const { data: sendData, error: sendErr } = await supabase.functions.invoke('send-email', {
+            body: { to: [resolvedEmail], subject, body: message, html: htmlBody },
+          });
+          if (sendErr) emailRes = { success: false, error: sendErr.message };
+          else if ((sendData as any)?.error) emailRes = { success: false, error: (sendData as any).error };
+          else emailRes = { success: true, response: JSON.stringify(sendData) };
+        } catch (e) {
+          emailRes = { success: false, error: (e as Error).message };
+        }
+        results.email = { ...emailRes, attempts: 1 };
+        await logDispatch(supabase, event_type, 'email',
+          emailRes.success ? 'sent' : 'failed', rawPayload,
+          undefined, resolvedEmail, resolvedUserId,
+          emailRes.error, emailRes.response, 1);
+        // Registrar também em email_logs para aparecer na aba Enviados
+        try {
+          await supabase.from('email_logs').insert({
+            from_email: 'noreply@webmarcas.net',
+            to_email: resolvedEmail,
+            subject,
+            body: message,
+            html_body: htmlBody,
+            status: emailRes.success ? 'sent' : 'failed',
+            trigger_type: `notification:${event_type}`,
+            error_message: emailRes.error || null,
+            sent_at: new Date().toISOString(),
+          });
+        } catch (e) {
+          console.error('[email_logs] erro ao registrar:', e);
+        }
+      }
+    }
+
     console.log(`[multichannel] event=${event_type} phone=${resolvedPhone || 'N/A'}`, JSON.stringify(results));
 
     return new Response(JSON.stringify({ success: true, event_type, results }), {
