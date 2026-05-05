@@ -149,10 +149,6 @@ export default function Devedores() {
   const openClientFile = async (d: Debtor) => {
     setLoadingClient(d.key);
     try {
-      const r = await callApi("__direct__", null);
-      // placeholder, replaced below
-    } catch {}
-    try {
       const { data: sess } = await supabase.auth.getSession();
       const token = sess.session?.access_token;
       if (!token) throw new Error("Sessão expirada.");
