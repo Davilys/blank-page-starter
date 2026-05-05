@@ -7,10 +7,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, RefreshCw, Loader2, Zap, AlertTriangle, Users, DollarSign, TrendingUp } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, RefreshCw, Loader2, Zap, AlertTriangle, Users, DollarSign, TrendingUp, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ClientWithProcess } from "@/components/admin/clients/ClientKanbanBoard";
+import { DatePeriodFilter, type DateFilterType } from "@/components/admin/clients/DatePeriodFilter";
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 
 const ClientDetailSheet = lazy(() =>
   import("@/components/admin/clients/ClientDetailSheet").then((m) => ({ default: m.ClientDetailSheet }))
@@ -79,6 +82,9 @@ export default function Devedores() {
   const [renegLoading, setRenegLoading] = useState(false);
   const [openClient, setOpenClient] = useState<ClientWithProcess | null>(null);
   const [loadingClient, setLoadingClient] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dateFilter, setDateFilter] = useState<DateFilterType>("all");
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
 
   const fetchDebtors = async () => {
     setLoading(true);
@@ -141,10 +147,44 @@ export default function Devedores() {
     }
   };
 
-  const totalDevedores = debtors.length;
-  const totalParcelas = debtors.reduce((s, d) => s + d.qtd_parcelas, 0);
-  const totalOriginal = debtors.reduce((s, d) => s + d.total_original, 0);
-  const totalComAcrescimo = debtors.reduce((s, d) => s + d.novo_total, 0);
+  const getInterval = (): { start: Date; end: Date } | null => {
+    const now = new Date();
+    if (dateFilter === "today") return { start: startOfDay(now), end: endOfDay(now) };
+    if (dateFilter === "week") return { start: startOfWeek(now, { weekStartsOn: 0 }), end: endOfWeek(now, { weekStartsOn: 0 }) };
+    if (dateFilter === "month") return { start: startOfMonth(selectedMonth), end: endOfMonth(selectedMonth) };
+    return null;
+  };
+  const interval = getInterval();
+
+  const matchesSearch = (text: string | null | undefined) =>
+    !searchTerm || (text || "").toLowerCase().includes(searchTerm.toLowerCase());
+
+  const filteredDebtors = debtors.filter((d) => {
+    if (!matchesSearch(d.cliente_nome) && !matchesSearch(d.cliente_cpf_cnpj) && !matchesSearch(d.cliente_email)) return false;
+    if (interval) {
+      const has = (d.parcelas || []).some((p) => {
+        if (!p.data_vencimento) return false;
+        const dt = new Date(p.data_vencimento + "T12:00:00");
+        return isWithinInterval(dt, interval);
+      });
+      if (!has) return false;
+    }
+    return true;
+  });
+
+  const filteredHistory = history.filter((h) => {
+    if (!matchesSearch(h.cliente_nome) && !matchesSearch(h.cliente_cpf_cnpj)) return false;
+    if (interval) {
+      const dt = new Date(h.created_at);
+      if (!isWithinInterval(dt, interval)) return false;
+    }
+    return true;
+  });
+
+  const totalDevedores = filteredDebtors.length;
+  const totalParcelas = filteredDebtors.reduce((s, d) => s + d.qtd_parcelas, 0);
+  const totalOriginal = filteredDebtors.reduce((s, d) => s + d.total_original, 0);
+  const totalComAcrescimo = filteredDebtors.reduce((s, d) => s + d.novo_total, 0);
 
   const openClientFile = async (d: Debtor) => {
     setLoadingClient(d.key);
@@ -229,10 +269,30 @@ export default function Devedores() {
         <SummaryCard icon={<TrendingUp className="h-5 w-5" />} label="Total +10%" value={fmtBRL(totalComAcrescimo)} accent />
       </div>
 
+      <Card>
+        <CardContent className="p-3 flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[240px]">
+            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome, CPF/CNPJ ou e-mail..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <DatePeriodFilter
+            dateFilter={dateFilter}
+            onDateFilterChange={setDateFilter}
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
+          />
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="lista">
         <TabsList>
           <TabsTrigger value="lista">Devedores ({totalDevedores})</TabsTrigger>
-          <TabsTrigger value="historico">Histórico ({history.length})</TabsTrigger>
+          <TabsTrigger value="historico">Histórico ({filteredHistory.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="lista">
@@ -250,14 +310,14 @@ export default function Devedores() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {debtors.length === 0 && (
+                  {filteredDebtors.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                         {loading ? "Carregando..." : "Nenhum devedor com mais de 60 dias. Clique em Sincronizar para buscar no Asaas."}
                       </TableCell>
                     </TableRow>
                   )}
-                  {debtors.map((d) => (
+                  {filteredDebtors.map((d) => (
                     <TableRow
                       key={d.key}
                       onClick={() => openClientFile(d)}
@@ -303,10 +363,10 @@ export default function Devedores() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {history.length === 0 && (
+                  {filteredHistory.length === 0 && (
                     <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nenhuma renegociação ainda.</TableCell></TableRow>
                   )}
-                  {history.map((h) => (
+                  {filteredHistory.map((h) => (
                     <TableRow
                       key={h.id}
                       onClick={() => openClientFile({
