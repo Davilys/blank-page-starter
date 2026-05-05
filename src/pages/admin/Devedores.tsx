@@ -158,7 +158,7 @@ Assim você mantém seu contrato ativo e evita qualquer risco de cancelamento �
 
 Nosso objetivo é garantir que sua marca continue protegida e em andamento no INPI.
 
-Me confirma aqui se posso já liberar essa condição pra você? 👍`;
+Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
 
         const html = `
 <p>Oi <strong>${nome}</strong>! Tudo bem?</p>
@@ -167,7 +167,7 @@ Me confirma aqui se posso já liberar essa condição pra você? 👍`;
 <p>📅 Primeira parcela só dia 20, segue fatura: ${link ? `<a href="${link}" target="_blank" rel="noopener">${link}</a>` : "(link indisponível)"}</p>
 <p>Assim você mantém seu contrato ativo e evita qualquer risco de cancelamento 🚨</p>
 <p>Nosso objetivo é garantir que sua marca continue protegida e em andamento no INPI.</p>
-<p>Me confirma aqui se posso já liberar essa condição pra você? 👍</p>`;
+<p>Só para confirma aqui ja liberei essa condição pra você, combinado... 👍</p>`;
 
         const channelsToSend: Array<'whatsapp' | 'email'> = [];
         if (phone) channelsToSend.push('whatsapp');
