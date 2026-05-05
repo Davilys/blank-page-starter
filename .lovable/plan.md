@@ -1,78 +1,72 @@
 ## Objetivo
 
-Ao clicar em **Confirmar renegociação** na aba Devedores, disparar automaticamente notificação por **email** e **WhatsApp** ao cliente com a mensagem padrão e o link da **primeira fatura** gerada no Asaas.
+1. Toda notificação enviada pelo canal **E-mail** (na aba Notificações ou em qualquer chamada do `send-multichannel-notification`) deve sair do `noreply@webmarcas.net` e aparecer em **Email → Enviados**.
+2. Adicionar **botões de filtro (funil)** na aba **Histórico** da Central de Notificações, separando o que foi enviado por **WhatsApp**, **E-mail** e **Plataforma (área do cliente / CRM)**.
 
-## Mensagem padrão
+---
 
-```
-Oi {NOME_CLIENTE}! Tudo bem?
+## 1. Envio real do canal E-mail nas notificações
 
-Consegui uma condição especial pra você não perder o seu processo de registro de marca 👇
-
-✅ Parcelamos o débito {VALOR_DEBITO} em aberto com mais de {DIAS_VENCIMENTO} dias, consegui fazer em até 5x sem juros no boleto!
-📅 Primeira parcela só dia 20, segue fatura: {LINK_PRIMEIRA_FATURA}
-
-Assim você mantém seu contrato ativo e evita qualquer risco de cancelamento 🚨
-
-Nosso objetivo é garantir que sua marca continue protegida e em andamento no INPI.
-
-Me confirma aqui se posso já liberar essa condição pra você? 👍
-```
-
-## Mudanças
-
-### 1. `supabase/functions/asaas-debtors-api/index.ts` (action `renegotiate`)
-
-No retorno do bloco RENEGOTIATE incluir dados que o frontend precisa para a notificação:
-
-- `primeira_fatura_url` = `created[0]?.invoiceUrl || created[0]?.bankSlipUrl || null`
-- `valor_debito_original` = `totalOriginal`
-- `dias_vencimento_max` = maior `(hoje - data_vencimento)` em dias entre as parcelas originais
-- `cliente_email`, `cliente_telefone` lidos do profile via CPF/CNPJ ou do registro Asaas (fallback: `GET /customers/{asaas_customer_id}` para email/mobilePhone)
-- `cliente_nome`
-
-### 2. `src/pages/admin/Devedores.tsx` (`handleRenegotiate`)
-
-Após sucesso, antes do toast/refresh, chamar duas edge functions em paralelo:
-
-**WhatsApp** (`send-multichannel-notification`):
-
+### Problema atual
+Em `supabase/functions/send-multichannel-notification/index.ts` (linha 291), o canal `email` é **filtrado e ignorado**:
 ```ts
-supabase.functions.invoke('send-multichannel-notification', {
-  body: {
-    event_type: 'manual',
-    channels: ['whatsapp'],
-    recipient: { nome, phone, email },
-    custom_message: msgFormatada,  // mensagem padrão preenchida
-    data: { link: primeira_fatura_url, marca: 'sua marca' },
-  }
-});
+const channels = rawChannels.filter(c => ['crm', 'sms', 'whatsapp'].includes(c));
 ```
+Por isso, quando o admin marca "E-mail (Resend)" na Central de Notificações, nada é enviado e nada aparece em Enviados.
 
-**Email** (`send-email`): envie pelo email [neroplay@webmarcas.net](mailto:noreply@webmarcas.net)
+### Mudanças
+**`supabase/functions/send-multichannel-notification/index.ts`**
+- Incluir `'email'` na lista permitida de canais.
+- Após blocos SMS/WhatsApp, adicionar bloco `if (channels.includes('email'))`:
+  - Se faltar `resolvedEmail`: marcar skipped e logar.
+  - Caso contrário, invocar a função `send-email` com:
+    - `to: [resolvedEmail]`
+    - `subject: getTitulo(event_type, safeData)`
+    - `html`: corpo gerado a partir de `message` (texto + link clicável quando `safeData.link` existir), com `<br/>` para quebras.
+  - Registrar em `notification_dispatch_logs` (channel `email`, status sent/failed).
+  - Registrar também em `email_logs` (insert) com `from_email = 'noreply@webmarcas.net'`, `to_email`, `subject`, `body`, `html_body`, `status = 'sent'|'failed'`, `trigger_type = 'notification:'+event_type`, `sent_at = now()`. Isso é o que faz aparecer na aba **Enviados** do módulo Email (que filtra `email_logs` por `status='sent'` e `from_email`).
 
-```ts
-supabase.functions.invoke('send-email', {
-  body: {
-    to: [email],
-    subject: 'Condição especial para regularizar seu registro de marca',
-    html: msgFormatadaHtml,  // mesma mensagem com <br/> e link clicável
-  }
-});
-```
+**`supabase/functions/send-email/index.ts`**
+- Já envia a partir de `noreply@webmarcas.net` (constante `VERIFIED_FROM_EMAIL`). Sem mudança.
+- Confirmação: nenhum outro from-address é usado.
 
-Helpers locais em `Devedores.tsx`:
+### Consequência
+- Notificações por E-mail passam a ser realmente entregues.
+- Aparecem automaticamente em **Email → Enviados** filtrando pela conta `noreply@webmarcas.net` (admin pode selecioná-la no seletor de contas; se não existir, será necessário adicioná-la em `email_accounts` — incluir um insert idempotente na migração se ela ainda não estiver cadastrada).
 
-- `formatRenegMessage({ nome, valor, dias, link })` retorna texto puro (WhatsApp) e versão HTML (email).
-- `valor` formatado em BRL, `dias` inteiro.
+---
 
-### 3. Tratamento de falha
+## 2. Filtros de canal na aba Histórico (Notificações)
 
-- Se notificação falhar, exibir `toast.warning("Renegociação criada, mas falhou enviar notificação")` mantendo o sucesso da renegociação.
-- Se faltar email ou telefone, enviar apenas o canal disponível e avisar.
+### Estado atual
+`src/pages/admin/Notificacoes.tsx` lista apenas a tabela `notifications` (canal CRM). A tabela `notification_dispatch_logs` já guarda envios por canal (`crm | sms | whatsapp | email`) e já é carregada (`dispatchLogs`).
+
+### Mudanças em `src/pages/admin/Notificacoes.tsx`
+- Novo estado `channelFilter: 'all' | 'plataforma' | 'whatsapp' | 'email'` (default `'all'`).
+- Acima da lista do Histórico, adicionar uma barra de **botões de funil** com os ícones já disponíveis (`Bell` para Plataforma, `MessageSquare` para WhatsApp, `Mail` para E-mail) — visual coerente com os filtros de tipo já existentes (linha 1148).
+- Quando `channelFilter === 'all'`: comportamento atual (lista `notifications`).
+- Quando filtro específico: exibir itens de `dispatchLogs` filtrados por `channel` (`plataforma` ↔ `crm`), mostrando destinatário (`recipient_email`/`recipient_phone`), evento, status (sent/failed badge), timestamp e mensagem (do `payload`). Reaproveitar o card de notificação (componente `NotificationCard`) adaptando-o para aceitar entradas de log.
+- Atualizar contadores do header ("Histórico 200") para refletir o total filtrado.
+- Manter a busca textual existente operando também sobre logs (matching em `recipient_email`/`recipient_phone`/`event_type`).
+
+### Filtro de busca
+- Aplicar `search` também em `dispatch_logs` (nome do cliente via join com `profiles` por `recipient_user_id` — já carregado em `clients`).
+
+---
+
+## 3. Conta de e-mail "noreply@webmarcas.net" visível em Enviados
+
+- Conferir se já existe linha em `email_accounts` com `email_address = 'noreply@webmarcas.net'`. Se não, criar via migração (idempotente: `on conflict do nothing`), com `display_name = 'WebMarcas'`, `is_default = true`.
+- Sem isso, o seletor de contas em `Emails.tsx` não mostra a conta e a aba Enviados fica vazia mesmo com `email_logs` populados.
+
+---
+
+## Arquivos alterados
+- `supabase/functions/send-multichannel-notification/index.ts` — adicionar canal email + log em `email_logs`.
+- `src/pages/admin/Notificacoes.tsx` — filtros de canal (Plataforma / WhatsApp / E-mail) na aba Histórico.
+- Migração SQL: garantir conta `noreply@webmarcas.net` em `email_accounts`.
 
 ## Fora de escopo
-
-- Sem novas tabelas ou migrations.
-- Não altera `send-multichannel-notification` nem `send-email` (já suportam `custom_message` e HTML livre).
-- Não toca no histórico/UI das outras abas.
+- Não mexer em SMS, BotConversa, ou no fluxo de Devedores.
+- Não alterar templates de e-mail nem o domínio remetente.
+- Não criar nova função; tudo reaproveita `send-email` e `email_logs`.
