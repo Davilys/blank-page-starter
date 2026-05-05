@@ -169,38 +169,32 @@ Me confirma aqui se posso já liberar essa condição pra você? 👍`;
 <p>Nosso objetivo é garantir que sua marca continue protegida e em andamento no INPI.</p>
 <p>Me confirma aqui se posso já liberar essa condição pra você? 👍</p>`;
 
-        const tasks: Promise<any>[] = [];
-        if (phone) {
-          tasks.push(
-            supabase.functions.invoke("send-multichannel-notification", {
-              body: {
-                event_type: "manual",
-                channels: ["whatsapp"],
-                recipient: { nome, phone, email },
-                custom_message: msg,
-                data: { link, marca: "sua marca" },
-              },
-            })
-          );
-        }
-        if (email) {
-          tasks.push(
-            supabase.functions.invoke("send-email", {
-              body: {
-                to: [email],
-                subject: "Condição especial para regularizar seu registro de marca",
-                html,
-              },
-            })
-          );
-        }
-        if (tasks.length === 0) {
+        const channelsToSend: Array<'whatsapp' | 'email'> = [];
+        if (phone) channelsToSend.push('whatsapp');
+        if (email) channelsToSend.push('email');
+
+        if (channelsToSend.length === 0) {
           toast.warning("Renegociação criada, mas cliente sem email/telefone para notificar.");
         } else {
-          const results = await Promise.allSettled(tasks);
-          const failed = results.filter((x) => x.status === "rejected").length;
-          if (failed > 0) toast.warning(`Renegociação criada, mas ${failed} canal(is) falharam ao notificar.`);
-          else toast.success("Cliente notificado por email e WhatsApp.");
+          const { data, error } = await supabase.functions.invoke("send-multichannel-notification", {
+            body: {
+              event_type: "manual",
+              channels: channelsToSend,
+              recipient: { nome, phone, email },
+              custom_message: msg,
+              custom_html: html,
+              custom_subject: "Condição especial para regularizar seu registro de marca",
+              data: { link, marca: "sua marca" },
+            },
+          });
+          if (error) {
+            toast.warning(`Renegociação criada, mas falha ao notificar: ${error.message}`);
+          } else {
+            const results = (data as any)?.results || {};
+            const failed = Object.values(results).filter((r: any) => r && r.success === false && !r.skipped).length;
+            if (failed > 0) toast.warning(`Renegociação criada, mas ${failed} canal(is) falharam ao notificar.`);
+            else toast.success(`Cliente notificado (${channelsToSend.join(' + ')}).`);
+          }
         }
       } catch (e: any) {
         toast.warning(`Renegociação criada, mas falha ao notificar: ${e.message}`);
