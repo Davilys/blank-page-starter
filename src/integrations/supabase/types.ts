@@ -599,6 +599,54 @@ export type Database = {
           },
         ]
       }
+      cobrancas_vencidas: {
+        Row: {
+          asaas_customer_id: string | null
+          asaas_payment_id: string
+          cliente_cpf_cnpj: string | null
+          cliente_email: string | null
+          cliente_nome: string | null
+          created_at: string
+          data_vencimento: string | null
+          descricao: string | null
+          dias_atraso: number | null
+          id: string
+          status: string
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          asaas_customer_id?: string | null
+          asaas_payment_id: string
+          cliente_cpf_cnpj?: string | null
+          cliente_email?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          data_vencimento?: string | null
+          descricao?: string | null
+          dias_atraso?: number | null
+          id?: string
+          status?: string
+          updated_at?: string
+          valor?: number
+        }
+        Update: {
+          asaas_customer_id?: string | null
+          asaas_payment_id?: string
+          cliente_cpf_cnpj?: string | null
+          cliente_email?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          data_vencimento?: string | null
+          descricao?: string | null
+          dias_atraso?: number | null
+          id?: string
+          status?: string
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: []
+      }
       contract_attachments: {
         Row: {
           contract_id: string
@@ -3086,6 +3134,59 @@ export type Database = {
           },
         ]
       }
+      parcelas_renegociadas: {
+        Row: {
+          asaas_payment_id: string | null
+          created_at: string
+          data_vencimento: string
+          id: string
+          invoice_url: string | null
+          link_boleto: string | null
+          motivo_cobranca: string
+          numero_parcela: number
+          renegociacao_id: string
+          status: string
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          asaas_payment_id?: string | null
+          created_at?: string
+          data_vencimento: string
+          id?: string
+          invoice_url?: string | null
+          link_boleto?: string | null
+          motivo_cobranca: string
+          numero_parcela: number
+          renegociacao_id: string
+          status?: string
+          updated_at?: string
+          valor: number
+        }
+        Update: {
+          asaas_payment_id?: string | null
+          created_at?: string
+          data_vencimento?: string
+          id?: string
+          invoice_url?: string | null
+          link_boleto?: string | null
+          motivo_cobranca?: string
+          numero_parcela?: number
+          renegociacao_id?: string
+          status?: string
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parcelas_renegociadas_renegociacao_id_fkey"
+            columns: ["renegociacao_id"]
+            isOneToOne: false
+            referencedRelation: "renegociacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       process_events: {
         Row: {
           created_at: string | null
@@ -3373,6 +3474,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      renegociacoes: {
+        Row: {
+          asaas_customer_id: string | null
+          cliente_cpf_cnpj: string | null
+          cliente_nome: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          motivo_cobranca: string
+          observacao: string | null
+          parcelas_originais_ids: string[]
+          valor_acrescimo: number
+          valor_original_total: number
+          valor_renegociado: number
+        }
+        Insert: {
+          asaas_customer_id?: string | null
+          cliente_cpf_cnpj?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          motivo_cobranca: string
+          observacao?: string | null
+          parcelas_originais_ids?: string[]
+          valor_acrescimo: number
+          valor_original_total: number
+          valor_renegociado: number
+        }
+        Update: {
+          asaas_customer_id?: string | null
+          cliente_cpf_cnpj?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          motivo_cobranca?: string
+          observacao?: string | null
+          parcelas_originais_ids?: string[]
+          valor_acrescimo?: number
+          valor_original_total?: number
+          valor_renegociado?: number
+        }
+        Relationships: []
       }
       rpi_entries: {
         Row: {
