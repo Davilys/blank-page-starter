@@ -19,6 +19,8 @@ interface NotificationPayload {
   };
   user_id?: string;
   custom_message?: string;
+  custom_html?: string;
+  custom_subject?: string;
   data?: {
     link?: string;
     valor?: string;
@@ -418,10 +420,12 @@ const handler = async (req: Request): Promise<Response> => {
         await logDispatch(supabase, event_type, 'email', 'failed', rawPayload,
           undefined, undefined, resolvedUserId, 'E-mail não informado', undefined, 0);
       } else {
-        const subject = getTitulo(event_type, safeData);
-        const htmlBody = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6">${
-          message.replace(/\n/g, '<br/>').replace(URL_REGEX, (u) => `<a href="${u}" style="color:#7c3aed;text-decoration:underline">${u}</a>`)
-        }</div>`;
+        const subject = payload.custom_subject || getTitulo(event_type, safeData);
+        const htmlBody = payload.custom_html
+          ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6">${payload.custom_html}</div>`
+          : `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6">${
+              message.replace(/\n/g, '<br/>').replace(URL_REGEX, (u) => `<a href="${u}" style="color:#7c3aed;text-decoration:underline">${u}</a>`)
+            }</div>`;
         let emailRes: { success: boolean; response?: string; error?: string } = { success: false };
         try {
           const { data: sendData, error: sendErr } = await supabase.functions.invoke('send-email', {
