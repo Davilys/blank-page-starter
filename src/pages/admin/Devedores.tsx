@@ -136,6 +136,76 @@ export default function Devedores() {
         observacao: observacao || undefined,
       });
       toast.success(`Renegociação criada com ${r.parcelas_criadas} boleto(s) no Asaas.`);
+
+      // ── envia notificação automática (email + WhatsApp) ──
+      try {
+        const nome = (r.cliente_nome || selected.cliente_nome || "Cliente").split(" ")[0];
+        const valor = fmtBRL(r.valor_debito_original ?? selected.total_original);
+        const dias = r.dias_vencimento_max ?? 60;
+        const link = r.primeira_fatura_url || "";
+        const email = r.cliente_email || selected.cliente_email || "";
+        const phone = r.cliente_telefone || "";
+
+        const msg =
+`Oi ${nome}! Tudo bem?
+
+Consegui uma condição especial pra você não perder o seu processo de registro de marca 👇
+
+✅ Parcelamos o débito ${valor} em aberto com mais de ${dias} dias, em até 5x sem juros no boleto!
+📅 Primeira parcela só dia 20, segue fatura: ${link}
+
+Assim você mantém seu contrato ativo e evita qualquer risco de cancelamento 🚨
+
+Nosso objetivo é garantir que sua marca continue protegida e em andamento no INPI.
+
+Me confirma aqui se posso já liberar essa condição pra você? 👍`;
+
+        const html = `
+<p>Oi <strong>${nome}</strong>! Tudo bem?</p>
+<p>Consegui uma condição especial pra você não perder o seu processo de registro de marca 👇</p>
+<p>✅ Parcelamos o débito <strong>${valor}</strong> em aberto com mais de <strong>${dias} dias</strong>, em até <strong>5x sem juros</strong> no boleto!</p>
+<p>📅 Primeira parcela só dia 20, segue fatura: ${link ? `<a href="${link}" target="_blank" rel="noopener">${link}</a>` : "(link indisponível)"}</p>
+<p>Assim você mantém seu contrato ativo e evita qualquer risco de cancelamento 🚨</p>
+<p>Nosso objetivo é garantir que sua marca continue protegida e em andamento no INPI.</p>
+<p>Me confirma aqui se posso já liberar essa condição pra você? 👍</p>`;
+
+        const tasks: Promise<any>[] = [];
+        if (phone) {
+          tasks.push(
+            supabase.functions.invoke("send-multichannel-notification", {
+              body: {
+                event_type: "manual",
+                channels: ["whatsapp"],
+                recipient: { nome, phone, email },
+                custom_message: msg,
+                data: { link, marca: "sua marca" },
+              },
+            })
+          );
+        }
+        if (email) {
+          tasks.push(
+            supabase.functions.invoke("send-email", {
+              body: {
+                to: [email],
+                subject: "Condição especial para regularizar seu registro de marca",
+                html,
+              },
+            })
+          );
+        }
+        if (tasks.length === 0) {
+          toast.warning("Renegociação criada, mas cliente sem email/telefone para notificar.");
+        } else {
+          const results = await Promise.allSettled(tasks);
+          const failed = results.filter((x) => x.status === "rejected").length;
+          if (failed > 0) toast.warning(`Renegociação criada, mas ${failed} canal(is) falharam ao notificar.`);
+          else toast.success("Cliente notificado por email e WhatsApp.");
+        }
+      } catch (e: any) {
+        toast.warning(`Renegociação criada, mas falha ao notificar: ${e.message}`);
+      }
+
       setSelected(null);
       setObservacao("");
       await fetchDebtors();
