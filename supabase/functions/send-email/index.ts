@@ -41,6 +41,7 @@ async function sendWithResendApi(payload: {
 }) {
   const resendApiKey = Deno.env.get("RESEND_API_KEY");
   if (!resendApiKey) {
+    console.error("RESEND_API_KEY env var not found");
     throw new Error("Email service not configured");
   }
 
