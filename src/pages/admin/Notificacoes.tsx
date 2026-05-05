@@ -1170,6 +1170,29 @@ export default function AdminNotificacoes() {
               </div>
             </div>
 
+            {/* Funil de canal: Plataforma / WhatsApp / E-mail */}
+            <div className="flex gap-2 flex-wrap">
+              {([
+                { key: 'all',      label: 'Todos os canais', icon: Radio,          color: 'rgb(168,85,247)' },
+                { key: 'crm',      label: 'Plataforma',       icon: Bell,           color: 'rgb(168,85,247)' },
+                { key: 'whatsapp', label: 'WhatsApp',         icon: MessageSquare,  color: 'rgb(34,197,94)' },
+                { key: 'email',    label: 'E-mail',           icon: Mail,           color: 'rgb(59,130,246)' },
+              ] as const).map(c => {
+                const active = channelFilter === c.key;
+                const Icon = c.icon;
+                return (
+                  <motion.button key={c.key} whileTap={{ scale: 0.94 }}
+                    onClick={() => setChannelFilter(c.key)}
+                    className={cn('flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all whitespace-nowrap',
+                      active ? 'text-white border-transparent' : 'bg-card/50 border-border/40 text-muted-foreground hover:text-foreground')}
+                    style={active ? { background: c.color, boxShadow: `0 4px 16px ${c.color.replace('rgb','rgba').replace(')',',0.3)')}` } : {}}>
+                    <Icon className="h-3.5 w-3.5" />
+                    {c.label}
+                  </motion.button>
+                );
+              })}
+            </div>
+
             {loading ? (
               <div className="space-y-3">
                 {Array.from({ length: 5 }).map((_, i) => (
@@ -1183,7 +1206,8 @@ export default function AdminNotificacoes() {
                   </motion.div>
                 ))}
               </div>
-            ) : filteredNotifications.length === 0 ? (
+            ) : (channelFilter === 'all' || channelFilter === 'crm')
+                ? (filteredNotifications.length === 0 ? (
               <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
                 className="flex flex-col items-center justify-center py-16 gap-4">
                 <motion.div className="w-16 h-16 rounded-2xl flex items-center justify-center"
@@ -1210,6 +1234,53 @@ export default function AdminNotificacoes() {
                   />
                 ))}
               </div>
+            )) : (
+              filteredChannelLogs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-muted/30 border border-border/40">
+                    {channelFilter === 'whatsapp' ? <MessageSquare className="h-6 w-6 text-emerald-500" /> : <Mail className="h-6 w-6 text-blue-500" />}
+                  </div>
+                  <p className="text-sm text-muted-foreground">Nenhum envio por {channelFilter === 'whatsapp' ? 'WhatsApp' : 'E-mail'} encontrado</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {filteredChannelLogs.map((l, i) => {
+                    const ok = l.status === 'sent';
+                    const isWa = l.channel === 'whatsapp';
+                    const recipient = l.recipient_email || l.recipient_phone || '—';
+                    return (
+                      <motion.div key={l.id}
+                        initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
+                        className="rounded-xl border border-border/40 bg-card/40 backdrop-blur-sm p-3 flex items-start gap-3">
+                        <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center border flex-shrink-0',
+                          isWa ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-blue-500/10 border-blue-500/20')}>
+                          {isWa ? <MessageSquare className="h-4 w-4 text-emerald-500" /> : <Mail className="h-4 w-4 text-blue-500" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                            <span className="text-sm font-medium text-foreground truncate">{l.event_type}</span>
+                            <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full font-bold',
+                              ok ? 'bg-emerald-500/15 text-emerald-500' : 'bg-red-500/15 text-red-500')}>
+                              {ok ? 'Enviado' : 'Falhou'}
+                            </span>
+                            {l.attempts > 1 && (
+                              <span className="text-[10px] text-muted-foreground">{l.attempts} tentativas</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">{recipient}</p>
+                          {l.error_message && (
+                            <p className="text-[11px] text-red-500/80 mt-0.5 line-clamp-2">{l.error_message}</p>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap flex items-center gap-1">
+                          <Clock className="h-2.5 w-2.5" />
+                          {formatDistanceToNow(new Date(l.created_at), { addSuffix: true, locale: ptBR })}
+                        </span>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )
             )}
           </motion.div>
         )}
