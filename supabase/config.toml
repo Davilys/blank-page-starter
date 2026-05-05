@@ -122,3 +122,6 @@ verify_jwt = false
 
 [functions.find-or-create-client-from-asaas]
 verify_jwt = false
+
+[functions.list-asaas-payments-for-client]
+verify_jwt = false

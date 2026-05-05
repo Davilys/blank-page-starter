@@ -1,58 +1,69 @@
 ## Objetivo
 
-Na aba **Devedores**, ao clicar no nome do cliente na linha da tabela, abrir o **mesmo ClientDetailSheet** usado na aba Clientes. Se o devedor (vindo do Asaas) ainda não existir como cliente no sistema, criá-lo automaticamente antes de abrir o ficheiro.
+Hoje a aba **Financeiro** do `ClientDetailSheet` só mostra:
+- `invoices` filtradas por `user_id` (só funciona se a fatura já está atrelada ao client_id local).
+- Bloco "Asaas" (vencidas + renegociações) só quando o profile já tem `asaas_customer_id` ou `cpf_cnpj` casa em `cobrancas_vencidas`.
 
-## Comportamento
+Resultado: para a maioria dos clientes (sem vínculo Asaas direto) a aba aparece vazia.
 
-1. Nome do cliente vira link/botão clicável (cursor pointer + hover azul).
-2. Ao clicar:
-   - Tenta localizar o profile existente por: `asaas_customer_id` → `cpf_cnpj` (com e sem máscara) → `email`.
-   - Se encontrado: carrega o profile completo e abre o `ClientDetailSheet`.
-   - Se não encontrado: chama nova edge function `find-or-create-client-from-asaas` que:
-     - Busca os dados do cliente no Asaas (`/customers/{id}`) para obter nome, email, cpfCnpj, telefone, endereço.
-     - Reaproveita a lógica de `create-client-user` (dedup por cpf/email; cria auth user + profile) quando há email.
-     - Se o Asaas não tiver email, cria apenas um `profiles` (sem auth user) com um placeholder `email = "asaas-{customer_id}@webmarcas.local"` e marca `origin = "asaas-devedor"`, garantindo que o sheet abra normalmente.
-     - Sempre grava `asaas_customer_id`, `cpf_cnpj`, `full_name`, `phone`, `address`, etc.
-   - Após criar, recarrega o profile e abre o sheet.
-3. O coluna **Renegociar** continua intacta (botão à direita).
+A meta é: para **TODOS** os clientes, mostrar no financeiro do ficheiro **todas** as cobranças do Asaas (pagas, em aberto, vencidas), encontrando-as por **CPF/CNPJ** ou **email** do profile, não apenas pelo `asaas_customer_id`.
 
-## Arquivos a alterar/criar
+## Como vai funcionar
 
-- **`supabase/functions/find-or-create-client-from-asaas/index.ts`** (novo)
-  - Auth obrigatória (admin via `has_role`).
-  - Input: `{ asaas_customer_id, cpf_cnpj?, cliente_nome?, cliente_email? }`.
-  - Output: `{ profile: <linha completa de profiles>, created: boolean }`.
-- **`supabase/config.toml`** — registrar a nova função (`verify_jwt = false`, validação interna).
-- **`src/pages/admin/Devedores.tsx`**
-  - Estado `selectedClient: ClientWithProcess | null` e `loadingClient: boolean`.
-  - Função `openClientFile(d: Debtor)` que chama a edge function e monta o objeto no formato `ClientWithProcess`.
-  - Render do `ClientDetailSheet` (lazy import como em `Clientes.tsx`).
-  - Nome do cliente na tabela vira `<button>` com `onClick={() => openClientFile(d)}`.
+1. **Resolver o(s) `asaas_customer_id` do cliente** sob demanda quando ele ainda não está vinculado:
+   - Se profile já tem `asaas_customer_id` → usar.
+   - Senão, chamar nova edge function `resolve-asaas-customer` que:
+     - Busca no Asaas por `cpfCnpj` (normalizado, sem máscara).
+     - Se nada, busca por `email`.
+     - Retorna lista de `customer_id` encontrados (pode haver mais de um).
+     - Se achou apenas 1 e o profile ainda não tem vínculo, grava `asaas_customer_id` no profile.
+
+2. **Buscar TODAS as cobranças do Asaas** desse(s) customer:
+   - Nova edge function `list-asaas-payments-for-client`:
+     - Input: `{ client_id }` (admin only).
+     - Lê profile (cpf_cnpj, email, asaas_customer_id).
+     - Resolve customer_ids via passos acima.
+     - Para cada customer_id, faz `GET /payments?customer={id}&limit=100` paginado até esgotar.
+     - Normaliza cada cobrança em:
+       ```
+       { id, asaas_id, value, net_value, status, due_date, payment_date,
+         description, invoice_url, bank_slip_url, billing_type, installment }
+       ```
+     - Classifica em: `pagas` (`RECEIVED|CONFIRMED|RECEIVED_IN_CASH`), `vencidas` (`OVERDUE` ou due_date < hoje e não paga), `em_aberto` (resto: `PENDING|AWAITING_*`).
+     - Retorna `{ customer_ids, totals: { pago, aberto, vencido }, items: [...] }`.
+
+3. **Atualização do `ClientDetailSheet` (Financeiro tab)**:
+   - Novo estado: `asaasPayments`, `asaasTotals`, `loadingAsaasPayments`.
+   - Ao abrir o sheet (após `loadFullData`), chamar `supabase.functions.invoke('list-asaas-payments-for-client', { body: { client_id }})`.
+   - Renderizar 3 cards no topo do bloco Asaas: **Pago**, **Em aberto**, **Vencido** (com totais BRL e contagem).
+   - Renderizar 3 listas colapsáveis (uma por status) com: descrição, valor, vencimento, data pagamento, link "Ver fatura" (`invoice_url`).
+   - Manter o bloco existente de **Renegociações** logo abaixo (intacto).
+   - Se nenhum customer_id resolvido → exibir aviso suave: "Nenhuma cobrança Asaas encontrada para este CPF/CNPJ/email".
+
+4. **Bônus de UX**: botão "Atualizar Asaas" ao lado dos cards para re-puxar sob demanda (sem F5).
+
+## Arquivos
+
+- `supabase/functions/list-asaas-payments-for-client/index.ts` (novo)
+  - Auth obrigatória, valida admin via `has_role`.
+  - Service role para ler profile e dar update no `asaas_customer_id` quando resolver.
+  - Usa `ASAAS_API_KEY`.
+- `supabase/config.toml` — registrar a função (`verify_jwt = false`, validação interna).
+- `src/components/admin/clients/ClientDetailSheet.tsx`
+  - Novos estados, novo `loadAsaasPayments(clientId)`.
+  - Novo bloco UI no Financeiro tab (3 cards + 3 listas) acima do bloco de renegociações.
+  - Botão refresh.
 
 ## Detalhes técnicos
 
-```ts
-// montagem mínima do ClientWithProcess para o sheet
-const clientForSheet: ClientWithProcess = {
-  id: profile.id,
-  full_name: profile.full_name,
-  email: profile.email,
-  phone: profile.phone,
-  company_name: profile.company_name,
-  priority: profile.priority,
-  origin: profile.origin,
-  contract_value: profile.contract_value,
-  process_id: null, brand_name: null, business_area: null,
-  pipeline_stage: null, process_status: null,
-  cpf_cnpj: profile.cpf_cnpj,
-  created_by: profile.created_by,
-  assigned_to: profile.assigned_to,
-};
-```
-
-O `ClientDetailSheet` carrega o resto (processos, faturas, documentos, notas) sozinho a partir do `id`.
+- Normalização CPF/CNPJ: `String(v).replace(/\D/g,'')`.
+- Asaas paginação: `offset` += 100 até `hasMore=false` ou `data.length<limit`. Cap defensivo: 10 páginas (1000 cobranças) por customer.
+- Sem novas colunas/migrations no DB. Não escreve em `invoices` (evita duplicar o que o webhook já mantém).
+- Os totais são calculados no servidor para evitar inconsistência de timezone no `dueDate`.
+- Se o Asaas retornar mais de um customer para o mesmo CPF/email, agregamos cobranças de todos (e mostramos um pequeno chip "n contas Asaas").
 
 ## Fora de escopo
 
-- Não altera lógica de renegociação nem de sincronização Asaas.
-- Não cria login para o cliente automaticamente quando o Asaas não tem email (fica como cadastro sem acesso até admin completar).
+- Não altera o webhook nem cria/edita `invoices` locais.
+- Não altera a aba Devedores nem a lógica de renegociação.
+- Não cria login para clientes sem auth user.
