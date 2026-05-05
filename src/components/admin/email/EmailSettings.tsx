@@ -108,23 +108,24 @@ export function EmailSettings() {
     mutationFn: async () => {
       if (!currentUser) throw new Error('Usuário não autenticado');
       if (!form.assigned_to) throw new Error('Selecione um administrador');
-      if (!form.smtp_host || !form.smtp_user || !form.smtp_password) {
-        throw new Error('Preencha todos os campos SMTP obrigatórios');
-      }
+      if (!form.email_address) throw new Error('Informe o endereço de e-mail');
 
-      // Test SMTP connection before saving
-      const { data: testResult, error: testError } = await supabase.functions.invoke('test-smtp-connection', {
-        body: {
-          smtp_host: form.smtp_host,
-          smtp_port: form.smtp_port,
-          smtp_user: form.smtp_user,
-          smtp_password: form.smtp_password,
-        },
-      });
-
-      if (testError) throw new Error('Erro ao testar conexão: ' + testError.message);
-      if (!testResult?.success) {
-        throw new Error(testResult?.error || 'Falha na validação das credenciais SMTP');
+      // SMTP é opcional (envio é feito via Resend a partir de noreply@webmarcas.net).
+      // Só validamos a conexão SMTP se o usuário preencheu host/user/senha.
+      const hasSmtp = !!(form.smtp_host && form.smtp_user && form.smtp_password);
+      if (hasSmtp) {
+        const { data: testResult, error: testError } = await supabase.functions.invoke('test-smtp-connection', {
+          body: {
+            smtp_host: form.smtp_host,
+            smtp_port: form.smtp_port,
+            smtp_user: form.smtp_user,
+            smtp_password: form.smtp_password,
+          },
+        });
+        if (testError) throw new Error('Erro ao testar conexão: ' + testError.message);
+        if (!testResult?.success) {
+          throw new Error(testResult?.error || 'Falha na validação das credenciais SMTP');
+        }
       }
 
       const { error } = await supabase.from('email_accounts').insert({
