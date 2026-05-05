@@ -1,69 +1,78 @@
 ## Objetivo
 
-Hoje a aba **Financeiro** do `ClientDetailSheet` só mostra:
-- `invoices` filtradas por `user_id` (só funciona se a fatura já está atrelada ao client_id local).
-- Bloco "Asaas" (vencidas + renegociações) só quando o profile já tem `asaas_customer_id` ou `cpf_cnpj` casa em `cobrancas_vencidas`.
+Ao clicar em **Confirmar renegociação** na aba Devedores, disparar automaticamente notificação por **email** e **WhatsApp** ao cliente com a mensagem padrão e o link da **primeira fatura** gerada no Asaas.
 
-Resultado: para a maioria dos clientes (sem vínculo Asaas direto) a aba aparece vazia.
+## Mensagem padrão
 
-A meta é: para **TODOS** os clientes, mostrar no financeiro do ficheiro **todas** as cobranças do Asaas (pagas, em aberto, vencidas), encontrando-as por **CPF/CNPJ** ou **email** do profile, não apenas pelo `asaas_customer_id`.
+```
+Oi {NOME_CLIENTE}! Tudo bem?
 
-## Como vai funcionar
+Consegui uma condição especial pra você não perder o seu processo de registro de marca 👇
 
-1. **Resolver o(s) `asaas_customer_id` do cliente** sob demanda quando ele ainda não está vinculado:
-   - Se profile já tem `asaas_customer_id` → usar.
-   - Senão, chamar nova edge function `resolve-asaas-customer` que:
-     - Busca no Asaas por `cpfCnpj` (normalizado, sem máscara).
-     - Se nada, busca por `email`.
-     - Retorna lista de `customer_id` encontrados (pode haver mais de um).
-     - Se achou apenas 1 e o profile ainda não tem vínculo, grava `asaas_customer_id` no profile.
+✅ Parcelamos o débito {VALOR_DEBITO} em aberto com mais de {DIAS_VENCIMENTO} dias, consegui fazer em até 5x sem juros no boleto!
+📅 Primeira parcela só dia 20, segue fatura: {LINK_PRIMEIRA_FATURA}
 
-2. **Buscar TODAS as cobranças do Asaas** desse(s) customer:
-   - Nova edge function `list-asaas-payments-for-client`:
-     - Input: `{ client_id }` (admin only).
-     - Lê profile (cpf_cnpj, email, asaas_customer_id).
-     - Resolve customer_ids via passos acima.
-     - Para cada customer_id, faz `GET /payments?customer={id}&limit=100` paginado até esgotar.
-     - Normaliza cada cobrança em:
-       ```
-       { id, asaas_id, value, net_value, status, due_date, payment_date,
-         description, invoice_url, bank_slip_url, billing_type, installment }
-       ```
-     - Classifica em: `pagas` (`RECEIVED|CONFIRMED|RECEIVED_IN_CASH`), `vencidas` (`OVERDUE` ou due_date < hoje e não paga), `em_aberto` (resto: `PENDING|AWAITING_*`).
-     - Retorna `{ customer_ids, totals: { pago, aberto, vencido }, items: [...] }`.
+Assim você mantém seu contrato ativo e evita qualquer risco de cancelamento 🚨
 
-3. **Atualização do `ClientDetailSheet` (Financeiro tab)**:
-   - Novo estado: `asaasPayments`, `asaasTotals`, `loadingAsaasPayments`.
-   - Ao abrir o sheet (após `loadFullData`), chamar `supabase.functions.invoke('list-asaas-payments-for-client', { body: { client_id }})`.
-   - Renderizar 3 cards no topo do bloco Asaas: **Pago**, **Em aberto**, **Vencido** (com totais BRL e contagem).
-   - Renderizar 3 listas colapsáveis (uma por status) com: descrição, valor, vencimento, data pagamento, link "Ver fatura" (`invoice_url`).
-   - Manter o bloco existente de **Renegociações** logo abaixo (intacto).
-   - Se nenhum customer_id resolvido → exibir aviso suave: "Nenhuma cobrança Asaas encontrada para este CPF/CNPJ/email".
+Nosso objetivo é garantir que sua marca continue protegida e em andamento no INPI.
 
-4. **Bônus de UX**: botão "Atualizar Asaas" ao lado dos cards para re-puxar sob demanda (sem F5).
+Me confirma aqui se posso já liberar essa condição pra você? 👍
+```
 
-## Arquivos
+## Mudanças
 
-- `supabase/functions/list-asaas-payments-for-client/index.ts` (novo)
-  - Auth obrigatória, valida admin via `has_role`.
-  - Service role para ler profile e dar update no `asaas_customer_id` quando resolver.
-  - Usa `ASAAS_API_KEY`.
-- `supabase/config.toml` — registrar a função (`verify_jwt = false`, validação interna).
-- `src/components/admin/clients/ClientDetailSheet.tsx`
-  - Novos estados, novo `loadAsaasPayments(clientId)`.
-  - Novo bloco UI no Financeiro tab (3 cards + 3 listas) acima do bloco de renegociações.
-  - Botão refresh.
+### 1. `supabase/functions/asaas-debtors-api/index.ts` (action `renegotiate`)
 
-## Detalhes técnicos
+No retorno do bloco RENEGOTIATE incluir dados que o frontend precisa para a notificação:
 
-- Normalização CPF/CNPJ: `String(v).replace(/\D/g,'')`.
-- Asaas paginação: `offset` += 100 até `hasMore=false` ou `data.length<limit`. Cap defensivo: 10 páginas (1000 cobranças) por customer.
-- Sem novas colunas/migrations no DB. Não escreve em `invoices` (evita duplicar o que o webhook já mantém).
-- Os totais são calculados no servidor para evitar inconsistência de timezone no `dueDate`.
-- Se o Asaas retornar mais de um customer para o mesmo CPF/email, agregamos cobranças de todos (e mostramos um pequeno chip "n contas Asaas").
+- `primeira_fatura_url` = `created[0]?.invoiceUrl || created[0]?.bankSlipUrl || null`
+- `valor_debito_original` = `totalOriginal`
+- `dias_vencimento_max` = maior `(hoje - data_vencimento)` em dias entre as parcelas originais
+- `cliente_email`, `cliente_telefone` lidos do profile via CPF/CNPJ ou do registro Asaas (fallback: `GET /customers/{asaas_customer_id}` para email/mobilePhone)
+- `cliente_nome`
+
+### 2. `src/pages/admin/Devedores.tsx` (`handleRenegotiate`)
+
+Após sucesso, antes do toast/refresh, chamar duas edge functions em paralelo:
+
+**WhatsApp** (`send-multichannel-notification`):
+
+```ts
+supabase.functions.invoke('send-multichannel-notification', {
+  body: {
+    event_type: 'manual',
+    channels: ['whatsapp'],
+    recipient: { nome, phone, email },
+    custom_message: msgFormatada,  // mensagem padrão preenchida
+    data: { link: primeira_fatura_url, marca: 'sua marca' },
+  }
+});
+```
+
+**Email** (`send-email`): envie pelo email [neroplay@webmarcas.net](mailto:noreply@webmarcas.net)
+
+```ts
+supabase.functions.invoke('send-email', {
+  body: {
+    to: [email],
+    subject: 'Condição especial para regularizar seu registro de marca',
+    html: msgFormatadaHtml,  // mesma mensagem com <br/> e link clicável
+  }
+});
+```
+
+Helpers locais em `Devedores.tsx`:
+
+- `formatRenegMessage({ nome, valor, dias, link })` retorna texto puro (WhatsApp) e versão HTML (email).
+- `valor` formatado em BRL, `dias` inteiro.
+
+### 3. Tratamento de falha
+
+- Se notificação falhar, exibir `toast.warning("Renegociação criada, mas falhou enviar notificação")` mantendo o sucesso da renegociação.
+- Se faltar email ou telefone, enviar apenas o canal disponível e avisar.
 
 ## Fora de escopo
 
-- Não altera o webhook nem cria/edita `invoices` locais.
-- Não altera a aba Devedores nem a lógica de renegociação.
-- Não cria login para clientes sem auth user.
+- Sem novas tabelas ou migrations.
+- Não altera `send-multichannel-notification` nem `send-email` (já suportam `custom_message` e HTML livre).
+- Não toca no histórico/UI das outras abas.
