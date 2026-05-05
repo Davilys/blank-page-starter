@@ -1113,7 +1113,7 @@ export default function AdminNotificacoes() {
         <div className="flex gap-1 p-1 rounded-2xl border backdrop-blur-sm overflow-x-auto"
           style={{ background: 'hsl(var(--card)/0.5)', borderColor: 'hsl(var(--border)/0.4)' }}>
           {([
-            { key: 'history',      label: 'Histórico',    icon: Bell,      count: notifications.length },
+            { key: 'history',      label: 'Histórico',    icon: Bell,      count: channelFilter === 'all' || channelFilter === 'crm' ? notifications.length : filteredChannelLogs.length },
             { key: 'templates',    label: 'Templates',    icon: FileText,  count: templates.length },
             { key: 'agendamentos', label: 'Agendamentos', icon: Calendar,  count: stats.scheduled },
             { key: 'relatorios',   label: 'Relatórios',   icon: BarChart3, count: dispatchLogs.length },
