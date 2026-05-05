@@ -195,6 +195,10 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
   const [appointments, setAppointments] = useState<ClientAppointment[]>([]);
   const [documents, setDocuments] = useState<ClientDocument[]>([]);
   const [invoices, setInvoices] = useState<ClientInvoice[]>([]);
+  const [asaasOverdue, setAsaasOverdue] = useState<any[]>([]);
+  const [asaasRenegs, setAsaasRenegs] = useState<any[]>([]);
+  const [asaasRenegParcelas, setAsaasRenegParcelas] = useState<any[]>([]);
+  const [loadingAsaas, setLoadingAsaas] = useState(false);
   const [profileData, setProfileData] = useState<any>(null);
   const [clientBrands, setClientBrands] = useState<any[]>([]);
   const [expandedBrandId, setExpandedBrandId] = useState<string | null>(null);
