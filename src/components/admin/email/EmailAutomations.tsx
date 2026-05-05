@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -74,7 +76,7 @@ const CATEGORY_OPTIONS = [
   { value: 'financeiro',  label: 'Financeiro' },
 ];
 
-const MOCK_AUTOMATIONS: Automation[] = [
+const SEED_AUTOMATIONS: Automation[] = [
   {
     id: '1', name: 'Onboarding Automático',
     description: 'Sequência completa de boas-vindas após assinatura de contrato',
@@ -156,7 +158,99 @@ function makeId() { return `step_${Date.now()}_${Math.random().toString(36).slic
 
 // ── Component ───────────────────────────────────────────────────────────────
 export function EmailAutomations() {
-  const [automations, setAutomations] = useState<Automation[]>(MOCK_AUTOMATIONS);
+  const queryClient = useQueryClient();
+
+  const { data: automations = [] } = useQuery({
+    queryKey: ['email-automations'],
+    queryFn: async (): Promise<Automation[]> => {
+      const { data, error } = await (supabase as any)
+        .from('email_automations')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      const rows = (data || []) as any[];
+      if (rows.length === 0) return SEED_AUTOMATIONS;
+      return rows.map((r: any): Automation => {
+        const triggerOpt = TRIGGER_OPTIONS.find(t => t.value === r.trigger_event);
+        const triggerStep: WorkflowStep = {
+          id: `${r.id}-trigger`,
+          type: 'trigger',
+          label: `Gatilho: ${triggerOpt?.label || r.trigger_event || 'Manual'}`,
+          detail: `Evento: ${r.trigger_event || '-'}`,
+          icon: triggerOpt?.icon || Zap,
+          color: triggerOpt?.color || 'text-emerald-500',
+        };
+        const persistedSteps: WorkflowStep[] = ((r.steps as any[]) || [])
+          .filter((s: any) => s.type !== 'trigger')
+          .map((s: any, i: number) => ({
+            id: s.id || `${r.id}-s-${i}`,
+            type: (s.type || 'action') as WorkflowStep['type'],
+            label: s.label || s.detail || 'Ação',
+            detail: s.detail || '',
+            icon: s.type === 'delay' ? Clock : s.type === 'condition' ? GitBranch : Mail,
+            color: s.type === 'delay' ? 'text-amber-500' : s.type === 'condition' ? 'text-purple-500' : 'text-primary',
+          }));
+        return {
+          id: r.id,
+          name: r.name,
+          description: r.description || '',
+          isActive: !!r.is_active,
+          triggerCount: r.trigger_count || 0,
+          successRate: r.success_rate || 0,
+          category: r.category || 'onboarding',
+          steps: [triggerStep, ...persistedSteps],
+          lastTriggered: r.last_triggered_at ? new Date(r.last_triggered_at).toLocaleString('pt-BR') : undefined,
+        };
+      });
+    },
+  });
+
+  const upsertAutomation = useMutation({
+    mutationFn: async (payload: { id?: string; name: string; description: string; category: string; trigger_event: string; steps: any[]; is_active?: boolean }) => {
+      if (payload.id) {
+        const { error } = await (supabase as any).from('email_automations')
+          .update({ name: payload.name, description: payload.description, category: payload.category, trigger_event: payload.trigger_event, steps: payload.steps })
+          .eq('id', payload.id);
+        if (error) throw error;
+      } else {
+        const { error } = await (supabase as any).from('email_automations')
+          .insert({ name: payload.name, description: payload.description, category: payload.category, trigger_event: payload.trigger_event, steps: payload.steps, is_active: false });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['email-automations'] }),
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async (params: { id: string; isActive: boolean }) => {
+      const { error } = await (supabase as any).from('email_automations')
+        .update({ is_active: params.isActive })
+        .eq('id', params.id);
+      if (error) throw error;
+    },
+    onMutate: async ({ id, isActive }) => {
+      await queryClient.cancelQueries({ queryKey: ['email-automations'] });
+      const prev = queryClient.getQueryData<Automation[]>(['email-automations']);
+      queryClient.setQueryData<Automation[]>(['email-automations'], (old) =>
+        (old || []).map(a => a.id === id ? { ...a, isActive } : a)
+      );
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(['email-automations'], ctx.prev);
+      toast.error('Erro ao atualizar status');
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['email-automations'] }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any).from('email_automations').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['email-automations'] }),
+  });
+
   const [expandedId, setExpandedId] = useState<string | null>('1');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [createOpen, setCreateOpen] = useState(false);
@@ -239,43 +333,47 @@ export function EmailAutomations() {
       return;
     }
     setIsSaving(true);
-    await new Promise(r => setTimeout(r, 800));
-
-    const workflowSteps = buildWorkflowSteps(form.trigger, steps);
-
-    if (editAutomation) {
-      setAutomations(prev => prev.map(a => a.id === editAutomation.id ? {
-        ...a, name: form.name, description: form.description, category: form.category, steps: workflowSteps,
-      } : a));
-      toast.success('Automação atualizada!');
-    } else {
-      const newAuto: Automation = {
-        id: Date.now().toString(),
+    try {
+      const stepsPayload = steps.map(s => ({
+        id: s.id,
+        type: s.actionValue === 'wait' ? 'delay' : s.actionValue === 'check_condition' ? 'condition' : 'action',
+        label: ACTION_OPTIONS.find(a => a.value === s.actionValue)?.label || s.actionValue,
+        detail: s.detail,
+        action: s.actionValue,
+      }));
+      await upsertAutomation.mutateAsync({
+        id: editAutomation?.id,
         name: form.name,
         description: form.description,
-        isActive: false,
-        triggerCount: 0,
-        successRate: 0,
         category: form.category,
-        steps: workflowSteps,
-      };
-      setAutomations(prev => [newAuto, ...prev]);
-      toast.success('🚀 Automação criada com sucesso!');
+        trigger_event: form.trigger,
+        steps: stepsPayload,
+      });
+      toast.success(editAutomation ? 'Automação atualizada!' : '🚀 Automação criada!');
+      setCreateOpen(false);
+      resetForm();
+    } catch (e: any) {
+      toast.error('Erro ao salvar: ' + (e.message || 'desconhecido'));
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
-    setCreateOpen(false);
-    resetForm();
   };
 
   const toggleAutomation = (id: string) => {
     const auto = automations.find(a => a.id === id);
-    setAutomations(prev => prev.map(a => a.id === id ? { ...a, isActive: !a.isActive } : a));
-    toast.success(auto?.isActive ? '⏸️ Automação pausada' : '▶️ Automação ativada');
+    if (!auto) return;
+    const newStatus = !auto.isActive;
+    toggleMutation.mutate({ id, isActive: newStatus });
+    toast.success(newStatus ? '▶️ Automação ativada' : '⏸️ Automação pausada');
   };
 
-  const handleDelete = (id: string) => {
-    setAutomations(prev => prev.filter(a => a.id !== id));
-    toast.success('Automação removida.');
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteMutation.mutateAsync(id);
+      toast.success('Automação removida.');
+    } catch (e: any) {
+      toast.error('Erro ao remover');
+    }
     setDeleteId(null);
   };
 
