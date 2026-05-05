@@ -464,6 +464,38 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
       setDocuments(docsRes.data || []);
       setInvoices(invoicesRes.data || []);
       setProfileData(profileRes.data);
+      // ── Asaas: cobranças vencidas + renegociações + parcelas
+      try {
+        setLoadingAsaas(true);
+        const cpf = (profileRes.data as any)?.cpf_cnpj || (profileRes.data as any)?.cpf || (profileRes.data as any)?.cnpj || null;
+        const asaasId = (profileRes.data as any)?.asaas_customer_id || null;
+        const filters: string[] = [];
+        if (asaasId) filters.push(`asaas_customer_id.eq.${asaasId}`);
+        if (cpf) filters.push(`cliente_cpf_cnpj.eq.${cpf}`);
+        if (filters.length > 0) {
+          const orExpr = filters.join(',');
+          const [overdueRes, renegRes] = await Promise.all([
+            supabase.from('cobrancas_vencidas').select('*').or(orExpr).order('data_vencimento', { ascending: true }),
+            supabase.from('renegociacoes').select('*').or(orExpr).order('created_at', { ascending: false }),
+          ]);
+          setAsaasOverdue(overdueRes.data || []);
+          const renegs = renegRes.data || [];
+          setAsaasRenegs(renegs);
+          if (renegs.length > 0) {
+            const { data: parcelas } = await supabase
+              .from('parcelas_renegociadas')
+              .select('*')
+              .in('renegociacao_id', renegs.map((r: any) => r.id))
+              .order('numero_parcela', { ascending: true });
+            setAsaasRenegParcelas(parcelas || []);
+          } else {
+            setAsaasRenegParcelas([]);
+          }
+        } else {
+          setAsaasOverdue([]); setAsaasRenegs([]); setAsaasRenegParcelas([]);
+        }
+      } catch (e) { console.warn('asaas fetch failed', e); }
+      finally { setLoadingAsaas(false); }
       setClientBrands(brandsRes.data || (client.brands ? client.brands.map(b => ({ ...b, business_area: null, status: null, created_at: null, updated_at: null, ncl_classes: null })) : []));
       setProcessPublicacoes(pubsRes.data || []);
       if (contractRes.data && contractRes.data.length > 0) {
