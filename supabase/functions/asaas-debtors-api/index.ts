@@ -299,7 +299,51 @@ Deno.serve(async (req) => {
         .update({ status: "renegociada", updated_at: new Date().toISOString() })
         .in("id", parcelas.map((p) => p.id));
 
-      return json({ success: true, renegociacao_id: reneg.id, parcelas_criadas: created.length });
+      // ── extra info para o front disparar notificação ──
+      const primeiraFaturaUrl = created[0]?.invoiceUrl || created[0]?.bankSlipUrl || null;
+      const diasMax = parcelas.reduce((mx, p) => {
+        if (!p.data_vencimento) return mx;
+        const d = daysBetween(p.data_vencimento);
+        return d > mx ? d : mx;
+      }, 0);
+
+      // tentar resolver email/telefone do cliente
+      let clienteEmail: string | null = cliente.cliente_email || null;
+      let clienteTelefone: string | null = (cliente as any).cliente_telefone || null;
+      try {
+        if (cliente_cpf_cnpj) {
+          const { data: prof } = await admin
+            .from("profiles")
+            .select("email, phone")
+            .eq("cpf_cnpj", cliente_cpf_cnpj)
+            .maybeSingle();
+          if (prof) {
+            clienteEmail = clienteEmail || prof.email || null;
+            clienteTelefone = clienteTelefone || prof.phone || null;
+          }
+        }
+        if ((!clienteEmail || !clienteTelefone) && asaas_customer_id) {
+          const cust = await asaas(`/customers/${asaas_customer_id}`).catch(() => null);
+          if (cust) {
+            clienteEmail = clienteEmail || cust.email || null;
+            clienteTelefone = clienteTelefone || cust.mobilePhone || cust.phone || null;
+          }
+        }
+      } catch (e) {
+        console.warn("resolve cliente contato falhou", e);
+      }
+
+      return json({
+        success: true,
+        renegociacao_id: reneg.id,
+        parcelas_criadas: created.length,
+        primeira_fatura_url: primeiraFaturaUrl,
+        valor_debito_original: totalOriginal,
+        dias_vencimento_max: diasMax,
+        cliente_nome: cliente.cliente_nome || null,
+        cliente_email: clienteEmail,
+        cliente_telefone: clienteTelefone,
+      });
     }
 
     // ────────────── REFRESH STATUS ──────────────
