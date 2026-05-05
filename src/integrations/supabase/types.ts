@@ -1352,6 +1352,54 @@ export type Database = {
         }
         Relationships: []
       }
+      email_automations: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          last_triggered_at: string | null
+          name: string
+          steps: Json
+          success_rate: number
+          trigger_count: number
+          trigger_event: string | null
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          last_triggered_at?: string | null
+          name: string
+          steps?: Json
+          success_rate?: number
+          trigger_count?: number
+          trigger_event?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          last_triggered_at?: string | null
+          name?: string
+          steps?: Json
+          success_rate?: number
+          trigger_count?: number
+          trigger_event?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       email_inbox: {
         Row: {
           account_id: string | null
