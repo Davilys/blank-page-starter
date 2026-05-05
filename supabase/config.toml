@@ -113,3 +113,6 @@ verify_jwt = false
 
 [functions.import-perfex-files]
 verify_jwt = false
+
+[functions.admin-upload-client-document]
+verify_jwt = true
