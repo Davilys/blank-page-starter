@@ -152,6 +152,11 @@ export default function Emails() {
     setSelectedEmail(null);
     setIsComposing(false);
     setReplyTo(null);
+    // Conta noreply só envia (não recebe) — abrir direto a pasta Enviados
+    const acc = emailAccounts.find(a => a.id === accountId);
+    if (acc?.email_address?.toLowerCase().startsWith('noreply@')) {
+      setCurrentFolder('sent');
+    }
   };
 
   const handleCompose = () => {
