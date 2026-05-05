@@ -679,6 +679,19 @@ export default function AdminNotificacoes() {
     return matchType && matchSearch;
   });
 
+  // Logs por canal (whatsapp / email / crm) — usa notification_dispatch_logs
+  const filteredChannelLogs = dispatchLogs.filter(l => {
+    if (channelFilter === 'all' || channelFilter === 'crm') return false;
+    if (l.channel !== channelFilter) return false;
+    if (!search) return true;
+    const s = search.toLowerCase();
+    return (
+      (l.recipient_email || '').toLowerCase().includes(s) ||
+      (l.recipient_phone || '').toLowerCase().includes(s) ||
+      l.event_type.toLowerCase().includes(s)
+    );
+  });
+
   const stats = {
     total: notifications.length,
     unread: notifications.filter(n => !n.read).length,
