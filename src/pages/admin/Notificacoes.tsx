@@ -448,7 +448,10 @@ export default function AdminNotificacoes() {
   });
 
   useEffect(() => { fetchNotifications(); fetchClients(); fetchTemplates(); fetchScheduled(); }, []);
-  useEffect(() => { if (activeTab === 'relatorios') fetchDispatchLogs(); }, [activeTab]);
+  useEffect(() => {
+    if (activeTab === 'relatorios') fetchDispatchLogs();
+    if (activeTab === 'history' && (channelFilter === 'whatsapp' || channelFilter === 'email')) fetchDispatchLogs();
+  }, [activeTab, channelFilter]);
 
   // ── Realtime subscription ──────────────────────────────────────────────────
   useEffect(() => {
