@@ -88,6 +88,7 @@ const INSTALLMENT_OPTIONS = { boleto: [1, 2, 3, 4, 5, 6], cartao: [1, 2, 3, 4, 5
 const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
 export default function AdminFinanceiro() {
+  const navigate = useNavigate();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [processes, setProcesses] = useState<Process[]>([]);
@@ -391,6 +392,14 @@ export default function AdminFinanceiro() {
               </div>
             </div>
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/admin/devedores')}
+                className="gap-2 border-red-500/40 text-red-600 hover:bg-red-500/10 animate-pulse"
+              >
+                <AlertTriangle className="h-4 w-4" /> Devedores
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
