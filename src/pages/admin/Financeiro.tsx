@@ -22,6 +22,7 @@ import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 interface Invoice {
   id: string;
