@@ -882,9 +882,21 @@ export default function AdminFinanceiro() {
                           </div>
                         </TableCell>
                         <TableCell className="py-3.5">
-                          <span className="text-sm text-muted-foreground">
-                            {(invoice.profiles as any)?.full_name || (invoice.profiles as any)?.email || '—'}
-                          </span>
+                          {invoice.user_id ? (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); openClientFile(invoice.user_id!); }}
+                              className="text-sm text-foreground hover:text-primary hover:underline inline-flex items-center gap-1.5 text-left"
+                              disabled={loadingClientId === invoice.user_id}
+                            >
+                              {loadingClientId === invoice.user_id && <Loader2 className="h-3 w-3 animate-spin" />}
+                              {(invoice.profiles as any)?.full_name || (invoice.profiles as any)?.email || '—'}
+                            </button>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">
+                              {(invoice.profiles as any)?.full_name || (invoice.profiles as any)?.email || '—'}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell className="hidden md:table-cell py-3.5">
                           {canViewFinancialValues ? (
