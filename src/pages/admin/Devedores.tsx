@@ -1038,9 +1038,10 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
   );
 }
 
-function SummaryCard({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value: string; accent?: boolean }) {
+function SummaryCard({ icon, label, value, accent, tone }: { icon: React.ReactNode; label: string; value: string; accent?: boolean; tone?: 'red' | 'orange' }) {
+  const accentBorder = tone === 'orange' ? 'border-orange-500/30' : 'border-emerald-500/30';
   return (
-    <Card className={accent ? "border-emerald-500/30" : ""}>
+    <Card className={accent ? accentBorder : ""}>
       <CardContent className="p-4 flex items-center gap-3">
         <div className={`p-2 rounded-lg ${accent ? "bg-emerald-500/10 text-emerald-600" : "bg-muted text-muted-foreground"}`}>{icon}</div>
         <div>
