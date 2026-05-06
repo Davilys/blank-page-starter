@@ -366,6 +366,7 @@ export default function AdminContratos() {
             asaas_payment_id,
             template_id,
             document_type,
+            signatory_name,
             contract_type:contract_types(name),
             contract_template:contract_templates(name),
             profile:profiles(full_name, phone)
@@ -1166,6 +1167,14 @@ export default function AdminContratos() {
         open={editOpen}
         onOpenChange={setEditOpen}
         onSuccess={refreshContracts}
+      />
+
+      <LinkClientDialog
+        contractId={linkContract?.id || null}
+        signatoryName={linkContract?.name || null}
+        open={!!linkContract}
+        onOpenChange={(v) => { if (!v) setLinkContract(null); }}
+        onLinked={refreshContracts}
       />
     </>
   );
