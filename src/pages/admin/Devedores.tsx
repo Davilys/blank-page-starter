@@ -619,7 +619,9 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
       <Tabs defaultValue="lista">
         <TabsList>
           <TabsTrigger value="lista">Devedores ({totalDevedores})</TabsTrigger>
+          <TabsTrigger value="devedor">Devedor ({filteredDebtors30.length})</TabsTrigger>
           <TabsTrigger value="historico">Histórico ({filteredHistory.length})</TabsTrigger>
+          <TabsTrigger value="historico-devedor">Histórico Devedor ({filteredHistory30.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="lista">
@@ -666,6 +668,58 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                         <Button size="sm" onClick={() => setSelected(d)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
                           Renegociar
                         </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="devedor">
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>CPF/CNPJ</TableHead>
+                    <TableHead className="text-center">Parcelas</TableHead>
+                    <TableHead className="text-right">Total devido</TableHead>
+                    <TableHead className="text-right">Total + 10%</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredDebtors30.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                        Nenhum vencido recente. Clique em Sincronizar para buscar no Asaas.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {filteredDebtors30.map((d) => (
+                    <TableRow key={d.key} onClick={() => openClientFile(d)} className="cursor-pointer">
+                      <TableCell className="font-medium">
+                        <span className="inline-flex items-center gap-2 hover:text-primary hover:underline transition-colors">
+                          {loadingClient === d.key && <Loader2 className="h-3 w-3 animate-spin" />}
+                          {d.cliente_nome || "—"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{d.cliente_cpf_cnpj || "—"}</TableCell>
+                      <TableCell className="text-center"><Badge variant="destructive">{d.qtd_parcelas}</Badge></TableCell>
+                      <TableCell className="text-right">{fmtBRL(d.total_original)}</TableCell>
+                      <TableCell className="text-right font-semibold text-emerald-600">{fmtBRL(d.novo_total)}</TableCell>
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="inline-flex gap-2">
+                          <Button size="sm" onClick={() => setSelectedNeg(d)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                            Negociar
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setSelectedCob(d)}>
+                            Cobrar
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -754,6 +808,60 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="historico-devedor">
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead className="text-right">Original</TableHead>
+                    <TableHead className="text-right">Acréscimo</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-center">Parcelas</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredHistory30.length === 0 && (
+                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhuma negociação ainda.</TableCell></TableRow>
+                  )}
+                  {filteredHistory30.map((h) => (
+                    <TableRow key={h.id}>
+                      <TableCell className="text-sm">{new Date(h.created_at).toLocaleDateString("pt-BR")}</TableCell>
+                      <TableCell>
+                        <span>{h.cliente_nome || h.cliente_cpf_cnpj || "—"}</span>
+                        <span className="inline-flex items-center gap-1 ml-2">
+                          <Button size="sm" variant="outline" className="h-6 px-2"
+                            onClick={() => handleResendDevedor(h, 'email')}
+                            disabled={resending === `${h.id}-email`} title="Reenviar e-mail">
+                            {resending === `${h.id}-email` ? <Loader2 className="h-3 w-3 animate-spin" /> : <Mail className="h-3 w-3" />}
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-6 px-2"
+                            onClick={() => handleResendDevedor(h, 'whatsapp')}
+                            disabled={resending === `${h.id}-whatsapp`} title="Reenviar WhatsApp">
+                            {resending === `${h.id}-whatsapp` ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageCircle className="h-3 w-3" />}
+                          </Button>
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={h.tipo === 'negociar' ? 'default' : 'outline'}>
+                          {h.tipo === 'negociar' ? 'Negociar 3x' : 'Cobrar único'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">{fmtBRL(h.valor_original_total)}</TableCell>
+                      <TableCell className="text-right text-amber-600">{fmtBRL(h.valor_acrescimo)}</TableCell>
+                      <TableCell className="text-right font-semibold">{fmtBRL(h.valor_total)}</TableCell>
+                      <TableCell className="text-center"><Badge variant="outline">{h.parcelas_devedor?.length || 0}</Badge></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
@@ -813,6 +921,60 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
             <Button onClick={handleRenegotiate} disabled={renegLoading} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
               {renegLoading && <Loader2 className="h-4 w-4 animate-spin" />}
               Confirmar renegociação
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Negociar 3x +10% */}
+      <Dialog open={!!selectedNeg} onOpenChange={(o) => !o && setSelectedNeg(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Negociar — {selectedNeg?.cliente_nome}</DialogTitle></DialogHeader>
+          {selectedNeg && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-lg border p-3">
+                  <div className="text-xs text-muted-foreground">Total original</div>
+                  <div className="font-semibold">{fmtBRL(selectedNeg.total_original)}</div>
+                </div>
+                <div className="rounded-lg border p-3 bg-amber-500/5">
+                  <div className="text-xs text-muted-foreground">+ 10%</div>
+                  <div className="font-semibold text-amber-600">{fmtBRL(selectedNeg.acrescimo)}</div>
+                </div>
+                <div className="rounded-lg border p-3 bg-emerald-500/5">
+                  <div className="text-xs text-muted-foreground">Novo total</div>
+                  <div className="font-bold text-emerald-600">{fmtBRL(selectedNeg.novo_total)}</div>
+                </div>
+              </div>
+              <p className="text-muted-foreground">3 boletos serão gerados (vencimento dia 20). Cliente será notificado por e-mail e WhatsApp.</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedNeg(null)} disabled={actionLoading}>Cancelar</Button>
+            <Button onClick={() => handleNegociarOrCobrar('negociar')} disabled={actionLoading} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+              {actionLoading && <Loader2 className="h-4 w-4 animate-spin" />} Confirmar negociação
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Cobrar (boleto único, sem taxa) */}
+      <Dialog open={!!selectedCob} onOpenChange={(o) => !o && setSelectedCob(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Cobrar — {selectedCob?.cliente_nome}</DialogTitle></DialogHeader>
+          {selectedCob && (
+            <div className="space-y-3 text-sm">
+              <div className="rounded-lg border p-3 text-center bg-emerald-500/5">
+                <div className="text-xs text-muted-foreground">Total (sem acréscimo)</div>
+                <div className="font-bold text-emerald-600 text-lg">{fmtBRL(selectedCob.total_original)}</div>
+              </div>
+              <p className="text-muted-foreground">1 boleto único será gerado (vencimento dia 20). Cliente será notificado por e-mail e WhatsApp.</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedCob(null)} disabled={actionLoading}>Cancelar</Button>
+            <Button onClick={() => handleNegociarOrCobrar('cobrar')} disabled={actionLoading} className="gap-2">
+              {actionLoading && <Loader2 className="h-4 w-4 animate-spin" />} Confirmar cobrança
             </Button>
           </DialogFooter>
         </DialogContent>
