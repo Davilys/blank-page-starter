@@ -107,6 +107,7 @@ Deno.serve(async (req) => {
       const limit = 100;
       let total = 0;
       let kept = 0;
+      let skipped_finalized = 0;
       const customerCache = new Map<string, any>();
       const minOverdueDays = 60;
 
@@ -116,11 +117,30 @@ Deno.serve(async (req) => {
         if (items.length === 0) break;
         total += items.length;
 
+        // Pré-checa quais asaas_payment_id já existem e em que status,
+        // para não ressuscitar parcelas já renegociadas/cobradas.
+        const ids = items.map((p) => p.id).filter(Boolean);
+        const existingMap = new Map<string, string>();
+        if (ids.length > 0) {
+          const { data: existing } = await admin
+            .from("cobrancas_vencidas")
+            .select("asaas_payment_id, status")
+            .in("asaas_payment_id", ids);
+          for (const r of existing || []) existingMap.set(r.asaas_payment_id, r.status);
+        }
+
         for (const p of items) {
           const due = p.dueDate as string;
           if (!due) continue;
           const dias = daysBetween(due);
           if (dias <= minOverdueDays) continue;
+
+          const prevStatus = existingMap.get(p.id);
+          if (prevStatus && prevStatus !== "pendente_renegociacao") {
+            // já foi negociada/cobrada/quitada — não tocar
+            skipped_finalized++;
+            continue;
+          }
 
           let cust = customerCache.get(p.customer);
           if (!cust && p.customer) {
@@ -154,7 +174,7 @@ Deno.serve(async (req) => {
         offset += limit;
       }
 
-      return json({ success: true, total_overdue: total, kept_over_60d: kept });
+      return json({ success: true, total_overdue: total, kept_over_60d: kept, skipped_finalized });
     }
 
     // ────────────── SYNC OVERDUE 30 (≤30 dias) ──────────────
@@ -163,6 +183,7 @@ Deno.serve(async (req) => {
       const limit = 100;
       let total = 0;
       let kept = 0;
+      let skipped_finalized = 0;
       const customerCache = new Map<string, any>();
 
       while (true) {
@@ -171,11 +192,27 @@ Deno.serve(async (req) => {
         if (items.length === 0) break;
         total += items.length;
 
+        const ids = items.map((p) => p.id).filter(Boolean);
+        const existingMap = new Map<string, string>();
+        if (ids.length > 0) {
+          const { data: existing } = await admin
+            .from("cobrancas_vencidas")
+            .select("asaas_payment_id, status")
+            .in("asaas_payment_id", ids);
+          for (const r of existing || []) existingMap.set(r.asaas_payment_id, r.status);
+        }
+
         for (const p of items) {
           const due = p.dueDate as string;
           if (!due) continue;
           const dias = daysBetween(due);
           if (dias < 1 || dias > 30) continue;
+
+          const prevStatus = existingMap.get(p.id);
+          if (prevStatus && prevStatus !== "pendente_renegociacao") {
+            skipped_finalized++;
+            continue;
+          }
 
           let cust = customerCache.get(p.customer);
           if (!cust && p.customer) {
@@ -207,7 +244,7 @@ Deno.serve(async (req) => {
         offset += limit;
       }
 
-      return json({ success: true, total_overdue: total, kept_under_30d: kept });
+      return json({ success: true, total_overdue: total, kept_under_30d: kept, skipped_finalized });
     }
 
     // ────────────── LIST GROUPED ──────────────
