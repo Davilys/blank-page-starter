@@ -143,6 +143,7 @@ Deno.serve(async (req) => {
             dias_atraso: dias,
             descricao: p.description || null,
             status: "pendente_renegociacao",
+            bucket: "d60",
             updated_at: new Date().toISOString(),
           }, { onConflict: "asaas_payment_id" });
 
@@ -156,12 +157,66 @@ Deno.serve(async (req) => {
       return json({ success: true, total_overdue: total, kept_over_60d: kept });
     }
 
+    // ────────────── SYNC OVERDUE 30 (≤30 dias) ──────────────
+    if (action === "sync-overdue-30") {
+      let offset = 0;
+      const limit = 100;
+      let total = 0;
+      let kept = 0;
+      const customerCache = new Map<string, any>();
+
+      while (true) {
+        const page = await asaas(`/payments?status=OVERDUE&limit=${limit}&offset=${offset}`);
+        const items: any[] = page?.data || [];
+        if (items.length === 0) break;
+        total += items.length;
+
+        for (const p of items) {
+          const due = p.dueDate as string;
+          if (!due) continue;
+          const dias = daysBetween(due);
+          if (dias < 1 || dias > 30) continue;
+
+          let cust = customerCache.get(p.customer);
+          if (!cust && p.customer) {
+            try {
+              cust = await asaas(`/customers/${p.customer}`);
+              customerCache.set(p.customer, cust);
+            } catch (e) { console.warn("customer fetch failed", p.customer, e); }
+          }
+
+          await admin.from("cobrancas_vencidas").upsert({
+            asaas_payment_id: p.id,
+            asaas_customer_id: p.customer,
+            cliente_nome: cust?.name || null,
+            cliente_cpf_cnpj: cust?.cpfCnpj || null,
+            cliente_email: cust?.email || null,
+            valor: p.value || 0,
+            data_vencimento: due,
+            dias_atraso: dias,
+            descricao: p.description || null,
+            status: "pendente_renegociacao",
+            bucket: "d30",
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "asaas_payment_id" });
+
+          kept++;
+        }
+
+        if (items.length < limit) break;
+        offset += limit;
+      }
+
+      return json({ success: true, total_overdue: total, kept_under_30d: kept });
+    }
+
     // ────────────── LIST GROUPED ──────────────
     if (action === "list-debtors-grouped") {
       const { data, error } = await admin
         .from("cobrancas_vencidas")
         .select("*")
         .eq("status", "pendente_renegociacao")
+        .eq("bucket", "d60")
         .order("cliente_nome", { ascending: true });
       if (error) throw error;
 
@@ -204,6 +259,183 @@ Deno.serve(async (req) => {
       });
 
       return json({ success: true, debtors: result });
+    }
+
+    // ────────────── LIST GROUPED 30 (≤30 dias) ──────────────
+    if (action === "list-debtors-30-grouped") {
+      const { data, error } = await admin
+        .from("cobrancas_vencidas")
+        .select("*")
+        .eq("status", "pendente_renegociacao")
+        .eq("bucket", "d30")
+        .order("cliente_nome", { ascending: true });
+      if (error) throw error;
+
+      const groups = new Map<string, any>();
+      for (const row of data || []) {
+        const key = (row.cliente_cpf_cnpj || row.asaas_customer_id || row.cliente_nome || "sem-id") as string;
+        if (!groups.has(key)) {
+          groups.set(key, {
+            key,
+            cliente_nome: row.cliente_nome,
+            cliente_cpf_cnpj: row.cliente_cpf_cnpj,
+            cliente_email: row.cliente_email,
+            asaas_customer_id: row.asaas_customer_id,
+            parcelas: [],
+            total: 0,
+          });
+        }
+        const g = groups.get(key);
+        g.parcelas.push(row);
+        g.total += Number(row.valor) || 0;
+      }
+
+      const result = Array.from(groups.values()).map((g) => {
+        const total = round2(g.total);
+        const acrescimo = round2(total * 0.10);
+        const novoTotal = round2(total + acrescimo);
+        const valorParcela = round2(novoTotal / 3);
+        const first = nextDay20(new Date());
+        const datas = [0, 1, 2].map((i) => fmtDate(addMonthsKeepDay20(first, i)));
+        return {
+          ...g,
+          qtd_parcelas: g.parcelas.length,
+          total_original: total,
+          acrescimo,
+          novo_total: novoTotal,
+          valor_parcela: valorParcela,
+          datas_parcelas: datas,
+          cobrar_data: fmtDate(first),
+        };
+      });
+
+      return json({ success: true, debtors: result });
+    }
+
+    // ────────────── NEGOCIAR / COBRAR DEVEDOR (≤30d) ──────────────
+    if (action === "negociar-devedor" || action === "cobrar-devedor") {
+      const body = await req.json();
+      const { cliente_cpf_cnpj, asaas_customer_id, observacao } = body || {};
+      if (!asaas_customer_id) return json({ error: "asaas_customer_id obrigatório" }, 400);
+
+      let q = admin.from("cobrancas_vencidas").select("*")
+        .eq("status", "pendente_renegociacao").eq("bucket", "d30");
+      if (cliente_cpf_cnpj) q = q.eq("cliente_cpf_cnpj", cliente_cpf_cnpj);
+      else q = q.eq("asaas_customer_id", asaas_customer_id);
+      const { data: parcelas, error: pErr } = await q;
+      if (pErr) throw pErr;
+      if (!parcelas || parcelas.length === 0) return json({ error: "Nenhuma parcela pendente" }, 400);
+
+      const cliente = parcelas[0];
+      const totalOriginal = round2(parcelas.reduce((s, p) => s + (Number(p.valor) || 0), 0));
+      const isNegociar = action === "negociar-devedor";
+      const acrescimo = isNegociar ? round2(totalOriginal * 0.10) : 0;
+      const novoTotal = round2(totalOriginal + acrescimo);
+      const numParcelas = isNegociar ? 3 : 1;
+      const baseParcela = round2(novoTotal / numParcelas);
+      const valores: number[] = [];
+      for (let i = 0; i < numParcelas - 1; i++) valores.push(baseParcela);
+      valores.push(round2(novoTotal - baseParcela * (numParcelas - 1)));
+
+      const first = nextDay20(new Date());
+      const datas = Array.from({ length: numParcelas }, (_, i) => fmtDate(addMonthsKeepDay20(first, i)));
+
+      const motivoBase = isNegociar
+        ? `Negociação 3x de ${parcelas.length} parcela(s) vencida(s) - ${cliente.cliente_nome || ""}. Original R$ ${totalOriginal.toFixed(2)} + 10% (R$ ${acrescimo.toFixed(2)}) = R$ ${novoTotal.toFixed(2)}.${observacao ? " Obs: " + observacao : ""}`
+        : `Cobrança única (sem taxa) de ${parcelas.length} parcela(s) - ${cliente.cliente_nome || ""}. Total R$ ${totalOriginal.toFixed(2)}.`;
+
+      const { data: neg, error: nErr } = await admin.from("negociacoes_devedor").insert({
+        cliente_nome: cliente.cliente_nome,
+        cliente_cpf_cnpj: cliente_cpf_cnpj || null,
+        asaas_customer_id,
+        tipo: isNegociar ? "negociar" : "cobrar",
+        valor_original_total: totalOriginal,
+        valor_acrescimo: acrescimo,
+        valor_total: novoTotal,
+        parcelas_originais_ids: parcelas.map((p) => p.asaas_payment_id),
+        motivo_cobranca: motivoBase,
+        observacao: observacao || null,
+        created_by: userId,
+      }).select().single();
+      if (nErr) throw nErr;
+
+      const created: any[] = [];
+      for (let i = 0; i < numParcelas; i++) {
+        try {
+          const payment = await asaas("/payments", {
+            method: "POST",
+            body: JSON.stringify({
+              customer: asaas_customer_id,
+              billingType: "BOLETO",
+              dueDate: datas[i],
+              value: valores[i],
+              description: (isNegociar
+                ? `Negociação ${i + 1}/${numParcelas} - ${cliente.cliente_nome || ""}`
+                : `Cobrança única - ${cliente.cliente_nome || ""}`).slice(0, 500),
+              externalReference: `${isNegociar ? "neg" : "cob"}:${neg.id}:${i + 1}`,
+            }),
+          });
+          await admin.from("parcelas_devedor").insert({
+            negociacao_id: neg.id,
+            numero_parcela: i + 1,
+            asaas_payment_id: payment.id,
+            valor: valores[i],
+            data_vencimento: datas[i],
+            status: payment.status || "PENDING",
+            link_boleto: payment.bankSlipUrl || null,
+            invoice_url: payment.invoiceUrl || null,
+            motivo_cobranca: motivoBase,
+          });
+          created.push(payment);
+        } catch (e) {
+          console.error("Falha ao criar parcela devedor", i + 1, e);
+          await admin.from("parcelas_devedor").insert({
+            negociacao_id: neg.id,
+            numero_parcela: i + 1,
+            valor: valores[i],
+            data_vencimento: datas[i],
+            status: "ERROR",
+            motivo_cobranca: `${motivoBase} | ERRO: ${e instanceof Error ? e.message : String(e)}`,
+          });
+        }
+      }
+
+      await admin
+        .from("cobrancas_vencidas")
+        .update({ status: isNegociar ? "renegociada" : "cobrada", updated_at: new Date().toISOString() })
+        .in("id", parcelas.map((p) => p.id));
+
+      const primeiraFaturaUrl = created[0]?.invoiceUrl || created[0]?.bankSlipUrl || null;
+      let clienteEmail: string | null = cliente.cliente_email || null;
+      let clienteTelefone: string | null = null;
+      try {
+        if (cliente_cpf_cnpj) {
+          const { data: prof } = await admin
+            .from("profiles").select("email, phone").eq("cpf_cnpj", cliente_cpf_cnpj).maybeSingle();
+          if (prof) { clienteEmail = clienteEmail || prof.email || null; clienteTelefone = prof.phone || null; }
+        }
+        if ((!clienteEmail || !clienteTelefone) && asaas_customer_id) {
+          const cust = await asaas(`/customers/${asaas_customer_id}`).catch(() => null);
+          if (cust) {
+            clienteEmail = clienteEmail || cust.email || null;
+            clienteTelefone = clienteTelefone || cust.mobilePhone || cust.phone || null;
+          }
+        }
+      } catch (e) { console.warn("resolve contato falhou", e); }
+
+      return json({
+        success: true,
+        negociacao_id: neg.id,
+        tipo: isNegociar ? "negociar" : "cobrar",
+        parcelas_criadas: created.length,
+        primeira_fatura_url: primeiraFaturaUrl,
+        valor_original: totalOriginal,
+        valor_acrescimo: acrescimo,
+        valor_total: novoTotal,
+        cliente_nome: cliente.cliente_nome || null,
+        cliente_email: clienteEmail,
+        cliente_telefone: clienteTelefone,
+      });
     }
 
     // ────────────── RENEGOTIATE ──────────────
