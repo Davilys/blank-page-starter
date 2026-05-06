@@ -513,6 +513,14 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
   const totalOriginal = filteredDebtors.reduce((s, d) => s + d.total_original, 0);
   const totalComAcrescimo = filteredDebtors.reduce((s, d) => s + d.novo_total, 0);
 
+  const totalDevedores30 = filteredDebtors30.length;
+  const totalParcelas30 = filteredDebtors30.reduce((s, d) => s + d.qtd_parcelas, 0);
+  const totalOriginal30 = filteredDebtors30.reduce((s, d) => s + d.total_original, 0);
+  const totalComAcrescimo30 = filteredDebtors30.reduce((s, d) => s + d.novo_total, 0);
+
+  const [activeTab, setActiveTab] = useState<string>("lista");
+  const is30Group = activeTab === "devedor" || activeTab === "historico-devedor";
+
   const openClientFile = async (d: Debtor) => {
     setLoadingClient(d.key);
     try {
