@@ -18,6 +18,7 @@ import { ptBR } from 'date-fns/locale';
 import { ContractDetailSheet } from '@/components/admin/contracts/ContractDetailSheet';
 import { CreateContractDialog } from '@/components/admin/contracts/CreateContractDialog';
 import { EditContractDialog } from '@/components/admin/contracts/EditContractDialog';
+import { LinkClientDialog } from '@/components/admin/contracts/LinkClientDialog';
 import { generateDocumentPrintHTML, getLogoBase64ForPDF } from '@/components/contracts/DocumentRenderer';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DatePeriodFilter, type DateFilterType } from '@/components/admin/clients/DatePeriodFilter';
@@ -1001,7 +1002,18 @@ export default function AdminContratos() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm">{contract.profile?.full_name || '-'}</TableCell>
+                       <TableCell className="text-sm">
+                         {contract.profile?.full_name || (
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             className="h-6 px-2 text-xs gap-1"
+                             onClick={(e) => { e.stopPropagation(); setLinkContract({ id: contract.id, name: contract.signatory_name || null }); }}
+                           >
+                             <Link2 className="h-3 w-3" /> Vincular cliente
+                           </Button>
+                         )}
+                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="rounded-lg text-xs font-normal border-border/50">
                           {contract.contract_type?.name || contract.contract_template?.name || 'N/D'}
