@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   Search, Plus, RefreshCw, FileSignature, MoreHorizontal, 
   Eye, Trash2, Download, Send, Filter, CheckCircle, XCircle, Loader2, Timer, Edit,
-  TrendingUp, DollarSign, FileText, PenTool, RotateCcw, Archive, Upload
+  TrendingUp, DollarSign, FileText, PenTool, RotateCcw, Archive, Upload, Link2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, isToday, isThisWeek, isThisMonth } from 'date-fns';
@@ -55,6 +55,7 @@ interface Contract {
   payment_method?: string | null;
   asaas_payment_id?: string | null;
   template_id?: string | null;
+  signatory_name?: string | null;
   contract_type?: { name: string } | null;
   contract_template?: { name: string } | null;
   profile?: { full_name: string | null; phone: string | null } | null;
@@ -155,6 +156,7 @@ export default function AdminContratos() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editContract, setEditContract] = useState<Contract | null>(null);
+  const [linkContract, setLinkContract] = useState<{ id: string; name: string | null } | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [expiringPromotion, setExpiringPromotion] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
