@@ -603,6 +603,7 @@ export type Database = {
         Row: {
           asaas_customer_id: string | null
           asaas_payment_id: string
+          bucket: string
           cliente_cpf_cnpj: string | null
           cliente_email: string | null
           cliente_nome: string | null
@@ -618,6 +619,7 @@ export type Database = {
         Insert: {
           asaas_customer_id?: string | null
           asaas_payment_id: string
+          bucket?: string
           cliente_cpf_cnpj?: string | null
           cliente_email?: string | null
           cliente_nome?: string | null
@@ -633,6 +635,7 @@ export type Database = {
         Update: {
           asaas_customer_id?: string | null
           asaas_payment_id?: string
+          bucket?: string
           cliente_cpf_cnpj?: string | null
           cliente_email?: string | null
           cliente_nome?: string | null
@@ -3016,6 +3019,54 @@ export type Database = {
           },
         ]
       }
+      negociacoes_devedor: {
+        Row: {
+          asaas_customer_id: string | null
+          cliente_cpf_cnpj: string | null
+          cliente_nome: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          motivo_cobranca: string | null
+          observacao: string | null
+          parcelas_originais_ids: string[] | null
+          tipo: string
+          valor_acrescimo: number
+          valor_original_total: number
+          valor_total: number
+        }
+        Insert: {
+          asaas_customer_id?: string | null
+          cliente_cpf_cnpj?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          motivo_cobranca?: string | null
+          observacao?: string | null
+          parcelas_originais_ids?: string[] | null
+          tipo: string
+          valor_acrescimo?: number
+          valor_original_total?: number
+          valor_total?: number
+        }
+        Update: {
+          asaas_customer_id?: string | null
+          cliente_cpf_cnpj?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          motivo_cobranca?: string | null
+          observacao?: string | null
+          parcelas_originais_ids?: string[] | null
+          tipo?: string
+          valor_acrescimo?: number
+          valor_original_total?: number
+          valor_total?: number
+        }
+        Relationships: []
+      }
       notification_dispatch_logs: {
         Row: {
           attempts: number | null
@@ -3178,6 +3229,59 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parcelas_devedor: {
+        Row: {
+          asaas_payment_id: string | null
+          created_at: string
+          data_vencimento: string
+          id: string
+          invoice_url: string | null
+          link_boleto: string | null
+          motivo_cobranca: string | null
+          negociacao_id: string
+          numero_parcela: number
+          status: string | null
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          asaas_payment_id?: string | null
+          created_at?: string
+          data_vencimento: string
+          id?: string
+          invoice_url?: string | null
+          link_boleto?: string | null
+          motivo_cobranca?: string | null
+          negociacao_id: string
+          numero_parcela: number
+          status?: string | null
+          updated_at?: string
+          valor: number
+        }
+        Update: {
+          asaas_payment_id?: string | null
+          created_at?: string
+          data_vencimento?: string
+          id?: string
+          invoice_url?: string | null
+          link_boleto?: string | null
+          motivo_cobranca?: string | null
+          negociacao_id?: string
+          numero_parcela?: number
+          status?: string | null
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parcelas_devedor_negociacao_id_fkey"
+            columns: ["negociacao_id"]
+            isOneToOne: false
+            referencedRelation: "negociacoes_devedor"
             referencedColumns: ["id"]
           },
         ]
