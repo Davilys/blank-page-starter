@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, RefreshCw, Loader2, Zap, AlertTriangle, Users, DollarSign, TrendingUp, Search } from "lucide-react";
+import { ArrowLeft, RefreshCw, Loader2, Zap, AlertTriangle, Users, DollarSign, TrendingUp, Search, Mail, MessageCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ClientWithProcess } from "@/components/admin/clients/ClientKanbanBoard";
@@ -85,6 +85,84 @@ export default function Devedores() {
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState<DateFilterType>("all");
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  const [resending, setResending] = useState<string | null>(null);
+
+  const buildRenegMessage = (nome: string, valor: string, dias: number, link: string) => {
+    const firstName = (nome || "Cliente").split(" ")[0];
+    const msg =
+`Oi ${firstName}! Tudo bem?
+
+Consegui uma condição especial pra você não perder o seu processo de registro de marca 👇
+
+✅ Parcelamos o débito ${valor} em aberto com mais de ${dias} dias, em até 5x sem juros no boleto!
+📅 Primeira parcela só dia 20, segue fatura: ${link}
+
+Assim você mantém seu contrato ativo e evita qualquer risco de cancelamento 🚨
+
+Nosso objetivo é garantir que sua marca continue protegida e em andamento no INPI.
+
+Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
+    const html = `
+<p>Oi <strong>${firstName}</strong>! Tudo bem?</p>
+<p>Consegui uma condição especial pra você não perder o seu processo de registro de marca 👇</p>
+<p>✅ Parcelamos o débito <strong>${valor}</strong> em aberto com mais de <strong>${dias} dias</strong>, em até <strong>5x sem juros</strong> no boleto!</p>
+<p>📅 Primeira parcela só dia 20, segue fatura: ${link ? `<a href="${link}" target="_blank" rel="noopener">${link}</a>` : "(link indisponível)"}</p>
+<p>Assim você mantém seu contrato ativo e evita qualquer risco de cancelamento 🚨</p>
+<p>Nosso objetivo é garantir que sua marca continue protegida e em andamento no INPI.</p>
+<p>Só para confirma aqui ja liberei essa condição pra você, combinado... 👍</p>`;
+    return { msg, html };
+  };
+
+  const handleResendNotification = async (h: Renegociacao, channel: 'email' | 'whatsapp') => {
+    setResending(`${h.id}-${channel}`);
+    try {
+      // primeira parcela (link)
+      const parcelas = (h.parcelas_renegociadas || []).slice().sort((a: any, b: any) => (a.numero_parcela || 0) - (b.numero_parcela || 0));
+      const link = parcelas[0]?.invoice_url || parcelas[0]?.link_boleto || "";
+      const dias = 60;
+      const valor = fmtBRL(h.valor_original_total);
+
+      // buscar contato
+      let email = "";
+      let phone = "";
+      if (h.cliente_cpf_cnpj) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("email, phone")
+          .or(`cpf.eq.${h.cliente_cpf_cnpj},cpf_cnpj.eq.${h.cliente_cpf_cnpj}`)
+          .maybeSingle();
+        email = prof?.email || "";
+        phone = prof?.phone || "";
+      }
+
+      if (channel === 'email' && !email) { toast.error("Cliente sem e-mail cadastrado."); return; }
+      if (channel === 'whatsapp' && !phone) { toast.error("Cliente sem telefone cadastrado."); return; }
+
+      const nome = h.cliente_nome || "Cliente";
+      const { msg, html } = buildRenegMessage(nome, valor, dias, link);
+
+      const { data, error } = await supabase.functions.invoke("send-multichannel-notification", {
+        body: {
+          event_type: "manual",
+          channels: [channel],
+          recipient: { nome, phone, email },
+          custom_message: msg,
+          custom_html: html,
+          custom_subject: "Condição especial para regularizar seu registro de marca",
+          data: { link, marca: "sua marca" },
+        },
+      });
+      if (error) throw new Error(error.message);
+      const results = (data as any)?.results || {};
+      const failed = Object.values(results).filter((r: any) => r && r.success === false && !r.skipped).length;
+      if (failed > 0) toast.warning(`Falha ao reenviar por ${channel}.`);
+      else toast.success(`Notificação reenviada por ${channel === 'email' ? 'e-mail' : 'WhatsApp'}.`);
+    } catch (e: any) {
+      toast.error(`Falha: ${e.message}`);
+    } finally {
+      setResending(null);
+    }
+  };
 
   const fetchDebtors = async () => {
     setLoading(true);
@@ -454,6 +532,28 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                         <span className="inline-flex items-center gap-2 hover:text-primary hover:underline transition-colors">
                           {loadingClient === h.id && <Loader2 className="h-3 w-3 animate-spin" />}
                           {h.cliente_nome || h.cliente_cpf_cnpj || "—"}
+                        </span>
+                        <span className="inline-flex items-center gap-1 ml-2" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2"
+                            onClick={(e) => { e.stopPropagation(); handleResendNotification(h, 'email'); }}
+                            disabled={resending === `${h.id}-email`}
+                            title="Reenviar e-mail"
+                          >
+                            {resending === `${h.id}-email` ? <Loader2 className="h-3 w-3 animate-spin" /> : <Mail className="h-3 w-3" />}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2"
+                            onClick={(e) => { e.stopPropagation(); handleResendNotification(h, 'whatsapp'); }}
+                            disabled={resending === `${h.id}-whatsapp`}
+                            title="Reenviar WhatsApp"
+                          >
+                            {resending === `${h.id}-whatsapp` ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageCircle className="h-3 w-3" />}
+                          </Button>
                         </span>
                       </TableCell>
                       <TableCell className="text-right">{fmtBRL(h.valor_original_total)}</TableCell>
