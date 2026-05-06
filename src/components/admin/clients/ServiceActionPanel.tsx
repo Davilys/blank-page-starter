@@ -35,26 +35,65 @@ interface ServiceActionPanelProps {
 
 const SALARIO_MINIMO_2025 = 1518;
 
-function generateTemplate(client: ServiceActionPanelProps['client'], stage: ServiceActionPanelProps['stage'], valor: number): string {
-  return `Prezado(a) ${client.full_name || 'Cliente'},
+// Próxima segunda-feira a partir de hoje (se hoje for segunda, vai para a próxima)
+function getNextMonday(): Date {
+  const d = new Date();
+  const day = d.getDay(); // 0=dom, 1=seg
+  const diff = ((1 - day + 7) % 7) || 7;
+  d.setDate(d.getDate() + diff);
+  d.setHours(12, 0, 0, 0);
+  return d;
+}
 
-Informamos que o INPI publicou uma exigência referente ao processo da marca "${client.brand_name || 'sua marca'}"${client.process_number ? ` (Protocolo: ${client.process_number})` : ''}.
+function fmtValor(v: number): string {
+  return v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+}
 
-Conforme o prazo legal, você tem 60 (sessenta) dias corridos para o cumprimento desta exigência, contados a partir da data de publicação na Revista da Propriedade Industrial (RPI).
+function generateEmailTemplate(client: ServiceActionPanelProps['client'], _stage: ServiceActionPanelProps['stage'], valor: number): string {
+  const nome = client.full_name || 'Cliente';
+  const marca = client.brand_name || 'sua marca';
+  const protocolo = client.process_number ? ` (Protocolo: ${client.process_number})` : '';
+  return `Prezad@ ${nome},
 
-De acordo com a Cláusula 5.2 do seu contrato, o cumprimento de exigências formais constitui serviço adicional. Conforme a Cláusula 10.3, será cobrado o valor correspondente a 1 (um) salário mínimo vigente no ano da publicação.
+Venho informar, com urgência, que o INPI publicou uma exigência referente ao processo da marca "${marca}"${protocolo}.
 
-Para dar continuidade ao processo, solicitamos o pagamento da taxa de serviço no valor de R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.
+Toda e qualquer publicação possui prazo de 60 (sessenta) dias corridos para o cumprimento desta exigência, contados a partir da data de publicação na Revista da Propriedade Industrial (RPI).
+
+Conforme informado no atendimento inicial e no contrato assinado, de acordo com a Cláusula 5.2 do seu contrato, o cumprimento de exigências formais constitui serviço adicional. Conforme a Cláusula 10.3, será cobrado o valor correspondente a 1 (um) salário mínimo vigente no ano da publicação, o que ocorreu em seu processo, conforme segue em anexo e publicado no Diário Oficial.
+
+Para dar continuidade ao processo, solicitamos o pagamento da taxa de serviço no valor de R$ ${fmtValor(valor)}. Vencimento: segunda-feira.
+
+Caso queira falar com o jurídico, informe o melhor dia e horário, pois precisamos resolver isso o quanto antes.
 
 Estamos à disposição para esclarecer qualquer dúvida.
 
 Atenciosamente,
+
 Equipe WebMarcas
-www.webmarcas.net | WhatsApp: (11) 91112-0225`;
+www.webmarcas.net
+WhatsApp: (11) 91112-0225`;
+}
+
+function generateWhatsAppTemplate(client: ServiceActionPanelProps['client'], _stage: ServiceActionPanelProps['stage'], valor: number): string {
+  const nome = client.full_name || 'Cliente';
+  const marca = client.brand_name || 'sua marca';
+  const protocolo = client.process_number ? ` (Protocolo: ${client.process_number})` : '';
+  return `Prezad@ ${nome},
+
+Informamos com urgência que o INPI publicou uma exigência referente ao processo da marca "${marca}"${protocolo}.
+
+O prazo para cumprimento é de 60 dias corridos, conforme publicação na RPI. Conforme informado no atendimento inicial e no contrato assinado, de acordo com a Cláusula 5.2 do seu contrato, sendo devido o valor de R$ ${fmtValor(valor)} para continuidade do processo. Vencimento: segunda-feira.
+
+O jurídico precisa falar com você com URGÊNCIA, informe o melhor dia e horário. Assim resolveremos esta questão e sanar eventuais dúvidas.
+
+Atenciosamente,
+
+Equipe WebMarcas`;
 }
 
 export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySent }: ServiceActionPanelProps) {
-  const [message, setMessage] = useState(() => generateTemplate(client, stage, SALARIO_MINIMO_2025));
+  const [message, setMessage] = useState(() => generateEmailTemplate(client, stage, SALARIO_MINIMO_2025));
+  const [whatsappMessage, setWhatsappMessage] = useState(() => generateWhatsAppTemplate(client, stage, SALARIO_MINIMO_2025));
   const [sendEmail, setSendEmail] = useState(true);
   const [sendWhatsApp, setSendWhatsApp] = useState(true);
   const [files, setFiles] = useState<File[]>([]);
@@ -68,8 +107,8 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
 
   const [sending, setSending] = useState(false);
 
-  const dueDate = new Date();
-  dueDate.setDate(dueDate.getDate() + 10);
+  // Vencimento sempre na próxima segunda-feira
+  const dueDate = getNextMonday();
   const dueDateStr = dueDate.toISOString().split('T')[0];
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,10 +178,10 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
       const invoiceData = invoiceRes.data;
       const paymentLink = invoiceData?.invoice_url || '';
 
-      // Build message with payment link
-      const finalMessage = paymentLink
-        ? message + `\n\nLink de pagamento: ${paymentLink}`
-        : message;
+      // Build messages with payment link
+      const linkBlock = paymentLink ? `\n\nLink de pagamento:\n${paymentLink}` : '';
+      const finalEmailMessage = message + linkBlock;
+      const finalWhatsappMessage = whatsappMessage + linkBlock;
 
       // 3. Send multichannel notification (CRM + WhatsApp)
       const notifChannels: string[] = ['crm'];
@@ -153,7 +192,7 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
           user_id: client.id,
           event_type: 'cobranca_gerada',
           channels: notifChannels,
-          custom_message: finalMessage,
+          custom_message: finalWhatsappMessage,
           data: {
             link: paymentLink,
             valor: String(valor),
@@ -169,7 +208,7 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
           body: {
             to: [client.email],
             subject: `Exigência INPI – ${stage.label} – ${client.brand_name || 'Marca'}`,
-            body: finalMessage,
+            body: finalEmailMessage,
             attachments,
           },
         });
@@ -251,6 +290,19 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
           />
         </div>
 
+        {/* WhatsApp message */}
+        <div className="space-y-2">
+          <Label className="text-xs font-semibold flex items-center gap-1.5">
+            <MessageCircle className="h-3.5 w-3.5 text-green-500" /> Mensagem WhatsApp
+          </Label>
+          <Textarea
+            value={whatsappMessage}
+            onChange={(e) => setWhatsappMessage(e.target.value)}
+            rows={8}
+            className="text-xs resize-none bg-background"
+          />
+        </div>
+
         {/* Channels */}
         <div className="flex gap-4">
           <label className="flex items-center gap-2 cursor-pointer">
@@ -309,7 +361,8 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
               onChange={(e) => {
                 const v = parseFloat(e.target.value) || 0;
                 setValor(v);
-                setMessage(generateTemplate(client, stage, v));
+              setMessage(generateEmailTemplate(client, stage, v));
+              setWhatsappMessage(generateWhatsAppTemplate(client, stage, v));
               }}
               className="h-9 text-sm bg-background"
               min={0}
@@ -369,7 +422,7 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
           {/* Due date info */}
           <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
             <CreditCard className="h-3.5 w-3.5" />
-            <span>Vencimento: <strong>{new Date(dueDateStr).toLocaleDateString('pt-BR')}</strong> (+10 dias)</span>
+            <span>Vencimento: <strong>{dueDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</strong> (próxima segunda-feira)</span>
           </div>
         </div>
 
