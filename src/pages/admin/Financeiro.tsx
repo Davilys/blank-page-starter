@@ -961,6 +961,17 @@ export default function AdminFinanceiro() {
           )}
         </motion.div>
       </div>
+
+      {sheetOpen && sheetClient && (
+        <Suspense fallback={null}>
+          <ClientDetailSheet
+            client={sheetClient}
+            open={sheetOpen}
+            onOpenChange={(o) => { setSheetOpen(o); if (!o) setSheetClient(null); }}
+            onUpdate={fetchInvoices}
+          />
+        </Suspense>
+      )}
     </>
   );
 }
