@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, lazy, Suspense, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,12 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+import type { ClientWithProcess } from '@/components/admin/clients/ClientKanbanBoard';
+
+// Lazy load the heavy ClientDetailSheet — same component used in Clientes/Devedores/Publicações
+const ClientDetailSheet = lazy(() =>
+  import('@/components/admin/clients/ClientDetailSheet').then((m) => ({ default: m.ClientDetailSheet }))
+);
 
 interface Invoice {
   id: string;
@@ -99,6 +105,80 @@ export default function AdminFinanceiro() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { canViewFinancialValues, isMasterAdmin } = useCanViewFinancialValues();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Client file sheet (same as Clientes/Devedores/Publicações)
+  const [sheetClient, setSheetClient] = useState<ClientWithProcess | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [loadingClientId, setLoadingClientId] = useState<string | null>(null);
+
+  const openClientFile = useCallback(async (clientId: string) => {
+    if (!clientId) return;
+    setLoadingClientId(clientId);
+    try {
+      const [profileRes, processesRes, contractsRes] = await Promise.all([
+        supabase.from('profiles')
+          .select('id, full_name, email, phone, cpf_cnpj, company_name, priority, origin, contract_value, created_at, last_contact, client_funnel_type, created_by, assigned_to')
+          .eq('id', clientId)
+          .single(),
+        supabase.from('brand_processes')
+          .select('id, user_id, brand_name, business_area, pipeline_stage, status, process_number')
+          .eq('user_id', clientId),
+        supabase.from('contracts')
+          .select('user_id, contract_value, payment_method')
+          .eq('user_id', clientId)
+          .order('created_at', { ascending: false })
+          .limit(1),
+      ]);
+      const profile: any = profileRes.data;
+      if (!profile) { toast.error('Cliente não encontrado'); return; }
+      const userProcesses = processesRes.data || [];
+      const latestContract = contractsRes.data?.[0];
+      const adminIds = [profile.created_by, profile.assigned_to].filter(Boolean) as string[];
+      const adminNameMap: Record<string, string> = {};
+      if (adminIds.length > 0) {
+        const { data: adminProfiles } = await supabase.from('profiles').select('id, full_name, email').in('id', adminIds);
+        for (const a of adminProfiles || []) adminNameMap[a.id] = a.full_name || a.email;
+      }
+      const mainProcess = userProcesses[0] || null;
+      const brands = userProcesses.map((p: any) => ({
+        id: p.id,
+        brand_name: p.brand_name,
+        pipeline_stage: p.pipeline_stage || (profile.client_funnel_type === 'comercial' ? 'assinou_contrato' : 'protocolado'),
+        process_number: p.process_number || undefined,
+      }));
+      const clientObj: ClientWithProcess = {
+        id: profile.id,
+        full_name: profile.full_name || '',
+        email: profile.email || '',
+        phone: profile.phone || null,
+        company_name: profile.company_name || null,
+        priority: profile.priority || 'medium',
+        origin: profile.origin || 'site',
+        contract_value: latestContract?.contract_value ? Number(latestContract.contract_value) : (profile.contract_value || 0),
+        process_id: mainProcess?.id || null,
+        brand_name: mainProcess?.brand_name || null,
+        business_area: mainProcess?.business_area || null,
+        pipeline_stage: mainProcess?.pipeline_stage || (profile.client_funnel_type === 'comercial' ? 'assinou_contrato' : 'protocolado'),
+        process_status: mainProcess?.status || null,
+        process_number: mainProcess?.process_number || undefined,
+        created_at: profile.created_at || undefined,
+        cpf_cnpj: profile.cpf_cnpj || undefined,
+        client_funnel_type: profile.client_funnel_type || 'juridico',
+        created_by: profile.created_by || null,
+        assigned_to: profile.assigned_to || null,
+        created_by_name: profile.created_by ? adminNameMap[profile.created_by] || null : null,
+        assigned_to_name: profile.assigned_to ? adminNameMap[profile.assigned_to] || null : null,
+        brands,
+      };
+      setSheetClient(clientObj);
+      setSheetOpen(true);
+    } catch (err) {
+      console.error('Error opening client file:', err);
+      toast.error('Erro ao carregar ficha do cliente');
+    } finally {
+      setLoadingClientId(null);
+    }
+  }, []);
 
   // Fetch current user id on mount
   useEffect(() => {
@@ -802,9 +882,21 @@ export default function AdminFinanceiro() {
                           </div>
                         </TableCell>
                         <TableCell className="py-3.5">
-                          <span className="text-sm text-muted-foreground">
-                            {(invoice.profiles as any)?.full_name || (invoice.profiles as any)?.email || '—'}
-                          </span>
+                          {invoice.user_id ? (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); openClientFile(invoice.user_id!); }}
+                              className="text-sm text-foreground hover:text-primary hover:underline inline-flex items-center gap-1.5 text-left"
+                              disabled={loadingClientId === invoice.user_id}
+                            >
+                              {loadingClientId === invoice.user_id && <Loader2 className="h-3 w-3 animate-spin" />}
+                              {(invoice.profiles as any)?.full_name || (invoice.profiles as any)?.email || '—'}
+                            </button>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">
+                              {(invoice.profiles as any)?.full_name || (invoice.profiles as any)?.email || '—'}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell className="hidden md:table-cell py-3.5">
                           {canViewFinancialValues ? (
@@ -869,6 +961,17 @@ export default function AdminFinanceiro() {
           )}
         </motion.div>
       </div>
+
+      {sheetOpen && sheetClient && (
+        <Suspense fallback={null}>
+          <ClientDetailSheet
+            client={sheetClient}
+            open={sheetOpen}
+            onOpenChange={(o) => { setSheetOpen(o); if (!o) setSheetClient(null); }}
+            onUpdate={fetchInvoices}
+          />
+        </Suspense>
+      )}
     </>
   );
 }
