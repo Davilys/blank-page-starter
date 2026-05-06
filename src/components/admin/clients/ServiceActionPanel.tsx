@@ -140,24 +140,17 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
       // 1. Upload documents if any
       const docUrls: { url: string; filename: string }[] = [];
       for (const f of files) {
-        const sanitizedName = f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const filePath = `${client.id}/${Date.now()}_${sanitizedName}`;
-        const { error: uploadErr } = await supabase.storage.from('documents').upload(filePath, f);
-        if (uploadErr) throw new Error(`Erro ao fazer upload: ${f.name}`);
-        const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
-        const docUrl = urlData.publicUrl;
-        docUrls.push({ url: docUrl, filename: f.name });
-
-        await supabase.from('documents').insert({
-          user_id: client.id,
-          name: f.name,
-          file_url: docUrl,
-          file_size: f.size,
-          mime_type: f.type,
-          document_type: 'notificacao',
-          uploaded_by: user?.id,
-          process_id: client.process_id || null,
+        const fd = new FormData();
+        fd.append('clientId', client.id);
+        fd.append('file', f);
+        const { data: upData, error: upErr } = await supabase.functions.invoke('admin-upload-client-document', {
+          body: fd,
         });
+        if (upErr || !upData?.success) {
+          const msg = (upData as any)?.error || upErr?.message || `Erro ao fazer upload: ${f.name}`;
+          throw new Error(msg);
+        }
+        docUrls.push({ url: upData.document.file_url, filename: f.name });
       }
 
       // 2. Create invoice via edge function
