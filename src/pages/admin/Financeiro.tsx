@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, lazy, Suspense, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,12 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+import type { ClientWithProcess } from '@/components/admin/clients/ClientKanbanBoard';
+
+// Lazy load the heavy ClientDetailSheet — same component used in Clientes/Devedores/Publicações
+const ClientDetailSheet = lazy(() =>
+  import('@/components/admin/clients/ClientDetailSheet').then((m) => ({ default: m.ClientDetailSheet }))
+);
 
 interface Invoice {
   id: string;
