@@ -581,9 +581,14 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
           </Button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-              <AlertTriangle className="h-6 w-6 text-red-500" /> Devedores
+              <AlertTriangle className={`h-6 w-6 ${is30Group ? "text-orange-500" : "text-red-500"}`} />
+              {is30Group ? "Devedor (30 dias)" : "Devedores (60 dias)"}
             </h1>
-            <p className="text-sm text-muted-foreground">Cobranças Asaas com mais de 60 dias de atraso</p>
+            <p className="text-sm text-muted-foreground">
+              {is30Group
+                ? "Cobranças Asaas vencidas em até 30 dias"
+                : "Cobranças Asaas com mais de 60 dias de atraso"}
+            </p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -598,10 +603,21 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
       </div>
 
       <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
-        <SummaryCard icon={<Users className="h-5 w-5" />} label="Devedores" value={String(totalDevedores)} />
-        <SummaryCard icon={<AlertTriangle className="h-5 w-5" />} label="Parcelas vencidas" value={String(totalParcelas)} />
-        <SummaryCard icon={<DollarSign className="h-5 w-5" />} label="Valor original" value={fmtBRL(totalOriginal)} />
-        <SummaryCard icon={<TrendingUp className="h-5 w-5" />} label="Total +10%" value={fmtBRL(totalComAcrescimo)} accent />
+        {is30Group ? (
+          <>
+            <SummaryCard icon={<Users className="h-5 w-5" />} label="Devedor (30d)" value={String(totalDevedores30)} tone="orange" />
+            <SummaryCard icon={<AlertTriangle className="h-5 w-5" />} label="Parcelas vencidas" value={String(totalParcelas30)} tone="orange" />
+            <SummaryCard icon={<DollarSign className="h-5 w-5" />} label="Valor original" value={fmtBRL(totalOriginal30)} tone="orange" />
+            <SummaryCard icon={<TrendingUp className="h-5 w-5" />} label="Total +10%" value={fmtBRL(totalComAcrescimo30)} tone="orange" accent />
+          </>
+        ) : (
+          <>
+            <SummaryCard icon={<Users className="h-5 w-5" />} label="Devedores (60d)" value={String(totalDevedores)} tone="red" />
+            <SummaryCard icon={<AlertTriangle className="h-5 w-5" />} label="Parcelas vencidas" value={String(totalParcelas)} tone="red" />
+            <SummaryCard icon={<DollarSign className="h-5 w-5" />} label="Valor original" value={fmtBRL(totalOriginal)} tone="red" />
+            <SummaryCard icon={<TrendingUp className="h-5 w-5" />} label="Total +10%" value={fmtBRL(totalComAcrescimo)} tone="red" accent />
+          </>
+        )}
       </div>
 
       <Card>
@@ -624,12 +640,32 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="lista">
-        <TabsList>
-          <TabsTrigger value="lista">Devedores ({totalDevedores})</TabsTrigger>
-          <TabsTrigger value="devedor">Devedor ({filteredDebtors30.length})</TabsTrigger>
-          <TabsTrigger value="historico">Histórico ({filteredHistory.length})</TabsTrigger>
-          <TabsTrigger value="historico-devedor">Histórico Devedor ({filteredHistory30.length})</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="flex-wrap h-auto">
+          <TabsTrigger
+            value="lista"
+            className="data-[state=active]:bg-red-600 data-[state=active]:text-white text-red-600"
+          >
+            Devedores 60 dias ({totalDevedores})
+          </TabsTrigger>
+          <TabsTrigger
+            value="historico"
+            className="data-[state=active]:bg-red-600 data-[state=active]:text-white text-red-600"
+          >
+            Histórico Devedores ({filteredHistory.length})
+          </TabsTrigger>
+          <TabsTrigger
+            value="devedor"
+            className="data-[state=active]:bg-orange-500 data-[state=active]:text-white text-orange-600"
+          >
+            Devedor 30 dias ({totalDevedores30})
+          </TabsTrigger>
+          <TabsTrigger
+            value="historico-devedor"
+            className="data-[state=active]:bg-orange-500 data-[state=active]:text-white text-orange-600"
+          >
+            Histórico Devedor ({filteredHistory30.length})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="lista">
