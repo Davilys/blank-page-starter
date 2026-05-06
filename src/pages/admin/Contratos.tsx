@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   Search, Plus, RefreshCw, FileSignature, MoreHorizontal, 
   Eye, Trash2, Download, Send, Filter, CheckCircle, XCircle, Loader2, Timer, Edit,
-  TrendingUp, DollarSign, FileText, PenTool, RotateCcw, Archive, Upload
+  TrendingUp, DollarSign, FileText, PenTool, RotateCcw, Archive, Upload, Link2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, isToday, isThisWeek, isThisMonth } from 'date-fns';
@@ -18,6 +18,7 @@ import { ptBR } from 'date-fns/locale';
 import { ContractDetailSheet } from '@/components/admin/contracts/ContractDetailSheet';
 import { CreateContractDialog } from '@/components/admin/contracts/CreateContractDialog';
 import { EditContractDialog } from '@/components/admin/contracts/EditContractDialog';
+import { LinkClientDialog } from '@/components/admin/contracts/LinkClientDialog';
 import { generateDocumentPrintHTML, getLogoBase64ForPDF } from '@/components/contracts/DocumentRenderer';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DatePeriodFilter, type DateFilterType } from '@/components/admin/clients/DatePeriodFilter';
@@ -54,6 +55,7 @@ interface Contract {
   payment_method?: string | null;
   asaas_payment_id?: string | null;
   template_id?: string | null;
+  signatory_name?: string | null;
   contract_type?: { name: string } | null;
   contract_template?: { name: string } | null;
   profile?: { full_name: string | null; phone: string | null } | null;
@@ -154,6 +156,7 @@ export default function AdminContratos() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editContract, setEditContract] = useState<Contract | null>(null);
+  const [linkContract, setLinkContract] = useState<{ id: string; name: string | null } | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [expiringPromotion, setExpiringPromotion] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
@@ -363,6 +366,7 @@ export default function AdminContratos() {
             asaas_payment_id,
             template_id,
             document_type,
+            signatory_name,
             contract_type:contract_types(name),
             contract_template:contract_templates(name),
             profile:profiles(full_name, phone)
@@ -1001,7 +1005,18 @@ export default function AdminContratos() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm">{contract.profile?.full_name || '-'}</TableCell>
+                       <TableCell className="text-sm">
+                         {contract.profile?.full_name || (
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             className="h-6 px-2 text-xs gap-1"
+                             onClick={(e) => { e.stopPropagation(); setLinkContract({ id: contract.id, name: contract.signatory_name || null }); }}
+                           >
+                             <Link2 className="h-3 w-3" /> Vincular cliente
+                           </Button>
+                         )}
+                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="rounded-lg text-xs font-normal border-border/50">
                           {contract.contract_type?.name || contract.contract_template?.name || 'N/D'}
@@ -1152,6 +1167,14 @@ export default function AdminContratos() {
         open={editOpen}
         onOpenChange={setEditOpen}
         onSuccess={refreshContracts}
+      />
+
+      <LinkClientDialog
+        contractId={linkContract?.id || null}
+        signatoryName={linkContract?.name || null}
+        open={!!linkContract}
+        onOpenChange={(v) => { if (!v) setLinkContract(null); }}
+        onLinked={refreshContracts}
       />
     </>
   );

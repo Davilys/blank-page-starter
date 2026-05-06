@@ -3990,7 +3990,16 @@ export type Database = {
         Args: { keep_id: string; merge_id: string }
         Returns: undefined
       }
+      only_digits: { Args: { s: string }; Returns: string }
       recalculate_upsell_weights: { Args: never; Returns: Json }
+      resolve_contract_user_id: {
+        Args: {
+          _signatory_cnpj: string
+          _signatory_cpf: string
+          _signatory_name: string
+        }
+        Returns: string
+      }
       sync_intelligence_history: { Args: never; Returns: Json }
     }
     Enums: {
