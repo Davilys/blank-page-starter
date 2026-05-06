@@ -482,7 +482,9 @@ Deno.serve(async (req) => {
       if (!asaas_customer_id) return json({ error: "asaas_customer_id obrigatório" }, 400);
 
       // pega parcelas vencidas desse cliente
-      let q = admin.from("cobrancas_vencidas").select("*").eq("status", "pendente_renegociacao");
+      let q = admin.from("cobrancas_vencidas").select("*")
+        .eq("status", "pendente_renegociacao")
+        .eq("bucket", "d60");
       if (cliente_cpf_cnpj) q = q.eq("cliente_cpf_cnpj", cliente_cpf_cnpj);
       else q = q.eq("asaas_customer_id", asaas_customer_id);
       const { data: parcelas, error: pErr } = await q;
