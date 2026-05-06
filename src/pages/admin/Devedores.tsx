@@ -873,18 +873,38 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                     <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhuma negociação ainda.</TableCell></TableRow>
                   )}
                   {filteredHistory30.map((h) => (
-                    <TableRow key={h.id}>
+                    <TableRow
+                      key={h.id}
+                      onClick={() => openClientFile({
+                        key: h.id,
+                        cliente_nome: h.cliente_nome,
+                        cliente_cpf_cnpj: h.cliente_cpf_cnpj,
+                        cliente_email: null,
+                        asaas_customer_id: "",
+                        parcelas: [],
+                        qtd_parcelas: 0,
+                        total_original: 0,
+                        acrescimo: 0,
+                        novo_total: 0,
+                        valor_parcela: 0,
+                        datas_parcelas: [],
+                      } as Debtor)}
+                      className="cursor-pointer"
+                    >
                       <TableCell className="text-sm">{new Date(h.created_at).toLocaleDateString("pt-BR")}</TableCell>
                       <TableCell>
-                        <span>{h.cliente_nome || h.cliente_cpf_cnpj || "—"}</span>
-                        <span className="inline-flex items-center gap-1 ml-2">
+                        <span className="inline-flex items-center gap-2 hover:text-primary hover:underline transition-colors">
+                          {loadingClient === h.id && <Loader2 className="h-3 w-3 animate-spin" />}
+                          {h.cliente_nome || h.cliente_cpf_cnpj || "—"}
+                        </span>
+                        <span className="inline-flex items-center gap-1 ml-2" onClick={(e) => e.stopPropagation()}>
                           <Button size="sm" variant="outline" className="h-6 px-2"
-                            onClick={() => handleResendDevedor(h, 'email')}
+                            onClick={(e) => { e.stopPropagation(); handleResendDevedor(h, 'email'); }}
                             disabled={resending === `${h.id}-email`} title="Reenviar e-mail">
                             {resending === `${h.id}-email` ? <Loader2 className="h-3 w-3 animate-spin" /> : <Mail className="h-3 w-3" />}
                           </Button>
                           <Button size="sm" variant="outline" className="h-6 px-2"
-                            onClick={() => handleResendDevedor(h, 'whatsapp')}
+                            onClick={(e) => { e.stopPropagation(); handleResendDevedor(h, 'whatsapp'); }}
                             disabled={resending === `${h.id}-whatsapp`} title="Reenviar WhatsApp">
                             {resending === `${h.id}-whatsapp` ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageCircle className="h-3 w-3" />}
                           </Button>
