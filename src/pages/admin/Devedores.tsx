@@ -533,6 +533,28 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                           {loadingClient === h.id && <Loader2 className="h-3 w-3 animate-spin" />}
                           {h.cliente_nome || h.cliente_cpf_cnpj || "—"}
                         </span>
+                        <span className="inline-flex items-center gap-1 ml-2" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2"
+                            onClick={(e) => { e.stopPropagation(); handleResendNotification(h, 'email'); }}
+                            disabled={resending === `${h.id}-email`}
+                            title="Reenviar e-mail"
+                          >
+                            {resending === `${h.id}-email` ? <Loader2 className="h-3 w-3 animate-spin" /> : <Mail className="h-3 w-3" />}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2"
+                            onClick={(e) => { e.stopPropagation(); handleResendNotification(h, 'whatsapp'); }}
+                            disabled={resending === `${h.id}-whatsapp`}
+                            title="Reenviar WhatsApp"
+                          >
+                            {resending === `${h.id}-whatsapp` ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageCircle className="h-3 w-3" />}
+                          </Button>
+                        </span>
                       </TableCell>
                       <TableCell className="text-right">{fmtBRL(h.valor_original_total)}</TableCell>
                       <TableCell className="text-right text-amber-600">{fmtBRL(h.valor_acrescimo)}</TableCell>
