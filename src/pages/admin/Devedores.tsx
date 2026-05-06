@@ -46,6 +46,19 @@ interface Renegociacao {
   parcelas_renegociadas?: any[];
 }
 
+interface NegociacaoDevedor {
+  id: string;
+  cliente_nome: string | null;
+  cliente_cpf_cnpj: string | null;
+  asaas_customer_id: string | null;
+  tipo: 'negociar' | 'cobrar';
+  valor_original_total: number;
+  valor_acrescimo: number;
+  valor_total: number;
+  created_at: string;
+  parcelas_devedor?: any[];
+}
+
 const fmtBRL = (n: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n || 0);
 const fmtDate = (s: string) => {
   const [y, m, d] = s.split("-");
@@ -76,8 +89,13 @@ export default function Devedores() {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [debtors, setDebtors] = useState<Debtor[]>([]);
+  const [debtors30, setDebtors30] = useState<Debtor[]>([]);
   const [history, setHistory] = useState<Renegociacao[]>([]);
+  const [history30, setHistory30] = useState<NegociacaoDevedor[]>([]);
   const [selected, setSelected] = useState<Debtor | null>(null);
+  const [selectedNeg, setSelectedNeg] = useState<Debtor | null>(null);
+  const [selectedCob, setSelectedCob] = useState<Debtor | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
   const [observacao, setObservacao] = useState("");
   const [renegLoading, setRenegLoading] = useState(false);
   const [openClient, setOpenClient] = useState<ClientWithProcess | null>(null);
@@ -110,6 +128,52 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
 <p>Assim você mantém seu contrato ativo e evita qualquer risco de cancelamento 🚨</p>
 <p>Nosso objetivo é garantir que sua marca continue protegida e em andamento no INPI.</p>
 <p>Só para confirma aqui ja liberei essa condição pra você, combinado... 👍</p>`;
+    return { msg, html };
+  };
+
+  const buildNegociar30Message = (nome: string, valorTotal: string, link: string) => {
+    const firstName = (nome || "Cliente").split(" ")[0];
+    const msg =
+`Oi ${firstName}! Tudo bem?
+
+Para você não ficar com pendências em aberto, consegui parcelar suas faturas vencidas em até 3x sem juros no boleto 👇
+
+✅ Total renegociado: ${valorTotal} (com pequeno acréscimo de 10%)
+📅 1ª parcela vence dia 20, segue boleto: ${link}
+
+Assim você regulariza tudo de forma tranquila e mantém seu cadastro em dia.
+
+Já liberei essa condição pra você, combinado? 👍`;
+    const html = `
+<p>Oi <strong>${firstName}</strong>! Tudo bem?</p>
+<p>Para você não ficar com pendências em aberto, consegui parcelar suas faturas vencidas em até <strong>3x sem juros</strong> no boleto 👇</p>
+<p>✅ Total renegociado: <strong>${valorTotal}</strong> (com pequeno acréscimo de 10%)</p>
+<p>📅 1ª parcela vence dia 20, segue boleto: ${link ? `<a href="${link}" target="_blank" rel="noopener">${link}</a>` : "(link indisponível)"}</p>
+<p>Assim você regulariza tudo de forma tranquila e mantém seu cadastro em dia.</p>
+<p>Já liberei essa condição pra você, combinado? 👍</p>`;
+    return { msg, html };
+  };
+
+  const buildCobrarMessage = (nome: string, valorTotal: string, link: string) => {
+    const firstName = (nome || "Cliente").split(" ")[0];
+    const msg =
+`Oi ${firstName}! Tudo bem?
+
+Juntei todas as suas faturas em aberto em um único boleto, sem qualquer acréscimo, pra ficar mais fácil de quitar 👇
+
+✅ Total: ${valorTotal}
+📅 Vencimento dia 20, segue boleto: ${link}
+
+Assim você regulariza tudo de uma vez e fica em dia.
+
+Combinado? 👍`;
+    const html = `
+<p>Oi <strong>${firstName}</strong>! Tudo bem?</p>
+<p>Juntei todas as suas faturas em aberto em um <strong>único boleto</strong>, sem qualquer acréscimo, pra ficar mais fácil de quitar 👇</p>
+<p>✅ Total: <strong>${valorTotal}</strong></p>
+<p>📅 Vencimento dia 20, segue boleto: ${link ? `<a href="${link}" target="_blank" rel="noopener">${link}</a>` : "(link indisponível)"}</p>
+<p>Assim você regulariza tudo de uma vez e fica em dia.</p>
+<p>Combinado? 👍</p>`;
     return { msg, html };
   };
 
@@ -164,11 +228,54 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
     }
   };
 
+  const handleResendDevedor = async (h: NegociacaoDevedor, channel: 'email' | 'whatsapp') => {
+    setResending(`${h.id}-${channel}`);
+    try {
+      const parcelas = (h.parcelas_devedor || []).slice().sort((a: any, b: any) => (a.numero_parcela || 0) - (b.numero_parcela || 0));
+      const link = parcelas[0]?.invoice_url || parcelas[0]?.link_boleto || "";
+      let email = ""; let phone = "";
+      if (h.cliente_cpf_cnpj) {
+        const { data: prof } = await supabase.from("profiles").select("email, phone")
+          .or(`cpf.eq.${h.cliente_cpf_cnpj},cpf_cnpj.eq.${h.cliente_cpf_cnpj}`).maybeSingle();
+        email = prof?.email || ""; phone = prof?.phone || "";
+      }
+      if (channel === 'email' && !email) { toast.error("Cliente sem e-mail."); return; }
+      if (channel === 'whatsapp' && !phone) { toast.error("Cliente sem telefone."); return; }
+      const nome = h.cliente_nome || "Cliente";
+      const valor = fmtBRL(h.valor_total);
+      const { msg, html } = h.tipo === 'negociar'
+        ? buildNegociar30Message(nome, valor, link)
+        : buildCobrarMessage(nome, valor, link);
+      const subject = h.tipo === 'negociar'
+        ? "Condição especial para regularizar suas faturas"
+        : "Boleto único das suas faturas em aberto";
+      const { error } = await supabase.functions.invoke("send-multichannel-notification", {
+        body: {
+          event_type: "manual",
+          channels: [channel],
+          recipient: { nome, phone, email },
+          custom_message: msg, custom_html: html, custom_subject: subject,
+          data: { link, marca: "sua marca" },
+        },
+      });
+      if (error) throw new Error(error.message);
+      toast.success(`Notificação reenviada por ${channel === 'email' ? 'e-mail' : 'WhatsApp'}.`);
+    } catch (e: any) {
+      toast.error(`Falha: ${e.message}`);
+    } finally {
+      setResending(null);
+    }
+  };
+
   const fetchDebtors = async () => {
     setLoading(true);
     try {
       const r = await callApi("list-debtors-grouped");
       setDebtors(r.debtors || []);
+      try {
+        const r30 = await callApi("list-debtors-30-grouped");
+        setDebtors30(r30.debtors || []);
+      } catch (e) { console.warn("list 30 fail", e); }
     } catch (e: any) {
       toast.error(e.message);
     } finally {
@@ -184,6 +291,13 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
       .limit(100);
     if (error) { toast.error(error.message); return; }
     setHistory((data || []) as any);
+    const { data: d30, error: e30 } = await (supabase as any)
+      .from("negociacoes_devedor")
+      .select("*, parcelas_devedor(*)")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (e30) { console.warn("hist 30 fail", e30); return; }
+    setHistory30((d30 || []) as any);
   };
 
   useEffect(() => {
@@ -194,9 +308,13 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const r = await callApi("sync-overdue");
-      toast.success(`Sincronizado: ${r.kept_over_60d} cobrança(s) com mais de 60 dias de atraso (de ${r.total_overdue} vencidas no Asaas).`);
+      const [r, r30] = await Promise.all([
+        callApi("sync-overdue"),
+        callApi("sync-overdue-30"),
+      ]);
+      toast.success(`Sincronizado: ${r.kept_over_60d} com 60+ dias e ${r30.kept_under_30d} com até 30 dias.`);
       await fetchDebtors();
+      await fetchHistory();
     } catch (e: any) {
       toast.error(`Falha na sincronização: ${e.message}`);
     } finally {
@@ -289,6 +407,59 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
     }
   };
 
+  const handleNegociarOrCobrar = async (kind: 'negociar' | 'cobrar') => {
+    const target = kind === 'negociar' ? selectedNeg : selectedCob;
+    if (!target) return;
+    setActionLoading(true);
+    try {
+      const r = await callApi(kind === 'negociar' ? 'negociar-devedor' : 'cobrar-devedor', {
+        cliente_cpf_cnpj: target.cliente_cpf_cnpj,
+        asaas_customer_id: target.asaas_customer_id,
+      });
+      toast.success(`${kind === 'negociar' ? 'Negociação' : 'Cobrança'} criada com ${r.parcelas_criadas} boleto(s).`);
+
+      try {
+        const nome = r.cliente_nome || target.cliente_nome || "Cliente";
+        const valor = fmtBRL(r.valor_total);
+        const link = r.primeira_fatura_url || "";
+        const email = r.cliente_email || target.cliente_email || "";
+        const phone = r.cliente_telefone || "";
+        const { msg, html } = kind === 'negociar'
+          ? buildNegociar30Message(nome, valor, link)
+          : buildCobrarMessage(nome, valor, link);
+        const subject = kind === 'negociar'
+          ? "Condição especial para regularizar suas faturas"
+          : "Boleto único das suas faturas em aberto";
+        const channels: Array<'whatsapp'|'email'> = [];
+        if (phone) channels.push('whatsapp');
+        if (email) channels.push('email');
+        if (channels.length === 0) {
+          toast.warning("Criado, mas cliente sem email/telefone.");
+        } else {
+          await supabase.functions.invoke("send-multichannel-notification", {
+            body: {
+              event_type: "manual", channels,
+              recipient: { nome, phone, email },
+              custom_message: msg, custom_html: html, custom_subject: subject,
+              data: { link, marca: "sua marca" },
+            },
+          });
+          toast.success(`Cliente notificado (${channels.join(' + ')}).`);
+        }
+      } catch (e: any) {
+        toast.warning(`Criado, mas falha ao notificar: ${e.message}`);
+      }
+
+      setSelectedNeg(null); setSelectedCob(null);
+      await fetchDebtors();
+      await fetchHistory();
+    } catch (e: any) {
+      toast.error(`Falha: ${e.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const getInterval = (): { start: Date; end: Date } | null => {
     const now = new Date();
     if (dateFilter === "today") return { start: startOfDay(now), end: endOfDay(now) };
@@ -315,6 +486,20 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
   });
 
   const filteredHistory = history.filter((h) => {
+    if (!matchesSearch(h.cliente_nome) && !matchesSearch(h.cliente_cpf_cnpj)) return false;
+    if (interval) {
+      const dt = new Date(h.created_at);
+      if (!isWithinInterval(dt, interval)) return false;
+    }
+    return true;
+  });
+
+  const filteredDebtors30 = debtors30.filter((d) => {
+    if (!matchesSearch(d.cliente_nome) && !matchesSearch(d.cliente_cpf_cnpj) && !matchesSearch(d.cliente_email)) return false;
+    return true;
+  });
+
+  const filteredHistory30 = history30.filter((h) => {
     if (!matchesSearch(h.cliente_nome) && !matchesSearch(h.cliente_cpf_cnpj)) return false;
     if (interval) {
       const dt = new Date(h.created_at);
