@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { AlertTriangle, MessageCircle, Mail, Loader2, RefreshCw, Search, CheckCircle2, Calendar, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { startOfDay, startOfWeek, startOfMonth, subDays } from "date-fns";
+import { loadClientForSheet } from "@/lib/clientSheet";
+import type { ClientWithProcess } from "@/components/admin/clients/ClientKanbanBoard";
+
+const ClientDetailSheet = lazy(() =>
+  import("@/components/admin/clients/ClientDetailSheet").then((m) => ({ default: m.ClientDetailSheet }))
+);
 
 type Period = "today" | "week" | "month" | "30d";
 
@@ -26,6 +32,7 @@ interface OverdueInvoice {
 interface CobrancaHist {
   id: string;
   invoice_id: string;
+  user_id: string | null;
   enviada_em: string;
   canais: string[];
   status: string;
@@ -47,6 +54,22 @@ export default function FinanceiroVencidos() {
   const [period, setPeriod] = useState<Period>("30d");
   const [search, setSearch] = useState("");
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [openClient, setOpenClient] = useState<ClientWithProcess | null>(null);
+  const [loadingClient, setLoadingClient] = useState<string | null>(null);
+
+  const openClientFile = async (userId: string | null | undefined) => {
+    if (!userId) { toast.error("Cliente sem perfil vinculado"); return; }
+    setLoadingClient(userId);
+    try {
+      const full = await loadClientForSheet(userId);
+      if (!full) { toast.error("Ficha do cliente não encontrada"); return; }
+      setOpenClient(full);
+    } catch (e: any) {
+      toast.error("Falha ao abrir ficha: " + (e.message || e));
+    } finally {
+      setLoadingClient(null);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -71,7 +94,7 @@ export default function FinanceiroVencidos() {
 
       const { data: hist } = await supabase
         .from("cobranca_historico")
-        .select("id, invoice_id, enviada_em, canais, status, cliente_nome, proxima_acao_em")
+        .select("id, invoice_id, user_id, enviada_em, canais, status, cliente_nome, proxima_acao_em")
         .order("enviada_em", { ascending: false })
         .limit(200);
       setHistory((hist as any) || []);
@@ -213,7 +236,15 @@ export default function FinanceiroVencidos() {
                   return (
                     <TableRow key={inv.id}>
                       <TableCell>
-                        <div className="text-sm font-medium">{inv.profiles?.full_name || inv.profiles?.email || "—"}</div>
+                        <button
+                          type="button"
+                          onClick={() => openClientFile(inv.user_id)}
+                          disabled={!inv.user_id || loadingClient === inv.user_id}
+                          className="text-sm font-medium text-left hover:underline text-primary disabled:opacity-60"
+                        >
+                          {loadingClient === inv.user_id ? <Loader2 className="h-3 w-3 animate-spin inline mr-1" /> : null}
+                          {inv.profiles?.full_name || inv.profiles?.email || "—"}
+                        </button>
                         <div className="text-xs text-muted-foreground">{inv.profiles?.phone || "sem telefone"}</div>
                       </TableCell>
                       <TableCell className="max-w-[220px]"><div className="text-sm line-clamp-1">{inv.description || "—"}</div></TableCell>
@@ -280,7 +311,17 @@ export default function FinanceiroVencidos() {
               ) : history.map((h) => (
                 <TableRow key={h.id}>
                   <TableCell className="text-sm">{new Date(h.enviada_em).toLocaleString("pt-BR")}</TableCell>
-                  <TableCell className="text-sm">{h.cliente_nome || "—"}</TableCell>
+                  <TableCell className="text-sm">
+                    <button
+                      type="button"
+                      onClick={() => openClientFile(h.user_id)}
+                      disabled={!h.user_id || loadingClient === h.user_id}
+                      className="text-left hover:underline text-primary disabled:opacity-60"
+                    >
+                      {loadingClient === h.user_id ? <Loader2 className="h-3 w-3 animate-spin inline mr-1" /> : null}
+                      {h.cliente_nome || "—"}
+                    </button>
+                  </TableCell>
                   <TableCell className="text-xs">{h.canais.join(", ")}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className={
@@ -298,6 +339,17 @@ export default function FinanceiroVencidos() {
           </Table>
         </TabsContent>
       </Tabs>
+
+      {openClient && (
+        <Suspense fallback={null}>
+          <ClientDetailSheet
+            client={openClient}
+            open={!!openClient}
+            onOpenChange={(o) => !o && setOpenClient(null)}
+            onUpdate={() => { load(); }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
