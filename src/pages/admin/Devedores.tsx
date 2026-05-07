@@ -12,6 +12,7 @@ import { ArrowLeft, RefreshCw, Loader2, Zap, AlertTriangle, Users, DollarSign, T
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ClientWithProcess } from "@/components/admin/clients/ClientKanbanBoard";
+import { loadClientForSheet } from "@/lib/clientSheet";
 import { DatePeriodFilter, type DateFilterType } from "@/components/admin/clients/DatePeriodFilter";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 
