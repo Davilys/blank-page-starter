@@ -375,6 +375,16 @@ async function syncFolder(
       const snippet = (parsed.text || parsed.html.replace(/<[^>]+>/g, ""))
         .substring(0, 200).trim().replace(/\s+/g, " ");
 
+      // Safe date parsing — many emails have malformed Date headers which
+      // would otherwise throw RangeError and freeze the sync at this UID.
+      let receivedAt: string;
+      try {
+        const d = new Date(env.date);
+        receivedAt = isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+      } catch {
+        receivedAt = new Date().toISOString();
+      }
+
       // Anti-alias filter: if syncing INBOX, only keep messages actually addressed
       // to this account's email (covers Hostinger forwards/aliases that deliver
       // copies of one mailbox into another).
@@ -412,7 +422,7 @@ async function syncFolder(
         has_attachments: parsed.attachments.length > 0,
         attachments: parsed.attachments,
         body_fetched_at: new Date().toISOString(),
-        received_at: new Date(env.date).toISOString(),
+        received_at: receivedAt,
         is_read: isSent || folderLabel === "trash",
         is_starred: false,
         is_archived: false,
@@ -432,6 +442,8 @@ async function syncFolder(
       }
     } catch (e) {
       console.error(`[${folderLabel}] uid=${uid} err:`, e);
+      // Always advance the watermark so a single bad message can't freeze the sync.
+      maxUidSeen = Math.max(maxUidSeen, uid);
     }
   }
 
