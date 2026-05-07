@@ -159,6 +159,20 @@ export default function AdminContratos() {
   const [editOpen, setEditOpen] = useState(false);
   const [editContract, setEditContract] = useState<Contract | null>(null);
   const [linkContract, setLinkContract] = useState<{ id: string; name: string | null } | null>(null);
+  const [openClient, setOpenClient] = useState<any>(null);
+  const [loadingClientId, setLoadingClientId] = useState<string | null>(null);
+
+  const openClientFile = async (userId: string | null | undefined) => {
+    if (!userId) return;
+    setLoadingClientId(userId);
+    try {
+      const c = await loadClientForSheet(userId);
+      if (c) setOpenClient(c);
+      else toast.error('Cliente não encontrado');
+    } finally {
+      setLoadingClientId(null);
+    }
+  };
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [expiringPromotion, setExpiringPromotion] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
@@ -1008,7 +1022,15 @@ export default function AdminContratos() {
                         </div>
                       </TableCell>
                        <TableCell className="text-sm">
-                         {contract.profile?.full_name || (
+                         {contract.profile?.full_name ? (
+                           <button
+                             className="text-left hover:underline text-primary font-medium inline-flex items-center gap-1"
+                             onClick={(e) => { e.stopPropagation(); openClientFile(contract.user_id); }}
+                           >
+                             {contract.profile.full_name}
+                             {loadingClientId === contract.user_id && <Loader2 className="h-3 w-3 animate-spin" />}
+                           </button>
+                         ) : (
                            <Button
                              variant="outline"
                              size="sm"
@@ -1191,6 +1213,17 @@ export default function AdminContratos() {
         onOpenChange={(v) => { if (!v) setLinkContract(null); }}
         onLinked={refreshContracts}
       />
+
+      {openClient && (
+        <Suspense fallback={null}>
+          <ClientDetailSheet
+            client={openClient}
+            open={!!openClient}
+            onOpenChange={(v) => { if (!v) setOpenClient(null); }}
+            onUpdate={refreshContracts}
+          />
+        </Suspense>
+      )}
     </>
   );
 }
