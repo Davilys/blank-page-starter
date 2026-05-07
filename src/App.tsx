@@ -65,6 +65,7 @@ const AdminModelosContrato = lazy(() => import("./pages/admin/ModelosContrato"))
 const AdminProcessos = lazy(() => import("./pages/admin/Processos"));
 const AdminDocumentos = lazy(() => import("./pages/admin/Documentos"));
 const AdminFinanceiro = lazy(() => import("./pages/admin/Financeiro"));
+const AdminFinanceiroVencidos = lazy(() => import("./pages/admin/FinanceiroVencidos"));
 const AdminDevedores = lazy(() => import("./pages/admin/Devedores"));
 const AdminNotificacoes = lazy(() => import("./pages/admin/Notificacoes"));
 const AdminConfiguracoes = lazy(() => import("./pages/admin/Configuracoes"));
@@ -163,6 +164,7 @@ const App = () => (
                 <Route path="processos" element={<AdminProcessos />} />
                 <Route path="documentos" element={<AdminDocumentos />} />
                 <Route path="financeiro" element={<AdminFinanceiro />} />
+                <Route path="financeiro/vencidos" element={<AdminFinanceiroVencidos />} />
                 <Route path="devedores" element={<AdminDevedores />} />
                 <Route path="notificacoes" element={<AdminNotificacoes />} />
                 <Route path="recursos-inpi" element={<AdminRecursosINPI />} />
