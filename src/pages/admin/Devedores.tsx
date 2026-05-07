@@ -545,7 +545,10 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
       const p = json.profile;
-      const client: ClientWithProcess = {
+      // Carrega o objeto completo (mesmo shape usado em todas as outras abas) para
+      // garantir que o ficheiro seja IDÊNTICO ao de Clientes/Publicações/Financeiro.
+      const full = await loadClientForSheet(p.id);
+      const client: ClientWithProcess = full || {
         id: p.id,
         full_name: p.full_name,
         email: p.email,
