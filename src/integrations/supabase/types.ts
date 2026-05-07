@@ -599,6 +599,71 @@ export type Database = {
           },
         ]
       }
+      cobranca_historico: {
+        Row: {
+          canais: string[]
+          cliente_email: string | null
+          cliente_nome: string | null
+          cliente_phone: string | null
+          created_at: string
+          enviada_em: string
+          id: string
+          invoice_id: string
+          message_email_html: string | null
+          message_email_subject: string | null
+          message_whatsapp: string | null
+          metadata: Json | null
+          proxima_acao_em: string | null
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          canais?: string[]
+          cliente_email?: string | null
+          cliente_nome?: string | null
+          cliente_phone?: string | null
+          created_at?: string
+          enviada_em?: string
+          id?: string
+          invoice_id: string
+          message_email_html?: string | null
+          message_email_subject?: string | null
+          message_whatsapp?: string | null
+          metadata?: Json | null
+          proxima_acao_em?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          canais?: string[]
+          cliente_email?: string | null
+          cliente_nome?: string | null
+          cliente_phone?: string | null
+          created_at?: string
+          enviada_em?: string
+          id?: string
+          invoice_id?: string
+          message_email_html?: string | null
+          message_email_subject?: string | null
+          message_whatsapp?: string | null
+          metadata?: Json | null
+          proxima_acao_em?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cobranca_historico_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cobrancas_vencidas: {
         Row: {
           asaas_customer_id: string | null
@@ -4096,6 +4161,7 @@ export type Database = {
       }
       only_digits: { Args: { s: string }; Returns: string }
       recalculate_upsell_weights: { Args: never; Returns: Json }
+      recheck_cobranca_reentry: { Args: never; Returns: number }
       resolve_contract_user_id: {
         Args: {
           _signatory_cnpj: string

@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { loadClientForSheet } from '@/lib/clientSheet';
 import type { ClientWithProcess } from '@/components/admin/clients/ClientKanbanBoard';
+import { OverdueChargeDialog } from '@/components/admin/financeiro/OverdueChargeDialog';
 
 // Lazy load the heavy ClientDetailSheet — same component used in Clientes/Devedores/Publicações
 const ClientDetailSheet = lazy(() =>
@@ -98,6 +99,7 @@ export default function AdminFinanceiro() {
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [overdueDialogOpen, setOverdueDialogOpen] = useState(false);
   const [processes, setProcesses] = useState<Process[]>([]);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -648,7 +650,10 @@ export default function AdminFinanceiro() {
             { title: 'Vencido',        value: filteredStats.overdue, icon: AlertTriangle, color: 'text-red-500', accent: 'from-red-500/20 to-red-500/5', border: 'border-red-500/20', ring: 'bg-red-500/15', count: filteredStats.overdueCount, countLabel: 'faturas' },
           ].map((stat, i) => (
             <motion.div key={stat.title} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
-              <Card className={cn('relative overflow-hidden border transition-all hover:shadow-lg hover:shadow-black/10 hover:-translate-y-0.5', stat.border)}>
+              <Card
+                className={cn('relative overflow-hidden border transition-all hover:shadow-lg hover:shadow-black/10 hover:-translate-y-0.5', stat.border, stat.title === 'Vencido' && 'cursor-pointer')}
+                onClick={stat.title === 'Vencido' ? () => setOverdueDialogOpen(true) : undefined}
+              >
                 <div className={cn('absolute inset-0 bg-gradient-to-br opacity-60', stat.accent)} />
                 <CardContent className="relative pt-5 pb-4 px-5">
                   <div className="flex items-start justify-between mb-3">
@@ -659,7 +664,10 @@ export default function AdminFinanceiro() {
                       {stat.count} {stat.countLabel}
                     </span>
                   </div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">{stat.title}</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                    {stat.title}
+                    {stat.title === 'Vencido' && <span className="ml-1 text-[10px] normal-case text-red-400">(clique p/ cobrar)</span>}
+                  </p>
                   {canViewFinancialValues ? (
                     <p className={cn('text-xl font-bold', stat.color)}>
                       R$ {fmt(stat.value)}
@@ -674,6 +682,8 @@ export default function AdminFinanceiro() {
             </motion.div>
           ))}
         </div>
+
+        <OverdueChargeDialog open={overdueDialogOpen} onOpenChange={setOverdueDialogOpen} />
 
         {/* ── PROGRESS BAR ───────────────────────── */}
         {filteredStats.total > 0 && canViewFinancialValues && (

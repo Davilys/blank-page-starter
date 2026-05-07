@@ -3,6 +3,9 @@ project_id = "scpbqsvwojhbxihyqbdz"
 [functions.send-multichannel-notification]
 verify_jwt = false
 
+[functions.cobrar-fatura-vencida]
+verify_jwt = true
+
 [functions.process-rpi]
 verify_jwt = false
 
