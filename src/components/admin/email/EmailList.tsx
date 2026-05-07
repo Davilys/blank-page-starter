@@ -1,19 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { Paperclip } from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/button';
 import { Search, Mail, Star, Clock, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { Email, EmailFolder } from '@/pages/admin/Emails';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
 
 interface EmailListProps {
   folder: 'inbox' | 'sent' | 'drafts' | 'spam' | 'starred' | 'archived' | 'trash' | 'scheduled' | 'automated';
@@ -24,27 +22,8 @@ interface EmailListProps {
 
 export function EmailList({ folder, onSelectEmail, accountId, accountEmail }: EmailListProps) {
   const [search, setSearch] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
   const queryClient = useQueryClient();
-
-  const syncMutation = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('sync-imap-inbox', {
-        body: { account_id: accountId }
-      });
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['emails'] });
-      const inboxCount = data.inbox?.synced || 0;
-      const sentCount = data.sent?.synced || 0;
-      toast.success(`Sincronização concluída! ${inboxCount} recebidos e ${sentCount} enviados novos.`);
-    },
-    onError: (error: any) => {
-      console.error('Sync error:', error);
-      toast.error('Erro ao sincronizar: ' + error.message);
-    }
-  });
 
   const { data: emails, isLoading } = useQuery({
     queryKey: ['emails', folder, accountId, accountEmail],
@@ -172,10 +151,10 @@ export function EmailList({ folder, onSelectEmail, accountId, accountEmail }: Em
       return mappedImap;
     },
     enabled: !!accountId,
-    refetchInterval: 120000, // Auto-refresh every 2 minutes
+    refetchInterval: 30000, // Auto-refresh every 30s
   });
 
-  // Silent background IMAP sync on mount and every 3 minutes
+  // Silent background IMAP sync on mount and every 30s
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
     if (!accountId) return;
@@ -183,20 +162,25 @@ export function EmailList({ folder, onSelectEmail, accountId, accountEmail }: Em
     // Silent sync (no toast)
     const silentSync = async () => {
       try {
+        setIsSyncing(true);
         await supabase.functions.invoke('sync-imap-inbox', {
           body: { account_id: accountId }
         });
         queryClient.invalidateQueries({ queryKey: ['emails'] });
+        queryClient.invalidateQueries({ queryKey: ['email-stats'] });
+        queryClient.invalidateQueries({ queryKey: ['email-unread-by-account'] });
       } catch (e) {
         console.error('Silent sync error:', e);
+      } finally {
+        setIsSyncing(false);
       }
     };
 
     // Sync on mount
     silentSync();
 
-    // Then every 3 minutes
-    syncIntervalRef.current = setInterval(silentSync, 180000);
+    // Then every 30 seconds
+    syncIntervalRef.current = setInterval(silentSync, 30000);
 
     return () => {
       if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
@@ -220,11 +204,23 @@ export function EmailList({ folder, onSelectEmail, accountId, accountEmail }: Em
     return () => { supabase.removeChannel(channel); };
   }, [accountId, queryClient]);
 
-  const filteredEmails = emails?.filter(email =>
-    email.subject.toLowerCase().includes(search.toLowerCase()) ||
-    email.from_email.toLowerCase().includes(search.toLowerCase()) ||
-    email.to_email.toLowerCase().includes(search.toLowerCase())
-  );
+  // Outlook-like ordering: unread first, then by date desc. Stable: do not
+  // reorder when an email is marked read during the same render cycle.
+  const filteredEmails = (emails || [])
+    .filter(email =>
+      email.subject.toLowerCase().includes(search.toLowerCase()) ||
+      email.from_email.toLowerCase().includes(search.toLowerCase()) ||
+      email.to_email.toLowerCase().includes(search.toLowerCase())
+    )
+    .slice()
+    .sort((a, b) => {
+      if (folder === 'inbox') {
+        if (!!a.is_read !== !!b.is_read) return a.is_read ? 1 : -1;
+      }
+      const da = new Date(a.received_at || a.sent_at || 0).getTime();
+      const db = new Date(b.received_at || b.sent_at || 0).getTime();
+      return db - da;
+    });
 
   const folderLabels: Record<string, string> = {
     inbox: 'Caixa de Entrada', sent: 'Enviados', drafts: 'Rascunhos', spam: 'Spam',
@@ -254,18 +250,14 @@ export function EmailList({ folder, onSelectEmail, accountId, accountEmail }: Em
             {title}
           </CardTitle>
           <div className="flex items-center gap-1.5 md:gap-2">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => syncMutation.mutate()}
-              disabled={syncMutation.isPending}
-              className="h-8 text-xs"
-            >
-              <RefreshCw className={cn("h-3.5 w-3.5 md:mr-1", syncMutation.isPending && "animate-spin")} />
-              <span className="hidden md:inline">Sincronizar</span>
-            </Button>
+            {isSyncing && (
+              <span className="hidden md:inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <RefreshCw className="h-3 w-3 animate-spin" />
+                Sincronizando…
+              </span>
+            )}
             <Badge variant="secondary" className="text-[10px] md:text-xs">
-              {emails?.length || 0}
+              {filteredEmails.length}
             </Badge>
           </div>
         </div>

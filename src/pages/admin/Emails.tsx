@@ -136,7 +136,28 @@ export default function Emails() {
       };
     },
     enabled: !!selectedAccountId,
-    refetchInterval: 60000,
+    refetchInterval: 30000,
+  });
+
+  // Unread count per account (for sidebar badges)
+  const { data: unreadByAccount } = useQuery({
+    queryKey: ['email-unread-by-account', emailAccounts.map(a => a.id).join(',')],
+    queryFn: async () => {
+      const map: Record<string, number> = {};
+      await Promise.all(emailAccounts.map(async (a) => {
+        const { count } = await supabase
+          .from('email_inbox')
+          .select('id', { count: 'exact', head: true })
+          .eq('account_id', a.id)
+          .eq('is_read', false)
+          .eq('is_archived', false)
+          .eq('folder', 'inbox');
+        map[a.id] = count || 0;
+      }));
+      return map;
+    },
+    enabled: emailAccounts.length > 0,
+    refetchInterval: 30000,
   });
 
   const handleFolderChange = (folder: EmailFolder) => {
@@ -272,6 +293,7 @@ export default function Emails() {
       emailAccounts={emailAccounts}
       selectedAccountId={selectedAccountId}
       onAccountChange={handleAccountChange}
+      unreadByAccount={unreadByAccount}
     />
   );
 
