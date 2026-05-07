@@ -1,88 +1,126 @@
-# Unificação do Ficheiro do Cliente e do Kanban
+## Objetivo
 
-## Diagnóstico
+Tornar o card "Vencido" do Financeiro clicável, abrir um modal com todos os vencidos dos últimos 30 dias, com filtros (dia/semana/mês), botão **Cobrar** ao lado de cada cliente (envia WhatsApp + e-mail com a mensagem aprovada), sincronização automática diária com Asaas (10h, seg-sex), histórico de cobranças e roteamento automático para Devedores 30+/60+ dias.
 
-### 1. Kanban de Publicações tem cores, ordem e labels DIFERENTES do Kanban Jurídico de Clientes
+## 1. Card "Vencido" clicável + Modal de Cobrança
 
-**Clientes / Jurídico** (`src/components/admin/clients/ClientKanbanBoard.tsx` → `PIPELINE_STAGES`):
-12 fases com ordem: protocolado → 003 → oposicao → exigencia_merito → indeferimento → notificacao → deferimento → **certificados** (plural) → renovacao → arquivado → distrato. Cada uma com `color`, `bgColor`, `textColor`, `description`.
+**Arquivo:** `src/pages/admin/Financeiro.tsx`
 
-**Publicações** (`src/components/admin/publicacao/PublicacaoKanban.tsx` → `STATUS_CONFIG`):
-Apenas 8 fases: 003 → oposicao → exigencia_merito → indeferimento → deferimento → **certificado** (singular) → renovacao → arquivado. Define seu próprio `accent` e `icon` (emoji), ignorando a paleta canônica.
+- Tornar o stat card "Vencido" um botão (`onClick` abre `<OverdueChargeDialog />`).
+- Criar novo componente `src/components/admin/financeiro/OverdueChargeDialog.tsx`:
+  - Lista todas as faturas com `status` normalizado = `overdue` E `due_date` nos últimos 30 dias (até hoje).
+  - Filtros no topo: **Hoje / Semana / Mês** (default: Mês), busca por nome.
+  - Tabela: Cliente · Marca/Descrição · Valor · Vencimento · Dias atraso · Telefone/Email · Botão **Cobrar**.
+  - Botão **Cobrar** chama `supabase.functions.invoke('cobrar-fatura-vencida', { body: { invoice_id } })`.
+  - Indicador "Já cobrada hoje" quando há registro recente em `cobranca_historico`.
 
-Resultado: o card "CERTIFICADO" aparece teal em uma aba e diferente na outra; "EXIGÊNCIA DE MÉRITO" aparece violet/orange dependendo da aba; faltam `protocolado`, `notificacao`, `distrato`.
+## 2. Edge Function `cobrar-fatura-vencida` (nova)
 
-### 2. Ficheiro do cliente abre em todas as abas, mas a aba "Serviços" só renderiza se `client.process_id` existe
+**Arquivo:** `supabase/functions/cobrar-fatura-vencida/index.ts`
 
-`ClientDetailSheet.tsx` linha 2313: `{client.process_id ? (...serviços...) : (...placeholder...)}`.
+- Recebe `invoice_id`, busca fatura + perfil (nome, phone, email).
+- Monta as duas mensagens com placeholders `[Nome do Cliente]` e `[data]`:
 
-- **Clientes**: `process_id` vem do `brand_processes` na query da listagem. OK.
-- **Publicações**: `fetchClientForSheet` em `PublicacaoTab.tsx` busca brand_processes, mas se a publicação não estiver vinculada a um processo do cliente (`mainProcess` = null → `process_id` = null), a aba Serviços fica vazia.
-- **Financeiro**: `openClientFile` faz a mesma busca. Mesma falha quando o cliente não tem `brand_processes` ainda (somente fatura).
-- **Devedores**: usa `find-or-create-client-from-asaas` que pode retornar sem processo.
+**WhatsApp** (texto da solicitação do usuário): coloque no texto o link da fatura em aberto 
 
-### 3. Confirmação positiva
-Todas as 4 abas já chamam o mesmo componente `@/components/admin/clients/ClientDetailSheet`. O problema é só (a) cores/colunas do kanban e (b) `process_id` ausente esconder a seção de serviços.
+```
+Olá, *{nome}*, tudo bem?
 
----
+Identificamos que sua fatura com vencimento em *{data}* encontra-se em aberto.
 
-## Mudanças
+Você consegue realizar o pagamento hoje?
+Preciso apenas da sua confirmação para atualizar nosso sistema.
 
-### A. Kanban unificado (Publicações usar a mesma fonte de cores do Jurídico)
+✅ Pagando hoje via PIX, conseguimos retirar multas e juros.
 
-Em `src/components/admin/publicacao/PublicacaoKanban.tsx`:
-- Remover o `STATUS_CONFIG` local.
-- Importar `PIPELINE_STAGES` de `@/components/admin/clients/ClientKanbanBoard` (já é `export const`).
-- Filtrar apenas as fases relevantes a publicações INPI (excluir `distrato` e `notificacao` que não vêm do RPI), preservando: `003`, `oposicao`, `exigencia_merito`, `indeferimento`, `deferimento`, `certificados`, `renovacao`, `arquivado`. Mapear `certificado` (status atual da publicação) → coluna `certificados`.
-- Usar o mesmo gradiente (`color`), `bgColor`, `textColor` e label do PIPELINE_STAGES nos cabeçalhos das colunas e nos cards (cor da borda lateral).
-- Manter os emojis em uma constante separada `PUB_STAGE_ICONS` indexada pelo `id` para conservar o visual atual.
+🔑 Chave PIX (CNPJ):
+*39.528.012/0001-29*
 
-Isso garante que `CERTIFICADO`, `OPOSIÇÃO`, `003`, `EXIGÊNCIA DE MÉRITO` etc. apareçam com **exatamente as mesmas cores** em Clientes, Publicações e dentro do ficheiro do cliente.
+Após o pagamento, me envie o comprovante por aqui para que eu possa dar baixa no sistema, tudo bem?
+```
 
-### B. Tipo do status na publicação
+**E-mail** (HTML com mesmo contexto, assunto: `Fatura em aberto — vencimento {data} — WebMarcas`).coloque no texto o link da fatura em aberto 
 
-Atualizar `PubStatus` em `PublicacaoKanban.tsx` (e no `helpers.tsx` se necessário) para incluir `certificados` como alias de `certificado`. Ao gravar, preferir gravar `certificados` (alinhado ao PIPELINE_STAGES). Manter compatibilidade lendo ambos.
+- Dispara via `send-multichannel-notification` (canais: whatsapp + email).
+- Insere registro em `cobranca_historico` (tabela nova).
+- Idempotência: bloqueia nova cobrança da mesma fatura nas últimas 24h.
 
-### C. Ficheiro: garantir que a aba "Serviços" sempre apareça
+## 3. Tabela `cobranca_historico` + retorno em 7 dias
 
-Em `ClientDetailSheet.tsx`:
+**Migration nova:**
 
-1. **Mostrar a seção mesmo sem `process_id`**: substituir a guarda `{client.process_id ? ... : placeholder}` por uma renderização que:
-   - Sempre exibe o seletor de marca (mostrando "Sem marca cadastrada — criar nova" quando `clientBrands.length === 0`).
-   - Sempre exibe os botões "Tipo de Serviço" (lista de `activeStages`).
-   - Permite criar uma `brand_processes` na hora ao clicar num estágio quando não há nenhuma — usa o `client.id` + `brand_name` do cliente (ou string "Marca principal") + `pipeline_stage` selecionado, depois recarrega `clientBrands`.
+```sql
+create table public.cobranca_historico (
+  id uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references invoices(id) on delete cascade,
+  user_id uuid,
+  cliente_nome text, cliente_email text, cliente_phone text,
+  enviada_em timestamptz not null default now(),
+  canais text[] not null,                 -- ['whatsapp','email']
+  status text not null default 'enviada', -- enviada | confirmada_paga | reentrada_fila
+  proxima_acao_em timestamptz,            -- enviada_em + 7d
+  message_whatsapp text, message_email_html text,
+  created_at timestamptz default now()
+);
+alter table public.cobranca_historico enable row level security;
+create policy "admins read/write" on public.cobranca_historico
+  for all using (has_role(auth.uid(),'admin')) with check (has_role(auth.uid(),'admin'));
+```
 
-2. **Hidratação automática**: dentro de `fetchClientData`, quando `brandsRes.data` for vazio mas existir alguma `publicacoes_marcas` para o cliente, criar/usar a publicação como brand virtual (já existe lógica para "isOrphan"; replicar para clientes "magros").
+- Aba **Histórico** dentro do modal: lista cobranças enviadas, status (enviada/confirmada_paga), última ação.
+- Quando uma fatura é confirmada paga no Asaas, `status` da cobrança vira `confirmada_paga`.
+- Se passar de `proxima_acao_em` (7 dias) sem pagamento confirmado → status = `reentrada_fila` (volta a aparecer no modal de Vencidos como "elegível para nova cobrança").
 
-### D. Padronizar `openClientFile` em Financeiro / Devedores / Publicações
+## 4. Sync automático Asaas — diário 10h seg-sex
 
-Extrair a função `fetchClientForSheet` de `PublicacaoTab.tsx` para um helper compartilhado (`src/lib/clientSheet.ts` → `loadClientForSheet(clientId): Promise<ClientWithProcess>`). Reutilizar em:
-- `src/pages/admin/Financeiro.tsx` (substitui o `openClientFile` local)
-- `src/pages/admin/Devedores.tsx` (substitui o caminho atual via edge function quando o cliente já existe; só usa `find-or-create-client-from-asaas` quando o `clientId` não estiver no `profiles`).
-- `src/components/admin/PublicacaoTab.tsx` (substitui pela chamada ao helper).
-- `src/pages/admin/Clientes.tsx` (opcional, usa o mesmo helper para garantir shape idêntico).
+**Edge function existente:** `sync-asaas-invoices` já atualiza status. Já existe `sync-overdue-30` e `sync-overdue-60` em `asaas-debtors-api`.
 
-Resultado: o objeto `ClientWithProcess` é construído pelo mesmo código em qualquer aba — ficheiro idêntico em Clientes, Publicações, Financeiro e Devedores.
+Criar cron job (`pg_cron` + `pg_net`) — executar via SQL insert:
 
-### E. Detalhe visual do header do ficheiro
+```sql
+select cron.schedule(
+  'asaas-daily-sync-10h',
+  '0 13 * * 1-5',  -- 10h BRT = 13h UTC, seg-sex
+  $$
+  select net.http_post(url:='https://scpbqsvwojhbxihyqbdz.supabase.co/functions/v1/sync-asaas-invoices', headers:='{"Content-Type":"application/json","apikey":"<ANON>"}'::jsonb, body:='{}'::jsonb);
+  select net.http_post(url:='https://scpbqsvwojhbxihyqbdz.supabase.co/functions/v1/asaas-debtors-api', headers:='{"Content-Type":"application/json","apikey":"<ANON>"}'::jsonb, body:='{"action":"sync-overdue-30"}'::jsonb);
+  select net.http_post(url:='https://scpbqsvwojhbxihyqbdz.supabase.co/functions/v1/asaas-debtors-api', headers:='{"Content-Type":"application/json","apikey":"<ANON>"}'::jsonb, body:='{"action":"sync-overdue-60"}'::jsonb);
+  $$
+);
+```
 
-`ClientDetailSheet` já tem `currentStage` derivado de `PIPELINE_STAGES`/`dynamicServiceStages`. Após (A), as cores do badge no topo do ficheiro casarão com a cor do card do Kanban (Publicações e Clientes).
+Botão **Atualizar** no modal força execução manual das mesmas funções.
 
----
+## 5. Roteamento automático 30+ / 60+ dias
 
-## Arquivos editados
+Já existe a lógica de buckets `d30` (1–30 dias) e `d60` (≥60 dias) em `asaas-debtors-api`. Ajustes:
 
-- `src/components/admin/publicacao/PublicacaoKanban.tsx` — usar `PIPELINE_STAGES` e remover `STATUS_CONFIG` local; mapear `certificado`↔`certificados`.
-- `src/components/admin/PublicacaoTab.tsx` — chamar helper compartilhado; ajustes de tipo se necessário.
-- `src/components/admin/clients/ClientDetailSheet.tsx` — sempre renderizar aba Serviços; criação on-the-fly de `brand_processes` quando inexistente.
-- `src/pages/admin/Financeiro.tsx` — usar helper compartilhado.
-- `src/pages/admin/Devedores.tsx` — preferir helper local quando `clientId` existe em `profiles`.
-- `src/lib/clientSheet.ts` (novo) — `loadClientForSheet(clientId)`.
+- **0–30 dias** → permanece no Financeiro/Vencido (modal de cobrança).
+- **>30 e <60 dias** → entra em `Devedores` aba "Devedor 30 dias" (bucket `d30`, já existe — confirmar que `sync-overdue-30` aceita até ~59 dias; ajustar limite superior de 30 → 59 em `asaas-debtors-api/index.ts` linha 209).
+- **≥60 dias** → "Devedor 60+" (bucket `d60`, já funciona).
+- Faturas confirmadas pagas no Asaas → `invoices.status` = `paid`/`confirmed`, não aparecem mais em vencidos. Cobrança correspondente em `cobranca_historico` é marcada `confirmada_paga` (histórico).
 
-Sem mudanças de banco, sem nova edge function.
+Acrescentar trigger SQL ou lógica no `sync-asaas-invoices`: ao detectar pagamento, atualizar `cobranca_historico.status='confirmada_paga'` para a fatura.
 
-## Resultado esperado
+## 6. Detalhes de UI no modal
 
-1. Kanban de Publicações exibe as mesmas colunas (mesmas cores, mesmos labels, mesma ordem) que o Kanban Jurídico em Clientes.
-2. Clicar no nome do cliente em Clientes, Publicações, Financeiro ou Devedores abre o **mesmo** `ClientDetailSheet`, com header, abas e cores idênticas.
-3. A aba "Serviços" aparece em qualquer cliente, mesmo sem `brand_processes` cadastrado, permitindo escolher o tipo de serviço e enviar notificação/cobrança como em Clientes.
+- Filtros de período (Hoje / Semana / Mês) reutilizando padrão dos botões já existentes em Financeiro.
+- Coluna "Ações": ícones WhatsApp + Email separados (envia só por aquele canal) e botão consolidado **Cobrar** (envia ambos).
+- Aba **Histórico** dentro do modal mostrando todas as cobranças enviadas com filtro por período.
+
+## Resumo dos arquivos
+
+**Novos**
+
+- `src/components/admin/financeiro/OverdueChargeDialog.tsx`
+- `supabase/functions/cobrar-fatura-vencida/index.ts`
+- Migration: tabela `cobranca_historico` + RLS + trigger de marcação como paga
+- SQL insert: cron job 10h seg-sex
+
+**Editados**
+
+- `src/pages/admin/Financeiro.tsx` — card "Vencido" clicável, integra dialog
+- `supabase/functions/asaas-debtors-api/index.ts` — bucket d30 passa a cobrir 1–59 dias
+- `supabase/functions/sync-asaas-invoices/index.ts` — atualiza `cobranca_historico` ao confirmar pagamento
+
+Pronto para aprovar e implementar?
