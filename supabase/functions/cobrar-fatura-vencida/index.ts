@@ -78,7 +78,7 @@ serve(async (req) => {
 
     const { data: invoice, error: invErr } = await admin
       .from("invoices")
-      .select("id, user_id, amount, due_date, status, invoice_url, description, profiles:user_id(full_name,email,phone)")
+      .select("id, user_id, contract_id, amount, due_date, status, invoice_url, description, profiles:user_id(full_name,email,phone)")
       .eq("id", invoice_id)
       .maybeSingle();
 
@@ -107,9 +107,38 @@ serve(async (req) => {
     }
 
     const profile: any = (invoice as any).profiles || {};
-    const nome = profile.full_name || "Cliente";
-    const email = profile.email || "";
-    const phone = profile.phone || "";
+    let nome = profile.full_name || "";
+    let email = profile.email || "";
+    let phone = profile.phone || "";
+
+    // Fallback: buscar dados do lead via contrato quando o profile não tem contato
+    if (!email || !phone) {
+      try {
+        let leadId: string | null = null;
+        if ((invoice as any).contract_id) {
+          const { data: contract } = await admin
+            .from("contracts")
+            .select("lead_id")
+            .eq("id", (invoice as any).contract_id)
+            .maybeSingle();
+          leadId = (contract as any)?.lead_id ?? null;
+        }
+        if (leadId) {
+          const { data: lead } = await admin
+            .from("leads")
+            .select("full_name,email,phone")
+            .eq("id", leadId)
+            .maybeSingle();
+          if (lead) {
+            nome = nome || (lead as any).full_name || "";
+            email = email || (lead as any).email || "";
+            phone = phone || (lead as any).phone || "";
+          }
+        }
+      } catch (_) { /* ignore */ }
+    }
+
+    if (!nome) nome = "Cliente";
     const data = fmtDate(invoice.due_date);
     const valor = fmtBRL(Number(invoice.amount || 0));
     const link = invoice.invoice_url || "";
@@ -125,6 +154,7 @@ serve(async (req) => {
     if (finalChannels.length === 0) {
       return new Response(JSON.stringify({
         error: "Cliente sem telefone/e-mail cadastrados",
+        details: { invoice_id, has_user: !!invoice.user_id, has_contract: !!(invoice as any).contract_id },
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
