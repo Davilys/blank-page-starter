@@ -292,6 +292,20 @@ function parseEnvelope(raw: string) {
   const subjMatch = raw.match(/Subject:\s*(.+?)(?:\r\n(?![ \t])|\r?\n(?![ \t]))/is);
   const dateMatch = raw.match(/Date:\s*(.+?)(?:\r\n|\r?\n)/i);
   const midMatch = raw.match(/Message-ID:\s*<?([^>\r\n]+)>?/i);
+  // Collect ALL recipient-related addresses to detect aliases/forwards
+  const headersBlock = raw.split(/\r?\n\r?\n/)[0] || "";
+  const unfolded = headersBlock.replace(/\r?\n[ \t]+/g, " ");
+  const recipientHeaders = ["To", "Cc", "Bcc", "Delivered-To", "X-Original-To", "Envelope-To", "X-Delivered-To"];
+  const recipients: string[] = [];
+  for (const h of recipientHeaders) {
+    const re = new RegExp(`^${h}:\\s*(.+)$`, "gim");
+    let mm: RegExpExecArray | null;
+    while ((mm = re.exec(unfolded)) !== null) {
+      const line = mm[1];
+      const emails = line.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+      for (const e of emails) recipients.push(e.toLowerCase());
+    }
+  }
   return {
     fromName: decodeMimeWords(fromMatch?.[1]?.trim() || ""),
     from: (fromMatch?.[2]?.trim() || "unknown@email.com").toLowerCase(),
@@ -300,6 +314,7 @@ function parseEnvelope(raw: string) {
     subject: decodeMimeWords((subjMatch?.[1]?.trim().replace(/\r?\n[ \t]+/g, " ") || "(Sem assunto)")),
     date: dateMatch?.[1]?.trim() || new Date().toISOString(),
     messageId: midMatch?.[1]?.trim() || `${Date.now()}-${Math.random().toString(36)}`,
+    recipients,
   };
 }
 
@@ -360,6 +375,18 @@ async function syncFolder(
       const snippet = (parsed.text || parsed.html.replace(/<[^>]+>/g, ""))
         .substring(0, 200).trim().replace(/\s+/g, " ");
 
+      // Anti-alias filter: if syncing INBOX, only keep messages actually addressed
+      // to this account's email (covers Hostinger forwards/aliases that deliver
+      // copies of one mailbox into another).
+      if (!isSent && folderLabel === "inbox") {
+        const myAddr = (account.email_address || "").toLowerCase();
+        const matchesMe = env.recipients.includes(myAddr);
+        if (!matchesMe && env.recipients.length > 0) {
+          maxUidSeen = Math.max(maxUidSeen, uid);
+          continue;
+        }
+      }
+
       // Skip if message_id already exists for this account+folder
       const { data: existing } = await supabase
         .from("email_inbox")
@@ -370,7 +397,7 @@ async function syncFolder(
         .maybeSingle();
       if (existing) { maxUidSeen = Math.max(maxUidSeen, uid); continue; }
 
-      const row = {
+      const row: any = {
         account_id: account.id,
         message_id: env.messageId,
         imap_uid: uid,
