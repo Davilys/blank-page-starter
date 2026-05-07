@@ -1045,7 +1045,20 @@ export default function AdminContratos() {
                             : '-'}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{contract.profile?.phone || '-'}</TableCell>
-                      <TableCell>{getSignatureBadge(contract.signature_status, contract.signature_expires_at)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {getSignatureBadge(contract.signature_status, contract.signature_expires_at)}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 px-2 text-xs gap-1"
+                            onClick={(e) => { e.stopPropagation(); setLinkContract({ id: contract.id, name: contract.signatory_name || contract.profile?.full_name || null }); }}
+                            title={contract.user_id ? 'Trocar cliente vinculado' : 'Vincular a um cliente'}
+                          >
+                            <Link2 className="h-3 w-3" /> {contract.user_id ? 'Revincular' : 'Vincular cliente'}
+                          </Button>
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
