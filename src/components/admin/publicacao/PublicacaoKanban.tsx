@@ -9,20 +9,26 @@ import { PIPELINE_STAGES } from '@/components/admin/clients/ClientKanbanBoard';
 // Status que aparecem no Kanban de Publicações (subset do PIPELINE_STAGES jurídico).
 // Mantemos a MESMA ordem, cores e labels do Kanban da aba Clientes/Jurídico para
 // que cores e nomes das colunas sejam idênticos em todas as abas.
-type PubStatus = '003' | 'oposicao' | 'exigencia_merito' | 'indeferimento' | 'deferimento' | 'certificado' | 'renovacao' | 'arquivado';
+type PubStatus = 'protocolado' | '003' | 'oposicao' | 'exigencia_merito' | 'indeferimento' | 'notificacao' | 'deferimento' | 'certificado' | 'renovacao' | 'arquivado' | 'distrato';
 
-const PUB_STAGE_IDS: PubStatus[] = ['003', 'oposicao', 'exigencia_merito', 'indeferimento', 'deferimento', 'certificado', 'renovacao', 'arquivado'];
+// Mesma ordem do Kanban Jurídico (Clientes). Mantemos 'certificado' (singular)
+// como id local porque é o status persistido nas publicações; mapeia para
+// 'certificados' (plural) do PIPELINE_STAGES para herdar cor/label.
+const PUB_STAGE_IDS: PubStatus[] = ['protocolado', '003', 'oposicao', 'exigencia_merito', 'indeferimento', 'notificacao', 'deferimento', 'certificado', 'renovacao', 'arquivado', 'distrato'];
 
 // Ícones (emoji) preservados para o visual atual do kanban de publicações.
 const PUB_STAGE_ICONS: Record<PubStatus, string> = {
+  protocolado: '📥',
   '003': '📋',
   oposicao: '⚔️',
   exigencia_merito: '📝',
   indeferimento: '❌',
+  notificacao: '🔔',
   deferimento: '✅',
   certificado: '🎓',
   renovacao: '🔄',
   arquivado: '📦',
+  distrato: '🚪',
 };
 
 // Configuração derivada do PIPELINE_STAGES (fonte de verdade) — mesmas cores
@@ -81,7 +87,7 @@ export function PublicacaoKanban({ publicacoes, processMap, clientMap, adminMap,
 
   const columns = useMemo(() => {
     const cols: Record<PubStatus, Publicacao[]> = {
-      '003': [], oposicao: [], exigencia_merito: [], indeferimento: [], deferimento: [], certificado: [], renovacao: [], arquivado: [],
+      protocolado: [], '003': [], oposicao: [], exigencia_merito: [], indeferimento: [], notificacao: [], deferimento: [], certificado: [], renovacao: [], arquivado: [], distrato: [],
     };
     publicacoes.forEach(p => {
       if (cols[p.status as PubStatus]) cols[p.status as PubStatus].push(p);
