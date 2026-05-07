@@ -9,6 +9,108 @@ const corsHeaders = {
 // Max new messages to fetch per folder per call (avoid CPU timeout)
 const MAX_PER_FOLDER = 40;
 
+// ============== Auto-reply ==============
+const AUTO_REPLY_SUBJECT = "Recebemos seu contato – WebMarcas";
+const AUTO_REPLY_HTML = `
+<div style="font-family: Arial, Helvetica, sans-serif; line-height:1.6; color:#333;">
+  <p>Olá,</p>
+  <p>Obrigado por entrar em contato com a <strong>WebMarcas</strong>.</p>
+  <p>Recebemos seu e-mail com sucesso. Esta é uma mensagem automática de confirmação de recebimento.</p>
+  <p>Nossa equipe irá analisar sua solicitação e retornará o mais breve possível.</p>
+  <p>⚠️ <strong>Importante:</strong><br/>
+  Para um atendimento mais rápido e prioritário, nosso principal canal de atendimento é o WhatsApp:<br/>
+  📲 <strong>(11) 91112-0225</strong></p>
+  <p>Nossa equipe especializada está disponível para auxiliar sobre:</p>
+  <ul>
+    <li>Registro de Marcas</li>
+    <li>Laudo de Viabilidade</li>
+    <li>Acompanhamento de Processos no INPI</li>
+  </ul>
+  <p>Atenciosamente,<br/>
+  <strong>Equipe WebMarcas</strong></p>
+  <hr style="border:none; border-top:1px solid #ddd; margin:20px 0;"/>
+  <p style="font-size:12px; color:#666;">
+    🌐 <a href="https://www.webmarcas.net">www.webmarcas.net</a><br/>
+    📧 ola@webmarcas.net<br/>
+    📱 @webpatentes
+  </p>
+</div>`;
+
+function isOwnDomain(email: string): boolean {
+  return /@webmarcas\.net$/i.test(email || "");
+}
+
+function looksAutomated(headers: string, subject: string): boolean {
+  const h = headers.toLowerCase();
+  if (h.includes("auto-submitted:") && !h.includes("auto-submitted: no")) return true;
+  if (h.includes("precedence: bulk") || h.includes("precedence: auto_reply") || h.includes("precedence: junk")) return true;
+  if (h.includes("x-auto-response-suppress:")) return true;
+  if (h.includes("list-unsubscribe:")) return true;
+  const s = (subject || "").toLowerCase();
+  if (s.includes("recebemos seu contato")) return true;
+  if (s.startsWith("auto:") || s.includes("out of office") || s.includes("ausência") || s.includes("ausencia automática")) return true;
+  return false;
+}
+
+async function sendAutoReply(
+  supabase: any,
+  account: any,
+  toEmail: string,
+  originalSubject: string,
+) {
+  try {
+    if (!toEmail || isOwnDomain(toEmail)) return;
+
+    // Dedup: only one auto-reply per (account, from) every 24h
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data: prev } = await supabase
+      .from("email_logs")
+      .select("id")
+      .eq("trigger_type", "auto_reply_received")
+      .eq("to_email", toEmail.toLowerCase())
+      .eq("from_email", account.email_address)
+      .gte("created_at", since)
+      .limit(1)
+      .maybeSingle();
+    if (prev) return;
+
+    const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+    if (!RESEND_API_KEY) return;
+
+    const displayName = account.display_name || "WebMarcas";
+    const fromAddress = `${displayName} <noreply@webmarcas.net>`;
+    const subject = originalSubject?.toLowerCase().startsWith("re:")
+      ? AUTO_REPLY_SUBJECT
+      : AUTO_REPLY_SUBJECT;
+
+    const resp = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: fromAddress,
+        to: [toEmail],
+        subject,
+        html: AUTO_REPLY_HTML,
+        reply_to: [account.email_address],
+        headers: { "Auto-Submitted": "auto-replied", "X-Auto-Response-Suppress": "All" },
+      }),
+    });
+
+    const ok = resp.ok;
+    await supabase.from("email_logs").insert({
+      from_email: account.email_address,
+      to_email: toEmail.toLowerCase(),
+      subject,
+      body: "Resposta automática de recebimento",
+      html_body: AUTO_REPLY_HTML,
+      status: ok ? "sent" : "failed",
+      trigger_type: "auto_reply_received",
+    });
+  } catch (e) {
+    console.error("auto-reply error:", e);
+  }
+}
+
 // ============== MIME helpers (decode + parse) ==============
 function decodeMimeWords(input: string): string {
   if (!input || !input.includes("=?")) return input;
@@ -245,6 +347,14 @@ async function syncFolder(
       const { error } = await supabase.from("email_inbox").insert(row);
       if (!error) synced++;
       maxUidSeen = Math.max(maxUidSeen, uid);
+
+      // Auto-reply only for inbox (received) messages
+      if (!error && !isSent && folderLabel === "inbox") {
+        const headersBlock = raw.split(/\r?\n\r?\n/)[0] || "";
+        if (!looksAutomated(headersBlock, env.subject) && !isOwnDomain(env.from)) {
+          await sendAutoReply(supabase, account, env.from, env.subject);
+        }
+      }
     } catch (e) {
       console.error(`[${folderLabel}] uid=${uid} err:`, e);
     }
