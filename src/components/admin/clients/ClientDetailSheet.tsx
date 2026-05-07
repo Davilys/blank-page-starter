@@ -55,7 +55,7 @@ interface ClientDetailSheetProps {
 
 interface ClientNote { id: string; content: string; created_at: string; }
 interface ClientAppointment { id: string; title: string; description: string | null; scheduled_at: string; completed: boolean; google_meet_link?: string | null; google_event_id?: string | null; }
-interface ClientDocument { id: string; name: string; file_url: string; created_at: string; file_size?: number | null; mime_type?: string | null; }
+interface ClientDocument { id: string; name: string; file_url: string; created_at: string; file_size?: number | null; mime_type?: string | null; _virtual?: boolean; contract_id?: string | null; }
 interface ClientInvoice { id: string; description: string; amount: number; status: string; due_date: string; payment_method?: string | null; pix_code?: string | null; }
 
 const useServicePricingOptions = () => {
@@ -725,6 +725,10 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
   };
 
   const handleDeleteDocument = async (doc: ClientDocument) => {
+    if (doc._virtual) {
+      toast.info('Este contrato está vinculado — desvincule pela aba Contratos para removê-lo daqui.');
+      return;
+    }
     const urlParts = doc.file_url.split('/storage/v1/object/public/documents/');
     if (urlParts[1]) await supabase.storage.from('documents').remove([urlParts[1]]);
     const { error } = await supabase.from('documents').delete().eq('id', doc.id);
