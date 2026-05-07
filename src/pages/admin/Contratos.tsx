@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,8 @@ import { ContractDetailSheet } from '@/components/admin/contracts/ContractDetail
 import { CreateContractDialog } from '@/components/admin/contracts/CreateContractDialog';
 import { EditContractDialog } from '@/components/admin/contracts/EditContractDialog';
 import { LinkClientDialog } from '@/components/admin/contracts/LinkClientDialog';
+import { loadClientForSheet } from '@/lib/clientSheet';
+const ClientDetailSheet = lazy(() => import('@/components/admin/clients/ClientDetailSheet').then(m => ({ default: m.ClientDetailSheet })));
 import { generateDocumentPrintHTML, getLogoBase64ForPDF } from '@/components/contracts/DocumentRenderer';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DatePeriodFilter, type DateFilterType } from '@/components/admin/clients/DatePeriodFilter';
