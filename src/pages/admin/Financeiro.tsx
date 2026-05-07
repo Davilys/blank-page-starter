@@ -25,7 +25,6 @@ import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { loadClientForSheet } from '@/lib/clientSheet';
 import type { ClientWithProcess } from '@/components/admin/clients/ClientKanbanBoard';
-import { OverdueChargeDialog } from '@/components/admin/financeiro/OverdueChargeDialog';
 
 // Lazy load the heavy ClientDetailSheet — same component used in Clientes/Devedores/Publicações
 const ClientDetailSheet = lazy(() =>
@@ -99,7 +98,6 @@ export default function AdminFinanceiro() {
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
-  const [overdueDialogOpen, setOverdueDialogOpen] = useState(false);
   const [processes, setProcesses] = useState<Process[]>([]);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -383,6 +381,24 @@ export default function AdminFinanceiro() {
 
   const paidPct = filteredStats.total > 0 ? (filteredStats.paid / filteredStats.total) * 100 : 0;
   const pendingPct = filteredStats.total > 0 ? (filteredStats.pending / filteredStats.total) * 100 : 0;
+
+  // Total vencido dos últimos 30 dias (independente do filtro de data atual)
+  const overdue30d = useMemo(() => {
+    const since = startOfDay(subDays(new Date(), 30));
+    const today = startOfDay(new Date());
+    let value = 0;
+    let count = 0;
+    for (const i of invoices) {
+      const ns = normalizeStatus(i.status);
+      if (ns === 'paid' || ns === 'cancelled') continue;
+      const due = new Date((i.due_date || '').length === 10 ? i.due_date + 'T00:00:00' : i.due_date);
+      if (due >= since && due <= today && (ns === 'overdue' || due < today)) {
+        value += Number(i.amount || 0);
+        count += 1;
+      }
+    }
+    return { value, count };
+  }, [invoices]);
 
   const clientProcesses = processes.filter(p => p.user_id === formData.user_id);
   const getInstallmentValue = () => {
