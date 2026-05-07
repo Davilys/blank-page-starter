@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, lazy, Suspense, useCallback } from 'react';
+import { useEffect, useState, useRef, lazy, Suspense, useCallback, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,7 @@ import {
   ArrowUpRight, ArrowDownRight, DollarSign, AlertTriangle, Zap, Filter,
   Calendar, ChevronLeft, ChevronRight
 } from 'lucide-react';
-import { format, subMonths, addMonths, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { format, subMonths, addMonths, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
 import { toast } from 'sonner';
@@ -663,12 +663,12 @@ export default function AdminFinanceiro() {
             { title: 'Total Faturado', value: filteredStats.total, icon: TrendingUp, color: 'text-primary', accent: 'from-primary/20 to-primary/5', border: 'border-primary/20', ring: 'bg-primary/15', count: filteredStats.totalCount, countLabel: 'faturas' },
             { title: 'Aguardando',     value: filteredStats.pending, icon: Clock,       color: 'text-amber-500', accent: 'from-amber-500/20 to-amber-500/5', border: 'border-amber-500/20', ring: 'bg-amber-500/15', count: filteredStats.pendingCount, countLabel: 'faturas' },
             { title: 'Recebido',       value: filteredStats.paid,    icon: CheckCircle, color: 'text-emerald-500', accent: 'from-emerald-500/20 to-emerald-500/5', border: 'border-emerald-500/20', ring: 'bg-emerald-500/15', count: filteredStats.paidCount, countLabel: 'pagas' },
-            { title: 'Vencido',        value: filteredStats.overdue, icon: AlertTriangle, color: 'text-red-500', accent: 'from-red-500/20 to-red-500/5', border: 'border-red-500/20', ring: 'bg-red-500/15', count: filteredStats.overdueCount, countLabel: 'faturas' },
+            { title: 'Vencido',        value: overdue30d.value, icon: AlertTriangle, color: 'text-red-500', accent: 'from-red-500/20 to-red-500/5', border: 'border-red-500/20', ring: 'bg-red-500/15', count: overdue30d.count, countLabel: 'últ. 30 dias' },
           ].map((stat, i) => (
             <motion.div key={stat.title} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
               <Card
                 className={cn('relative overflow-hidden border transition-all hover:shadow-lg hover:shadow-black/10 hover:-translate-y-0.5', stat.border, stat.title === 'Vencido' && 'cursor-pointer')}
-                onClick={stat.title === 'Vencido' ? () => setOverdueDialogOpen(true) : undefined}
+                onClick={stat.title === 'Vencido' ? () => navigate('/admin/financeiro/vencidos') : undefined}
               >
                 <div className={cn('absolute inset-0 bg-gradient-to-br opacity-60', stat.accent)} />
                 <CardContent className="relative pt-5 pb-4 px-5">
@@ -698,8 +698,6 @@ export default function AdminFinanceiro() {
             </motion.div>
           ))}
         </div>
-
-        <OverdueChargeDialog open={overdueDialogOpen} onOpenChange={setOverdueDialogOpen} />
 
         {/* ── PROGRESS BAR ───────────────────────── */}
         {filteredStats.total > 0 && canViewFinancialValues && (
