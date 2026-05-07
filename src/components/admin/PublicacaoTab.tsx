@@ -35,6 +35,7 @@ import { PublicacaoKanban } from '@/components/admin/publicacao/PublicacaoKanban
 import { BulkActionsBar } from '@/components/admin/publicacao/BulkActionsBar';
 import { exportPublicacaoPDF } from '@/components/admin/publicacao/PublicacaoPDFExport';
 import { ClientDetailSheet } from '@/components/admin/clients/ClientDetailSheet';
+import { loadClientForSheet } from '@/lib/clientSheet';
 import { CreateInvoiceDialog } from '@/components/admin/clients/CreateInvoiceDialog';
 import type { ClientWithProcess } from '@/components/admin/clients/ClientKanbanBoard';
 
