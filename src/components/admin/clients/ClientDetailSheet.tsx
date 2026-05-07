@@ -2310,41 +2310,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
 
                 {/* ─── SERVICES TAB ──────────────────────────────────────── */}
                 <TabsContent value="services" className="mt-0 space-y-4">
-                  {(() => {
-                    // Garante que sempre exista um processo alvo. Se o cliente ainda não tem
-                    // brand_process cadastrado, criamos um sob demanda para que a aba Serviços
-                    // (e suas notificações/cobranças) funcione em qualquer cliente.
-                    const ensureProcessId = async (): Promise<string | null> => {
-                      const existing = selectedServiceBrandId || client.process_id || (clientBrands[0]?.id ?? null);
-                      if (existing) return existing;
-                      try {
-                        const { data, error } = await supabase
-                          .from('brand_processes')
-                          .insert({
-                            user_id: client.id,
-                            brand_name: client.brand_name || client.full_name || 'Marca principal',
-                            business_area: client.business_area || null,
-                            pipeline_stage: client.pipeline_stage || 'protocolado',
-                            status: 'em_andamento',
-                          })
-                          .select('id, brand_name, business_area, process_number, pipeline_stage, status, created_at, updated_at, ncl_classes')
-                          .single();
-                        if (error || !data) {
-                          toast.error('Erro ao criar processo automaticamente');
-                          return null;
-                        }
-                        setClientBrands((prev) => [...prev, data]);
-                        setSelectedServiceBrandId(data.id);
-                        onUpdate();
-                        return data.id;
-                      } catch (e) {
-                        console.error(e);
-                        toast.error('Erro ao criar processo automaticamente');
-                        return null;
-                      }
-                    };
-                    return true;
-                  })() ? (
+                  {true ? (
                     <div className="space-y-4">
                       {/* Brand selector when client has multiple brands */}
                       {clientBrands.length > 1 && (
