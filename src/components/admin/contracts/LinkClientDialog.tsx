@@ -45,9 +45,15 @@ export function LinkClientDialog({ contractId, signatoryName, open, onOpenChange
     if (!contractId) return;
     setLinkingId(clientId);
     const { error } = await supabase.from('contracts').update({ user_id: clientId }).eq('id', contractId);
+    if (error) { setLinkingId(null); toast.error('Erro ao vincular: ' + error.message); return; }
+    // Propaga o vínculo para documentos (anexos) e faturas associadas a este contrato,
+    // para que apareçam no ficheiro do cliente (aba Anexos) e na área do cliente.
+    await Promise.all([
+      supabase.from('documents').update({ user_id: clientId }).eq('contract_id', contractId),
+      supabase.from('invoices').update({ user_id: clientId }).eq('contract_id', contractId),
+    ]);
     setLinkingId(null);
-    if (error) { toast.error('Erro ao vincular: ' + error.message); return; }
-    toast.success('Contrato vinculado ao cliente');
+    toast.success('Contrato vinculado — disponível na área e nos anexos do cliente');
     onLinked();
     onOpenChange(false);
   };
