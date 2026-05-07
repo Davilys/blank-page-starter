@@ -55,7 +55,7 @@ interface ClientDetailSheetProps {
 
 interface ClientNote { id: string; content: string; created_at: string; }
 interface ClientAppointment { id: string; title: string; description: string | null; scheduled_at: string; completed: boolean; google_meet_link?: string | null; google_event_id?: string | null; }
-interface ClientDocument { id: string; name: string; file_url: string; created_at: string; file_size?: number | null; mime_type?: string | null; }
+interface ClientDocument { id: string; name: string; file_url: string; created_at: string; file_size?: number | null; mime_type?: string | null; _virtual?: boolean; contract_id?: string | null; }
 interface ClientInvoice { id: string; description: string; amount: number; status: string; due_date: string; payment_method?: string | null; pix_code?: string | null; }
 
 const useServicePricingOptions = () => {
@@ -454,7 +454,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         return;
       }
 
-      const [notesRes, appointmentsRes, docsRes, invoicesRes, profileRes, contractRes, brandsRes, pubsRes] = await Promise.all([
+      const [notesRes, appointmentsRes, docsRes, invoicesRes, profileRes, contractRes, brandsRes, pubsRes, linkedContractsRes] = await Promise.all([
         supabase.from('client_notes').select('*').eq('user_id', client.id).order('created_at', { ascending: false }),
         supabase.from('client_appointments').select('*').eq('user_id', client.id).order('scheduled_at', { ascending: true }),
         supabase.from('documents').select('*').eq('user_id', client.id).order('created_at', { ascending: false }),
@@ -463,10 +463,29 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         supabase.from('contracts').select('contract_value, payment_method, signature_status').eq('user_id', client.id).order('created_at', { ascending: false }).limit(1),
         supabase.from('brand_processes').select('id, brand_name, business_area, process_number, pipeline_stage, status, created_at, updated_at, ncl_classes, inpi_protocol, deposit_date, grant_date, expiry_date, next_step, next_step_date, notes').eq('user_id', client.id).order('created_at', { ascending: false }),
         supabase.from('publicacoes_marcas').select('*').eq('client_id', client.id).order('proximo_prazo_critico', { ascending: true, nullsFirst: false }),
+        supabase.from('contracts').select('id, contract_number, subject, signature_status, signed_at, created_at').eq('user_id', client.id).order('created_at', { ascending: false }),
       ]);
       setNotes(notesRes.data || []);
       setAppointments(appointmentsRes.data || []);
-      setDocuments(docsRes.data || []);
+      // Mescla anexos (documents) com contratos vinculados ao cliente que não têm PDF anexado,
+      // para garantir que ao vincular um contrato no CRM ele apareça na aba Anexos do cliente.
+      const docs = (docsRes.data || []) as any[];
+      const linkedContracts = (linkedContractsRes?.data || []) as any[];
+      const contractIdsWithDoc = new Set(docs.filter(d => d.contract_id).map(d => d.contract_id));
+      const virtualContractDocs = linkedContracts
+        .filter(c => !contractIdsWithDoc.has(c.id))
+        .map(c => ({
+          id: `contract-${c.id}`,
+          name: `Contrato ${c.contract_number || ''} ${c.subject ? '— ' + c.subject : ''}`.trim(),
+          file_url: `/admin/contratos?open=${c.id}`,
+          mime_type: 'application/pdf',
+          file_size: null,
+          document_type: 'contrato',
+          contract_id: c.id,
+          created_at: c.created_at,
+          _virtual: true,
+        }));
+      setDocuments([...docs, ...virtualContractDocs] as any);
       setInvoices(invoicesRes.data || []);
       setProfileData(profileRes.data);
       // ── Asaas: cobranças vencidas + renegociações + parcelas
@@ -706,6 +725,10 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
   };
 
   const handleDeleteDocument = async (doc: ClientDocument) => {
+    if (doc._virtual) {
+      toast.info('Este contrato está vinculado — desvincule pela aba Contratos para removê-lo daqui.');
+      return;
+    }
     const urlParts = doc.file_url.split('/storage/v1/object/public/documents/');
     if (urlParts[1]) await supabase.storage.from('documents').remove([urlParts[1]]);
     const { error } = await supabase.from('documents').delete().eq('id', doc.id);
