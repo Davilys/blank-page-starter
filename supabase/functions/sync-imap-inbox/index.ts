@@ -116,30 +116,77 @@ function decodeMimeWords(input: string): string {
   if (!input || !input.includes("=?")) return input;
   return input.replace(
     /=\?([^?]+)\?(Q|B)\?([^?]*)\?=/gi,
-    (_m, _cs, enc, encoded) => {
+    (_m, cs, enc, encoded) => {
+      const charset = (cs || "utf-8").toLowerCase();
       try {
         if (enc.toUpperCase() === "B") {
           const b = Uint8Array.from(atob(encoded), c => c.charCodeAt(0));
-          return new TextDecoder("utf-8").decode(b);
+          return safeDecode(b, charset);
         }
         const d = encoded.replace(/_/g, " ").replace(/=([0-9A-Fa-f]{2})/g, (_: string, h: string) => String.fromCharCode(parseInt(h, 16)));
         const b = new Uint8Array([...d].map(c => c.charCodeAt(0)));
-        return new TextDecoder("utf-8").decode(b);
+        return safeDecode(b, charset);
       } catch { return encoded; }
     }
   ).replace(/\r?\n[ \t]+/g, "");
 }
-function decodeQP(input: string): string {
-  return input.replace(/=\r?\n/g, "").replace(/=([0-9A-Fa-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+function safeDecode(bytes: Uint8Array, charset: string): string {
+  const c = (charset || "utf-8").toLowerCase().replace(/^"|"$/g, "");
+  const aliases: Record<string, string> = {
+    "utf8": "utf-8",
+    "us-ascii": "utf-8",
+    "ascii": "utf-8",
+    "latin1": "windows-1252",
+    "iso-8859-1": "windows-1252",
+  };
+  const enc = aliases[c] || c;
+  try { return new TextDecoder(enc, { fatal: false }).decode(bytes); }
+  catch {
+    try { return new TextDecoder("utf-8", { fatal: false }).decode(bytes); }
+    catch { return new TextDecoder("windows-1252").decode(bytes); }
+  }
 }
-function decodeB64(input: string): string {
-  try { return new TextDecoder("utf-8").decode(Uint8Array.from(atob(input.replace(/\s/g, "")), c => c.charCodeAt(0))); }
-  catch { return input; }
+function decodeQP(input: string, charset = "utf-8"): string {
+  const cleaned = input.replace(/=\r?\n/g, "");
+  const bytes: number[] = [];
+  for (let i = 0; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (ch === "=" && /^[0-9A-Fa-f]{2}$/.test(cleaned.substring(i + 1, i + 3))) {
+      bytes.push(parseInt(cleaned.substring(i + 1, i + 3), 16));
+      i += 2;
+    } else {
+      bytes.push(cleaned.charCodeAt(i) & 0xff);
+    }
+  }
+  return safeDecode(new Uint8Array(bytes), charset);
 }
-function decodeContent(body: string, enc: string): string {
+function decodeB64(input: string, charset = "utf-8"): string {
+  try {
+    const bytes = Uint8Array.from(atob(input.replace(/\s/g, "")), c => c.charCodeAt(0));
+    return safeDecode(bytes, charset);
+  } catch { return input; }
+}
+function getCharset(ct: string): string {
+  const m = ct.match(/charset\s*=\s*"?([^";\s]+)"?/i);
+  return (m?.[1] || "utf-8").toLowerCase();
+}
+function decodeContent(body: string, enc: string, charset = "utf-8"): string {
   const e = (enc || "7bit").trim().toLowerCase();
-  if (e === "base64") return decodeB64(body);
-  if (e === "quoted-printable") return decodeQP(body);
+  if (e === "base64") return decodeB64(body, charset);
+  if (e === "quoted-printable") return decodeQP(body, charset);
+  // 7bit / 8bit / binary: re-interpret JS string (Latin-1 view of raw bytes) as the declared charset.
+  if (charset && charset !== "utf-8" && charset !== "us-ascii") {
+    const bytes = new Uint8Array([...body].map(c => c.charCodeAt(0) & 0xff));
+    return safeDecode(bytes, charset);
+  }
+  // Default: assume UTF-8 already; if the JS string holds raw UTF-8 bytes (mojibake), fix it.
+  if (/[\u0080-\u00ff]/.test(body)) {
+    try {
+      const bytes = new Uint8Array([...body].map(c => c.charCodeAt(0) & 0xff));
+      const utf8 = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      return utf8;
+    } catch { /* not valid UTF-8, keep original */ }
+  }
   return body;
 }
 function getHeader(headers: string, name: string): string {
@@ -162,6 +209,7 @@ function parseMime(raw: string): Parsed {
   const ct = getHeader(headers, "Content-Type") || "text/plain";
   const cte = getHeader(headers, "Content-Transfer-Encoding") || "7bit";
   const cd = getHeader(headers, "Content-Disposition") || "";
+  const charset = getCharset(ct);
   if (ct.toLowerCase().startsWith("multipart/")) {
     const b = getBoundary(ct);
     if (!b) return { text: body, html: "", attachments: [] };
@@ -190,7 +238,7 @@ function parseMime(raw: string): Parsed {
     const m = (cd + "; " + ct).match(/(?:file)?name="?([^"\r\n;]+)"?/i);
     if (m) return { text: "", html: "", attachments: [{ filename: decodeMimeWords(m[1].trim()), content_type: ct.split(";")[0].trim(), size: body.length }] };
   }
-  const dec = decodeContent(body.trim(), cte);
+  const dec = decodeContent(body.trim(), cte, charset);
   if (ct.toLowerCase().includes("text/html")) return { text: "", html: dec, attachments: [] };
   if (ct.toLowerCase().includes("text/plain")) return { text: dec, html: "", attachments: [] };
   const nm = ct.match(/name="?([^"\r\n;]+)"?/i);
