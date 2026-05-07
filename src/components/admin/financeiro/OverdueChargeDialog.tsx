@@ -126,14 +126,21 @@ export function OverdueChargeDialog({ open, onOpenChange }: { open: boolean; onO
       period === "month" ? startOfMonth(now) :
       subDays(now, 30);
     const q = search.trim().toLowerCase();
+    // Faturas com cobrança já enviada saem da lista e vão para o histórico
+    const charged = new Set(
+      history
+        .filter((h) => h.status === "enviada" || h.status === "reentrada_fila" || h.status === "confirmada_paga")
+        .map((h) => h.invoice_id)
+    );
     return invoices.filter((i) => {
+      if (charged.has(i.id)) return false;
       const d = new Date(i.due_date + "T00:00:00");
       if (d < start) return false;
       if (!q) return true;
       const name = (i.profiles?.full_name || i.profiles?.email || "").toLowerCase();
       return name.includes(q) || (i.description || "").toLowerCase().includes(q);
     });
-  }, [invoices, period, search]);
+  }, [invoices, period, search, history]);
 
   const total = filtered.reduce((s, i) => s + Number(i.amount || 0), 0);
   const recentByInvoice = useMemo(() => {
