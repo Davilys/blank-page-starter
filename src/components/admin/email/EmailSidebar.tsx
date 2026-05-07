@@ -27,6 +27,7 @@ interface EmailSidebarProps {
   emailAccounts?: EmailAccount[];
   selectedAccountId?: string | null;
   onAccountChange?: (accountId: string) => void;
+  unreadByAccount?: Record<string, number>;
 }
 
 const mainFolders: { id: EmailFolder; label: string; icon: React.ComponentType<{ className?: string }>; badge?: keyof EmailSidebarProps['stats'] }[] = [
@@ -57,7 +58,7 @@ const quickFilters: { id: EmailFolder; label: string; icon: React.ComponentType<
   { id: 'filter-support', label: 'Suporte', icon: HeadphonesIcon, color: 'text-rose-500' },
 ];
 
-export function EmailSidebar({ currentFolder, onFolderChange, onCompose, stats, isMasterAdmin = false, emailAccounts, selectedAccountId, onAccountChange }: EmailSidebarProps) {
+export function EmailSidebar({ currentFolder, onFolderChange, onCompose, stats, isMasterAdmin = false, emailAccounts, selectedAccountId, onAccountChange, unreadByAccount }: EmailSidebarProps) {
   const [showFilters, setShowFilters] = useState(true);
   const [showTools, setShowTools] = useState(true);
   const [showAccounts, setShowAccounts] = useState(true);
@@ -128,6 +129,14 @@ export function EmailSidebar({ currentFolder, onFolderChange, onCompose, stats, 
                 </div>
                 {isActive && (
                   <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
+                )}
+                {unreadByAccount && unreadByAccount[account.id] > 0 && (
+                  <Badge
+                    variant={isActive ? 'secondary' : 'default'}
+                    className="text-[10px] h-4 min-w-4 px-1 py-0"
+                  >
+                    {unreadByAccount[account.id]}
+                  </Badge>
                 )}
               </motion.button>
             );
