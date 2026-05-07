@@ -13,11 +13,12 @@ function decodeMimeWords(input: string): string {
   if (!input || !input.includes("=?")) return input;
   return input.replace(
     /=\?([^?]+)\?(Q|B)\?([^?]*)\?=/gi,
-    (_match, _charset, encoding, encoded) => {
+    (_match, charset, encoding, encoded) => {
+      const cs = (charset || "utf-8").toLowerCase();
       try {
         if (encoding.toUpperCase() === "B") {
           const bytes = Uint8Array.from(atob(encoded), c => c.charCodeAt(0));
-          return new TextDecoder("utf-8").decode(bytes);
+          return safeDecode(bytes, cs);
         }
         const decoded = encoded
           .replace(/_/g, " ")
@@ -25,34 +26,66 @@ function decodeMimeWords(input: string): string {
             String.fromCharCode(parseInt(hex, 16))
           );
         const bytes = new Uint8Array([...decoded].map(c => c.charCodeAt(0)));
-        return new TextDecoder("utf-8").decode(bytes);
+        return safeDecode(bytes, cs);
       } catch { return encoded; }
     }
   ).replace(/\r?\n[ \t]+/g, "");
 }
 
-function decodeQP(input: string): string {
-  return input
-    .replace(/=\r?\n/g, "")
-    .replace(/=([0-9A-Fa-f]{2})/g, (_, hex) =>
-      String.fromCharCode(parseInt(hex, 16))
-    );
-}
-
-function decodeBase64ToString(input: string): string {
-  try {
-    const cleaned = input.replace(/\s/g, "");
-    const bytes = Uint8Array.from(atob(cleaned), c => c.charCodeAt(0));
-    return new TextDecoder("utf-8").decode(bytes);
-  } catch {
-    return input;
+function safeDecode(bytes: Uint8Array, charset: string): string {
+  const c = (charset || "utf-8").toLowerCase().replace(/^"|"$/g, "");
+  const aliases: Record<string, string> = {
+    "utf8": "utf-8",
+    "us-ascii": "utf-8",
+    "ascii": "utf-8",
+    "latin1": "windows-1252",
+    "iso-8859-1": "windows-1252",
+  };
+  const enc = aliases[c] || c;
+  try { return new TextDecoder(enc, { fatal: false }).decode(bytes); }
+  catch {
+    try { return new TextDecoder("utf-8", { fatal: false }).decode(bytes); }
+    catch { return new TextDecoder("windows-1252").decode(bytes); }
   }
 }
-
-function decodeContent(body: string, encoding: string): string {
+function decodeQP(input: string, charset = "utf-8"): string {
+  const cleaned = input.replace(/=\r?\n/g, "");
+  const bytes: number[] = [];
+  for (let i = 0; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (ch === "=" && /^[0-9A-Fa-f]{2}$/.test(cleaned.substring(i + 1, i + 3))) {
+      bytes.push(parseInt(cleaned.substring(i + 1, i + 3), 16));
+      i += 2;
+    } else {
+      bytes.push(cleaned.charCodeAt(i) & 0xff);
+    }
+  }
+  return safeDecode(new Uint8Array(bytes), charset);
+}
+function decodeBase64ToString(input: string, charset = "utf-8"): string {
+  try {
+    const bytes = Uint8Array.from(atob(input.replace(/\s/g, "")), c => c.charCodeAt(0));
+    return safeDecode(bytes, charset);
+  } catch { return input; }
+}
+function getCharset(ct: string): string {
+  const m = ct.match(/charset\s*=\s*"?([^";\s]+)"?/i);
+  return (m?.[1] || "utf-8").toLowerCase();
+}
+function decodeContent(body: string, encoding: string, charset = "utf-8"): string {
   const enc = (encoding || "7bit").trim().toLowerCase();
-  if (enc === "base64") return decodeBase64ToString(body);
-  if (enc === "quoted-printable") return decodeQP(body);
+  if (enc === "base64") return decodeBase64ToString(body, charset);
+  if (enc === "quoted-printable") return decodeQP(body, charset);
+  if (charset && charset !== "utf-8" && charset !== "us-ascii") {
+    const bytes = new Uint8Array([...body].map(c => c.charCodeAt(0) & 0xff));
+    return safeDecode(bytes, charset);
+  }
+  if (/[\u0080-\u00ff]/.test(body)) {
+    try {
+      const bytes = new Uint8Array([...body].map(c => c.charCodeAt(0) & 0xff));
+      return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    } catch { /* keep */ }
+  }
   return body;
 }
 
@@ -96,6 +129,7 @@ function parseMimePart(raw: string): ParsedEmail {
   const ct = getHeaderValue(headers, "Content-Type") || "text/plain";
   const cte = getHeaderValue(headers, "Content-Transfer-Encoding") || "7bit";
   const cd = getHeaderValue(headers, "Content-Disposition") || "";
+  const charset = getCharset(ct);
 
   // Multipart
   if (ct.toLowerCase().startsWith("multipart/")) {
@@ -148,7 +182,7 @@ function parseMimePart(raw: string): ParsedEmail {
   }
 
   // Decode body content
-  const decoded = decodeContent(body.trim(), cte);
+  const decoded = decodeContent(body.trim(), cte, charset);
 
   if (ct.toLowerCase().includes("text/html")) {
     return { text: "", html: decoded, attachments: [] };
