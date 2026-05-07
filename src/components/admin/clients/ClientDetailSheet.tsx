@@ -876,6 +876,44 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
   };
 
   const handleQuickAction = async (actionId: string) => {
+    return _handleQuickActionImpl(actionId);
+  };
+
+  // Garante que exista um brand_process para o cliente. Cria um sob demanda
+  // quando ainda não há nenhum, permitindo que a aba "Serviços" funcione mesmo
+  // para clientes recém-criados via Financeiro/Devedores/Publicações.
+  const ensureProcessId = async (): Promise<string | null> => {
+    const existing = selectedServiceBrandId || client?.process_id || (clientBrands[0]?.id ?? null);
+    if (existing) return existing;
+    if (!client?.id) return null;
+    try {
+      const { data, error } = await supabase
+        .from('brand_processes')
+        .insert({
+          user_id: client.id,
+          brand_name: client.brand_name || client.full_name || 'Marca principal',
+          business_area: client.business_area || null,
+          pipeline_stage: client.pipeline_stage || 'protocolado',
+          status: 'em_andamento',
+        } as any)
+        .select('id, brand_name, business_area, process_number, pipeline_stage, status, created_at, updated_at, ncl_classes')
+        .single();
+      if (error || !data) {
+        toast.error('Erro ao criar processo automaticamente');
+        return null;
+      }
+      setClientBrands((prev) => [...prev, data]);
+      setSelectedServiceBrandId(data.id);
+      onUpdate();
+      return data.id;
+    } catch (e) {
+      console.error('ensureProcessId failed', e);
+      toast.error('Erro ao criar processo automaticamente');
+      return null;
+    }
+  };
+
+  const _handleQuickActionImpl = async (actionId: string) => {
     // Auto-close other inline views when switching
     if (actionId === 'email') { setShowProcessDetails(false); }
     if (actionId === 'processo') { setShowEmailCompose(false); }
@@ -2310,7 +2348,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
 
                 {/* ─── SERVICES TAB ──────────────────────────────────────── */}
                 <TabsContent value="services" className="mt-0 space-y-4">
-                  {client.process_id ? (
+                  {true ? (
                     <div className="space-y-4">
                       {/* Brand selector when client has multiple brands */}
                       {clientBrands.length > 1 && (
@@ -2352,7 +2390,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                             setEditData(prev => ({ ...prev, pipeline_stage: v }));
                             setSelectedServiceType(v);
                             setActiveTab('services');
-                            const targetProcessId = selectedServiceBrandId || client.process_id;
+                            const targetProcessId = selectedServiceBrandId || client.process_id || await ensureProcessId();
                             if (targetProcessId) {
                               await supabase.from('brand_processes').update({ pipeline_stage: v }).eq('id', targetProcessId);
                               toast.success('Pipeline atualizado!');
@@ -2398,7 +2436,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                                   setSelectedServiceType(stage.id);
                                   setEditData(prev => ({ ...prev, pipeline_stage: stage.id }));
                                   setExpandedStageAction(prev => prev === stage.id ? null : stage.id);
-                                    const targetProcessId = selectedServiceBrandId || client.process_id;
+                                    const targetProcessId = selectedServiceBrandId || client.process_id || await ensureProcessId();
                                     if (targetProcessId) {
                                     await supabase.from('brand_processes').update({ pipeline_stage: stage.id }).eq('id', targetProcessId);
                                     toast.success(`Serviço: ${stage.label}`);

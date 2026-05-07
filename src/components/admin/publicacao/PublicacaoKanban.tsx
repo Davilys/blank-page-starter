@@ -4,19 +4,43 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { differenceInDays, parseISO, addDays, addYears, format } from 'date-fns';
 import { Clock, AlertTriangle, User, Flame, GripVertical, Calendar } from 'lucide-react';
+import { PIPELINE_STAGES } from '@/components/admin/clients/ClientKanbanBoard';
 
+// Status que aparecem no Kanban de Publicações (subset do PIPELINE_STAGES jurídico).
+// Mantemos a MESMA ordem, cores e labels do Kanban da aba Clientes/Jurídico para
+// que cores e nomes das colunas sejam idênticos em todas as abas.
 type PubStatus = '003' | 'oposicao' | 'exigencia_merito' | 'indeferimento' | 'deferimento' | 'certificado' | 'renovacao' | 'arquivado';
 
-const STATUS_CONFIG: Record<PubStatus, { label: string; accent: string; icon: string }> = {
-  '003': { label: '003', accent: 'from-yellow-500 to-amber-500', icon: '📋' },
-  oposicao: { label: 'Oposição', accent: 'from-orange-500 to-orange-600', icon: '⚔️' },
-  exigencia_merito: { label: 'Exigência de Mérito', accent: 'from-violet-500 to-violet-600', icon: '📝' },
-  indeferimento: { label: 'Indeferimento', accent: 'from-red-500 to-red-600', icon: '❌' },
-  deferimento: { label: 'Deferimento', accent: 'from-emerald-500 to-emerald-600', icon: '✅' },
-  certificado: { label: 'Certificado', accent: 'from-teal-500 to-teal-600', icon: '🎓' },
-  renovacao: { label: 'Renovação', accent: 'from-cyan-500 to-cyan-600', icon: '🔄' },
-  arquivado: { label: 'Arquivado', accent: 'from-gray-500 to-gray-600', icon: '📦' },
+const PUB_STAGE_IDS: PubStatus[] = ['003', 'oposicao', 'exigencia_merito', 'indeferimento', 'deferimento', 'certificado', 'renovacao', 'arquivado'];
+
+// Ícones (emoji) preservados para o visual atual do kanban de publicações.
+const PUB_STAGE_ICONS: Record<PubStatus, string> = {
+  '003': '📋',
+  oposicao: '⚔️',
+  exigencia_merito: '📝',
+  indeferimento: '❌',
+  deferimento: '✅',
+  certificado: '🎓',
+  renovacao: '🔄',
+  arquivado: '📦',
 };
+
+// Configuração derivada do PIPELINE_STAGES (fonte de verdade) — mesmas cores
+// que o Kanban Jurídico em /admin/clientes.
+const STATUS_CONFIG: Record<PubStatus, { label: string; accent: string; icon: string }> = (() => {
+  const map: Record<string, { label: string; accent: string; icon: string }> = {};
+  for (const id of PUB_STAGE_IDS) {
+    // 'certificado' (singular, status da publicação) mapeia para 'certificados' (plural) do PIPELINE_STAGES
+    const lookupId = id === 'certificado' ? 'certificados' : id;
+    const stage = PIPELINE_STAGES.find((s) => s.id === lookupId);
+    map[id] = {
+      label: stage?.label || id,
+      accent: stage?.color || 'from-zinc-500 to-zinc-600',
+      icon: PUB_STAGE_ICONS[id],
+    };
+  }
+  return map as Record<PubStatus, { label: string; accent: string; icon: string }>;
+})();
 
 interface Publicacao {
   id: string;

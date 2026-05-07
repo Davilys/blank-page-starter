@@ -12,6 +12,7 @@ import { ArrowLeft, RefreshCw, Loader2, Zap, AlertTriangle, Users, DollarSign, T
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ClientWithProcess } from "@/components/admin/clients/ClientKanbanBoard";
+import { loadClientForSheet } from "@/lib/clientSheet";
 import { DatePeriodFilter, type DateFilterType } from "@/components/admin/clients/DatePeriodFilter";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 
@@ -545,7 +546,10 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
       const p = json.profile;
-      const client: ClientWithProcess = {
+      // Carrega o objeto completo (mesmo shape usado em todas as outras abas) para
+      // garantir que o ficheiro seja IDÊNTICO ao de Clientes/Publicações/Financeiro.
+      const full = await loadClientForSheet(p.id);
+      const client: ClientWithProcess = full || {
         id: p.id,
         full_name: p.full_name,
         email: p.email,
