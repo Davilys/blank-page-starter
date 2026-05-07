@@ -206,7 +206,8 @@ Deno.serve(async (req) => {
           const due = p.dueDate as string;
           if (!due) continue;
           const dias = daysBetween(due);
-          if (dias < 1 || dias > 30) continue;
+          // Bucket d30 = entre 31 e 59 dias de atraso (0–30 fica em Financeiro/Vencido, ≥60 vai para d60)
+          if (dias < 31 || dias > 59) continue;
 
           const prevStatus = existingMap.get(p.id);
           if (prevStatus && prevStatus !== "pendente_renegociacao") {
