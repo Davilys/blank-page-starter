@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+import { loadClientForSheet } from '@/lib/clientSheet';
 import type { ClientWithProcess } from '@/components/admin/clients/ClientKanbanBoard';
 
 // Lazy load the heavy ClientDetailSheet — same component used in Clientes/Devedores/Publicações
