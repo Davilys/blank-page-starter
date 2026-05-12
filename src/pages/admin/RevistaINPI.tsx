@@ -273,6 +273,32 @@ export default function RevistaINPI() {
   const [confirmDeleteUpload, setConfirmDeleteUpload] = useState<RpiUpload | null>(null);
   const [confirmDedup, setConfirmDedup] = useState(false);
   const [dedupRunning, setDedupRunning] = useState(false);
+  const [historicoPage, setHistoricoPage] = useState(1);
+  const HISTORICO_PAGE_SIZE = 10;
+
+  type UploadStatusKind = 'done' | 'partial' | 'pending' | 'error' | 'processing';
+  const getUploadStatus = (u: RpiUpload): {
+    kind: UploadStatusKind;
+    label: string;
+    iconBg: string;
+    badge: string;
+  } => {
+    if (u.status === 'error') {
+      return { kind: 'error', label: 'Erro', iconBg: 'bg-red-500/10 text-red-600', badge: 'bg-red-500/10 text-red-600 border-red-500/20' };
+    }
+    if (u.status !== 'completed') {
+      return { kind: 'processing', label: 'Processando…', iconBg: 'bg-amber-500/10 text-amber-600', badge: 'bg-amber-500/10 text-amber-600 border-amber-500/20' };
+    }
+    const total = u.total_processes_found || 0;
+    const matched = u.total_clients_matched || 0;
+    if (total === 0 || matched === 0) {
+      return { kind: 'pending', label: 'Sem processamento', iconBg: 'bg-red-500/10 text-red-600', badge: 'bg-red-500/10 text-red-600 border-red-500/20' };
+    }
+    if (matched < total) {
+      return { kind: 'partial', label: 'Em processamento', iconBg: 'bg-orange-500/10 text-orange-600', badge: 'bg-orange-500/10 text-orange-600 border-orange-500/20' };
+    }
+    return { kind: 'done', label: 'Processado', iconBg: 'bg-emerald-500/10 text-emerald-600', badge: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' };
+  };
 
   const downloadedRpiNumbers = useMemo(() => {
     const s = new Set<number>();
