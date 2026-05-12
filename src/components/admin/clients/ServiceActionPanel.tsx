@@ -91,9 +91,51 @@ Atenciosamente,
 Equipe WebMarcas`;
 }
 
+function generateArquivadoEmail(client: ServiceActionPanelProps['client']): string {
+  const nome = client.full_name || 'Cliente';
+  const marca = client.brand_name || 'sua marca';
+  const numero = client.process_number || '0000000';
+  return `Prezado ${nome},
+
+Venho informar que o INPI publicou o arquivamento do processo da marca "${marca}". N. PROCESSO: ${numero}
+
+Conforme previsto contratualmente, a WebMarcas possui cláusula de garantia para os casos em que o arquivamento ocorra por decisão do INPI durante o exame do processo, possibilitando a abertura de um novo pedido sem cobrança de novos honorários advocatícios.
+
+Entretanto, é importante esclarecer que a garantia contratual não se aplica em casos de arquivamento decorrente do não cumprimento de exigências ou publicações dentro do prazo legal estabelecido pelo INPI.
+
+Dessa forma, precisamos agendar uma reunião com nosso departamento jurídico para análise completa do processo, verificação da aplicação da garantia contratual e definição das próximas medidas para eventual abertura de um novo pedido de registro.
+
+Nos informe, por gentileza, o melhor dia e horário para alinharmos todos os detalhes da forma mais rápida e transparente possível.
+
+Seguimos à disposição para quaisquer esclarecimentos.
+
+Atenciosamente,
+
+Equipe WebMarcas
+www.webmarcas.net
+WhatsApp: (11) 91112-0225`;
+}
+
+function generateArquivadoWhatsApp(_client: ServiceActionPanelProps['client']): string {
+  return `Olá, tudo bem?
+
+Verificamos que o INPI publicou o arquivamento do processo da sua marca. Precisamos agendar um breve alinhamento com o nosso jurídico para analisar a aplicação da cláusula de garantia contratual e verificar a possibilidade de abertura de um novo processo sem cobrança de novos honorários.
+
+Importante: a garantia é válida para casos de arquivamento por decisão do INPI, não se aplicando quando ocorre perda de prazo para cumprimento de exigência/publicação.
+
+Qual o melhor horário para conversarmos? 🙏
+
+Equipe WebMarcas`;
+}
+
 export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySent }: ServiceActionPanelProps) {
-  const [message, setMessage] = useState(() => generateEmailTemplate(client, stage, SALARIO_MINIMO_2025));
-  const [whatsappMessage, setWhatsappMessage] = useState(() => generateWhatsAppTemplate(client, stage, SALARIO_MINIMO_2025));
+  const isArquivado = stage.id === 'arquivado';
+  const [message, setMessage] = useState(() =>
+    isArquivado ? generateArquivadoEmail(client) : generateEmailTemplate(client, stage, SALARIO_MINIMO_2025)
+  );
+  const [whatsappMessage, setWhatsappMessage] = useState(() =>
+    isArquivado ? generateArquivadoWhatsApp(client) : generateWhatsAppTemplate(client, stage, SALARIO_MINIMO_2025)
+  );
   const [sendEmail, setSendEmail] = useState(true);
   const [sendWhatsApp, setSendWhatsApp] = useState(true);
   const [files, setFiles] = useState<File[]>([]);
@@ -128,7 +170,7 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
       toast.error('Selecione pelo menos um canal de envio');
       return;
     }
-    if (valor <= 0) {
+    if (!isArquivado && valor <= 0) {
       toast.error('Informe o valor da cobrança');
       return;
     }
@@ -153,25 +195,28 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
         docUrls.push({ url: upData.document.file_url, filename: f.name });
       }
 
-      // 2. Create invoice via edge function
-      const invoiceRes = await supabase.functions.invoke('create-admin-invoice', {
-        body: {
-          user_id: client.id,
-          process_id: client.process_id || null,
-          description: `Serviço: ${stage.label} - Exigência INPI`,
-          payment_method: paymentType === 'avista' ? 'pix' : paymentMethod,
-          payment_type: paymentType,
-          installments: paymentType === 'parcelado' ? installments : 1,
-          total_value: valor,
-          due_date: dueDateStr,
-        },
-      });
+      // 2. Create invoice via edge function (skip in arquivado mode — apenas notificação)
+      let invoiceData: any = null;
+      let paymentLink = '';
+      if (!isArquivado) {
+        const invoiceRes = await supabase.functions.invoke('create-admin-invoice', {
+          body: {
+            user_id: client.id,
+            process_id: client.process_id || null,
+            description: `Serviço: ${stage.label} - Exigência INPI`,
+            payment_method: paymentType === 'avista' ? 'pix' : paymentMethod,
+            payment_type: paymentType,
+            installments: paymentType === 'parcelado' ? installments : 1,
+            total_value: valor,
+            due_date: dueDateStr,
+          },
+        });
+        if (invoiceRes.error) throw new Error(invoiceRes.error.message || 'Erro ao criar cobrança');
+        invoiceData = invoiceRes.data;
+        paymentLink = invoiceData?.invoice_url || '';
+      }
 
-      if (invoiceRes.error) throw new Error(invoiceRes.error.message || 'Erro ao criar cobrança');
-      const invoiceData = invoiceRes.data;
-      const paymentLink = invoiceData?.invoice_url || '';
-
-      // Build messages with payment link
+      // Build messages with payment link (no link in arquivado mode)
       const linkBlock = paymentLink ? `\n\nLink de pagamento:\n${paymentLink}` : '';
       const finalEmailMessage = message + linkBlock;
       const finalWhatsappMessage = whatsappMessage + linkBlock;
@@ -183,7 +228,7 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
       await supabase.functions.invoke('send-multichannel-notification', {
         body: {
           user_id: client.id,
-          event_type: 'cobranca_gerada',
+          event_type: isArquivado ? 'arquivamento' : 'cobranca_gerada',
           channels: notifChannels,
           custom_message: finalWhatsappMessage,
           data: {
@@ -200,7 +245,9 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
         await supabase.functions.invoke('send-email', {
           body: {
             to: [client.email],
-            subject: `Exigência INPI – ${stage.label} – ${client.brand_name || 'Marca'}`,
+            subject: isArquivado
+              ? `Arquivamento do processo – ${client.brand_name || 'Marca'} – WebMarcas`
+              : `Exigência INPI – ${stage.label} – ${client.brand_name || 'Marca'}`,
             body: finalEmailMessage,
             attachments,
           },
@@ -211,21 +258,25 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
       await supabase.from('client_activities').insert({
         user_id: client.id,
         admin_id: user?.id,
-        activity_type: 'notificacao_cobranca',
-        description: `Notificação + cobrança enviada: ${stage.label} - R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-        metadata: {
+        activity_type: isArquivado ? 'notificacao_arquivamento' : 'notificacao_cobranca',
+        description: isArquivado
+          ? `Notificação de arquivamento enviada: ${stage.label}`
+          : `Notificação + cobrança enviada: ${stage.label} - R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        metadata: ({
           stage_id: stage.id,
           stage_label: stage.label,
-          valor,
-          payment_type: paymentType,
-          payment_method: paymentType === 'avista' ? 'pix' : paymentMethod,
+          ...(isArquivado ? {} : {
+            valor,
+            payment_type: paymentType,
+            payment_method: paymentType === 'avista' ? 'pix' : paymentMethod,
+            invoice_id: invoiceData?.invoice_id,
+          }),
           channels: { email: sendEmail, whatsapp: sendWhatsApp },
-          invoice_id: invoiceData?.invoice_id,
           document_urls: docUrls.map(d => d.url),
-        } as any,
+        }) as any,
       });
 
-      toast.success('Notificação e cobrança enviadas com sucesso!');
+      toast.success(isArquivado ? 'Notificação de arquivamento enviada com sucesso!' : 'Notificação e cobrança enviadas com sucesso!');
       onUpdate();
       onClose();
     } catch (err: any) {
