@@ -1944,6 +1944,52 @@ export default function RevistaINPI() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete single upload confirmation */}
+      <AlertDialog open={!!confirmDeleteUpload} onOpenChange={(o) => !o && setConfirmDeleteUpload(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir histórico desta RPI?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDeleteUpload && (
+                <>
+                  Será removido o registro <strong>RPI {confirmDeleteUpload.rpi_number || '—'}</strong> ({confirmDeleteUpload.file_name}) e todos os processos vinculados a este upload. Esta ação não pode ser desfeita.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmDeleteUpload && handleDeleteUpload(confirmDeleteUpload)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Clean duplicates confirmation */}
+      <AlertDialog open={confirmDedup} onOpenChange={setConfirmDedup}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Limpar registros duplicados?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Serão removidos <strong>{duplicateUploads.length}</strong> registros duplicados, mantendo o mais recente concluído de cada RPI. Os processos vinculados aos registros removidos também serão apagados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCleanDuplicates}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {dedupRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Limpar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
