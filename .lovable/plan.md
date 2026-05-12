@@ -1,46 +1,42 @@
 ## Objetivo
+Na aba **Revista INPI → Histórico**, permitir que o admin **exclua manualmente** o histórico de uma RPI (e seus processos vinculados), e impedir que a **Busca Remota** baixe novamente uma RPI já processada (evitando duplicatas como as 28x da RPI 2873 hoje no banco).
 
-Substituir o HTML inline `buildDistratoHtml` pelo modelo padrão de distrato sem multa já existente em `src/lib/documentTemplates.ts` (`generateDistratoSemMultaContent`), para que o contrato de distrato gerado ao clicar em "Enviar Notificação + Distrato sem multa" use exatamente o mesmo texto/cláusulas do modelo padrão usado no resto do sistema.
+## O que será alterado
 
-## Mudança única
+### 1. Excluir histórico por RPI (manual, pelo admin)
+Em `src/pages/admin/RevistaINPI.tsx`, na aba **Histórico**:
+- Adicionar um botão de lixeira (`Trash2`) em cada card de upload, ao lado da seta `ArrowRight`.
+- Ao clicar, abre um `AlertDialog` de confirmação mostrando "RPI {número} • {file_name}".
+- Confirmando, executa:
+  - `DELETE FROM rpi_entries WHERE rpi_upload_id = :id`
+  - `DELETE FROM rpi_uploads WHERE id = :id`
+- Toast de sucesso, recarrega a lista (`fetchUploads`) e limpa `selectedUpload` se for o atual.
+- `stopPropagation` no botão para não abrir o detalhe ao clicar.
 
-### `src/components/admin/clients/ServiceActionPanel.tsx`
+Adicionar também um botão no topo da aba: **"Limpar duplicados"** que detecta uploads com mesmo `rpi_number` e mantém apenas o mais recente concluído (`status = completed`), removendo os demais com confirmação prévia mostrando quantos serão removidos.
 
-1. Remover a função local `buildDistratoHtml` (não será mais usada).
-2. Importar `generateDistratoSemMultaContent` de `@/lib/documentTemplates`.
-3. Ampliar a leitura do `profiles` no bloco `if (isDistrato)` para incluir os campos exigidos pelo template padrão:
-   - `full_name, cpf, cnpj, cpf_cnpj, company_name, address, city, state, zip_code, email, phone`.
-4. Montar o objeto `vars` esperado por `generateDistratoSemMultaContent`:
-   - `nome_empresa`: `profile.company_name || profile.full_name || client.full_name || 'Cliente'`
-   - `cnpj`: CNPJ formatado se houver, senão CPF, senão `[a informar]`
-   - `endereco`: `profile.address || '[Endereço a informar]'`
-   - `cidade`: `profile.city || '[Cidade]'`
-   - `estado`: `profile.state || '[UF]'`
-   - `cep`: `profile.zip_code || '[CEP]'`
-   - `nome_representante`: `profile.full_name || client.full_name || nome_empresa`
-   - `cpf_representante`: CPF do profile (ou `cpf_cnpj` quando tiver 11 dígitos), senão `[CPF a informar]`
-   - `email`: `profile.email || client.email || ''`
-   - `telefone`: `profile.phone || client.phone || ''`
-   - `marca`: `client.brand_name?.trim() || '[Nome da Marca]'`
-5. Gerar o conteúdo de texto via `generateDistratoSemMultaContent(vars)` e convertê-lo para um HTML simples preservando quebras de linha:
-   ```ts
-   const text = generateDistratoSemMultaContent(vars);
-   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Distrato Contratual sem Multa</title></head><body style="font-family: Arial, Helvetica, sans-serif; color:#111; line-height:1.6; max-width:800px; margin:0 auto; padding:24px; white-space:pre-wrap;">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</body></html>`;
-   ```
-   Isso mantém o mesmo conteúdo do modelo padrão sem reescrever cláusulas.
-6. Continuar inserindo na tabela `contracts` com:
-   - `contract_type = 'distrato'`
-   - `document_type = 'distrato_sem_multa'` (alinhado ao identificador do template padrão, em vez de `'distrato'` genérico)
-   - `subject = 'Distrato Contratual sem Multa – ' + marca`
-   - `description = 'Distrato sem multa – encerramento de responsabilidade'`
-   - `contract_value = 0`, `penalty_value = 0`
-   - `signatory_name`, `signatory_cpf`, `signatory_cnpj`
-   - `contract_html` = HTML acima
-7. Restante do fluxo (`generate-signature-link`, substituição de `[INSERIR LINK]`, `send-multichannel-notification`, `send-email`, `client_activities`) permanece exatamente igual.
+### 2. Evitar duplicidade na Busca Remota
+Em `supabase/functions/fetch-inpi-magazine/index.ts`, no fluxo de download (modo com `rpiNumber`), antes de inserir em `rpi_uploads`:
+- Consultar `rpi_uploads` por `rpi_number = targetRpi` com `status = completed`.
+- Se já existir, retornar resposta `409` informativa: `{ error: 'ALREADY_DOWNLOADED', message: 'RPI {n} já foi baixada em {data}', existingUploadId, force: false }` em vez de baixar novamente.
+- Aceitar parâmetro opcional `force: true` no body para permitir refetch deliberado (caso o admin precise reprocessar). Quando `force=true`, antes de inserir o novo upload, apaga os existentes da mesma RPI (`rpi_entries` + `rpi_uploads`) para manter base limpa.
 
-## Fora do escopo
+No frontend (`handleRemoteFetch`):
+- Tratar o erro `ALREADY_DOWNLOADED`: mostrar `toast` com botão "Reprocessar mesmo assim" que rechama com `force: true`.
+- Na UI de seleção de RPI no `<Select>` da Busca Remota, marcar com badge `Já baixada` os números que já constam em `uploads` (informação já carregada no estado `uploads`).
 
-- Não alterar `documentTemplates.ts`.
-- Não mexer no fluxo de Arquivado nem em outras etapas.
-- Não criar nem alterar edge functions, banco ou políticas RLS.
-- Não tocar nos textos de e‑mail/WhatsApp do distrato definidos no passo anterior.
+### 3. Permissões / RLS
+A tabela `rpi_uploads` e `rpi_entries` já são geridas por admins. Verificar se há policy de DELETE para admins; caso falte, criar migration:
+- `CREATE POLICY "admins delete rpi_uploads" ON rpi_uploads FOR DELETE USING (has_role(auth.uid(), 'admin'));`
+- Mesmo para `rpi_entries`.
+
+(Só será adicionada se a verificação mostrar que falta — a checagem será feita antes da migration.)
+
+## Fora de escopo
+- Não alterar parser XML, fluxos de matching de cliente, notificações, nem outras abas (Busca Remota mantém UX, só ganha guard de duplicidade).
+- Não excluir automaticamente: a limpeza é sempre manual e confirmada pelo admin.
+
+## Arquivos afetados
+- `src/pages/admin/RevistaINPI.tsx` (UI Histórico + Busca Remota)
+- `supabase/functions/fetch-inpi-magazine/index.ts` (guard de duplicidade + força)
+- Possível migration nova para policies de DELETE (apenas se ausentes)
