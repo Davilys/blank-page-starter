@@ -134,13 +134,97 @@ Qual o melhor horário para conversarmos? 🙏
 Equipe WebMarcas`;
 }
 
+const DISTRATO_LINK_PLACEHOLDER = '[INSERIR LINK]';
+
+function generateDistratoEmail(client: ServiceActionPanelProps['client']): string {
+  const nome = client.full_name || 'Cliente';
+  const marca = client.brand_name?.trim() || '[NOME DA MARCA]';
+  const numero = client.process_number?.trim() || '[Nº DO PROCESSO]';
+  return `Prezado(a) ${nome},
+
+Servimo-nos da presente NOTIFICAÇÃO EXTRAJUDICIAL para formalizar o DISTRATO CONTRATUAL e o ENCERRAMENTO DE RESPONSABILIDADE referente ao processo da marca "${marca}" (Nº ${numero}) junto ao INPI.
+
+Conforme a Cláusula 9.1 do contrato firmado entre as partes, o encerramento contratual pode ocorrer mediante comunicação prévia, por escrito, com prazo de 30 (trinta) dias.
+
+Segue abaixo o link do distrato para assinatura digital:
+
+${DISTRATO_LINK_PLACEHOLDER}
+
+Importante: ainda que o instrumento de distrato não seja assinado, esta notificação possui validade jurídica. Caso o distrato não seja assinado dentro do prazo de 30 (trinta) dias, a WebMarcas deixará de possuir qualquer vínculo, responsabilidade de acompanhamento ou obrigação perante o referido processo junto ao INPI.
+
+Permanecemos à disposição para resolver a presente questão de forma amigável e transparente.
+
+Atenciosamente,
+
+Equipe WebMarcas
+www.webmarcas.net
+WhatsApp: (11) 91112-0225`;
+}
+
+function generateDistratoWhatsApp(client: ServiceActionPanelProps['client']): string {
+  const marca = client.brand_name?.trim() || '[NOME DA MARCA]';
+  return `Olá, tudo bem?
+
+Estamos encaminhando formalmente a NOTIFICAÇÃO EXTRAJUDICIAL referente ao encerramento contratual do processo da marca "${marca}".
+
+Conforme cláusula 9.1 do contrato, o encerramento pode ocorrer mediante comunicação prévia por escrito com prazo de 30 dias.
+
+Segue abaixo o link do distrato para assinatura digital:
+
+${DISTRATO_LINK_PLACEHOLDER}
+
+Importante: mesmo sem assinatura, esta notificação possui validade jurídica. Caso o distrato não seja assinado dentro do prazo de 30 dias, a WebMarcas deixará de possuir qualquer vínculo, responsabilidade de acompanhamento ou obrigação perante o processo junto ao INPI.
+
+Ficamos à disposição para resolver de forma amigável e transparente.
+
+Equipe WebMarcas`;
+}
+
+function buildDistratoHtml(opts: {
+  nome: string;
+  cpf?: string | null;
+  cnpj?: string | null;
+  marca: string;
+  processo: string;
+}): string {
+  const docLine = opts.cnpj
+    ? `CNPJ nº ${opts.cnpj}`
+    : opts.cpf
+      ? `CPF nº ${opts.cpf}`
+      : 'documento de identificação a ser informado';
+  const dataExt = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Distrato Contratual sem Multa</title></head><body style="font-family: Arial, Helvetica, sans-serif; color:#111; line-height:1.6; max-width:800px; margin:0 auto; padding:24px;">
+    <h1 style="text-align:center; font-size:18px;">INSTRUMENTO PARTICULAR DE DISTRATO CONTRATUAL — SEM MULTA</h1>
+    <p><strong>CONTRATADA:</strong> WebMarcas, pessoa jurídica de direito privado, doravante denominada CONTRATADA.</p>
+    <p><strong>CONTRATANTE:</strong> ${opts.nome}, ${docLine}, doravante denominado(a) CONTRATANTE.</p>
+    <p><strong>OBJETO:</strong> O presente instrumento tem por objeto o encerramento, em comum acordo, do contrato de prestação de serviços firmado entre as partes, referente ao processo da marca <strong>"${opts.marca}"</strong> (Nº ${opts.processo}) junto ao Instituto Nacional da Propriedade Industrial – INPI.</p>
+    <p><strong>Cláusula 1ª.</strong> As partes, de comum acordo e nos termos da Cláusula 9.1 do contrato original, rescindem o referido instrumento, observado o aviso prévio de 30 (trinta) dias.</p>
+    <p><strong>Cláusula 2ª.</strong> Não há aplicação de multa rescisória ou qualquer cobrança financeira decorrente deste distrato, dando-se as partes plena, geral e recíproca quitação.</p>
+    <p><strong>Cláusula 3ª.</strong> A WebMarcas deixa de possuir qualquer vínculo, responsabilidade de acompanhamento ou obrigação perante o referido processo junto ao INPI a partir da assinatura deste instrumento, ou, caso este não seja assinado, a partir do término do prazo de 30 (trinta) dias contados do envio desta notificação.</p>
+    <p><strong>Cláusula 4ª.</strong> O presente distrato possui validade jurídica nos termos da Lei nº 13.874/2019 e da MP nº 2.200-2/2001, podendo ser assinado eletronicamente.</p>
+    <p style="margin-top:32px;">Local e data: Brasil, ${dataExt}.</p>
+    <p style="margin-top:48px;">__________________________________________<br/>WebMarcas — CONTRATADA</p>
+    <p style="margin-top:32px;">__________________________________________<br/>${opts.nome} — CONTRATANTE</p>
+  </body></html>`;
+}
+
 export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySent }: ServiceActionPanelProps) {
   const isArquivado = stage.id === 'arquivado';
+  const isDistrato = stage.id === 'distrato';
+  const isNotificationOnly = isArquivado || isDistrato;
   const [message, setMessage] = useState(() =>
-    isArquivado ? generateArquivadoEmail(client) : generateEmailTemplate(client, stage, SALARIO_MINIMO_2025)
+    isDistrato
+      ? generateDistratoEmail(client)
+      : isArquivado
+        ? generateArquivadoEmail(client)
+        : generateEmailTemplate(client, stage, SALARIO_MINIMO_2025)
   );
   const [whatsappMessage, setWhatsappMessage] = useState(() =>
-    isArquivado ? generateArquivadoWhatsApp(client) : generateWhatsAppTemplate(client, stage, SALARIO_MINIMO_2025)
+    isDistrato
+      ? generateDistratoWhatsApp(client)
+      : isArquivado
+        ? generateArquivadoWhatsApp(client)
+        : generateWhatsAppTemplate(client, stage, SALARIO_MINIMO_2025)
   );
   const [sendEmail, setSendEmail] = useState(true);
   const [sendWhatsApp, setSendWhatsApp] = useState(true);
@@ -176,7 +260,7 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
       toast.error('Selecione pelo menos um canal de envio');
       return;
     }
-    if (!isArquivado && valor <= 0) {
+    if (!isNotificationOnly && valor <= 0) {
       toast.error('Informe o valor da cobrança');
       return;
     }
@@ -201,10 +285,10 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
         docUrls.push({ url: upData.document.file_url, filename: f.name });
       }
 
-      // 2. Create invoice via edge function (skip in arquivado mode — apenas notificação)
+      // 2. Create invoice via edge function (skip in notification-only modes — arquivado/distrato)
       let invoiceData: any = null;
       let paymentLink = '';
-      if (!isArquivado) {
+      if (!isNotificationOnly) {
         const invoiceRes = await supabase.functions.invoke('create-admin-invoice', {
           body: {
             user_id: client.id,
@@ -222,10 +306,69 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
         paymentLink = invoiceData?.invoice_url || '';
       }
 
-      // Build messages with payment link (no link in arquivado mode)
-      const linkBlock = paymentLink ? `\n\nLink de pagamento:\n${paymentLink}` : '';
-      const finalEmailMessage = message + linkBlock;
-      const finalWhatsappMessage = whatsappMessage + linkBlock;
+      // 2b. Distrato: criar contrato sem multa e gerar link de assinatura
+      let distratoContractId: string | null = null;
+      let distratoSignatureUrl = '';
+      if (isDistrato) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name, cpf, cnpj, cpf_cnpj')
+          .eq('id', client.id)
+          .maybeSingle();
+        const nome = (profile?.full_name || client.full_name || 'Cliente').trim();
+        const cpf = (profile?.cpf || (profile?.cpf_cnpj && profile.cpf_cnpj.replace(/\D/g, '').length === 11 ? profile.cpf_cnpj : null)) as string | null;
+        const cnpj = (profile?.cnpj || (profile?.cpf_cnpj && profile.cpf_cnpj.replace(/\D/g, '').length === 14 ? profile.cpf_cnpj : null)) as string | null;
+        const marca = client.brand_name?.trim() || 'Marca';
+        const processo = client.process_number?.trim() || 'sem número';
+        const html = buildDistratoHtml({ nome, cpf, cnpj, marca, processo });
+        const today = new Date().toISOString().split('T')[0];
+        const contractNumber = `DIST-${Date.now()}`;
+
+        const { data: created, error: cErr } = await supabase
+          .from('contracts')
+          .insert({
+            user_id: client.id,
+            process_id: client.process_id || null,
+            contract_number: contractNumber,
+            contract_type: 'distrato',
+            document_type: 'distrato',
+            subject: `Distrato Contratual – ${marca}`,
+            description: 'Distrato sem multa – encerramento de responsabilidade',
+            contract_value: 0,
+            penalty_value: 0,
+            contract_html: html,
+            signature_status: 'pending',
+            visible_to_client: true,
+            start_date: today,
+            created_by: user?.id,
+            signatory_name: nome,
+            signatory_cpf: cpf,
+            signatory_cnpj: cnpj,
+            suggested_classes: [],
+          })
+          .select('id')
+          .single();
+        if (cErr || !created) throw new Error(cErr?.message || 'Erro ao criar contrato de distrato');
+        distratoContractId = created.id;
+
+        const { data: linkRes, error: linkErr } = await supabase.functions.invoke('generate-signature-link', {
+          body: { contractId: created.id, baseUrl: window.location.origin },
+        });
+        if (linkErr || !linkRes?.success) throw new Error(linkErr?.message || 'Erro ao gerar link de assinatura');
+        distratoSignatureUrl = linkRes.data?.url || '';
+      }
+
+      // Build messages
+      let finalEmailMessage: string;
+      let finalWhatsappMessage: string;
+      if (isDistrato) {
+        finalEmailMessage = message.replaceAll(DISTRATO_LINK_PLACEHOLDER, distratoSignatureUrl || '(link indisponível)');
+        finalWhatsappMessage = whatsappMessage.replaceAll(DISTRATO_LINK_PLACEHOLDER, distratoSignatureUrl || '(link indisponível)');
+      } else {
+        const linkBlock = paymentLink ? `\n\nLink de pagamento:\n${paymentLink}` : '';
+        finalEmailMessage = message + linkBlock;
+        finalWhatsappMessage = whatsappMessage + linkBlock;
+      }
 
       // 3. Send multichannel notification (CRM + WhatsApp)
       const notifChannels: string[] = ['crm'];
@@ -234,13 +377,14 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
       await supabase.functions.invoke('send-multichannel-notification', {
         body: {
           user_id: client.id,
-          event_type: isArquivado ? 'arquivamento' : 'cobranca_gerada',
+          event_type: isDistrato ? 'distrato_enviado' : isArquivado ? 'arquivamento' : 'cobranca_gerada',
           channels: notifChannels,
           custom_message: finalWhatsappMessage,
           data: {
-            link: paymentLink,
+            link: isDistrato ? distratoSignatureUrl : paymentLink,
             valor: String(valor),
             marca: client.brand_name || 'sua marca',
+            ...(isDistrato ? { contract_id: distratoContractId } : {}),
           },
         },
       });
@@ -251,9 +395,11 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
         await supabase.functions.invoke('send-email', {
           body: {
             to: [client.email],
-            subject: isArquivado
-              ? `Arquivamento do processo – ${client.brand_name || 'Marca'} – WebMarcas`
-              : `Exigência INPI – ${stage.label} – ${client.brand_name || 'Marca'}`,
+            subject: isDistrato
+              ? 'Notificação Extrajudicial – Distrato Contratual e Encerramento de Responsabilidade'
+              : isArquivado
+                ? `Arquivamento do processo – ${client.brand_name || 'Marca'} – WebMarcas`
+                : `Exigência INPI – ${stage.label} – ${client.brand_name || 'Marca'}`,
             body: finalEmailMessage,
             attachments,
           },
@@ -264,25 +410,41 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
       await supabase.from('client_activities').insert({
         user_id: client.id,
         admin_id: user?.id,
-        activity_type: isArquivado ? 'notificacao_arquivamento' : 'notificacao_cobranca',
-        description: isArquivado
-          ? `Notificação de arquivamento enviada: ${stage.label}`
-          : `Notificação + cobrança enviada: ${stage.label} - R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        activity_type: isDistrato
+          ? 'notificacao_distrato'
+          : isArquivado
+            ? 'notificacao_arquivamento'
+            : 'notificacao_cobranca',
+        description: isDistrato
+          ? `Notificação extrajudicial de distrato enviada: ${stage.label}`
+          : isArquivado
+            ? `Notificação de arquivamento enviada: ${stage.label}`
+            : `Notificação + cobrança enviada: ${stage.label} - R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
         metadata: ({
           stage_id: stage.id,
           stage_label: stage.label,
-          ...(isArquivado ? {} : {
-            valor,
-            payment_type: paymentType,
-            payment_method: paymentType === 'avista' ? 'pix' : paymentMethod,
-            invoice_id: invoiceData?.invoice_id,
-          }),
+          ...(isDistrato
+            ? { contract_id: distratoContractId, signature_url: distratoSignatureUrl }
+            : isArquivado
+              ? {}
+              : {
+                  valor,
+                  payment_type: paymentType,
+                  payment_method: paymentType === 'avista' ? 'pix' : paymentMethod,
+                  invoice_id: invoiceData?.invoice_id,
+                }),
           channels: { email: sendEmail, whatsapp: sendWhatsApp },
           document_urls: docUrls.map(d => d.url),
         }) as any,
       });
 
-      toast.success(isArquivado ? 'Notificação de arquivamento enviada com sucesso!' : 'Notificação e cobrança enviadas com sucesso!');
+      toast.success(
+        isDistrato
+          ? 'Notificação de distrato enviada com sucesso!'
+          : isArquivado
+            ? 'Notificação de arquivamento enviada com sucesso!'
+            : 'Notificação e cobrança enviadas com sucesso!'
+      );
       onUpdate();
       onClose();
     } catch (err: any) {
@@ -309,7 +471,7 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
             </div>
             <div>
               <p className="text-sm font-semibold">Painel de Ação – {stage.label}</p>
-              <p className="text-xs text-muted-foreground">{isArquivado ? 'Notificação ao cliente' : 'Notificação + Cobrança'}</p>
+              <p className="text-xs text-muted-foreground">{isDistrato ? 'Notificação Extrajudicial – Distrato' : isArquivado ? 'Notificação ao cliente' : 'Notificação + Cobrança'}</p>
             </div>
           </div>
           <button className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center" onClick={onClose}>
@@ -393,10 +555,10 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
           </div>
         </div>
 
-        {!isArquivado && <Separator />}
+        {!isNotificationOnly && <Separator />}
 
         {/* Billing Section */}
-        {!isArquivado && (
+        {!isNotificationOnly && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <DollarSign className="h-4 w-4 text-primary" />
@@ -482,10 +644,12 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
         <Button
           className="w-full h-11 text-sm font-semibold"
           onClick={handleSend}
-          disabled={sending || (!sendEmail && !sendWhatsApp) || (!isArquivado && valor <= 0)}
+          disabled={sending || (!sendEmail && !sendWhatsApp) || (!isNotificationOnly && valor <= 0)}
         >
           {sending ? (
             <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Enviando...</>
+          ) : isDistrato ? (
+            <><Send className="h-4 w-4 mr-2" /> {alreadySent ? 'Reenviar Notificação + Distrato' : 'Enviar Notificação + Distrato sem multa'}</>
           ) : isArquivado ? (
             <><Send className="h-4 w-4 mr-2" /> {alreadySent ? 'Reenviar Notificação' : 'Enviar Notificação'}</>
           ) : alreadySent ? (
