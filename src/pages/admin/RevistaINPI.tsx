@@ -510,17 +510,27 @@ export default function RevistaINPI() {
     setEntries(entriesWithDetails);
   };
 
-  const handleRemoteFetch = async (rpiNumber?: number) => {
+  const handleRemoteFetch = async (rpiNumber?: number, force = false) => {
     setFetchingRemote(true);
     try {
       const targetRpi = rpiNumber || parseInt(selectedRpiNumber) || latestRpi;
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-inpi-magazine`, {
         method: 'POST',
-        body: JSON.stringify({ rpiNumber: targetRpi }),
+        body: JSON.stringify({ rpiNumber: targetRpi, force }),
         headers: { 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`, 'Content-Type': 'application/json' },
       });
       const result = await response.json();
       if (!response.ok) {
+        if (result.error === 'ALREADY_DOWNLOADED') {
+          toast.warning(result.message || `RPI ${targetRpi} já foi baixada`, {
+            duration: 10000,
+            action: {
+              label: 'Reprocessar mesmo assim',
+              onClick: () => handleRemoteFetch(targetRpi, true),
+            },
+          });
+          return;
+        }
         if (result.error === 'XML_NOT_AVAILABLE' || result.error === 'XML_NOT_YET_AVAILABLE') {
           toast.info(result.message, { duration: 8000 });
           if (result.latestWithXml) { setSelectedRpiNumber(result.latestWithXml.toString()); toast.info(`Sugerimos buscar a RPI ${result.latestWithXml} que possui XML disponível.`, { duration: 5000 }); }
