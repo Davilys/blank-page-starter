@@ -1700,7 +1700,11 @@ export default function RevistaINPI() {
             </div>
             {uploads.length > 0 ? (
               <div className="grid gap-3">
-                {uploads.map((upload, index) => (
+                {uploads
+                  .slice((historicoPage - 1) * HISTORICO_PAGE_SIZE, historicoPage * HISTORICO_PAGE_SIZE)
+                  .map((upload, index) => {
+                  const st = getUploadStatus(upload);
+                  return (
                   <motion.div
                     key={upload.id}
                     initial={{ opacity: 0, y: 10 }}
@@ -1718,14 +1722,11 @@ export default function RevistaINPI() {
                       <CardContent className="py-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-4">
-                            <div className={`p-2.5 rounded-xl ${
-                              upload.status === 'completed' ? 'bg-emerald-500/10 text-emerald-600' :
-                              upload.status === 'error' ? 'bg-red-500/10 text-red-600' :
-                              'bg-amber-500/10 text-amber-600'
-                            }`}>
-                              {upload.status === 'completed' ? <CheckCircle className="h-5 w-5" /> :
-                               upload.status === 'error' ? <AlertCircle className="h-5 w-5" /> :
-                               <Loader2 className="h-5 w-5 animate-spin" />}
+                            <div className={`p-2.5 rounded-xl ${st.iconBg}`}>
+                              {st.kind === 'done' ? <CheckCircle className="h-5 w-5" /> :
+                               st.kind === 'error' ? <AlertCircle className="h-5 w-5" /> :
+                               st.kind === 'processing' ? <Loader2 className="h-5 w-5 animate-spin" /> :
+                               <AlertCircle className="h-5 w-5" />}
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
@@ -1735,13 +1736,7 @@ export default function RevistaINPI() {
                                     {format(new Date(upload.rpi_date), "dd/MM/yyyy", { locale: ptBR })}
                                   </Badge>
                                 )}
-                                <Badge className={
-                                  upload.status === 'completed' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
-                                  upload.status === 'error' ? 'bg-red-500/10 text-red-600 border-red-500/20' :
-                                  'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                                }>
-                                  {upload.status === 'completed' ? 'Processada' : upload.status === 'error' ? 'Erro' : 'Pendente'}
-                                </Badge>
+                                <Badge className={st.badge}>{st.label}</Badge>
                               </div>
                               <p className="text-xs text-muted-foreground mt-1">
                                 {upload.file_name} • {format(new Date(upload.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}
@@ -1779,7 +1774,35 @@ export default function RevistaINPI() {
                       </CardContent>
                     </Card>
                   </motion.div>
-                ))}
+                  );
+                })}
+                {uploads.length > HISTORICO_PAGE_SIZE && (
+                  <div className="flex items-center justify-between pt-3">
+                    <p className="text-xs text-muted-foreground">
+                      Página {historicoPage} de {Math.max(1, Math.ceil(uploads.length / HISTORICO_PAGE_SIZE))} • {uploads.length} registros
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={historicoPage <= 1}
+                        onClick={() => setHistoricoPage(p => Math.max(1, p - 1))}
+                        className="rounded-xl"
+                      >
+                        Anterior
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={historicoPage >= Math.ceil(uploads.length / HISTORICO_PAGE_SIZE)}
+                        onClick={() => setHistoricoPage(p => Math.min(Math.ceil(uploads.length / HISTORICO_PAGE_SIZE), p + 1))}
+                        className="rounded-xl"
+                      >
+                        Próxima
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <Card className="border-dashed border-2">
