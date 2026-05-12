@@ -239,6 +239,7 @@ async function resolveBrandProcessId(
 // ─── Main Component ──────────────────────────────────────────────────
 export default function RevistaINPI() {
   const [uploads, setUploads] = useState<RpiUpload[]>([]);
+  const [uploadStats, setUploadStats] = useState<Record<string, { total: number; matched: number }>>({});
   const [entries, setEntries] = useState<RpiEntry[]>([]);
   const [selectedUpload, setSelectedUpload] = useState<RpiUpload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -289,9 +290,13 @@ export default function RevistaINPI() {
     if (u.status !== 'completed') {
       return { kind: 'processing', label: 'Processando…', iconBg: 'bg-amber-500/10 text-amber-600', badge: 'bg-amber-500/10 text-amber-600 border-amber-500/20' };
     }
-    const total = u.total_processes_found || 0;
-    const matched = u.total_clients_matched || 0;
-    if (total === 0 || matched === 0) {
+    const stat = uploadStats[u.id];
+    const total = stat?.total ?? (u.total_processes_found || 0);
+    const matched = stat?.matched ?? (u.total_clients_matched || 0);
+    if (total === 0) {
+      return { kind: 'pending', label: 'Sem processamento', iconBg: 'bg-red-500/10 text-red-600', badge: 'bg-red-500/10 text-red-600 border-red-500/20' };
+    }
+    if (matched === 0) {
       return { kind: 'pending', label: 'Sem processamento', iconBg: 'bg-red-500/10 text-red-600', badge: 'bg-red-500/10 text-red-600 border-red-500/20' };
     }
     if (matched < total) {
@@ -513,6 +518,21 @@ export default function RevistaINPI() {
     else {
       setUploads(data || []);
       if (data && data.length > 0 && !selectedUpload) setSelectedUpload(data[0]);
+      // Compute real per-upload stats from rpi_entries (manual assignments included)
+      try {
+        const { data: ent } = await supabase
+          .from('rpi_entries')
+          .select('rpi_upload_id, matched_client_id');
+        const stats: Record<string, { total: number; matched: number }> = {};
+        for (const e of (ent || []) as Array<{ rpi_upload_id: string; matched_client_id: string | null }>) {
+          if (!e.rpi_upload_id) continue;
+          const s = stats[e.rpi_upload_id] || { total: 0, matched: 0 };
+          s.total += 1;
+          if (e.matched_client_id) s.matched += 1;
+          stats[e.rpi_upload_id] = s;
+        }
+        setUploadStats(stats);
+      } catch (err) { console.warn('Falha ao calcular stats por upload', err); }
     }
     setLoading(false);
   };
