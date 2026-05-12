@@ -268,6 +268,82 @@ export default function RevistaINPI() {
   const [editForm, setEditForm] = useState({ brand_name: '', process_number: '', ncl_classes: '', holder_name: '' });
   const [savingEdit, setSavingEdit] = useState(false);
   const [updatingDispatchType, setUpdatingDispatchType] = useState<string | null>(null);
+  const [deletingUploadId, setDeletingUploadId] = useState<string | null>(null);
+  const [confirmDeleteUpload, setConfirmDeleteUpload] = useState<RpiUpload | null>(null);
+  const [confirmDedup, setConfirmDedup] = useState(false);
+  const [dedupRunning, setDedupRunning] = useState(false);
+
+  const downloadedRpiNumbers = useMemo(() => {
+    const s = new Set<number>();
+    for (const u of uploads) {
+      const n = parseInt(u.rpi_number || '');
+      if (!Number.isNaN(n)) s.add(n);
+    }
+    return s;
+  }, [uploads]);
+
+  const duplicateUploads = useMemo(() => {
+    // Group by rpi_number, keep newest completed (or newest overall), mark rest for removal
+    const byRpi = new Map<string, RpiUpload[]>();
+    for (const u of uploads) {
+      if (!u.rpi_number) continue;
+      const arr = byRpi.get(u.rpi_number) || [];
+      arr.push(u);
+      byRpi.set(u.rpi_number, arr);
+    }
+    const toRemove: RpiUpload[] = [];
+    for (const [, arr] of byRpi) {
+      if (arr.length <= 1) continue;
+      const sorted = [...arr].sort((a, b) => {
+        const ac = a.status === 'completed' ? 1 : 0;
+        const bc = b.status === 'completed' ? 1 : 0;
+        if (ac !== bc) return bc - ac;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+      toRemove.push(...sorted.slice(1));
+    }
+    return toRemove;
+  }, [uploads]);
+
+  const handleDeleteUpload = async (upload: RpiUpload) => {
+    setDeletingUploadId(upload.id);
+    try {
+      const { error: entriesErr } = await supabase.from('rpi_entries').delete().eq('rpi_upload_id', upload.id);
+      if (entriesErr) throw entriesErr;
+      const { error: upErr } = await supabase.from('rpi_uploads').delete().eq('id', upload.id);
+      if (upErr) throw upErr;
+      toast.success(`RPI ${upload.rpi_number || ''} removida do histórico`);
+      if (selectedUpload?.id === upload.id) { setSelectedUpload(null); setEntries([]); }
+      await fetchUploads();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || 'Erro ao excluir histórico');
+    } finally {
+      setDeletingUploadId(null);
+      setConfirmDeleteUpload(null);
+    }
+  };
+
+  const handleCleanDuplicates = async () => {
+    setDedupRunning(true);
+    try {
+      const ids = duplicateUploads.map(u => u.id);
+      if (ids.length === 0) { toast.info('Nenhum duplicado encontrado'); return; }
+      const { error: e1 } = await supabase.from('rpi_entries').delete().in('rpi_upload_id', ids);
+      if (e1) throw e1;
+      const { error: e2 } = await supabase.from('rpi_uploads').delete().in('id', ids);
+      if (e2) throw e2;
+      toast.success(`${ids.length} registros duplicados removidos`);
+      if (selectedUpload && ids.includes(selectedUpload.id)) { setSelectedUpload(null); setEntries([]); }
+      await fetchUploads();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || 'Erro ao limpar duplicados');
+    } finally {
+      setDedupRunning(false);
+      setConfirmDedup(false);
+    }
+  };
 
   const handleDispatchTypeChange = async (entry: RpiEntry, newType: string) => {
     setUpdatingDispatchType(entry.id);
