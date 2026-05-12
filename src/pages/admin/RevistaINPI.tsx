@@ -290,9 +290,13 @@ export default function RevistaINPI() {
     if (u.status !== 'completed') {
       return { kind: 'processing', label: 'Processando…', iconBg: 'bg-amber-500/10 text-amber-600', badge: 'bg-amber-500/10 text-amber-600 border-amber-500/20' };
     }
-    const total = u.total_processes_found || 0;
-    const matched = u.total_clients_matched || 0;
-    if (total === 0 || matched === 0) {
+    const stat = uploadStats[u.id];
+    const total = stat?.total ?? (u.total_processes_found || 0);
+    const matched = stat?.matched ?? (u.total_clients_matched || 0);
+    if (total === 0) {
+      return { kind: 'pending', label: 'Sem processamento', iconBg: 'bg-red-500/10 text-red-600', badge: 'bg-red-500/10 text-red-600 border-red-500/20' };
+    }
+    if (matched === 0) {
       return { kind: 'pending', label: 'Sem processamento', iconBg: 'bg-red-500/10 text-red-600', badge: 'bg-red-500/10 text-red-600 border-red-500/20' };
     }
     if (matched < total) {
