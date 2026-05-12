@@ -562,7 +562,7 @@ serve(async (req) => {
   }
 
   try {
-    const { rpiNumber, mode } = await req.json();
+    const { rpiNumber, mode, force } = await req.json();
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -599,6 +599,36 @@ serve(async (req) => {
     if (!rpiNumber && withXml.length > 0 && !withXml.includes(targetRpi)) {
       console.log(`RPI ${targetRpi} no XML, falling back to ${withXml[0]}`);
       targetRpi = withXml[0];
+    }
+
+    // Guard against duplicate downloads
+    const { data: existing } = await supabase
+      .from('rpi_uploads')
+      .select('id, created_at, status, total_processes_found')
+      .eq('rpi_number', targetRpi.toString())
+      .order('created_at', { ascending: false });
+
+    const completedExisting = (existing || []).find((u: any) => u.status === 'completed');
+    if (completedExisting && !force) {
+      const dt = new Date(completedExisting.created_at).toLocaleString('pt-BR');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'ALREADY_DOWNLOADED',
+          message: `RPI ${targetRpi} já foi baixada em ${dt} (${completedExisting.total_processes_found || 0} processos). Use "Reprocessar mesmo assim" para baixar novamente.`,
+          rpiNumber: targetRpi,
+          existingUploadId: completedExisting.id,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 409 }
+      );
+    }
+
+    // Force mode: clear existing rows for this RPI to avoid accumulating duplicates
+    if (force && existing && existing.length > 0) {
+      const ids = existing.map((u: any) => u.id);
+      console.log(`Force mode: removing ${ids.length} existing upload(s) for RPI ${targetRpi}`);
+      await supabase.from('rpi_entries').delete().in('rpi_upload_id', ids);
+      await supabase.from('rpi_uploads').delete().in('id', ids);
     }
 
     console.log(`Fetching RPI ${targetRpi}...`);

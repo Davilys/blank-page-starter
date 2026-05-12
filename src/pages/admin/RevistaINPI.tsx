@@ -6,6 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -19,6 +23,7 @@ import {
   Building2, Cloud, CloudDownload, Globe, Sparkles, Zap, UserPlus,
   AlertTriangle, BarChart3, TrendingUp, Shield, Activity, Newspaper,
   ExternalLink, Hash, Layers, Radio, Database, Wifi, Pencil, Save, X,
+  Trash2, Copy as CopyIcon,
 } from 'lucide-react';
 import { format, addDays, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -263,6 +268,82 @@ export default function RevistaINPI() {
   const [editForm, setEditForm] = useState({ brand_name: '', process_number: '', ncl_classes: '', holder_name: '' });
   const [savingEdit, setSavingEdit] = useState(false);
   const [updatingDispatchType, setUpdatingDispatchType] = useState<string | null>(null);
+  const [deletingUploadId, setDeletingUploadId] = useState<string | null>(null);
+  const [confirmDeleteUpload, setConfirmDeleteUpload] = useState<RpiUpload | null>(null);
+  const [confirmDedup, setConfirmDedup] = useState(false);
+  const [dedupRunning, setDedupRunning] = useState(false);
+
+  const downloadedRpiNumbers = useMemo(() => {
+    const s = new Set<number>();
+    for (const u of uploads) {
+      const n = parseInt(u.rpi_number || '');
+      if (!Number.isNaN(n)) s.add(n);
+    }
+    return s;
+  }, [uploads]);
+
+  const duplicateUploads = useMemo(() => {
+    // Group by rpi_number, keep newest completed (or newest overall), mark rest for removal
+    const byRpi = new Map<string, RpiUpload[]>();
+    for (const u of uploads) {
+      if (!u.rpi_number) continue;
+      const arr = byRpi.get(u.rpi_number) || [];
+      arr.push(u);
+      byRpi.set(u.rpi_number, arr);
+    }
+    const toRemove: RpiUpload[] = [];
+    for (const [, arr] of byRpi) {
+      if (arr.length <= 1) continue;
+      const sorted = [...arr].sort((a, b) => {
+        const ac = a.status === 'completed' ? 1 : 0;
+        const bc = b.status === 'completed' ? 1 : 0;
+        if (ac !== bc) return bc - ac;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+      toRemove.push(...sorted.slice(1));
+    }
+    return toRemove;
+  }, [uploads]);
+
+  const handleDeleteUpload = async (upload: RpiUpload) => {
+    setDeletingUploadId(upload.id);
+    try {
+      const { error: entriesErr } = await supabase.from('rpi_entries').delete().eq('rpi_upload_id', upload.id);
+      if (entriesErr) throw entriesErr;
+      const { error: upErr } = await supabase.from('rpi_uploads').delete().eq('id', upload.id);
+      if (upErr) throw upErr;
+      toast.success(`RPI ${upload.rpi_number || ''} removida do histórico`);
+      if (selectedUpload?.id === upload.id) { setSelectedUpload(null); setEntries([]); }
+      await fetchUploads();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || 'Erro ao excluir histórico');
+    } finally {
+      setDeletingUploadId(null);
+      setConfirmDeleteUpload(null);
+    }
+  };
+
+  const handleCleanDuplicates = async () => {
+    setDedupRunning(true);
+    try {
+      const ids = duplicateUploads.map(u => u.id);
+      if (ids.length === 0) { toast.info('Nenhum duplicado encontrado'); return; }
+      const { error: e1 } = await supabase.from('rpi_entries').delete().in('rpi_upload_id', ids);
+      if (e1) throw e1;
+      const { error: e2 } = await supabase.from('rpi_uploads').delete().in('id', ids);
+      if (e2) throw e2;
+      toast.success(`${ids.length} registros duplicados removidos`);
+      if (selectedUpload && ids.includes(selectedUpload.id)) { setSelectedUpload(null); setEntries([]); }
+      await fetchUploads();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || 'Erro ao limpar duplicados');
+    } finally {
+      setDedupRunning(false);
+      setConfirmDedup(false);
+    }
+  };
 
   const handleDispatchTypeChange = async (entry: RpiEntry, newType: string) => {
     setUpdatingDispatchType(entry.id);
@@ -429,17 +510,27 @@ export default function RevistaINPI() {
     setEntries(entriesWithDetails);
   };
 
-  const handleRemoteFetch = async (rpiNumber?: number) => {
+  const handleRemoteFetch = async (rpiNumber?: number, force = false) => {
     setFetchingRemote(true);
     try {
       const targetRpi = rpiNumber || parseInt(selectedRpiNumber) || latestRpi;
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-inpi-magazine`, {
         method: 'POST',
-        body: JSON.stringify({ rpiNumber: targetRpi }),
+        body: JSON.stringify({ rpiNumber: targetRpi, force }),
         headers: { 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`, 'Content-Type': 'application/json' },
       });
       const result = await response.json();
       if (!response.ok) {
+        if (result.error === 'ALREADY_DOWNLOADED') {
+          toast.warning(result.message || `RPI ${targetRpi} já foi baixada`, {
+            duration: 10000,
+            action: {
+              label: 'Reprocessar mesmo assim',
+              onClick: () => handleRemoteFetch(targetRpi, true),
+            },
+          });
+          return;
+        }
         if (result.error === 'XML_NOT_AVAILABLE' || result.error === 'XML_NOT_YET_AVAILABLE') {
           toast.info(result.message, { duration: 8000 });
           if (result.latestWithXml) { setSelectedRpiNumber(result.latestWithXml.toString()); toast.info(`Sugerimos buscar a RPI ${result.latestWithXml} que possui XML disponível.`, { duration: 5000 }); }
@@ -936,6 +1027,7 @@ export default function RevistaINPI() {
                           <SelectContent>
                             {recentRpis.map(rpi => {
                               const hasXml = rpWithXml.includes(rpi);
+                              const alreadyDownloaded = downloadedRpiNumbers.has(rpi);
                               return (
                                 <SelectItem key={rpi} value={rpi.toString()}>
                                   <span className="flex items-center gap-2">
@@ -945,6 +1037,9 @@ export default function RevistaINPI() {
                                       <Badge className="text-xs bg-emerald-500/10 text-emerald-600 border-emerald-500/20">XML ✓</Badge>
                                     ) : (
                                       <Badge variant="outline" className="text-xs text-muted-foreground">Sem XML</Badge>
+                                    )}
+                                    {alreadyDownloaded && (
+                                      <Badge className="text-xs bg-blue-500/10 text-blue-600 border-blue-500/20">Já baixada</Badge>
                                     )}
                                   </span>
                                 </SelectItem>
@@ -1555,6 +1650,27 @@ export default function RevistaINPI() {
 
           {/* ─── TAB: Histórico ─── */}
           <TabsContent value="history" className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-primary" />
+                  Histórico de RPIs
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {uploads.length} registros • {duplicateUploads.length} duplicados detectados
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={duplicateUploads.length === 0 || dedupRunning}
+                onClick={() => setConfirmDedup(true)}
+                className="gap-2 rounded-xl"
+              >
+                <CopyIcon className="h-4 w-4" />
+                Limpar duplicados ({duplicateUploads.length})
+              </Button>
+            </div>
             {uploads.length > 0 ? (
               <div className="grid gap-3">
                 {uploads.map((upload, index) => (
@@ -1619,6 +1735,18 @@ export default function RevistaINPI() {
                               </div>
                             )}
                             <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-500/10 rounded-lg"
+                              disabled={deletingUploadId === upload.id}
+                              onClick={(e) => { e.stopPropagation(); setConfirmDeleteUpload(upload); }}
+                              aria-label="Excluir histórico"
+                            >
+                              {deletingUploadId === upload.id
+                                ? <Loader2 className="h-4 w-4 animate-spin" />
+                                : <Trash2 className="h-4 w-4" />}
+                            </Button>
                           </div>
                         </div>
                       </CardContent>
@@ -1816,6 +1944,52 @@ export default function RevistaINPI() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete single upload confirmation */}
+      <AlertDialog open={!!confirmDeleteUpload} onOpenChange={(o) => !o && setConfirmDeleteUpload(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir histórico desta RPI?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDeleteUpload && (
+                <>
+                  Será removido o registro <strong>RPI {confirmDeleteUpload.rpi_number || '—'}</strong> ({confirmDeleteUpload.file_name}) e todos os processos vinculados a este upload. Esta ação não pode ser desfeita.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmDeleteUpload && handleDeleteUpload(confirmDeleteUpload)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Clean duplicates confirmation */}
+      <AlertDialog open={confirmDedup} onOpenChange={setConfirmDedup}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Limpar registros duplicados?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Serão removidos <strong>{duplicateUploads.length}</strong> registros duplicados, mantendo o mais recente concluído de cada RPI. Os processos vinculados aos registros removidos também serão apagados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCleanDuplicates}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {dedupRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Limpar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
