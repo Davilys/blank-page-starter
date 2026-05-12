@@ -1,73 +1,71 @@
 ## Objetivo
 
-No ficheiro do cliente (aba **Serviços**), quando o estágio selecionado for **ARQUIVADOS**, o "Painel de Ação" deve apenas **enviar a notificação** (e‑mail + WhatsApp) com textos específicos — **sem gerar cobrança/fatura**, sem campos de valor, parcelamento ou vencimento.
+Quando o admin clicar na etapa **Distrato** dentro do ficheiro do cliente (aba Serviços) e acionar o painel de ação:
 
-Para todos os outros estágios (Exigência, Oposição, etc.), o comportamento atual de "Notificação + Cobrança" permanece inalterado.
+1. **Não gerar cobrança** (igual ao fluxo de "Arquivado").
+2. **Criar automaticamente um contrato de distrato sem multa** já preenchido com os dados do cliente.
+3. **Gerar o link de assinatura digital** desse distrato.
+4. **Enviar a notificação extrajudicial** com o link tanto por **e‑mail** como por **WhatsApp**, usando os textos exatos solicitados.
+5. Botão do painel passa a ser **"Enviar Notificação + Distrato sem multa"**.
 
-## Onde mexer
-
-Apenas em **`src/components/admin/clients/ServiceActionPanel.tsx`** (estágio identificado por `stage.id === 'arquivado'`).
+Tudo limitado à etapa cujo `stage.id === 'distrato'`. Outras etapas seguem inalteradas.
 
 ## Mudanças
 
-### 1. Detectar modo "arquivado"
-Adicionar `const isArquivado = stage.id === 'arquivado';` no topo do componente.
+### 1. `src/components/admin/clients/ServiceActionPanel.tsx`
 
-### 2. Textos novos (somente quando `isArquivado`)
-Criar dois geradores dedicados que substituem os templates atuais ao montar o painel.
+- Adicionar flag `isDistrato = stage.id === 'distrato'`.
+- Tratar `isDistrato` no mesmo nível de `isArquivado`: ocultar bloco de Cobrança, pular `create-admin-invoice`, mudar subtítulo para "Notificação Extrajudicial – Distrato", botão para "Enviar Notificação + Distrato sem multa" (e "Reenviar..." quando já houver registro).
+- Novos templates (preenchimento automático com `client.full_name`, `client.brand_name`, `client.process_number`; placeholders `[NOME DA MARCA]` / `[Nº DO PROCESSO]` quando órfão):
+  - **E‑mail**
+    - Assunto: `Notificação Extrajudicial – Distrato Contratual e Encerramento de Responsabilidade`
+    - Corpo: texto fornecido pelo usuário, com `[INSERIR LINK]` substituído pelo link de assinatura ao enviar.
+  - **WhatsApp**: texto fornecido pelo usuário, com `[INSERIR LINK]` substituído pelo link.
+- No `handleSend`, quando `isDistrato`:
+  1. Inserir registro em `public.contracts` via `supabase.from('contracts').insert({...})` com:
+     - `user_id = client.id`
+     - `process_id = client.process_id`
+     - `contract_type = 'distrato'`
+     - `document_type = 'distrato'`
+     - `subject = 'Distrato Contratual – ' + (brand_name || 'Marca')`
+     - `description = 'Distrato sem multa – encerramento de responsabilidade'`
+     - `contract_value = 0`, `penalty_value = 0`
+     - `signatory_name`, `signatory_cpf`, `signatory_cnpj` (lidos do `profiles` do cliente)
+     - `contract_html`: HTML gerado a partir de um template fixo de distrato sem multa (cláusula 9.1, prazo de 30 dias, sem cobrança de multa). Inclui dados do cliente, marca, processo e data.
+     - `signature_status = 'pending'`, `visible_to_client = true`, `start_date = hoje`, `created_by = admin.id`.
+     - `contract_number`: `DIST-<timestamp>` (ou padrão usado no resto do app).
+  2. Chamar a edge function `generate-signature-link` com `{ contractId, baseUrl: window.location.origin }` e capturar `data.url` como `signatureUrl`.
+  3. Substituir `[INSERIR LINK]` nas mensagens (e‑mail e WhatsApp) pelo `signatureUrl`. Não anexar bloco extra.
+  4. Enviar via `send-multichannel-notification` (canais `crm` + `whatsapp` quando marcado) com `event_type: 'distrato_enviado'`, `data: { link: signatureUrl, marca, contract_id }`.
+  5. Enviar e‑mail via `send-email` com o assunto exato e corpo final, incluindo anexos opcionais já carregados.
+  6. Registrar `client_activities` com `activity_type: 'notificacao_distrato'`, `description` resumida e `metadata` contendo `contract_id`, `signatureUrl`, `stage_id`.
+  7. Toast: "Notificação de distrato enviada com sucesso!".
+- Pré‑carregar dados extras do cliente (cpf, cnpj) no `ClientDetailSheet` ou ler dentro do `handleSend` via `supabase.from('profiles').select('cpf, cnpj, full_name').eq('id', client.id).single()` para preencher os campos do contrato. (Adicionar essa leitura dentro do próprio `handleSend` para isolar a alteração.)
 
-**E‑mail – assunto:** `Arquivamento do processo – {marca} – WebMarcas`
+### 2. Sem alterações em outros arquivos
 
-**E‑mail – corpo:**
+- Não mexer em edge functions, banco, modelos de contrato existentes, fluxo de `arquivado` ou demais etapas.
+- Reutilizar `generate-signature-link`, `send-multichannel-notification` e `send-email` já disponíveis.
+
+## Detalhes técnicos do template HTML do distrato
+
+HTML simples, inline, contendo:
+
+```text
+INSTRUMENTO PARTICULAR DE DISTRATO CONTRATUAL — SEM MULTA
+Partes: WebMarcas (CONTRATADA) e {nome_cliente} ({cpf/cnpj}) (CONTRATANTE)
+Objeto: encerramento do contrato de prestação de serviços referente ao
+processo da marca "{marca}" (Nº {processo}) junto ao INPI.
+Cláusula 1ª — As partes, de comum acordo, rescindem o contrato original,
+nos termos da Cláusula 9.1, com aviso prévio de 30 dias.
+Cláusula 2ª — Não há aplicação de multa rescisória.
+Cláusula 3ª — A WebMarcas deixa de possuir qualquer vínculo, responsabilidade
+de acompanhamento ou obrigação perante o referido processo no INPI a partir
+da assinatura deste instrumento (ou do término do prazo de 30 dias caso não
+seja assinado).
+Cláusula 4ª — Este distrato possui validade jurídica conforme a Lei
+13.874/2019 e MP 2.200-2/2001.
+Local e data: {cidade/UF}, {data por extenso}.
 ```
-Prezado {NOME DO CLIENTE},
 
-Venho informar que o INPI publicou o arquivamento do processo da marca "{MARCA}". N. PROCESSO: {NÚMERO}
-
-Conforme previsto contratualmente, a WebMarcas possui cláusula de garantia para os casos em que o arquivamento ocorra por decisão do INPI durante o exame do processo, possibilitando a abertura de um novo pedido sem cobrança de novos honorários advocatícios.
-
-Entretanto, é importante esclarecer que a garantia contratual não se aplica em casos de arquivamento decorrente do não cumprimento de exigências ou publicações dentro do prazo legal estabelecido pelo INPI.
-
-Dessa forma, precisamos agendar uma reunião com nosso departamento jurídico para análise completa do processo, verificação da aplicação da garantia contratual e definição das próximas medidas para eventual abertura de um novo pedido de registro.
-
-Nos informe, por gentileza, o melhor dia e horário para alinharmos todos os detalhes da forma mais rápida e transparente possível.
-
-Seguimos à disposição para quaisquer esclarecimentos.
-
-Atenciosamente,
-Equipe WebMarcas
-www.webmarcas.net
-WhatsApp: (11) 91112-0225
-```
-
-**WhatsApp:**
-```
-Olá, tudo bem?
-
-Verificamos que o INPI publicou o arquivamento do processo da sua marca. Precisamos agendar um breve alinhamento com o nosso jurídico para analisar a aplicação da cláusula de garantia contratual e verificar a possibilidade de abertura de um novo processo sem cobrança de novos honorários.
-
-Importante: a garantia é válida para casos de arquivamento por decisão do INPI, não se aplicando quando ocorre perda de prazo para cumprimento de exigência/publicação.
-
-Qual o melhor horário para conversarmos? 🙏
-
-Equipe WebMarcas
-```
-
-Substituições: `{NOME DO CLIENTE}` ← `client.full_name`, `{MARCA}` ← `client.brand_name`, `{NÚMERO}` ← `client.process_number` (se vazio, mostrar `0000000`).
-
-### 3. UI condicional
-Quando `isArquivado === true`:
-- Subtítulo do painel: **"Notificação ao cliente"** (em vez de "Notificação + Cobrança").
-- **Ocultar** completamente a seção `Cobrança` (Valor, Método/Parcelamento, info de vencimento).
-- Manter: Mensagem (e‑mail), Mensagem WhatsApp, checkboxes de canais, anexos opcionais.
-- Botão final: **"Enviar notificação"** (em vez de "Enviar notificação e cobrança").
-
-### 4. Ação de envio (`handleSend`) condicional
-Quando `isArquivado`:
-- **Pular** a chamada `create-admin-invoice` (nenhuma fatura criada, nenhum link de pagamento gerado).
-- Não anexar bloco "Link de pagamento" às mensagens.
-- Continuar enviando: upload de anexos (se houver), `send-multichannel-notification` (canais `crm` + `whatsapp` se marcado) e `send-email` (se marcado).
-- Registrar em `client_activities` com `activity_type: 'notificacao_arquivamento'` e descrição "Notificação de arquivamento enviada"; metadata sem `valor`/`invoice_id`.
-- Toast: "Notificação de arquivamento enviada com sucesso!".
-
-Nenhuma alteração em outros arquivos, edge functions ou no banco.
+Validação final: build TypeScript do Vite continua passando; envio testado pelo próprio usuário no preview.
