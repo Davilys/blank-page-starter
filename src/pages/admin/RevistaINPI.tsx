@@ -1646,6 +1646,27 @@ export default function RevistaINPI() {
 
           {/* ─── TAB: Histórico ─── */}
           <TabsContent value="history" className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-primary" />
+                  Histórico de RPIs
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {uploads.length} registros • {duplicateUploads.length} duplicados detectados
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={duplicateUploads.length === 0 || dedupRunning}
+                onClick={() => setConfirmDedup(true)}
+                className="gap-2 rounded-xl"
+              >
+                <CopyIcon className="h-4 w-4" />
+                Limpar duplicados ({duplicateUploads.length})
+              </Button>
+            </div>
             {uploads.length > 0 ? (
               <div className="grid gap-3">
                 {uploads.map((upload, index) => (
@@ -1710,6 +1731,18 @@ export default function RevistaINPI() {
                               </div>
                             )}
                             <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-500/10 rounded-lg"
+                              disabled={deletingUploadId === upload.id}
+                              onClick={(e) => { e.stopPropagation(); setConfirmDeleteUpload(upload); }}
+                              aria-label="Excluir histórico"
+                            >
+                              {deletingUploadId === upload.id
+                                ? <Loader2 className="h-4 w-4 animate-spin" />
+                                : <Trash2 className="h-4 w-4" />}
+                            </Button>
                           </div>
                         </div>
                       </CardContent>
