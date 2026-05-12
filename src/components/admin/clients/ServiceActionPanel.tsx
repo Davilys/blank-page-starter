@@ -362,8 +362,8 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
       let finalEmailMessage: string;
       let finalWhatsappMessage: string;
       if (isDistrato) {
-        finalEmailMessage = message.replaceAll(DISTRATO_LINK_PLACEHOLDER, distratoSignatureUrl || '(link indisponível)');
-        finalWhatsappMessage = whatsappMessage.replaceAll(DISTRATO_LINK_PLACEHOLDER, distratoSignatureUrl || '(link indisponível)');
+        finalEmailMessage = message.split(DISTRATO_LINK_PLACEHOLDER).join(distratoSignatureUrl || '(link indisponível)');
+        finalWhatsappMessage = whatsappMessage.split(DISTRATO_LINK_PLACEHOLDER).join(distratoSignatureUrl || '(link indisponível)');
       } else {
         const linkBlock = paymentLink ? `\n\nLink de pagamento:\n${paymentLink}` : '';
         finalEmailMessage = message + linkBlock;
