@@ -83,6 +83,7 @@ const DISPATCH_TYPE_OPTIONS = [
   { value: 'deferimento', label: 'Deferimento' },
   { value: 'certificado', label: 'Certificado' },
   { value: 'renovacao', label: 'Renovação' },
+  { value: 'distrato', label: 'Distrato' },
   { value: 'arquivado', label: 'Arquivado' },
 ];
 
