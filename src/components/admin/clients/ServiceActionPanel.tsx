@@ -303,7 +303,7 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
             </div>
             <div>
               <p className="text-sm font-semibold">Painel de Ação – {stage.label}</p>
-              <p className="text-xs text-muted-foreground">Notificação + Cobrança</p>
+              <p className="text-xs text-muted-foreground">{isArquivado ? 'Notificação ao cliente' : 'Notificação + Cobrança'}</p>
             </div>
           </div>
           <button className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center" onClick={onClose}>
@@ -387,9 +387,10 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
           </div>
         </div>
 
-        <Separator />
+        {!isArquivado && <Separator />}
 
         {/* Billing Section */}
+        {!isArquivado && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <DollarSign className="h-4 w-4 text-primary" />
@@ -469,15 +470,18 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
             <span>Vencimento: <strong>{dueDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</strong> (próxima segunda-feira)</span>
           </div>
         </div>
+        )}
 
         {/* Send Button */}
         <Button
           className="w-full h-11 text-sm font-semibold"
           onClick={handleSend}
-          disabled={sending || (!sendEmail && !sendWhatsApp) || valor <= 0}
+          disabled={sending || (!sendEmail && !sendWhatsApp) || (!isArquivado && valor <= 0)}
         >
           {sending ? (
             <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Enviando...</>
+          ) : isArquivado ? (
+            <><Send className="h-4 w-4 mr-2" /> {alreadySent ? 'Reenviar Notificação' : 'Enviar Notificação'}</>
           ) : alreadySent ? (
             <><Send className="h-4 w-4 mr-2" /> Reenviar Notificação + Cobrança</>
           ) : (
