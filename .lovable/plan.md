@@ -1,71 +1,46 @@
 ## Objetivo
 
-Quando o admin clicar na etapa **Distrato** dentro do ficheiro do cliente (aba Serviços) e acionar o painel de ação:
+Substituir o HTML inline `buildDistratoHtml` pelo modelo padrão de distrato sem multa já existente em `src/lib/documentTemplates.ts` (`generateDistratoSemMultaContent`), para que o contrato de distrato gerado ao clicar em "Enviar Notificação + Distrato sem multa" use exatamente o mesmo texto/cláusulas do modelo padrão usado no resto do sistema.
 
-1. **Não gerar cobrança** (igual ao fluxo de "Arquivado").
-2. **Criar automaticamente um contrato de distrato sem multa** já preenchido com os dados do cliente.
-3. **Gerar o link de assinatura digital** desse distrato.
-4. **Enviar a notificação extrajudicial** com o link tanto por **e‑mail** como por **WhatsApp**, usando os textos exatos solicitados.
-5. Botão do painel passa a ser **"Enviar Notificação + Distrato sem multa"**.
+## Mudança única
 
-Tudo limitado à etapa cujo `stage.id === 'distrato'`. Outras etapas seguem inalteradas.
+### `src/components/admin/clients/ServiceActionPanel.tsx`
 
-## Mudanças
+1. Remover a função local `buildDistratoHtml` (não será mais usada).
+2. Importar `generateDistratoSemMultaContent` de `@/lib/documentTemplates`.
+3. Ampliar a leitura do `profiles` no bloco `if (isDistrato)` para incluir os campos exigidos pelo template padrão:
+   - `full_name, cpf, cnpj, cpf_cnpj, company_name, address, city, state, zip_code, email, phone`.
+4. Montar o objeto `vars` esperado por `generateDistratoSemMultaContent`:
+   - `nome_empresa`: `profile.company_name || profile.full_name || client.full_name || 'Cliente'`
+   - `cnpj`: CNPJ formatado se houver, senão CPF, senão `[a informar]`
+   - `endereco`: `profile.address || '[Endereço a informar]'`
+   - `cidade`: `profile.city || '[Cidade]'`
+   - `estado`: `profile.state || '[UF]'`
+   - `cep`: `profile.zip_code || '[CEP]'`
+   - `nome_representante`: `profile.full_name || client.full_name || nome_empresa`
+   - `cpf_representante`: CPF do profile (ou `cpf_cnpj` quando tiver 11 dígitos), senão `[CPF a informar]`
+   - `email`: `profile.email || client.email || ''`
+   - `telefone`: `profile.phone || client.phone || ''`
+   - `marca`: `client.brand_name?.trim() || '[Nome da Marca]'`
+5. Gerar o conteúdo de texto via `generateDistratoSemMultaContent(vars)` e convertê-lo para um HTML simples preservando quebras de linha:
+   ```ts
+   const text = generateDistratoSemMultaContent(vars);
+   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Distrato Contratual sem Multa</title></head><body style="font-family: Arial, Helvetica, sans-serif; color:#111; line-height:1.6; max-width:800px; margin:0 auto; padding:24px; white-space:pre-wrap;">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</body></html>`;
+   ```
+   Isso mantém o mesmo conteúdo do modelo padrão sem reescrever cláusulas.
+6. Continuar inserindo na tabela `contracts` com:
+   - `contract_type = 'distrato'`
+   - `document_type = 'distrato_sem_multa'` (alinhado ao identificador do template padrão, em vez de `'distrato'` genérico)
+   - `subject = 'Distrato Contratual sem Multa – ' + marca`
+   - `description = 'Distrato sem multa – encerramento de responsabilidade'`
+   - `contract_value = 0`, `penalty_value = 0`
+   - `signatory_name`, `signatory_cpf`, `signatory_cnpj`
+   - `contract_html` = HTML acima
+7. Restante do fluxo (`generate-signature-link`, substituição de `[INSERIR LINK]`, `send-multichannel-notification`, `send-email`, `client_activities`) permanece exatamente igual.
 
-### 1. `src/components/admin/clients/ServiceActionPanel.tsx`
+## Fora do escopo
 
-- Adicionar flag `isDistrato = stage.id === 'distrato'`.
-- Tratar `isDistrato` no mesmo nível de `isArquivado`: ocultar bloco de Cobrança, pular `create-admin-invoice`, mudar subtítulo para "Notificação Extrajudicial – Distrato", botão para "Enviar Notificação + Distrato sem multa" (e "Reenviar..." quando já houver registro).
-- Novos templates (preenchimento automático com `client.full_name`, `client.brand_name`, `client.process_number`; placeholders `[NOME DA MARCA]` / `[Nº DO PROCESSO]` quando órfão):
-  - **E‑mail**
-    - Assunto: `Notificação Extrajudicial – Distrato Contratual e Encerramento de Responsabilidade`
-    - Corpo: texto fornecido pelo usuário, com `[INSERIR LINK]` substituído pelo link de assinatura ao enviar.
-  - **WhatsApp**: texto fornecido pelo usuário, com `[INSERIR LINK]` substituído pelo link.
-- No `handleSend`, quando `isDistrato`:
-  1. Inserir registro em `public.contracts` via `supabase.from('contracts').insert({...})` com:
-     - `user_id = client.id`
-     - `process_id = client.process_id`
-     - `contract_type = 'distrato'`
-     - `document_type = 'distrato'`
-     - `subject = 'Distrato Contratual – ' + (brand_name || 'Marca')`
-     - `description = 'Distrato sem multa – encerramento de responsabilidade'`
-     - `contract_value = 0`, `penalty_value = 0`
-     - `signatory_name`, `signatory_cpf`, `signatory_cnpj` (lidos do `profiles` do cliente)
-     - `contract_html`: HTML gerado a partir de um template fixo de distrato sem multa (cláusula 9.1, prazo de 30 dias, sem cobrança de multa). Inclui dados do cliente, marca, processo e data.
-     - `signature_status = 'pending'`, `visible_to_client = true`, `start_date = hoje`, `created_by = admin.id`.
-     - `contract_number`: `DIST-<timestamp>` (ou padrão usado no resto do app).
-  2. Chamar a edge function `generate-signature-link` com `{ contractId, baseUrl: window.location.origin }` e capturar `data.url` como `signatureUrl`.
-  3. Substituir `[INSERIR LINK]` nas mensagens (e‑mail e WhatsApp) pelo `signatureUrl`. Não anexar bloco extra.
-  4. Enviar via `send-multichannel-notification` (canais `crm` + `whatsapp` quando marcado) com `event_type: 'distrato_enviado'`, `data: { link: signatureUrl, marca, contract_id }`.
-  5. Enviar e‑mail via `send-email` com o assunto exato e corpo final, incluindo anexos opcionais já carregados.
-  6. Registrar `client_activities` com `activity_type: 'notificacao_distrato'`, `description` resumida e `metadata` contendo `contract_id`, `signatureUrl`, `stage_id`.
-  7. Toast: "Notificação de distrato enviada com sucesso!".
-- Pré‑carregar dados extras do cliente (cpf, cnpj) no `ClientDetailSheet` ou ler dentro do `handleSend` via `supabase.from('profiles').select('cpf, cnpj, full_name').eq('id', client.id).single()` para preencher os campos do contrato. (Adicionar essa leitura dentro do próprio `handleSend` para isolar a alteração.)
-
-### 2. Sem alterações em outros arquivos
-
-- Não mexer em edge functions, banco, modelos de contrato existentes, fluxo de `arquivado` ou demais etapas.
-- Reutilizar `generate-signature-link`, `send-multichannel-notification` e `send-email` já disponíveis.
-
-## Detalhes técnicos do template HTML do distrato
-
-HTML simples, inline, contendo:
-
-```text
-INSTRUMENTO PARTICULAR DE DISTRATO CONTRATUAL — SEM MULTA
-Partes: WebMarcas (CONTRATADA) e {nome_cliente} ({cpf/cnpj}) (CONTRATANTE)
-Objeto: encerramento do contrato de prestação de serviços referente ao
-processo da marca "{marca}" (Nº {processo}) junto ao INPI.
-Cláusula 1ª — As partes, de comum acordo, rescindem o contrato original,
-nos termos da Cláusula 9.1, com aviso prévio de 30 dias.
-Cláusula 2ª — Não há aplicação de multa rescisória.
-Cláusula 3ª — A WebMarcas deixa de possuir qualquer vínculo, responsabilidade
-de acompanhamento ou obrigação perante o referido processo no INPI a partir
-da assinatura deste instrumento (ou do término do prazo de 30 dias caso não
-seja assinado).
-Cláusula 4ª — Este distrato possui validade jurídica conforme a Lei
-13.874/2019 e MP 2.200-2/2001.
-Local e data: {cidade/UF}, {data por extenso}.
-```
-
-Validação final: build TypeScript do Vite continua passando; envio testado pelo próprio usuário no preview.
+- Não alterar `documentTemplates.ts`.
+- Não mexer no fluxo de Arquivado nem em outras etapas.
+- Não criar nem alterar edge functions, banco ou políticas RLS.
+- Não tocar nos textos de e‑mail/WhatsApp do distrato definidos no passo anterior.

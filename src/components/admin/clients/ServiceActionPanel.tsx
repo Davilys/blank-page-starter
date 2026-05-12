@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { X, Mail, MessageCircle, Upload, Loader2, Send, FileText, DollarSign, CreditCard, Paperclip, AlertCircle } from 'lucide-react';
+import { generateDistratoSemMultaContent } from '@/lib/documentTemplates';
 
 interface ServiceActionPanelProps {
   client: {
@@ -180,33 +181,7 @@ Ficamos à disposição para resolver de forma amigável e transparente.
 Equipe WebMarcas`;
 }
 
-function buildDistratoHtml(opts: {
-  nome: string;
-  cpf?: string | null;
-  cnpj?: string | null;
-  marca: string;
-  processo: string;
-}): string {
-  const docLine = opts.cnpj
-    ? `CNPJ nº ${opts.cnpj}`
-    : opts.cpf
-      ? `CPF nº ${opts.cpf}`
-      : 'documento de identificação a ser informado';
-  const dataExt = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Distrato Contratual sem Multa</title></head><body style="font-family: Arial, Helvetica, sans-serif; color:#111; line-height:1.6; max-width:800px; margin:0 auto; padding:24px;">
-    <h1 style="text-align:center; font-size:18px;">INSTRUMENTO PARTICULAR DE DISTRATO CONTRATUAL — SEM MULTA</h1>
-    <p><strong>CONTRATADA:</strong> WebMarcas, pessoa jurídica de direito privado, doravante denominada CONTRATADA.</p>
-    <p><strong>CONTRATANTE:</strong> ${opts.nome}, ${docLine}, doravante denominado(a) CONTRATANTE.</p>
-    <p><strong>OBJETO:</strong> O presente instrumento tem por objeto o encerramento, em comum acordo, do contrato de prestação de serviços firmado entre as partes, referente ao processo da marca <strong>"${opts.marca}"</strong> (Nº ${opts.processo}) junto ao Instituto Nacional da Propriedade Industrial – INPI.</p>
-    <p><strong>Cláusula 1ª.</strong> As partes, de comum acordo e nos termos da Cláusula 9.1 do contrato original, rescindem o referido instrumento, observado o aviso prévio de 30 (trinta) dias.</p>
-    <p><strong>Cláusula 2ª.</strong> Não há aplicação de multa rescisória ou qualquer cobrança financeira decorrente deste distrato, dando-se as partes plena, geral e recíproca quitação.</p>
-    <p><strong>Cláusula 3ª.</strong> A WebMarcas deixa de possuir qualquer vínculo, responsabilidade de acompanhamento ou obrigação perante o referido processo junto ao INPI a partir da assinatura deste instrumento, ou, caso este não seja assinado, a partir do término do prazo de 30 (trinta) dias contados do envio desta notificação.</p>
-    <p><strong>Cláusula 4ª.</strong> O presente distrato possui validade jurídica nos termos da Lei nº 13.874/2019 e da MP nº 2.200-2/2001, podendo ser assinado eletronicamente.</p>
-    <p style="margin-top:32px;">Local e data: Brasil, ${dataExt}.</p>
-    <p style="margin-top:48px;">__________________________________________<br/>WebMarcas — CONTRATADA</p>
-    <p style="margin-top:32px;">__________________________________________<br/>${opts.nome} — CONTRATANTE</p>
-  </body></html>`;
-}
+// Distrato HTML é gerado a partir do template padrão `generateDistratoSemMultaContent`.
 
 export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySent }: ServiceActionPanelProps) {
   const isArquivado = stage.id === 'arquivado';
@@ -312,15 +287,30 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
       if (isDistrato) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('full_name, cpf, cnpj, cpf_cnpj')
+          .select('full_name, cpf, cnpj, cpf_cnpj, company_name, address, city, state, zip_code, email, phone')
           .eq('id', client.id)
           .maybeSingle();
         const nome = (profile?.full_name || client.full_name || 'Cliente').trim();
         const cpf = (profile?.cpf || (profile?.cpf_cnpj && profile.cpf_cnpj.replace(/\D/g, '').length === 11 ? profile.cpf_cnpj : null)) as string | null;
         const cnpj = (profile?.cnpj || (profile?.cpf_cnpj && profile.cpf_cnpj.replace(/\D/g, '').length === 14 ? profile.cpf_cnpj : null)) as string | null;
-        const marca = client.brand_name?.trim() || 'Marca';
-        const processo = client.process_number?.trim() || 'sem número';
-        const html = buildDistratoHtml({ nome, cpf, cnpj, marca, processo });
+        const marca = client.brand_name?.trim() || '[Nome da Marca]';
+        const nomeEmpresa = profile?.company_name || nome;
+        const vars = {
+          nome_empresa: nomeEmpresa,
+          cnpj: cnpj || cpf || '[a informar]',
+          endereco: profile?.address || '[Endereço a informar]',
+          cidade: profile?.city || '[Cidade]',
+          estado: profile?.state || '[UF]',
+          cep: profile?.zip_code || '[CEP]',
+          nome_representante: nome,
+          cpf_representante: cpf || '[CPF a informar]',
+          email: profile?.email || client.email || '',
+          telefone: profile?.phone || client.phone || '',
+          marca,
+        };
+        const text = generateDistratoSemMultaContent(vars);
+        const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Distrato Contratual sem Multa</title></head><body style="font-family: Arial, Helvetica, sans-serif; color:#111; line-height:1.6; max-width:800px; margin:0 auto; padding:24px; white-space:pre-wrap;">${escaped}</body></html>`;
         const today = new Date().toISOString().split('T')[0];
         const contractNumber = `DIST-${Date.now()}`;
 
@@ -331,8 +321,8 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
             process_id: client.process_id || null,
             contract_number: contractNumber,
             contract_type: 'distrato',
-            document_type: 'distrato',
-            subject: `Distrato Contratual – ${marca}`,
+            document_type: 'distrato_sem_multa',
+            subject: `Distrato Contratual sem Multa – ${marca}`,
             description: 'Distrato sem multa – encerramento de responsabilidade',
             contract_value: 0,
             penalty_value: 0,
