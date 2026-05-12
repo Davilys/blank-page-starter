@@ -514,6 +514,21 @@ export default function RevistaINPI() {
     else {
       setUploads(data || []);
       if (data && data.length > 0 && !selectedUpload) setSelectedUpload(data[0]);
+      // Compute real per-upload stats from rpi_entries (manual assignments included)
+      try {
+        const { data: ent } = await supabase
+          .from('rpi_entries')
+          .select('rpi_upload_id, matched_client_id');
+        const stats: Record<string, { total: number; matched: number }> = {};
+        for (const e of (ent || []) as Array<{ rpi_upload_id: string; matched_client_id: string | null }>) {
+          if (!e.rpi_upload_id) continue;
+          const s = stats[e.rpi_upload_id] || { total: 0, matched: 0 };
+          s.total += 1;
+          if (e.matched_client_id) s.matched += 1;
+          stats[e.rpi_upload_id] = s;
+        }
+        setUploadStats(stats);
+      } catch (err) { console.warn('Falha ao calcular stats por upload', err); }
     }
     setLoading(false);
   };
