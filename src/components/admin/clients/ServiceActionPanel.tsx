@@ -93,8 +93,8 @@ Equipe WebMarcas`;
 
 function generateArquivadoEmail(client: ServiceActionPanelProps['client']): string {
   const nome = client.full_name || 'Cliente';
-  const marca = client.brand_name || 'sua marca';
-  const numero = client.process_number || '0000000';
+  const marca = client.brand_name?.trim() || '[NOME DA MARCA]';
+  const numero = client.process_number?.trim() || '[Nº DO PROCESSO]';
   return `Prezado ${nome},
 
 Venho informar que o INPI publicou o arquivamento do processo da marca "${marca}". N. PROCESSO: ${numero}
@@ -116,10 +116,16 @@ www.webmarcas.net
 WhatsApp: (11) 91112-0225`;
 }
 
-function generateArquivadoWhatsApp(_client: ServiceActionPanelProps['client']): string {
+function generateArquivadoWhatsApp(client: ServiceActionPanelProps['client']): string {
+  const marca = client.brand_name?.trim();
+  const numero = client.process_number?.trim();
+  const refs: string[] = [];
+  if (marca) refs.push(`marca "${marca}"`);
+  if (numero) refs.push(`processo nº ${numero}`);
+  const ref = refs.length ? ` (${refs.join(' — ')})` : '';
   return `Olá, tudo bem?
 
-Verificamos que o INPI publicou o arquivamento do processo da sua marca. Precisamos agendar um breve alinhamento com o nosso jurídico para analisar a aplicação da cláusula de garantia contratual e verificar a possibilidade de abertura de um novo processo sem cobrança de novos honorários.
+Verificamos que o INPI publicou o arquivamento do processo da sua marca${ref}. Precisamos agendar um breve alinhamento com o nosso jurídico para analisar a aplicação da cláusula de garantia contratual e verificar a possibilidade de abertura de um novo processo sem cobrança de novos honorários.
 
 Importante: a garantia é válida para casos de arquivamento por decisão do INPI, não se aplicando quando ocorre perda de prazo para cumprimento de exigência/publicação.
 
