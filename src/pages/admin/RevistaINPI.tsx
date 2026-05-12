@@ -1027,6 +1027,7 @@ export default function RevistaINPI() {
                           <SelectContent>
                             {recentRpis.map(rpi => {
                               const hasXml = rpWithXml.includes(rpi);
+                              const alreadyDownloaded = downloadedRpiNumbers.has(rpi);
                               return (
                                 <SelectItem key={rpi} value={rpi.toString()}>
                                   <span className="flex items-center gap-2">
@@ -1036,6 +1037,9 @@ export default function RevistaINPI() {
                                       <Badge className="text-xs bg-emerald-500/10 text-emerald-600 border-emerald-500/20">XML ✓</Badge>
                                     ) : (
                                       <Badge variant="outline" className="text-xs text-muted-foreground">Sem XML</Badge>
+                                    )}
+                                    {alreadyDownloaded && (
+                                      <Badge className="text-xs bg-blue-500/10 text-blue-600 border-blue-500/20">Já baixada</Badge>
                                     )}
                                   </span>
                                 </SelectItem>
