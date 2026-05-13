@@ -1555,7 +1555,7 @@ export default function RevistaINPI() {
                                               <span className="text-[11px] text-muted-foreground">Etapa Sugerida</span>
                                               <div className="mt-1">
                                                 <Badge className="bg-primary/10 text-primary border-primary/20">
-                                                  {PIPELINE_STAGES.find(s => s.value === suggestStage(entry.dispatch_code, entry.dispatch_text))?.label || 'Protocolado'}
+                                                  {juridicoStageById[suggestStage(entry.dispatch_code, entry.dispatch_text)]?.label || 'Protocolado'}
                                                 </Badge>
                                               </div>
                                             </div>
@@ -1593,7 +1593,7 @@ export default function RevistaINPI() {
                                                     <span className="text-[11px] text-muted-foreground">Etapa Atual</span>
                                                     <div className="mt-1">
                                                       <Badge variant="outline">
-                                                        {PIPELINE_STAGES.find(s => s.value === entry.process?.pipeline_stage)?.label || entry.process.pipeline_stage}
+                                                      {juridicoStageById[entry.process?.pipeline_stage as string]?.label || entry.process.pipeline_stage}
                                                       </Badge>
                                                     </div>
                                                   </div>
