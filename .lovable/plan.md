@@ -1,56 +1,33 @@
-# Sincronizar etapas do Kanban Jurídico em todo o sistema
+# Corrigir erro ao salvar processo com etapa customizada
 
-## Objetivo
+## Problema
+Ao tentar salvar um `brand_processes` com uma etapa customizada do Kanban Jurídico (ex.: `sobrestamento`), o banco retorna:
 
-Quando uma nova etapa é criada (ou reordenada) no Kanban da aba **Jurídico** (Configurar Etapas), ela deve aparecer automaticamente, na mesma ordem, em todos os pontos onde o usuário escolhe a fase do processo:
+```
+new row for relation "brand_processes" violates check constraint "brand_processes_status_check"
+```
 
-- Ficha do cliente -> aba **Serviços** -> "Status" e "Fase do Pipeline"
-- Aba **Revista** -> **Processos identificados** (dropdown "Tipo" de Despacho da imagem 1)
-- Aba **Revista** -> **Histórico**
-- Aba **Publicação** -> Kanban
+A causa é uma `CHECK constraint` antiga em `brand_processes` que só aceita um conjunto fixo de slugs de `pipeline_stage` (protocolado, 003, oposicao, etc.). Etapas novas criadas pelo admin no Kanban não passam por essa lista — por isso o salvamento falha.
 
-Auditar a sincronização ida-e-volta entre `brand_processes.pipeline_stage` e `publicacoes_marcas.status` para que funcione com etapas customizadas, sem perder dados.
+Isso contradiz a refatoração já feita no front (hook `useJuridicoStages` + `normalizePipelineStageId` aceitando qualquer slug `[a-z0-9_]+`).
 
-## Causa raiz
+## Solução
+Substituir o CHECK por uma validação de **formato de slug**, mantendo segurança (sem aceitar lixo) mas permitindo qualquer etapa válida criada no Kanban.
 
-1. `src/lib/pipelineStage.ts` mantém um allowlist fixo (`BRAND_PROCESS_ALLOWED_PIPELINE_STAGES`). `normalizePipelineStageId` retorna `null` para qualquer etapa fora dessa lista, e `sanitizePipelineStagesConfig` descarta etapas customizadas. Resultado: etapas novas criadas no Kanban Jurídico somem do seletor da ficha.
-2. Em `src/pages/admin/RevistaINPI.tsx` o array `PIPELINE_STAGES` (linhas ~99-111) e os mapas `PIPELINE_TO_PUB_STATUS` / `PUB_STATUS_TO_PIPELINE` são hard-coded. Etapas novas não aparecem no dropdown "Tipo" de despacho nem no histórico.
-3. Em `src/components/admin/PublicacaoTab.tsx` o mapa `PIPELINE_TO_PUB` (linhas ~753-762) também é hard-coded. Etapas novas no Jurídico não geram cards no Kanban da Publicação.
+### Migration
+```sql
+ALTER TABLE public.brand_processes
+  DROP CONSTRAINT IF EXISTS brand_processes_status_check;
 
-## Mudanças propostas
+ALTER TABLE public.brand_processes
+  ADD CONSTRAINT brand_processes_pipeline_stage_format_check
+  CHECK (pipeline_stage IS NULL OR pipeline_stage ~ '^[a-z0-9_]+$');
+```
 
-### 1. Allowlist dinâmico em `pipelineStage.ts`
+## Impacto
+- Nenhum dado existente é alterado (todos os slugs atuais já casam com `^[a-z0-9_]+$`).
+- Nenhum código de aplicação muda — o front já normaliza com a mesma regex.
+- Etapas customizadas (ex.: `sobrestamento`) passam a ser salvas normalmente.
 
-Manter os aliases (`arquivados -> arquivado`, etc.), mas deixar passar qualquer id normalizado (slug `a-z0-9_`). Assim `distrato`, `oposicao_replica`, etc. sobrevivem à sanitização.
-
-### 2. Hook único `useJuridicoStages`
-
-Novo `src/hooks/useJuridicoStages.ts` que:
-
-- Lê `system_settings` com `key = 'admin_kanban_juridico_stages'`.
-- Aplica `sanitizePipelineStagesConfig` preservando ordem.
-- Retorna `{ stages, stageById }` com fallback para a lista padrão atual.
-- Re-busca quando a configuração muda.
-
-### 3. Consumidores passam a usar o hook
-
-- `RevistaINPI.tsx`: substitui `PIPELINE_STAGES` por `stages` do hook (dropdown "Tipo", badges, label, cor). Mapas `PIPELINE_TO_PUB_STATUS` / `PUB_STATUS_TO_PIPELINE` viram identidade `id -> id` com aliases legados (`certificados <-> certificado`, `notificacao_extrajudicial -> 003`, `distrato -> arquivado` quando o destino não suporta `distrato`).
-- `PublicacaoTab.tsx`: `PIPELINE_TO_PUB` derivado das `stages` (id-para-id), preservando aliases legados.
-- `ClientDetailSheet.tsx`: passa a usar o hook para garantir que etapas customizadas não sejam filtradas pela sanitização.
-
-### 4. Auditoria das três abas
-
-- **Revista -> Processos identificados**: dropdown "Tipo" mostra todas as etapas Jurídico na ordem. Ao vincular, grava `brand_processes.pipeline_stage` com o id exato.
-- **Revista -> Histórico**: badges de fase usam `stages` dinâmicas (label/cor do hook).
-- **Publicação -> Kanban**: colunas continuam vindas do enum `PubStatus` (fases de publicação). Regra: mover card -> atualiza `pipeline_stage` do processo via mapa dinâmico; alterar `pipeline_stage` na ficha -> cria/atualiza publicação correspondente.
-
-### 5. Ordem
-
-A ordem definida em `AdminKanbanConfig` (drag-and-drop) é a fonte da verdade. Todos os consumidores renderizam pelo array `stages` na ordem retornada.
-
-## Detalhes técnicos
-
-- Arquivos: `src/lib/pipelineStage.ts`, novo `src/hooks/useJuridicoStages.ts`, `src/pages/admin/RevistaINPI.tsx`, `src/components/admin/PublicacaoTab.tsx`, ajustes em `src/components/admin/clients/ClientDetailSheet.tsx`.
-- Sem migração de banco. Sem mudança em `system_settings`.
-- Aliases preservam dados antigos (`certificados -> certificado`, `arquivados -> arquivado`, `notificacao_extrajudicial -> notificacao`).
-- Fora de escopo: Kanban da área cliente, Edge Functions, importação Perfex.
+## Arquivos
+- Nova migration Supabase (apenas DDL).
