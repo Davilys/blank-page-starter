@@ -585,7 +585,8 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className={embedded ? "space-y-6" : "p-4 md:p-6 space-y-6"}>
+      {!embedded && (
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => navigate("/admin/financeiro")} className="gap-2">
@@ -613,6 +614,7 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
           </Button>
         </div>
       </div>
+      )}
 
       <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
         {is30Group ? (
@@ -652,7 +654,8 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
         </CardContent>
       </Card>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={effectiveTab} onValueChange={setActiveTab}>
+        {!embedded && (
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger
             value="lista"
@@ -679,6 +682,7 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
             Histórico Devedor ({filteredHistory30.length})
           </TabsTrigger>
         </TabsList>
+        )}
 
         <TabsContent value="lista">
           <Card>
