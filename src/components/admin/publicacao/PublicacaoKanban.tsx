@@ -5,19 +5,13 @@ import { cn } from '@/lib/utils';
 import { differenceInDays, parseISO, addDays, addYears, format } from 'date-fns';
 import { Clock, AlertTriangle, User, Flame, GripVertical, Calendar } from 'lucide-react';
 import { PIPELINE_STAGES } from '@/components/admin/clients/ClientKanbanBoard';
+import { useJuridicoStages } from '@/hooks/useJuridicoStages';
 
-// Status que aparecem no Kanban de Publicações (subset do PIPELINE_STAGES jurídico).
-// Mantemos a MESMA ordem, cores e labels do Kanban da aba Clientes/Jurídico para
-// que cores e nomes das colunas sejam idênticos em todas as abas.
-type PubStatus = 'protocolado' | '003' | 'oposicao' | 'exigencia_merito' | 'indeferimento' | 'notificacao' | 'deferimento' | 'certificado' | 'renovacao' | 'arquivado' | 'distrato';
+// Tipo do status: agora aceita qualquer slug (etapas customizadas do Kanban Jurídico).
+type PubStatus = string;
 
-// Mesma ordem do Kanban Jurídico (Clientes). Mantemos 'certificado' (singular)
-// como id local porque é o status persistido nas publicações; mapeia para
-// 'certificados' (plural) do PIPELINE_STAGES para herdar cor/label.
-const PUB_STAGE_IDS: PubStatus[] = ['protocolado', '003', 'oposicao', 'exigencia_merito', 'indeferimento', 'notificacao', 'deferimento', 'certificado', 'renovacao', 'arquivado', 'distrato'];
-
-// Ícones (emoji) preservados para o visual atual do kanban de publicações.
-const PUB_STAGE_ICONS: Record<PubStatus, string> = {
+// Ícones (emoji) padrão por slug conhecido — etapas customizadas usam o ícone genérico.
+const PUB_STAGE_ICONS: Record<string, string> = {
   protocolado: '📥',
   '003': '📋',
   oposicao: '⚔️',
@@ -26,27 +20,12 @@ const PUB_STAGE_ICONS: Record<PubStatus, string> = {
   notificacao: '🔔',
   deferimento: '✅',
   certificado: '🎓',
+  certificados: '🎓',
   renovacao: '🔄',
   arquivado: '📦',
   distrato: '🚪',
 };
-
-// Configuração derivada do PIPELINE_STAGES (fonte de verdade) — mesmas cores
-// que o Kanban Jurídico em /admin/clientes.
-const STATUS_CONFIG: Record<PubStatus, { label: string; accent: string; icon: string }> = (() => {
-  const map: Record<string, { label: string; accent: string; icon: string }> = {};
-  for (const id of PUB_STAGE_IDS) {
-    // 'certificado' (singular, status da publicação) mapeia para 'certificados' (plural) do PIPELINE_STAGES
-    const lookupId = id === 'certificado' ? 'certificados' : id;
-    const stage = PIPELINE_STAGES.find((s) => s.id === lookupId);
-    map[id] = {
-      label: stage?.label || id,
-      accent: stage?.color || 'from-zinc-500 to-zinc-600',
-      icon: PUB_STAGE_ICONS[id],
-    };
-  }
-  return map as Record<PubStatus, { label: string; accent: string; icon: string }>;
-})();
+const DEFAULT_ICON = '🏷️';
 
 interface Publicacao {
   id: string;
@@ -74,6 +53,27 @@ interface Props {
 
 export function PublicacaoKanban({ publicacoes, processMap, clientMap, adminMap, onSelect, selectedId, onStatusChange, resolveRpiNumber }: Props) {
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const { stages: juridicoStages } = useJuridicoStages();
+
+  // Configuração derivada do Kanban Jurídico (fonte de verdade dinâmica via system_settings).
+  // Inclui automaticamente novas etapas criadas em "Configurar Etapas — Jurídico".
+  const STATUS_CONFIG = useMemo(() => {
+    const map: Record<string, { label: string; accent: string; icon: string }> = {};
+    for (const stage of juridicoStages) {
+      // 'certificados' (plural, slug do Kanban) também responde por 'certificado' (status da publicação)
+      const fallback = PIPELINE_STAGES.find((s) => s.id === stage.id || (stage.id === 'certificado' && s.id === 'certificados'));
+      map[stage.id] = {
+        label: stage.label,
+        accent: (stage as any).color || fallback?.color || 'from-zinc-500 to-zinc-600',
+        icon: PUB_STAGE_ICONS[stage.id] || DEFAULT_ICON,
+      };
+    }
+    // Garante 'certificado' (singular, status legado das publicações) caso o slug seja 'certificados'
+    if (!map['certificado'] && map['certificados']) {
+      map['certificado'] = map['certificados'];
+    }
+    return map;
+  }, [juridicoStages]);
 
   // Build a secondary lookup: process_number -> process for fallback resolution
   const processNumberMap = useMemo(() => {
@@ -86,18 +86,19 @@ export function PublicacaoKanban({ publicacoes, processMap, clientMap, adminMap,
   const [dragOverStatus, setDragOverStatus] = useState<PubStatus | null>(null);
 
   const columns = useMemo(() => {
-    const cols: Record<PubStatus, Publicacao[]> = {
-      protocolado: [], '003': [], oposicao: [], exigencia_merito: [], indeferimento: [], notificacao: [], deferimento: [], certificado: [], renovacao: [], arquivado: [], distrato: [],
-    };
+    const cols: Record<string, Publicacao[]> = {};
+    Object.keys(STATUS_CONFIG).forEach(k => { cols[k] = []; });
     publicacoes.forEach(p => {
-      if (cols[p.status as PubStatus]) cols[p.status as PubStatus].push(p);
+      const key = p.status as string;
+      if (!cols[key]) cols[key] = [];
+      cols[key].push(p);
     });
     return cols;
-  }, [publicacoes]);
+  }, [publicacoes, STATUS_CONFIG]);
 
   const allColumns = useMemo(() => {
     return Object.entries(STATUS_CONFIG) as [PubStatus, typeof STATUS_CONFIG[PubStatus]][];
-  }, []);
+  }, [STATUS_CONFIG]);
 
   const handleDragStart = useCallback((e: React.DragEvent, pub: Publicacao) => {
     setDraggedId(pub.id);
