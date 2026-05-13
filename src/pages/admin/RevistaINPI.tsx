@@ -240,6 +240,7 @@ async function resolveBrandProcessId(
 // ─── Main Component ──────────────────────────────────────────────────
 export default function RevistaINPI() {
   const [uploads, setUploads] = useState<RpiUpload[]>([]);
+  const { stages: juridicoStages, stageById: juridicoStageById } = useJuridicoStages();
   const [uploadStats, setUploadStats] = useState<Record<string, { total: number; matched: number }>>({});
   const [entries, setEntries] = useState<RpiEntry[]>([]);
   const [selectedUpload, setSelectedUpload] = useState<RpiUpload | null>(null);
