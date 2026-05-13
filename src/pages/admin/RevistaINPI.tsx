@@ -1521,10 +1521,12 @@ export default function RevistaINPI() {
                                                 <Select
                                                   value={(() => {
                                                     const currentType = (entry.dispatch_type || '').toLowerCase();
-                                                    const match = DISPATCH_TYPE_OPTIONS.find(o => 
+                                                    const match = juridicoStages.find(s =>
+                                                      s.label.toLowerCase() === currentType || s.id === currentType
+                                                    ) || DISPATCH_TYPE_OPTIONS.find(o =>
                                                       o.label.toLowerCase() === currentType || o.value === currentType
                                                     );
-                                                    return match?.value || '';
+                                                    return (match as any)?.id || (match as any)?.value || '';
                                                   })()}
                                                   onValueChange={(val) => handleDispatchTypeChange(entry, val)}
                                                   disabled={updatingDispatchType === entry.id}
@@ -1537,8 +1539,8 @@ export default function RevistaINPI() {
                                                     )}
                                                   </SelectTrigger>
                                                   <SelectContent>
-                                                    {DISPATCH_TYPE_OPTIONS.map(opt => (
-                                                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                                    {juridicoStages.map(stage => (
+                                                      <SelectItem key={stage.id} value={stage.id}>{stage.label}</SelectItem>
                                                     ))}
                                                   </SelectContent>
                                                 </Select>
