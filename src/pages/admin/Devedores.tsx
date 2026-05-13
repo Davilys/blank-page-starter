@@ -85,7 +85,14 @@ async function callApi(action: string, body?: any) {
   return json;
 }
 
-export default function Devedores() {
+type DevedoresTabKey = "lista" | "historico" | "devedor" | "historico-devedor";
+
+interface DevedoresProps {
+  embedded?: boolean;
+  forceTab?: DevedoresTabKey;
+}
+
+export default function Devedores({ embedded = false, forceTab }: DevedoresProps = {}) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -519,8 +526,9 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
   const totalOriginal30 = filteredDebtors30.reduce((s, d) => s + d.total_original, 0);
   const totalComAcrescimo30 = filteredDebtors30.reduce((s, d) => s + d.novo_total, 0);
 
-  const [activeTab, setActiveTab] = useState<string>("lista");
-  const is30Group = activeTab === "devedor" || activeTab === "historico-devedor";
+  const [activeTab, setActiveTab] = useState<string>(forceTab ?? "lista");
+  const effectiveTab = forceTab ?? activeTab;
+  const is30Group = effectiveTab === "devedor" || effectiveTab === "historico-devedor";
 
   const openClientFile = async (d: Debtor) => {
     setLoadingClient(d.key);
@@ -577,7 +585,8 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className={embedded ? "space-y-6" : "p-4 md:p-6 space-y-6"}>
+      {!embedded && (
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => navigate("/admin/financeiro")} className="gap-2">
@@ -605,6 +614,7 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
           </Button>
         </div>
       </div>
+      )}
 
       <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
         {is30Group ? (
@@ -644,7 +654,8 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
         </CardContent>
       </Card>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={effectiveTab} onValueChange={setActiveTab}>
+        {!embedded && (
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger
             value="lista"
@@ -671,6 +682,7 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
             Histórico Devedor ({filteredHistory30.length})
           </TabsTrigger>
         </TabsList>
+        )}
 
         <TabsContent value="lista">
           <Card>

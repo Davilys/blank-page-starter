@@ -441,14 +441,6 @@ export default function AdminFinanceiro() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate('/admin/devedores')}
-                className="gap-2 border-red-500/40 text-red-600 hover:bg-red-500/10 animate-pulse"
-              >
-                <AlertTriangle className="h-4 w-4" /> Devedores
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
                 onClick={handleSyncAsaas}
                 disabled={syncing}
                 className="gap-2 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"

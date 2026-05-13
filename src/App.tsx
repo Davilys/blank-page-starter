@@ -165,7 +165,7 @@ const App = () => (
                 <Route path="documentos" element={<AdminDocumentos />} />
                 <Route path="financeiro" element={<AdminFinanceiro />} />
                 <Route path="financeiro/vencidos" element={<AdminFinanceiroVencidos />} />
-                <Route path="devedores" element={<AdminDevedores />} />
+                <Route path="devedores" element={<Navigate to="/admin/financeiro/vencidos" replace />} />
                 <Route path="notificacoes" element={<AdminNotificacoes />} />
                 <Route path="recursos-inpi" element={<AdminRecursosINPI />} />
                 <Route path="revista-inpi" element={<AdminRevistaINPI />} />
