@@ -85,7 +85,14 @@ async function callApi(action: string, body?: any) {
   return json;
 }
 
-export default function Devedores() {
+type DevedoresTabKey = "lista" | "historico" | "devedor" | "historico-devedor";
+
+interface DevedoresProps {
+  embedded?: boolean;
+  forceTab?: DevedoresTabKey;
+}
+
+export default function Devedores({ embedded = false, forceTab }: DevedoresProps = {}) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -519,8 +526,9 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
   const totalOriginal30 = filteredDebtors30.reduce((s, d) => s + d.total_original, 0);
   const totalComAcrescimo30 = filteredDebtors30.reduce((s, d) => s + d.novo_total, 0);
 
-  const [activeTab, setActiveTab] = useState<string>("lista");
-  const is30Group = activeTab === "devedor" || activeTab === "historico-devedor";
+  const [activeTab, setActiveTab] = useState<string>(forceTab ?? "lista");
+  const effectiveTab = forceTab ?? activeTab;
+  const is30Group = effectiveTab === "devedor" || effectiveTab === "historico-devedor";
 
   const openClientFile = async (d: Debtor) => {
     setLoadingClient(d.key);
