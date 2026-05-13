@@ -64,7 +64,7 @@ As partes celebram o presente Acordo de Tarifas, que se regerá pelas cláusulas
 
 3.1 Enviar cópias digitais por e-mail e relatório anual do processo;
 3.2 Executar os serviços conforme o contrato e a legislação;
-3.3 Cumprir prazos e exigências do INPI;
+3.3 Cumprir prazos e exigências do INPI, conforme a clausula 10.3 do contrato;
 3.4 Comunicar impedimentos imediatamente, a fim de cumprir as normas do INPI para garantir o registro.
 
 4. CLÁUSULA QUARTA – DAS OBRIGAÇÕES GERAIS DA CONTRATANTE
@@ -78,7 +78,7 @@ As partes celebram o presente Acordo de Tarifas, que se regerá pelas cláusulas
 
 5.1 Os pagamentos à CONTRATADA serão efetuados conforme a opção escolhida:
 {{forma_pagamento_detalhada}}
-5.2 Taxas do INPI: As taxas federais obrigatórias (GRU) serão de responsabilidade exclusiva do CONTRATANTE, devendo ser recolhidas diretamente ao INPI.
+5.2 Taxas do INPI e anuidade: As taxas federais obrigatórias (GRU) serão de responsabilidade exclusiva do CONTRATANTE, devendo ser recolhidas diretamente ao INPI e a taxa de anuidade valor de R$398,00 a ser paga sempre do 05/12 de cada ano. Se houver exigências ou publicações extras, os custos serão cobrados à parte, conforme a Cláusula 10.3, e devidamente publicados no Diário Oficial da União, garantindo transparência. Após essas etapas, o requerente receberá o certificado de registro válido por 10 anos, com direito à renovação.
 5.3 O cadastro do CONTRATANTE junto ao INPI é realizado pela CONTRATADA previamente ao pagamento das taxas federais.
 5.4 Em caso de parcelamento, o atraso de qualquer parcela implicará no vencimento antecipado de todas as demais, com acréscimo de multa e juros conforme cláusula sétima.
 
@@ -102,15 +102,17 @@ e) Inscrição em cadastros de proteção ao crédito após 30 dias de inadimpl�
 
 9. CLÁUSULA NONA – DA RESCISÃO
 
-9.1 Este contrato poderá ser rescindido por qualquer das partes mediante aviso prévio de 30 (trinta) dias, por escrito.
-9.2 A CONTRATANTE somente poderá cancelar o contrato se não houver débitos pendentes com a CONTRATADA.
-9.3 Em caso de rescisão antecipada por iniciativa da CONTRATANTE, não haverá devolução de valores já pagos referentes a serviços executados ou em andamento.
+9.1 O presente contrato poderá ser rescindido por qualquer das partes, mediante comunicação prévia, por escrito, com antecedência mínima de 30 (trinta) dias, sem prejuízo das obrigações já assumidas.
+9.2 A CONTRATANTE somente poderá requerer a rescisão contratual desde que esteja adimplente com todas as obrigações financeiras assumidas junto à CONTRATADA.
+9.3 Em caso de rescisão antecipada por iniciativa da CONTRATANTE, não haverá, em nenhuma hipótese, devolução de valores já pagos, tendo em vista a natureza dos serviços prestados, especialmente aqueles já executados, iniciados ou colocados à disposição.
+9.4 Nos termos do artigo 49 da Lei nº 8.078/90 (Código de Defesa do Consumidor), fica assegurado o direito de arrependimento no prazo de 7 (sete) dias contados da assinatura do presente instrumento, desde que não tenha havido início da execução dos serviços.
+9.5 Após o decurso do prazo legal de arrependimento previsto na cláusula anterior, a rescisão contratual por iniciativa da CONTRATANTE implicará na incidência de multa compensatória no valor de R$ 398,00 (trezentos e noventa e oito reais) por cada processo contratado, a título de ressarcimento pelos custos operacionais, administrativos, técnicos e demais despesas inerentes à estrutura disponibilizada e aos serviços já iniciados ou colocados à disposição.
 
 10. CLÁUSULA DÉCIMA – DAS CONDIÇÕES GERAIS
 
 10.1 Fica pactuada entre as partes a prestação dos serviços de acompanhamento e vigilância do(s) processo(s) referentes à marca {{marca}}.
 10.2 Durante a tramitação do processo junto ao INPI, poderão surgir situações que exijam a apresentação de documentos adicionais, os quais deverão ser providenciados pela CONTRATANTE em tempo hábil.
-10.3 A CONTRATADA não se responsabiliza por decisões do INPI contrárias ao pedido de registro, desde que tenha cumprido integralmente suas obrigações contratuais.
+10.3 As publicações e despachos emitidos pelo INPI serão cobrados separadamente, por fase do processo, no valor de um salário mínimo vigente na data da publicação a ser cumprida, o recolhimento das taxas federais será de responsabilidade da CONTRATANTE e deverá ser realizado conforme a liberação dos respectivos despachos publicados na Revista da Propriedade Industrial (RPI), adicionalmente, quaisquer respostas, notificações ou manifestações extrajudiciais solicitadas também estarão sujeitas à mesma tabela de valores estabelecida para atos processuais.
 
 11. CLÁUSULA DÉCIMA PRIMEIRA – DAS DISPOSIÇÕES FINAIS
 
@@ -122,17 +124,17 @@ e) Inscrição em cadastros de proteção ao crédito após 30 dias de inadimpl�
 
 12.1 Para dirimir quaisquer dúvidas ou controvérsias oriundas do presente instrumento, as partes elegem o Foro da Comarca de São Paulo – SP, com renúncia expressa a qualquer outro, por mais privilegiado que seja.
 
-Por estarem justas e contratadas, as partes assinam o presente instrumento em 02 (duas) vias de igual teor e forma, na presença das testemunhas abaixo.
+As partes declaram estar de pleno acordo com todas as cláusulas deste instrumento, o qual é firmado por meio de assinatura eletrônica, nos termos da Lei nº 14.063/2020, possuindo a mesma validade jurídica e força probante de um documento assinado fisicamente, dispensando a necessidade de vias impressas e testemunhas.
 
 São Paulo, {{data_extenso}}.
 
-CONTRATADA:
+_______________________________
 WebMarcas Intelligence PI
 CNPJ: 39.528.012/0001-29
 
-CONTRATANTE:
+_______________________________
 {{nome_cliente}}
-CPF/CNPJ: {{cpf_cnpj}}`;
+CPF: {{cpf}}`;
 
 // Premium contract template - R$398/mês recorrente
 const PREMIUM_CONTRACT_TEMPLATE = `CONTRATO PARTICULAR DE PRESTAÇÃO DE SERVIÇOS DE ASSESSORAMENTO PREMIUM PARA REGISTRO DE MARCA JUNTO AO INPI
@@ -198,9 +200,10 @@ e) Inscrição em cadastros de proteção ao crédito após 30 dias de inadimpl�
 
 9. CLÁUSULA NONA – DA RESCISÃO
 
-9.1 Este contrato poderá ser rescindido por qualquer das partes mediante aviso prévio de 30 (trinta) dias, por escrito.
-9.2 A CONTRATANTE somente poderá cancelar o contrato se não houver débitos pendentes com a CONTRATADA.
-9.3 Em caso de rescisão antecipada por iniciativa da CONTRATANTE, não haverá devolução de valores já pagos referentes a serviços executados ou em andamento.
+9.1 Este contrato poderá ser rescindido por qualquer das partes mediante aviso prévio, por escrito, com antecedência mínima de 30 (trinta) dias.
+9.2 A CONTRATANTE somente poderá solicitar a rescisão caso não existam débitos pendentes junto à CONTRATADA.
+9.3 Em caso de rescisão antecipada por iniciativa da CONTRATANTE, não haverá devolução de valores já pagos referentes a serviços já executados ou em andamento.
+9.4 Decorrido o prazo legal de arrependimento de 7 (sete) dias, conforme previsto no art. 49 da Lei nº 8.078/90 (Código de Defesa do Consumidor), a rescisão contratual por iniciativa da CONTRATANTE estará sujeita à cobrança de multa compensatória no valor de R$ 398,00 (trezentos e noventa e oito reais), a título de custos operacionais e administrativos.
 
 10. CLÁUSULA DÉCIMA – DAS CONDIÇÕES GERAIS
 
@@ -269,14 +272,10 @@ As partes celebram o presente Acordo de Tarifas, que se regerá pelas cláusulas
 
 5. CLÁUSULA QUINTA – DAS CONDIÇÕES DE PAGAMENTO
 
-5.1 Os pagamentos à CONTRATADA serão efetuados mediante assinatura mensal recorrente no valor de R$ 1.621,00 (mil seiscentos e vinte e um reais), cobrada automaticamente via boleto ou cartão de crédito, com vigência a partir da data de assinatura deste contrato.
-
+5.1 Os pagamentos à CONTRATADA serão efetuados mediante assinatura mensal recorrente no valor de R$ 1.621,00 (mil quatrocentos e noventa e sete reais), cobrada automaticamente via boleto ou cartão de crédito, com vigência a partir da data de assinatura deste contrato.
 5.2 O valor da mensalidade será atualizado anualmente com base no salário mínimo nacional vigente no ano da cobrança. A correção será aplicada proporcionalmente à variação do salário mínimo, tomando como referência o valor vigente na data de assinatura deste contrato.
-
-5.3 Taxas do INPI e anuidade: As taxas federais obrigatórias (GRU) serão de responsabilidade exclusiva do CONTRATANTE, devendo ser recolhidas diretamente ao INPI e a taxa de anuidade valor de R$1.621,00 a ser paga sempre do 05/12 de cada ano. Após essas etapas, o requerente receberá o certificado de registro válido por 10 anos, com direito à renovação.
-
+5.3 Taxas do INPI e anuidade: As taxas federais obrigatórias (GRU) serão de responsabilidade exclusiva do CONTRATANTE, devendo ser recolhidas diretamente ao INPI e a taxa de anuidade valor de Rconst CORPORATE_CONTRACT_TEMPLATE = .621,00 a ser paga sempre do 05/12 de cada ano. Após essas etapas, o requerente receberá o certificado de registro válido por 10 anos, com direito à renovação.
 5.4 O cadastro do CONTRATANTE junto ao INPI é realizado pela CONTRATADA previamente ao pagamento das taxas federais.
-
 5.5 O atraso no pagamento da mensalidade implicará em acréscimo de multa e juros conforme cláusula sétima.
 
 6. CLÁUSULA SEXTA – DO PRAZO DE VIGÊNCIA
@@ -299,13 +298,14 @@ e) Inscrição em cadastros de proteção ao crédito após 30 dias de inadimpl�
 
 9. CLÁUSULA NONA – DA RESCISÃO
 
-9.1 Este contrato poderá ser rescindido por qualquer das partes mediante aviso prévio de 30 (trinta) dias, por escrito.
-9.2 A CONTRATANTE somente poderá cancelar o contrato se não houver débitos pendentes com a CONTRATADA.
-9.3 Em caso de rescisão antecipada por iniciativa da CONTRATANTE, não haverá devolução de valores já pagos referentes a serviços executados ou em andamento.
+9.1 Este contrato poderá ser rescindido por qualquer das partes mediante aviso prévio, por escrito, com antecedência mínima de 30 (trinta) dias.
+9.2 A CONTRATANTE somente poderá solicitar a rescisão caso não existam débitos pendentes junto à CONTRATADA.
+9.3 Em caso de rescisão antecipada por iniciativa da CONTRATANTE, não haverá devolução de valores já pagos referentes a serviços já executados ou em andamento.
+9.4 Decorrido o prazo legal de arrependimento de 7 (sete) dias, conforme previsto no art. 49 da Lei nº 8.078/90 (Código de Defesa do Consumidor), a rescisão contratual por iniciativa da CONTRATANTE estará sujeita à cobrança de multa compensatória no valor de R$ 398,00 (trezentos e noventa e oito reais), a título de custos operacionais e administrativos.
 
 10. CLÁUSULA DÉCIMA – DAS CONDIÇÕES GERAIS
 
-10.1 Fica pactuada entre as partes a prestação dos serviços de acompanhamento e vigilância do(s) processo(s) referentes às marcas registradas sob o Plano Corporativo.
+10.1 Fica pactuada entre as partes a prestação dos serviços de acompanhamento e vigilância do(s) processo(s) referentes à marca {{marca}}.
 10.2 Durante a tramitação do processo junto ao INPI, poderão surgir situações que exijam a apresentação de documentos adicionais, os quais deverão ser providenciados pela CONTRATANTE em tempo hábil.
 10.3 A CONTRATADA se compromete a cumprir todas as exigências, oposições e recursos necessários sem custo adicional de honorários, estando estes já contemplados na mensalidade do Plano Corporativo. O recolhimento das taxas federais (GRU) será de responsabilidade da CONTRATANTE e deverá ser realizado conforme a liberação dos respectivos despachos publicados na Revista da Propriedade Industrial (RPI).
 10.4 O Plano Corporativo contempla registros de marcas ilimitados, vinculados exclusivamente ao CPF ou CNPJ do CONTRATANTE que realizou a contratação. Todas as marcas registradas sob este plano deverão ser tituladas no mesmo CPF ou CNPJ cadastrado. Caso o CONTRATANTE deseje registrar marcas em outro CPF ou CNPJ, deverá contratar um novo plano específico para tal finalidade.
