@@ -817,7 +817,7 @@ export default function PublicacaoTab() {
     };
 
     createMissing();
-  }, [isLoading, processes, publicacoes, queryClient]);
+  }, [isLoading, processes, publicacoes, queryClient, juridicoStages]);
 
   // ─── Runtime enrichment: sync missing data from linked brand_processes ───
   const enrichmentRef = useRef(false);
