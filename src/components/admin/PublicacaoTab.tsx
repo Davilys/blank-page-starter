@@ -38,9 +38,10 @@ import { ClientDetailSheet } from '@/components/admin/clients/ClientDetailSheet'
 import { loadClientForSheet } from '@/lib/clientSheet';
 import { CreateInvoiceDialog } from '@/components/admin/clients/CreateInvoiceDialog';
 import type { ClientWithProcess } from '@/components/admin/clients/ClientKanbanBoard';
+import { useJuridicoStages } from '@/hooks/useJuridicoStages';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-type PubStatus = '003' | 'oposicao' | 'exigencia_merito' | 'indeferimento' | 'deferimento' | 'certificado' | 'renovacao' | 'arquivado';
+type PubStatus = string;
 type PubTipo = 'publicacao_rpi' | 'decisao' | 'certificado' | 'renovacao';
 type PrazoFilter = 'todos' | 'hoje' | '7dias' | '30dias' | 'atrasados';
 type SortKey = 'cliente' | 'marca' | 'data_pub' | 'prazo' | 'status';
@@ -297,6 +298,7 @@ function TimelineStep({ step, date, isCompleted, isOverdue }: {
 // ─── Main Component ─────────────────────────────────────────────────────────
 export default function PublicacaoTab() {
   const queryClient = useQueryClient();
+  const { stages: juridicoStages } = useJuridicoStages();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filterClient, setFilterClient] = useState<string>('todos');
@@ -760,6 +762,11 @@ export default function PublicacaoTab() {
       renovacao: 'renovacao',
       distrato: 'arquivado',
     };
+    // Etapas customizadas criadas em "Configurar Etapas — Jurídico" são mapeadas
+    // 1:1 (identidade) para que apareçam como coluna no Kanban de Publicações.
+    juridicoStages.forEach(s => {
+      if (!PIPELINE_TO_PUB[s.id]) PIPELINE_TO_PUB[s.id] = s.id;
+    });
 
     // Set of process IDs already linked to a publicação
     const linkedProcIds = new Set(publicacoes.map(p => p.process_id).filter(Boolean));
