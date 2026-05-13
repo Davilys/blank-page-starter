@@ -1889,7 +1889,7 @@ export default function RevistaINPI() {
                   <div className="flex-1">
                     {selectedEntry.process?.pipeline_stage && (
                       <Badge variant="outline" className="mb-2">
-                        Atual: {PIPELINE_STAGES.find(s => s.value === selectedEntry.process?.pipeline_stage)?.label || selectedEntry.process.pipeline_stage}
+                        Atual: {juridicoStageById[selectedEntry.process?.pipeline_stage as string]?.label || selectedEntry.process.pipeline_stage}
                       </Badge>
                     )}
                   </div>
@@ -1898,7 +1898,7 @@ export default function RevistaINPI() {
                     <Select value={newStage} onValueChange={setNewStage}>
                       <SelectTrigger className="rounded-xl"><SelectValue placeholder="Nova etapa" /></SelectTrigger>
                       <SelectContent>
-                        {PIPELINE_STAGES.map(stage => (<SelectItem key={stage.value} value={stage.value}>{stage.label}</SelectItem>))}
+                        {juridicoStages.map(stage => (<SelectItem key={stage.id} value={stage.id}>{stage.label}</SelectItem>))}
                       </SelectContent>
                     </Select>
                   </div>
