@@ -1,0 +1,2 @@
+ALTER TABLE public.brand_processes DROP CONSTRAINT IF EXISTS brand_processes_status_check;
+ALTER TABLE public.brand_processes ADD CONSTRAINT brand_processes_pipeline_stage_format_check CHECK (pipeline_stage IS NULL OR pipeline_stage ~ '^[a-z0-9_]+$');
