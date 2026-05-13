@@ -32,6 +32,7 @@ import {
 import type { ClientWithProcess } from './ClientKanbanBoard';
 import { PIPELINE_STAGES, COMMERCIAL_PIPELINE_STAGES } from './ClientKanbanBoard';
 import { normalizePipelineStageId, sanitizePipelineStagesConfig } from '@/lib/pipelineStage';
+import { useJuridicoStages } from '@/hooks/useJuridicoStages';
 import { ServiceActionPanel } from './ServiceActionPanel';
 import { usePricing } from '@/hooks/usePricing';
 import { PLAN_CONFIG } from './ClientKanbanBoard';
