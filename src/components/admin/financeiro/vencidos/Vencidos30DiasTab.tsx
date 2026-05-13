@@ -43,7 +43,11 @@ const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", cur
 const fmtDate = (d: string | null) => (d ? new Date(d.length === 10 ? d + "T00:00:00" : d).toLocaleDateString("pt-BR") : "—");
 const daysAgo = (d: string) => Math.floor((Date.now() - new Date(d.length === 10 ? d + "T00:00:00" : d).getTime()) / 86400000);
 
-export default function Vencidos30DiasTab() {
+interface Vencidos30DiasTabProps {
+  view?: "lista" | "historico";
+}
+
+export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabProps = {}) {
   const [invoices, setInvoices] = useState<OverdueInvoice[]>([]);
   const [history, setHistory] = useState<CobrancaHist[]>([]);
   const [loading, setLoading] = useState(false);
