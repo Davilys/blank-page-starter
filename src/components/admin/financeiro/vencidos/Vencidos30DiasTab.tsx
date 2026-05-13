@@ -172,6 +172,8 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
 
   return (
     <div className="flex flex-col gap-3">
+      {view === "lista" ? (
+      <>
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -276,6 +278,53 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
           </TableBody>
         </Table>
       </div>
+      </>
+      ) : (
+        <div className="border rounded-md overflow-auto max-h-[calc(100vh-340px)]">
+          <Table>
+            <TableHeader className="sticky top-0 bg-background z-10">
+              <TableRow>
+                <TableHead>Data</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Canais</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Próx. ação</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {history.length === 0 ? (
+                <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">Sem cobranças registradas</TableCell></TableRow>
+              ) : history.map((h) => (
+                <TableRow key={h.id} className="hover:bg-muted/40">
+                  <TableCell className="text-sm">{new Date(h.enviada_em).toLocaleString("pt-BR")}</TableCell>
+                  <TableCell className="text-sm">
+                    <button
+                      type="button"
+                      onClick={() => openClientFile(h.user_id)}
+                      disabled={!h.user_id || loadingClient === h.user_id}
+                      className="text-left hover:underline text-primary disabled:opacity-60"
+                    >
+                      {loadingClient === h.user_id ? <Loader2 className="h-3 w-3 animate-spin inline mr-1" /> : null}
+                      {h.cliente_nome || "—"}
+                    </button>
+                  </TableCell>
+                  <TableCell className="text-xs">{h.canais.join(", ")}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={
+                      h.status === "confirmada_paga" ? "text-emerald-500 border-emerald-500/40" :
+                      h.status === "reentrada_fila" ? "text-amber-500 border-amber-500/40" :
+                      "text-blue-500 border-blue-500/40"
+                    }>{h.status}</Badge>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {h.proxima_acao_em ? new Date(h.proxima_acao_em).toLocaleDateString("pt-BR") : "—"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       {openClient && (
         <Suspense fallback={null}>
