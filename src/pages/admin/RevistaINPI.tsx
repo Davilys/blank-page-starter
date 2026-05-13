@@ -28,6 +28,7 @@ import {
 import { format, addDays, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { calcAutoFields } from '@/components/admin/publicacao/helpers';
+import { useJuridicoStages } from '@/hooks/useJuridicoStages';
 // PublicacaoTab moved to its own page at /admin/publicacao
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -239,6 +240,7 @@ async function resolveBrandProcessId(
 // ─── Main Component ──────────────────────────────────────────────────
 export default function RevistaINPI() {
   const [uploads, setUploads] = useState<RpiUpload[]>([]);
+  const { stages: juridicoStages, stageById: juridicoStageById } = useJuridicoStages();
   const [uploadStats, setUploadStats] = useState<Record<string, { total: number; matched: number }>>({});
   const [entries, setEntries] = useState<RpiEntry[]>([]);
   const [selectedUpload, setSelectedUpload] = useState<RpiUpload | null>(null);
@@ -750,7 +752,7 @@ export default function RevistaINPI() {
       if (selectedEntry.matched_client_id) {
         await supabase.from('notifications').insert({ user_id: selectedEntry.matched_client_id, title: 'Atualização do Processo', message: `Seu processo da marca \"${selectedEntry.brand_name}\" foi atualizado com base na RPI.`, type: 'info', link: '/cliente/processos' });
         const { data: { user } } = await supabase.auth.getUser();
-        await supabase.from('client_activities').insert({ user_id: selectedEntry.matched_client_id, admin_id: user?.id, activity_type: 'process_update', description: `Processo atualizado via RPI para etapa: ${PIPELINE_STAGES.find(s => s.value === newStage)?.label}` });
+        await supabase.from('client_activities').insert({ user_id: selectedEntry.matched_client_id, admin_id: user?.id, activity_type: 'process_update', description: `Processo atualizado via RPI para etapa: ${juridicoStageById[newStage]?.label || newStage}` });
       }
       toast.success('Processo atualizado com sucesso!');
       setUpdateDialogOpen(false);
@@ -1519,10 +1521,12 @@ export default function RevistaINPI() {
                                                 <Select
                                                   value={(() => {
                                                     const currentType = (entry.dispatch_type || '').toLowerCase();
-                                                    const match = DISPATCH_TYPE_OPTIONS.find(o => 
+                                                    const match = juridicoStages.find(s =>
+                                                      s.label.toLowerCase() === currentType || s.id === currentType
+                                                    ) || DISPATCH_TYPE_OPTIONS.find(o =>
                                                       o.label.toLowerCase() === currentType || o.value === currentType
                                                     );
-                                                    return match?.value || '';
+                                                    return (match as any)?.id || (match as any)?.value || '';
                                                   })()}
                                                   onValueChange={(val) => handleDispatchTypeChange(entry, val)}
                                                   disabled={updatingDispatchType === entry.id}
@@ -1535,8 +1539,8 @@ export default function RevistaINPI() {
                                                     )}
                                                   </SelectTrigger>
                                                   <SelectContent>
-                                                    {DISPATCH_TYPE_OPTIONS.map(opt => (
-                                                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                                    {juridicoStages.map(stage => (
+                                                      <SelectItem key={stage.id} value={stage.id}>{stage.label}</SelectItem>
                                                     ))}
                                                   </SelectContent>
                                                 </Select>
@@ -1553,7 +1557,7 @@ export default function RevistaINPI() {
                                               <span className="text-[11px] text-muted-foreground">Etapa Sugerida</span>
                                               <div className="mt-1">
                                                 <Badge className="bg-primary/10 text-primary border-primary/20">
-                                                  {PIPELINE_STAGES.find(s => s.value === suggestStage(entry.dispatch_code, entry.dispatch_text))?.label || 'Protocolado'}
+                                                  {juridicoStageById[suggestStage(entry.dispatch_code, entry.dispatch_text)]?.label || 'Protocolado'}
                                                 </Badge>
                                               </div>
                                             </div>
@@ -1591,7 +1595,7 @@ export default function RevistaINPI() {
                                                     <span className="text-[11px] text-muted-foreground">Etapa Atual</span>
                                                     <div className="mt-1">
                                                       <Badge variant="outline">
-                                                        {PIPELINE_STAGES.find(s => s.value === entry.process?.pipeline_stage)?.label || entry.process.pipeline_stage}
+                                                      {juridicoStageById[entry.process?.pipeline_stage as string]?.label || entry.process.pipeline_stage}
                                                       </Badge>
                                                     </div>
                                                   </div>
@@ -1887,7 +1891,7 @@ export default function RevistaINPI() {
                   <div className="flex-1">
                     {selectedEntry.process?.pipeline_stage && (
                       <Badge variant="outline" className="mb-2">
-                        Atual: {PIPELINE_STAGES.find(s => s.value === selectedEntry.process?.pipeline_stage)?.label || selectedEntry.process.pipeline_stage}
+                        Atual: {juridicoStageById[selectedEntry.process?.pipeline_stage as string]?.label || selectedEntry.process.pipeline_stage}
                       </Badge>
                     )}
                   </div>
@@ -1896,7 +1900,7 @@ export default function RevistaINPI() {
                     <Select value={newStage} onValueChange={setNewStage}>
                       <SelectTrigger className="rounded-xl"><SelectValue placeholder="Nova etapa" /></SelectTrigger>
                       <SelectContent>
-                        {PIPELINE_STAGES.map(stage => (<SelectItem key={stage.value} value={stage.value}>{stage.label}</SelectItem>))}
+                        {juridicoStages.map(stage => (<SelectItem key={stage.id} value={stage.id}>{stage.label}</SelectItem>))}
                       </SelectContent>
                     </Select>
                   </div>
