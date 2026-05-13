@@ -2,17 +2,43 @@ import { lazy, Suspense, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { AlertTriangle, ArrowLeft, Clock, CalendarClock, History, Loader2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Clock, CalendarClock, History, List, Loader2 } from "lucide-react";
 
 const Vencidos30DiasTab = lazy(() => import("@/components/admin/financeiro/vencidos/Vencidos30DiasTab"));
 const Devedores = lazy(() => import("./Devedores"));
 
-type TabKey = "ate30" | "mais30" | "mais60" | "historico";
+type TabKey = "ate30" | "mais30" | "mais60";
+type View = "lista" | "historico";
+
+function ViewToggle({ value, onChange }: { value: View; onChange: (v: View) => void }) {
+  return (
+    <div className="inline-flex rounded-md border border-border/60 overflow-hidden bg-background">
+      <Button
+        size="sm"
+        variant={value === "lista" ? "default" : "ghost"}
+        className="rounded-none h-9 gap-1"
+        onClick={() => onChange("lista")}
+      >
+        <List className="h-3.5 w-3.5" /> Lista
+      </Button>
+      <Button
+        size="sm"
+        variant={value === "historico" ? "default" : "ghost"}
+        className="rounded-none h-9 gap-1"
+        onClick={() => onChange("historico")}
+      >
+        <History className="h-3.5 w-3.5" /> Histórico
+      </Button>
+    </div>
+  );
+}
 
 export default function FinanceiroVencidos() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<TabKey>("ate30");
-  const [historicoSub, setHistoricoSub] = useState<"30" | "60">("60");
+  const [view30, setView30] = useState<View>("lista");
+  const [view60, setView60] = useState<View>("lista");
+  const [viewAte30, setViewAte30] = useState<View>("lista");
 
   return (
     <div className="p-4 md:p-6 space-y-5">
@@ -58,49 +84,22 @@ export default function FinanceiroVencidos() {
           >
             <AlertTriangle className="h-4 w-4" /> Devedores +60 dias
           </TabsTrigger>
-          <TabsTrigger
-            value="historico"
-            className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-slate-500 data-[state=active]:to-slate-700 data-[state=active]:text-white"
-          >
-            <History className="h-4 w-4" /> Histórico
-          </TabsTrigger>
         </TabsList>
 
         <Suspense fallback={<div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
-          <TabsContent value="ate30" className="mt-0">
-            <Vencidos30DiasTab />
+          <TabsContent value="ate30" className="mt-0 space-y-3">
+            <ViewToggle value={viewAte30} onChange={setViewAte30} />
+            <Vencidos30DiasTab view={viewAte30} />
           </TabsContent>
 
-          <TabsContent value="mais30" className="mt-0">
-            <Devedores embedded forceTab="devedor" />
+          <TabsContent value="mais30" className="mt-0 space-y-3">
+            <ViewToggle value={view30} onChange={setView30} />
+            <Devedores embedded forceTab={view30 === "lista" ? "devedor" : "historico-devedor"} />
           </TabsContent>
 
-          <TabsContent value="mais60" className="mt-0">
-            <Devedores embedded forceTab="lista" />
-          </TabsContent>
-
-          <TabsContent value="historico" className="mt-0 space-y-4">
-            <div className="inline-flex rounded-md border border-border/60 overflow-hidden">
-              <Button
-                size="sm"
-                variant={historicoSub === "30" ? "default" : "ghost"}
-                className="rounded-none h-9"
-                onClick={() => setHistoricoSub("30")}
-              >
-                Negociações +30 dias
-              </Button>
-              <Button
-                size="sm"
-                variant={historicoSub === "60" ? "default" : "ghost"}
-                className="rounded-none h-9"
-                onClick={() => setHistoricoSub("60")}
-              >
-                Renegociações +60 dias
-              </Button>
-            </div>
-            {historicoSub === "30"
-              ? <Devedores embedded forceTab="historico-devedor" />
-              : <Devedores embedded forceTab="historico" />}
+          <TabsContent value="mais60" className="mt-0 space-y-3">
+            <ViewToggle value={view60} onChange={setView60} />
+            <Devedores embedded forceTab={view60 === "lista" ? "lista" : "historico"} />
           </TabsContent>
         </Suspense>
       </Tabs>
