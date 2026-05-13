@@ -32,6 +32,7 @@ import {
 import type { ClientWithProcess } from './ClientKanbanBoard';
 import { PIPELINE_STAGES, COMMERCIAL_PIPELINE_STAGES } from './ClientKanbanBoard';
 import { normalizePipelineStageId, sanitizePipelineStagesConfig } from '@/lib/pipelineStage';
+import { useJuridicoStages } from '@/hooks/useJuridicoStages';
 import { ServiceActionPanel } from './ServiceActionPanel';
 import { usePricing } from '@/hooks/usePricing';
 import { PLAN_CONFIG } from './ClientKanbanBoard';
@@ -331,6 +332,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
     priority: 'medium', origin: 'site', brand_name: '', business_area: '', assigned_to: '',
   });
   const [newProcess, setNewProcess] = useState({ brand_name: '', process_number: '', pipeline_stage: 'protocolado', business_area: '' });
+  const { stages: juridicoStages } = useJuridicoStages();
 
   useEffect(() => {
     if (client && open) {
@@ -3235,14 +3237,9 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                                             <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                                             <SelectContent>
                                               <SelectItem value="em_andamento">Em andamento</SelectItem>
-                                              <SelectItem value="003">003</SelectItem>
-                                              <SelectItem value="oposicao">Oposição</SelectItem>
-                                              <SelectItem value="exigencia_merito">Exigência de Mérito</SelectItem>
-                                              <SelectItem value="indeferimento">Indeferimento</SelectItem>
-                                              <SelectItem value="deferimento">Deferimento</SelectItem>
-                                              <SelectItem value="certificado">Certificado</SelectItem>
-                                              <SelectItem value="renovacao">Renovação</SelectItem>
-                                              <SelectItem value="arquivado">Arquivado</SelectItem>
+                                              {juridicoStages.map(stage => (
+                                                <SelectItem key={stage.id} value={stage.id}>{stage.label}</SelectItem>
+                                              ))}
                                             </SelectContent>
                                           </Select>
                                         </div>
