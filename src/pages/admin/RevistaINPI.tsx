@@ -28,6 +28,7 @@ import {
 import { format, addDays, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { calcAutoFields } from '@/components/admin/publicacao/helpers';
+import { useJuridicoStages } from '@/hooks/useJuridicoStages';
 // PublicacaoTab moved to its own page at /admin/publicacao
 
 // ─── Types ───────────────────────────────────────────────────────────
