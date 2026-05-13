@@ -368,34 +368,39 @@ export function useContractTemplate(
     setError(null);
 
     try {
-      // For plans with built-in templates, use them directly to avoid DB mismatch
-      if (plan === 'premium' || plan === 'corporativo' || plan === 'essencial') {
-        const defaultTemplate = getDefaultTemplateForPlan(plan);
-        setTemplate({
-          id: `default-${plan}`,
-          name: defaultTemplate.name,
-          content: defaultTemplate.content,
-          variables: [
-            '{{nome_cliente}}', '{{cpf}}', '{{email}}', '{{telefone}}',
-            '{{marca}}', '{{ramo_atividade}}', '{{endereco_completo}}',
-            '{{razao_social_ou_nome}}', '{{dados_cnpj}}', '{{forma_pagamento_detalhada}}',
-            '{{data_extenso}}'
-          ],
-          is_active: true
-        });
-        setDocumentType('contract');
-        setIsLoading(false);
-        return;
-      }
+      // For plans, prefer the exact-name template from the DB (admin-edited
+      // in "Modelos de Contrato"); fall back to the built-in constant only
+      // when no active row exists.
+      const planExactName: Record<PlanType, string> | null = plan
+        ? {
+            essencial: 'Contrato Padrão - Registro de Marca INPI',
+            premium: 'Contrato Premium - Registro de Marca INPI',
+            corporativo: 'Contrato Corporativo - Registro de Marca INPI',
+          }
+        : null;
+      const exactName = planExactName ? planExactName[plan as PlanType] : templateName;
 
-      // Search for template by name (case insensitive partial match)
-      const { data, error: fetchError } = await supabase
+      // 1) Try exact name match first
+      let { data, error: fetchError } = await supabase
         .from('contract_templates')
         .select('id, name, content, variables, is_active')
         .eq('is_active', true)
-        .or(`name.ilike.%${templateName}%,name.ilike.%Registro de Marca%`)
+        .eq('name', exactName)
         .order('created_at', { ascending: false })
         .limit(1);
+
+      // 2) If no exact match, fall back to a partial match
+      if (!fetchError && (!data || data.length === 0)) {
+        const partial = await supabase
+          .from('contract_templates')
+          .select('id, name, content, variables, is_active')
+          .eq('is_active', true)
+          .or(`name.ilike.%${exactName}%,name.ilike.%Registro de Marca%`)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        data = partial.data ?? null;
+        fetchError = partial.error;
+      }
 
       if (fetchError) {
         throw fetchError;
@@ -409,9 +414,9 @@ export function useContractTemplate(
         setTemplate(foundTemplate);
         setDocumentType(getDocumentTypeFromTemplateName(foundTemplate.name));
       } else {
-        const defaultTemplate = getDefaultTemplateForPlan('essencial');
+        const defaultTemplate = getDefaultTemplateForPlan(plan ?? 'essencial');
         setTemplate({
-          id: 'default',
+          id: `default-${plan ?? 'essencial'}`,
           name: defaultTemplate.name,
           content: defaultTemplate.content,
           variables: [
@@ -422,7 +427,7 @@ export function useContractTemplate(
           ],
           is_active: true
         });
-        setDocumentType(getDocumentTypeFromTemplateName(templateName));
+        setDocumentType(getDocumentTypeFromTemplateName(exactName));
       }
     } catch (err) {
       console.error('Error fetching contract template:', err);
