@@ -752,7 +752,7 @@ export default function RevistaINPI() {
       if (selectedEntry.matched_client_id) {
         await supabase.from('notifications').insert({ user_id: selectedEntry.matched_client_id, title: 'Atualização do Processo', message: `Seu processo da marca \"${selectedEntry.brand_name}\" foi atualizado com base na RPI.`, type: 'info', link: '/cliente/processos' });
         const { data: { user } } = await supabase.auth.getUser();
-        await supabase.from('client_activities').insert({ user_id: selectedEntry.matched_client_id, admin_id: user?.id, activity_type: 'process_update', description: `Processo atualizado via RPI para etapa: ${PIPELINE_STAGES.find(s => s.value === newStage)?.label}` });
+        await supabase.from('client_activities').insert({ user_id: selectedEntry.matched_client_id, admin_id: user?.id, activity_type: 'process_update', description: `Processo atualizado via RPI para etapa: ${juridicoStageById[newStage]?.label || newStage}` });
       }
       toast.success('Processo atualizado com sucesso!');
       setUpdateDialogOpen(false);
