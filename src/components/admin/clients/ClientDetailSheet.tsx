@@ -332,6 +332,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
     priority: 'medium', origin: 'site', brand_name: '', business_area: '', assigned_to: '',
   });
   const [newProcess, setNewProcess] = useState({ brand_name: '', process_number: '', pipeline_stage: 'protocolado', business_area: '' });
+  const { stages: juridicoStages } = useJuridicoStages();
 
   useEffect(() => {
     if (client && open) {
