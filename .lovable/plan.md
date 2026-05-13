@@ -1,33 +1,67 @@
-# Corrigir erro ao salvar processo com etapa customizada
+# Centralizar Devedores em "Vencidos" (Premium)
 
-## Problema
-Ao tentar salvar um `brand_processes` com uma etapa customizada do Kanban Jurídico (ex.: `sobrestamento`), o banco retorna:
+## Objetivo
 
-```
-new row for relation "brand_processes" violates check constraint "brand_processes_status_check"
-```
+Unificar todas as visões de inadimplência em **uma única tela** acessada ao clicar no card "Vencido" do Financeiro. Hoje a informação está espalhada em duas páginas:
 
-A causa é uma `CHECK constraint` antiga em `brand_processes` que só aceita um conjunto fixo de slugs de `pipeline_stage` (protocolado, 003, oposicao, etc.). Etapas novas criadas pelo admin no Kanban não passam por essa lista — por isso o salvamento falha.
+- `/admin/financeiro/vencidos` — faturas vencidas até 30 dias.
+- `/admin/devedores` — devedores 30 dias e devedores 60+ dias com histórico.
 
-Isso contradiz a refatoração já feita no front (hook `useJuridicoStages` + `normalizePipelineStageId` aceitando qualquer slug `[a-z0-9_]+`).
+O botão "Devedores" no header do Financeiro será removido. Tudo passa a viver dentro da nova tela "Vencidos".
 
-## Solução
-Substituir o CHECK por uma validação de **formato de slug**, mantendo segurança (sem aceitar lixo) mas permitindo qualquer etapa válida criada no Kanban.
+## Nova tela `/admin/financeiro/vencidos`
 
-### Migration
-```sql
-ALTER TABLE public.brand_processes
-  DROP CONSTRAINT IF EXISTS brand_processes_status_check;
+Layout premium: cabeçalho com gradiente sutil, 4 cards de resumo no topo e um sistema de **abas** organizando cada faixa de atraso + histórico.
 
-ALTER TABLE public.brand_processes
-  ADD CONSTRAINT brand_processes_pipeline_stage_format_check
-  CHECK (pipeline_stage IS NULL OR pipeline_stage ~ '^[a-z0-9_]+$');
-```
+### Abas
 
-## Impacto
-- Nenhum dado existente é alterado (todos os slugs atuais já casam com `^[a-z0-9_]+$`).
-- Nenhum código de aplicação muda — o front já normaliza com a mesma regex.
-- Etapas customizadas (ex.: `sobrestamento`) passam a ser salvas normalmente.
+1. **Vencidos até 30 dias** — faturas Asaas vencidas há 1–30 dias (conteúdo atual de `FinanceiroVencidos`).
+2. **Devedores +30 dias** — agrupado por cliente (atual aba "Devedor 30 dias").
+3. **Devedores +60 dias** — agrupado por cliente, com renegociação +10% (atual aba "Devedores 60 dias").
+4. **Histórico de cobranças** — unificado, com filtro por faixa.
 
-## Arquivos
-- Nova migration Supabase (apenas DDL).
+Cada aba mantém: busca por nome/CPF/descrição, filtros de período quando aplicável, ações já existentes (WhatsApp, Email, abrir ficha do cliente, sincronizar Asaas, marcar como pago) e badges coloridos por faixa (laranja 30, vermelho 60+).
+
+### Cards de resumo (topo)
+
+- Total de devedores únicos
+- Valor em aberto até 30 dias
+- Valor em aberto +30 dias
+- Valor em aberto +60 dias (com acréscimo)
+
+### Acabamento "premium"
+
+- Hero com gradiente suave (tokens do design system) e ícone de alerta.
+- Cards com hover, contagem animada e ícones temáticos.
+- Tabs com indicador deslizante e contagem entre parênteses.
+- Skeleton loaders durante o fetch.
+- Estado vazio ilustrado por aba.
+- Linhas com hover e ações em ícones com tooltip.
+
+## Mudanças no Financeiro
+
+- `Financeiro.tsx`: remover o botão **Devedores** do header (≈ linha 447). O acesso a tudo passa pelo card "Vencido", que continua navegando para `/admin/financeiro/vencidos`.
+
+## Roteamento
+
+- `/admin/financeiro/vencidos` continua sendo a rota principal.
+- `/admin/devedores` vira **redirect** para `/admin/financeiro/vencidos` (compatibilidade com links antigos e sidebar).
+- Atualizar `AdminLayout` / `MobileBottomNav` se houver link "Devedores" para apontar para a nova rota.
+
+## Detalhes técnicos
+
+- Reescrever `src/pages/admin/FinanceiroVencidos.tsx` como container com `Tabs`.
+- Extrair conteúdo em componentes em `src/components/admin/financeiro/vencidos/`:
+  - `Vencidos30DiasTab.tsx` (lógica atual de `FinanceiroVencidos`)
+  - `Devedores30DiasTab.tsx` (extraído de `Devedores.tsx`)
+  - `Devedores60DiasTab.tsx` (extraído de `Devedores.tsx`)
+  - `HistoricoCobrancasTab.tsx` (unifica `historico_cobranca` + `negociacoes_devedores`)
+- Reaproveitar `loadClientForSheet`, `ClientDetailSheet` (lazy) e edge functions já existentes (`list-debtors-30-grouped`, `sync-overdue-30`, `cobrar-fatura-vencida`, `asaas-debtors-api`).
+- `Devedores.tsx` passa a renderizar `<Navigate to="/admin/financeiro/vencidos" replace />`.
+- Sem mudanças de schema, RLS ou migrations.
+
+## Fora de escopo
+
+- Alterar lógica de juros/acréscimo.
+- Novas integrações Asaas.
+- Mudar templates de email/WhatsApp.
