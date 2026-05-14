@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { MessageCircle, Mail, Loader2, RefreshCw, Search, CheckCircle2, Calendar } from "lucide-react";
+import { MessageCircle, Mail, Loader2, RefreshCw, Search, CheckCircle2, Calendar, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { startOfDay, startOfWeek, startOfMonth, subDays } from "date-fns";
 import { loadClientForSheet } from "@/lib/clientSheet";
@@ -55,6 +55,7 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
   const [period, setPeriod] = useState<Period>("30d");
   const [search, setSearch] = useState("");
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [openClient, setOpenClient] = useState<ClientWithProcess | null>(null);
   const [loadingClient, setLoadingClient] = useState<string | null>(null);
 
@@ -141,6 +142,24 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
       toast.error("Falha: " + (e.message || e));
     } finally {
       setSendingId(null);
+    }
+  };
+
+  const excluir = async (invoice_id: string) => {
+    if (!window.confirm("Remover esta fatura da lista de vencidos? Ela será marcada como cancelada.")) return;
+    setDeletingId(invoice_id);
+    try {
+      const { error } = await supabase
+        .from("invoices")
+        .update({ status: "cancelled", updated_at: new Date().toISOString() })
+        .eq("id", invoice_id);
+      if (error) throw error;
+      setInvoices((prev) => prev.filter((i) => i.id !== invoice_id));
+      toast.success("Fatura removida da lista");
+    } catch (e: any) {
+      toast.error("Falha ao excluir: " + (e.message || e));
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -273,6 +292,12 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
                         className="bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white">
                         {sendingId === inv.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
                         Cobrar
+                      </Button>
+                      <Button size="sm" variant="ghost" disabled={deletingId !== null}
+                        onClick={() => excluir(inv.id)} title="Remover da lista">
+                        {deletingId === inv.id
+                          ? <Loader2 className="h-3 w-3 animate-spin" />
+                          : <Trash2 className="h-3 w-3 text-destructive" />}
                       </Button>
                     </div>
                   </TableCell>
