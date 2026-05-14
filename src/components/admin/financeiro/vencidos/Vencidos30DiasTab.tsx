@@ -85,11 +85,15 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
         .order("due_date", { ascending: false })
         .limit(500);
       if (error) throw error;
+      // Só consideramos vencido se a data de vencimento já passou.
+      // Status 'overdue' isolado não basta — o Asaas pode ter reagendado a fatura para o futuro.
       const overdue = (data || []).filter((i: any) => {
         const s = i.status || "";
         if (PAID.includes(s)) return false;
         if (s === "cancelled" || s === "CANCELLED") return false;
-        return s === "overdue" || s === "OVERDUE" || daysAgo(i.due_date) > 0;
+        if (!i.due_date) return false;
+        if (daysAgo(i.due_date) <= 0) return false; // vence hoje ou no futuro → não vencido
+        return s === "pending" || s === "overdue" || s === "OVERDUE";
       });
       setInvoices(overdue as any);
 
