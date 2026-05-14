@@ -174,6 +174,9 @@ Deno.serve(async (req) => {
         offset += limit;
       }
 
+      // Cleanup: linhas d60 que NÃO foram tocadas neste sweep podem ter sido
+      // reagendadas/quitadas no Asaas. Re-checa cada uma e remove se já não estiver vencida >60d.
+      await cleanupBucket(admin, "d60", 60);
       return json({ success: true, total_overdue: total, kept_over_60d: kept, skipped_finalized });
     }
 
@@ -245,6 +248,7 @@ Deno.serve(async (req) => {
         offset += limit;
       }
 
+      await cleanupBucket(admin, "d30", 31, 59);
       return json({ success: true, total_overdue: total, kept_under_30d: kept, skipped_finalized });
     }
 
