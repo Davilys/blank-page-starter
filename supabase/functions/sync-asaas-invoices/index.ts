@@ -22,11 +22,12 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Fetch all pending invoices that have an asaas_invoice_id
+    // Fetch all pending/overdue invoices that have an asaas_invoice_id.
+    // We include 'overdue' so faturas que foram reagendadas no Asaas voltem para 'pending'.
     const { data: pendingInvoices, error: fetchError } = await supabase
       .from('invoices')
-      .select('id, asaas_invoice_id, status, amount, description, user_id')
-      .eq('status', 'pending')
+      .select('id, asaas_invoice_id, status, amount, due_date, description, user_id')
+      .in('status', ['pending', 'overdue'])
       .not('asaas_invoice_id', 'is', null);
 
     if (fetchError) {
@@ -67,23 +68,39 @@ serve(async (req) => {
 
         const asaasPayment = await asaasResponse.json();
         const asaasStatus = asaasPayment.status as string;
-
-        // If still PENDING in Asaas, skip
-        if (asaasStatus === 'PENDING') {
-          continue;
-        }
-
-        // Map Asaas status to local status
-        const newStatus = mapAsaasStatus(asaasStatus);
+        const asaasDueDate: string | null = asaasPayment.dueDate || null;
+        const asaasValue: number | null =
+          typeof asaasPayment.value === 'number' ? asaasPayment.value : null;
         const paymentDate = asaasPayment.paymentDate || asaasPayment.confirmedDate || null;
+
+        // Always sync due_date and amount from Asaas (source of truth).
+        // Map status; if Asaas says PENDING but the dueDate is in the past, keep 'pending'
+        // (Asaas may not have flipped to OVERDUE yet) — and vice-versa, if previously OVERDUE
+        // locally but Asaas now PENDING with dueDate in the future, status returns to 'pending'.
+        let newStatus = mapAsaasStatus(asaasStatus);
+        const todayStr = new Date().toISOString().slice(0, 10);
+        if (asaasStatus === 'PENDING' && asaasDueDate && asaasDueDate >= todayStr) {
+          newStatus = 'pending';
+        }
 
         const updateData: Record<string, unknown> = {
           status: newStatus,
           updated_at: new Date().toISOString(),
         };
-
+        if (asaasDueDate) updateData.due_date = asaasDueDate;
+        if (asaasValue !== null) updateData.amount = asaasValue;
         if (paymentDate && (newStatus === 'confirmed' || newStatus === 'received')) {
           updateData.payment_date = paymentDate;
+        }
+
+        // Skip the write if nothing actually changed (avoid trigger churn)
+        const noChange =
+          newStatus === invoice.status &&
+          (!asaasDueDate || asaasDueDate === (invoice as any).due_date) &&
+          (asaasValue === null || Number(asaasValue) === Number(invoice.amount));
+        if (noChange) {
+          await new Promise((r) => setTimeout(r, 250));
+          continue;
         }
 
         const { error: updateError } = await supabase
