@@ -72,6 +72,47 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/**
+ * Re-checa no Asaas cada cobrança ainda marcada como pendente_renegociacao no bucket
+ * informado e remove a linha (ou move o status) caso a fatura tenha sido reagendada
+ * para o futuro, paga ou cancelada — ou seja, não esteja mais vencida na faixa esperada.
+ */
+async function cleanupBucket(admin: any, bucket: "d30" | "d60", minDays: number, maxDays?: number) {
+  const { data: rows } = await admin
+    .from("cobrancas_vencidas")
+    .select("asaas_payment_id")
+    .eq("status", "pendente_renegociacao")
+    .eq("bucket", bucket);
+  if (!rows || rows.length === 0) return;
+
+  for (const r of rows) {
+    if (!r.asaas_payment_id) continue;
+    try {
+      const res = await fetch(`${ASAAS_BASE}/payments/${r.asaas_payment_id}`, {
+        headers: { access_token: ASAAS_API_KEY, "Content-Type": "application/json" },
+      });
+      if (!res.ok) { await res.text(); continue; }
+      const p = await res.json();
+      const status = (p.status || "").toUpperCase();
+      const due = p.dueDate as string | undefined;
+      const dias = due ? daysBetween(due) : -1;
+      const stillInBucket =
+        status === "OVERDUE" &&
+        dias >= minDays &&
+        (maxDays === undefined || dias <= maxDays);
+      if (!stillInBucket) {
+        await admin
+          .from("cobrancas_vencidas")
+          .delete()
+          .eq("asaas_payment_id", r.asaas_payment_id)
+          .eq("status", "pendente_renegociacao");
+      }
+    } catch (e) {
+      console.warn("cleanupBucket fetch failed", r.asaas_payment_id, e);
+    }
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
