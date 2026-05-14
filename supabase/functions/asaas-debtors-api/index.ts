@@ -140,7 +140,14 @@ Deno.serve(async (req) => {
     if (!roleRow) return json({ error: "Forbidden: admin only" }, 403);
 
     const url = new URL(req.url);
-    const action = url.searchParams.get("action") || "";
+    let action = url.searchParams.get("action") || "";
+    let bodyJson: any = null;
+    if (!action && (req.method === "POST" || req.method === "PUT" || req.method === "PATCH")) {
+      try {
+        bodyJson = await req.clone().json();
+        if (bodyJson && typeof bodyJson.action === "string") action = bodyJson.action;
+      } catch { /* ignore */ }
+    }
 
     // ────────────── SYNC OVERDUE ──────────────
     if (action === "sync-overdue") {
