@@ -291,6 +291,30 @@ function findFolder(listResp: string, candidates: string[]): string | null {
   return null;
 }
 
+// Increment consecutive_errors per (account, folder='_account') so cron-sync-all-emails
+// can fire an alert after 3 consecutive failures.
+async function recordAccountError(supabase: any, accountId: string, msg: string) {
+  try {
+    const { data: cur } = await supabase
+      .from("email_sync_state")
+      .select("consecutive_errors")
+      .eq("account_id", accountId)
+      .eq("folder", "_account")
+      .maybeSingle();
+    const n = (cur?.consecutive_errors || 0) + 1;
+    await supabase.from("email_sync_state").upsert({
+      account_id: accountId,
+      folder: "_account",
+      last_uid: 0,
+      last_synced_at: new Date().toISOString(),
+      last_error: msg.slice(0, 500),
+      consecutive_errors: n,
+    }, { onConflict: "account_id,folder" });
+  } catch (e) {
+    console.error("recordAccountError failed", e);
+  }
+}
+
 function parseEnvelope(raw: string) {
   const fromMatch = raw.match(/From:\s*(?:"?([^"<]*)"?\s*)?<?([^>\r\n]+)>?/i);
   const toMatch = raw.match(/To:\s*(?:"?([^"<]*)"?\s*)?<?([^>\r\n]+)>?/i);
