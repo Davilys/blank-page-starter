@@ -316,14 +316,21 @@ async function recordAccountError(supabase: any, accountId: string, msg: string)
 }
 
 function parseEnvelope(raw: string) {
-  const fromMatch = raw.match(/From:\s*(?:"?([^"<]*)"?\s*)?<?([^>\r\n]+)>?/i);
-  const toMatch = raw.match(/To:\s*(?:"?([^"<]*)"?\s*)?<?([^>\r\n]+)>?/i);
-  const subjMatch = raw.match(/Subject:\s*(.+?)(?:\r\n(?![ \t])|\r?\n(?![ \t]))/is);
-  const dateMatch = raw.match(/Date:\s*(.+?)(?:\r\n|\r?\n)/i);
-  const midMatch = raw.match(/Message-ID:\s*<?([^>\r\n]+)>?/i);
+  // Isolate the headers block and unfold continuation lines BEFORE matching,
+  // otherwise regexes like /From:/i match substrings inside DKIM-Signature
+  // (which contains `h=from:to:cc:subject:date:message-id...` and base64 `b=...`)
+  // and the envelope ends up filled with DKIM garbage.
+  const headersBlock = raw.split(/\r?\n\r?\n/)[0] || raw.split(/\n\n/)[0] || raw;
+  const unfolded = headersBlock.replace(/\r?\n[ \t]+/g, " ").replace(/\n[ \t]+/g, " ");
+
+  // Anchored, line-based matches — only real top-level headers will match.
+  const fromMatch = unfolded.match(/^From:\s*(?:"?([^"<\r\n]*?)"?\s*)?<?([^>\r\n\s]+@[^>\r\n\s]+)>?/im);
+  const toMatch = unfolded.match(/^To:\s*(?:"?([^"<\r\n]*?)"?\s*)?<?([^>\r\n\s]+@[^>\r\n\s]+)>?/im);
+  const subjMatch = unfolded.match(/^Subject:\s*(.+)$/im);
+  const dateMatch = unfolded.match(/^Date:\s*(.+)$/im);
+  const midMatch = unfolded.match(/^Message-ID:\s*<?([^>\r\n\s]+)>?/im);
+
   // Collect ALL recipient-related addresses to detect aliases/forwards
-  const headersBlock = raw.split(/\r?\n\r?\n/)[0] || "";
-  const unfolded = headersBlock.replace(/\r?\n[ \t]+/g, " ");
   const recipientHeaders = ["To", "Cc", "Bcc", "Delivered-To", "X-Original-To", "Envelope-To", "X-Delivered-To"];
   const recipients: string[] = [];
   for (const h of recipientHeaders) {
