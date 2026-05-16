@@ -6,10 +6,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Max new messages to fetch per folder per call (avoid CPU timeout)
-const MAX_PER_FOLDER = 40;
-// Max during a backfill call (still bounded to avoid CPU timeout)
-const MAX_PER_FOLDER_BACKFILL = 200;
+// Max new messages to fetch per folder per call (avoid CPU timeout).
+// Edge runtime CPU budget is small — keep this conservative; remaining UIDs
+// are picked up on the next cron tick.
+const MAX_PER_FOLDER = 12;
+const MAX_PER_FOLDER_BACKFILL = 50;
 // Other @webmarcas.net mailboxes we also sync — used to detect true alias deliveries
 // (we still insert them, but tag is_alias=true so the UI can group/filter them).
 const SIBLING_DOMAIN = "webmarcas.net";
@@ -509,7 +510,13 @@ async function syncFolder(
       if (!error && !isAlias && !isSent && folderLabel === "inbox") {
         const headersBlock = raw.split(/\r?\n\r?\n/)[0] || "";
         if (!looksAutomated(headersBlock, env.subject) && !isOwnDomain(env.from)) {
-          await sendAutoReply(supabase, account, env.from, env.subject);
+          // Fire-and-forget: don't block the sync loop (avoids CPU timeout).
+          const p = sendAutoReply(supabase, account, env.from, env.subject).catch(e => console.error("autoreply bg:", e));
+          // @ts-ignore EdgeRuntime is available in Supabase edge runtime
+          if (typeof EdgeRuntime !== "undefined" && (EdgeRuntime as any).waitUntil) {
+            // @ts-ignore
+            (EdgeRuntime as any).waitUntil(p);
+          }
         }
       }
     } catch (e) {
