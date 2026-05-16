@@ -8,6 +8,11 @@ const corsHeaders = {
 
 // Max new messages to fetch per folder per call (avoid CPU timeout)
 const MAX_PER_FOLDER = 40;
+// Max during a backfill call (still bounded to avoid CPU timeout)
+const MAX_PER_FOLDER_BACKFILL = 200;
+// Other @webmarcas.net mailboxes we also sync — used to detect true alias deliveries
+// (we still insert them, but tag is_alias=true so the UI can group/filter them).
+const SIBLING_DOMAIN = "webmarcas.net";
 
 // ============== Auto-reply ==============
 const AUTO_REPLY_SUBJECT = "Recebemos seu contato – WebMarcas";
@@ -335,32 +340,47 @@ async function syncFolder(
   account: any,
   folderLabel: string,
   serverFolder: string,
-  tagPrefix: string
-): Promise<{ synced: number; new_uid: number }> {
+  tagPrefix: string,
+  opts: { backfill?: boolean; sinceUid?: number } = {}
+): Promise<{ synced: number; new_uid: number; skipped_alias: number; skipped_dup: number; errors: number }> {
   const sel = await sendCmd(conn, `${tagPrefix}S`, `SELECT "${serverFolder}"`);
-  if (!sel.includes(`${tagPrefix}S OK`)) return { synced: 0, new_uid: 0 };
+  if (!sel.includes(`${tagPrefix}S OK`)) {
+    const errMsg = `SELECT ${serverFolder} failed`;
+    console.error(`[${account.email_address}/${folderLabel}] ${errMsg}`);
+    return { synced: 0, new_uid: 0, skipped_alias: 0, skipped_dup: 0, errors: 1 };
+  }
 
-  // Load last_uid for this (account, folder)
+  // Determine start UID. In backfill mode we ignore the saved watermark and
+  // process from `sinceUid` (default 1) — but ONLY advance the watermark up to
+  // the last UID we actually processed in this call, so subsequent calls
+  // resume cleanly without skipping UIDs.
   const { data: state } = await supabase
     .from("email_sync_state")
     .select("last_uid")
     .eq("account_id", account.id)
     .eq("folder", folderLabel)
     .maybeSingle();
-  const lastUid = state?.last_uid || 0;
+  const savedUid = state?.last_uid || 0;
+  const isBackfill = !!opts.backfill;
+  const startUid = isBackfill ? Math.max(1, opts.sinceUid ?? 1) : savedUid + 1;
 
-  // Fetch UIDs newer than lastUid
-  const searchResp = await sendCmd(conn, `${tagPrefix}U`, `UID SEARCH UID ${lastUid + 1}:*`);
+  const searchResp = await sendCmd(conn, `${tagPrefix}U`, `UID SEARCH UID ${startUid}:*`);
   const sm = searchResp.match(/\* SEARCH\s+([\d\s]+)/);
-  if (!sm) return { synced: 0, new_uid: lastUid };
-  const allUids = sm[1].trim().split(/\s+/).filter(Boolean).map(Number).filter(n => n > lastUid);
-  if (allUids.length === 0) return { synced: 0, new_uid: lastUid };
+  if (!sm) return { synced: 0, new_uid: savedUid, skipped_alias: 0, skipped_dup: 0, errors: 0 };
+  const allUids = sm[1].trim().split(/\s+/).filter(Boolean).map(Number).filter(n => n >= startUid);
+  if (allUids.length === 0) return { synced: 0, new_uid: savedUid, skipped_alias: 0, skipped_dup: 0, errors: 0 };
 
-  // Take only newest MAX_PER_FOLDER
+  // CHUNK ASCENDING: process from oldest unread UID forward, so a burst of
+  // >MAX messages doesn't permanently skip the older ones — they're picked up
+  // on the next call.
   allUids.sort((a, b) => a - b);
-  const uidsToFetch = allUids.slice(-MAX_PER_FOLDER);
-  let maxUidSeen = lastUid;
+  const limit = isBackfill ? MAX_PER_FOLDER_BACKFILL : MAX_PER_FOLDER;
+  const uidsToFetch = allUids.slice(0, limit);
+  let lastProcessedUid = isBackfill ? savedUid : savedUid; // only update if non-backfill or we surpass it
   let synced = 0;
+  let skippedAlias = 0;
+  let skippedDup = 0;
+  let errors = 0;
   const isSent = folderLabel === "sent";
 
   // Fetch one by one (more reliable parsing than batch)
@@ -385,15 +405,25 @@ async function syncFolder(
         receivedAt = new Date().toISOString();
       }
 
-      // Anti-alias filter: if syncing INBOX, only keep messages actually addressed
-      // to this account's email (covers Hostinger forwards/aliases that deliver
-      // copies of one mailbox into another).
-      if (!isSent && folderLabel === "inbox") {
+      // Anti-alias CLASSIFICATION (not discard): mark as is_alias when the
+      // message landed in this INBOX but was clearly delivered to a different
+      // @webmarcas.net address that we also sync. We still insert it so the
+      // UI can show it (Outlook-like behavior).
+      let isAlias = false;
+      if (!isSent && folderLabel === "inbox" && env.recipients.length > 0) {
         const myAddr = (account.email_address || "").toLowerCase();
         const matchesMe = env.recipients.includes(myAddr);
-        if (!matchesMe && env.recipients.length > 0) {
-          maxUidSeen = Math.max(maxUidSeen, uid);
-          continue;
+        if (!matchesMe) {
+          const deliveredToSibling = env.recipients.some(r => r.endsWith("@" + SIBLING_DOMAIN) && r !== myAddr);
+          if (deliveredToSibling) {
+            // Other @webmarcas.net mailbox also syncs this — skip to avoid duplicate.
+            skippedAlias++;
+            console.log(`[${account.email_address}/${folderLabel}] uid=${uid} skipped_alias for=${env.recipients.join(",")}`);
+            if (uid > lastProcessedUid) lastProcessedUid = uid;
+            continue;
+          }
+          // External alias (catch-all, forward from outside) — keep it, flag it.
+          isAlias = true;
         }
       }
 
@@ -405,7 +435,11 @@ async function syncFolder(
         .eq("folder", folderLabel)
         .eq("message_id", env.messageId)
         .maybeSingle();
-      if (existing) { maxUidSeen = Math.max(maxUidSeen, uid); continue; }
+      if (existing) {
+        skippedDup++;
+        if (uid > lastProcessedUid) lastProcessedUid = uid;
+        continue;
+      }
 
       const row: any = {
         account_id: account.id,
@@ -427,23 +461,31 @@ async function syncFolder(
         is_starred: false,
         is_archived: false,
         folder: folderLabel,
+        is_alias: isAlias,
       };
 
       const { error } = await supabase.from("email_inbox").insert(row);
-      if (!error) synced++;
-      maxUidSeen = Math.max(maxUidSeen, uid);
+      if (!error) {
+        synced++;
+        console.log(`[${account.email_address}/${folderLabel}] uid=${uid} inserted from=${env.from} alias=${isAlias}`);
+      } else {
+        errors++;
+        console.error(`[${account.email_address}/${folderLabel}] uid=${uid} insert_error=${error.message}`);
+      }
+      if (uid > lastProcessedUid) lastProcessedUid = uid;
 
       // Auto-reply only for inbox (received) messages
-      if (!error && !isSent && folderLabel === "inbox") {
+      if (!error && !isAlias && !isSent && folderLabel === "inbox") {
         const headersBlock = raw.split(/\r?\n\r?\n/)[0] || "";
         if (!looksAutomated(headersBlock, env.subject) && !isOwnDomain(env.from)) {
           await sendAutoReply(supabase, account, env.from, env.subject);
         }
       }
     } catch (e) {
-      console.error(`[${folderLabel}] uid=${uid} err:`, e);
+      errors++;
+      console.error(`[${account.email_address}/${folderLabel}] uid=${uid} parse_error:`, e);
       // Always advance the watermark so a single bad message can't freeze the sync.
-      maxUidSeen = Math.max(maxUidSeen, uid);
+      if (uid > lastProcessedUid) lastProcessedUid = uid;
     }
   }
 
@@ -451,18 +493,22 @@ async function syncFolder(
   await supabase.from("email_sync_state").upsert({
     account_id: account.id,
     folder: folderLabel,
-    last_uid: maxUidSeen,
+    last_uid: lastProcessedUid,
     last_synced_at: new Date().toISOString(),
+    last_error: null,
+    consecutive_errors: 0,
   }, { onConflict: "account_id,folder" });
 
-  return { synced, new_uid: maxUidSeen };
+  return { synced, new_uid: lastProcessedUid, skipped_alias: skippedAlias, skipped_dup: skippedDup, errors };
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { account_id } = await req.json().catch(() => ({}));
+    const body = await req.json().catch(() => ({}));
+    const { account_id, mode, since_uid } = body || {};
+    const backfill = mode === "backfill";
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     let q = supabase.from("email_accounts").select("*");
@@ -482,19 +528,25 @@ serve(async (req) => {
         const conn = await Deno.connectTls({ hostname: account.imap_host, port: account.imap_port || 993 });
         await readGreeting(conn);
         const login = await sendCmd(conn, "A1", `LOGIN "${account.smtp_user}" "${account.smtp_password}"`);
-        if (!login.includes("A1 OK")) { conn.close(); results.push({ account: account.email_address, error: "login failed" }); continue; }
+        if (!login.includes("A1 OK")) {
+          conn.close();
+          console.error(`[${account.email_address}] LOGIN failed`);
+          await recordAccountError(supabase, account.id, "LOGIN failed");
+          results.push({ account: account.email_address, error: "login failed" });
+          continue;
+        }
         const listResp = await sendCmd(conn, "L1", 'LIST "" "*"');
 
-        const folderResults: Record<string, { synced: number; new_uid: number }> = {};
+        const folderResults: Record<string, { synced: number; new_uid: number; skipped_alias: number; skipped_dup: number; errors: number }> = {};
         let tagN = 10;
         for (const [label, candidates] of Object.entries(FOLDER_NAMES)) {
           const server = label === "inbox" ? "INBOX" : findFolder(listResp, candidates);
-          if (!server) { folderResults[label] = { synced: 0, new_uid: 0 }; continue; }
+          if (!server) { folderResults[label] = { synced: 0, new_uid: 0, skipped_alias: 0, skipped_dup: 0, errors: 0 }; continue; }
           try {
-            folderResults[label] = await syncFolder(conn, supabase, account, label, server, `T${tagN++}`);
+            folderResults[label] = await syncFolder(conn, supabase, account, label, server, `T${tagN++}`, { backfill, sinceUid: since_uid });
           } catch (e: any) {
             console.error(`Folder ${label} error:`, e?.message);
-            folderResults[label] = { synced: 0, new_uid: 0 };
+            folderResults[label] = { synced: 0, new_uid: 0, skipped_alias: 0, skipped_dup: 0, errors: 1 };
           }
         }
 
@@ -504,6 +556,7 @@ serve(async (req) => {
         results.push({ account: account.email_address, folders: folderResults });
       } catch (e: any) {
         console.error(`Account ${account.email_address} error:`, e?.message);
+        await recordAccountError(supabase, account.id, e?.message || "unknown");
         results.push({ account: account.email_address, error: e?.message });
       }
     }
