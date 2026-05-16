@@ -1482,6 +1482,7 @@ export type Database = {
           has_attachments: boolean | null
           id: string
           imap_uid: number | null
+          is_alias: boolean | null
           is_archived: boolean | null
           is_read: boolean | null
           is_starred: boolean | null
@@ -1505,6 +1506,7 @@ export type Database = {
           has_attachments?: boolean | null
           id?: string
           imap_uid?: number | null
+          is_alias?: boolean | null
           is_archived?: boolean | null
           is_read?: boolean | null
           is_starred?: boolean | null
@@ -1528,6 +1530,7 @@ export type Database = {
           has_attachments?: boolean | null
           id?: string
           imap_uid?: number | null
+          is_alias?: boolean | null
           is_archived?: boolean | null
           is_read?: boolean | null
           is_starred?: boolean | null
@@ -1620,19 +1623,25 @@ export type Database = {
       email_sync_state: {
         Row: {
           account_id: string
+          consecutive_errors: number | null
           folder: string
+          last_error: string | null
           last_synced_at: string
           last_uid: number
         }
         Insert: {
           account_id: string
+          consecutive_errors?: number | null
           folder: string
+          last_error?: string | null
           last_synced_at?: string
           last_uid?: number
         }
         Update: {
           account_id?: string
+          consecutive_errors?: number | null
           folder?: string
+          last_error?: string | null
           last_synced_at?: string
           last_uid?: number
         }
