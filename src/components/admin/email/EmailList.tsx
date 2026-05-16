@@ -7,7 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Mail, Star, Clock, RefreshCw } from 'lucide-react';
+import { Search, Mail, Star, Clock, RefreshCw, History } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { Email, EmailFolder } from '@/pages/admin/Emails';
@@ -23,6 +25,7 @@ interface EmailListProps {
 export function EmailList({ folder, onSelectEmail, accountId, accountEmail }: EmailListProps) {
   const [search, setSearch] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isBackfilling, setIsBackfilling] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: emails, isLoading } = useQuery({
@@ -187,6 +190,27 @@ export function EmailList({ folder, onSelectEmail, accountId, accountEmail }: Em
     };
   }, [accountId, queryClient]);
 
+  const handleBackfill = async () => {
+    if (!accountId || isBackfilling) return;
+    if (!confirm('Reimportar o histórico completo desta conta? Pode levar vários minutos e várias rodadas.')) return;
+    setIsBackfilling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-imap-inbox', {
+        body: { account_id: accountId, mode: 'backfill', since_uid: 1 },
+      });
+      if (error) throw error;
+      const folders = (data as any)?.results?.[0]?.folders || {};
+      const total = Object.values(folders).reduce((acc: number, f: any) => acc + (f?.synced || 0), 0);
+      toast.success(`Reimportação: ${total} novas mensagens. Continue clicando para buscar o restante.`);
+      queryClient.invalidateQueries({ queryKey: ['emails'] });
+      queryClient.invalidateQueries({ queryKey: ['email-stats'] });
+    } catch (e: any) {
+      toast.error('Erro ao reimportar: ' + (e?.message || 'desconhecido'));
+    } finally {
+      setIsBackfilling(false);
+    }
+  };
+
   // Realtime: listen for new/updated emails on this account
   useEffect(() => {
     if (!accountId) return;
@@ -256,6 +280,17 @@ export function EmailList({ folder, onSelectEmail, accountId, accountEmail }: Em
                 Sincronizando…
               </span>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBackfill}
+              disabled={!accountId || isBackfilling}
+              title="Reimportar histórico completo desta conta"
+              className="h-7 px-2 text-[11px] gap-1"
+            >
+              {isBackfilling ? <RefreshCw className="h-3 w-3 animate-spin" /> : <History className="h-3 w-3" />}
+              <span className="hidden md:inline">Histórico</span>
+            </Button>
             <Badge variant="secondary" className="text-[10px] md:text-xs">
               {filteredEmails.length}
             </Badge>
