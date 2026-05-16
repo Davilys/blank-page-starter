@@ -194,15 +194,17 @@ export function EmailView({ email, onBack, onReply, onForward, onUseDraftFromAI 
   };
 
   const handleDelete = async () => {
+    // Propagate to IMAP server FIRST (needs the row to exist to read imap_uid/account)
+    try {
+      await supabase.functions.invoke('update-imap-flag', {
+        body: { email_id: email.id, action: 'delete' },
+      });
+    } catch { /* non-fatal: still delete locally */ }
     const { error } = await supabase.from('email_inbox').delete().eq('id', email.id);
     if (error) {
       toast.error('Erro ao excluir email: ' + error.message);
       return;
     }
-    // Propagate to IMAP server (fire & forget)
-    supabase.functions.invoke('update-imap-flag', {
-      body: { email_id: email.id, action: 'delete' },
-    }).catch(() => {});
     toast.success('🗑️ Email excluído com sucesso');
     queryClient.invalidateQueries({ queryKey: ['emails'] });
     queryClient.invalidateQueries({ queryKey: ['email-stats'] });
