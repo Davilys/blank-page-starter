@@ -165,6 +165,10 @@ export function EmailView({ email, onBack, onReply, onForward, onUseDraftFromAI 
         queryClient.invalidateQueries({ queryKey: ['emails'] });
         queryClient.invalidateQueries({ queryKey: ['email-stats'] });
       });
+      // Propagate to IMAP server (fire & forget)
+      supabase.functions.invoke('update-imap-flag', {
+        body: { email_id: email.id, action: 'mark_read' },
+      }).catch(() => {});
     }
   }, [email.id, email.is_read, queryClient]);
 
@@ -195,6 +199,10 @@ export function EmailView({ email, onBack, onReply, onForward, onUseDraftFromAI 
       toast.error('Erro ao excluir email: ' + error.message);
       return;
     }
+    // Propagate to IMAP server (fire & forget)
+    supabase.functions.invoke('update-imap-flag', {
+      body: { email_id: email.id, action: 'delete' },
+    }).catch(() => {});
     toast.success('🗑️ Email excluído com sucesso');
     queryClient.invalidateQueries({ queryKey: ['emails'] });
     queryClient.invalidateQueries({ queryKey: ['email-stats'] });
@@ -216,6 +224,9 @@ export function EmailView({ email, onBack, onReply, onForward, onUseDraftFromAI 
 
   const handleMarkUnread = async () => {
     await supabase.from('email_inbox').update({ is_read: false }).eq('id', email.id);
+    supabase.functions.invoke('update-imap-flag', {
+      body: { email_id: email.id, action: 'mark_unread' },
+    }).catch(() => {});
     queryClient.invalidateQueries({ queryKey: ['emails'] });
     toast.success('Marcado como não lido');
     onBack();
