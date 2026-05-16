@@ -41,6 +41,40 @@ serve(async (req) => {
     }
   }));
 
+  // Alert: 3+ consecutive failures recorded by sync-imap-inbox
+  try {
+    const { data: bad } = await supabase
+      .from("email_sync_state")
+      .select("account_id, last_error, consecutive_errors")
+      .eq("folder", "_account")
+      .gte("consecutive_errors", 3);
+    if (bad && bad.length) {
+      const { data: admins } = await supabase
+        .from("user_roles").select("user_id").eq("role", "admin");
+      const adminIds = (admins || []).map(a => a.user_id);
+      for (const row of bad) {
+        const acc = (accounts || []).find(a => a.id === row.account_id);
+        const title = "Falha na sincronização de e-mail";
+        const message = `Conta ${acc?.email_address || row.account_id} falhou ${row.consecutive_errors}x seguidas: ${row.last_error || "erro desconhecido"}`;
+        // De-dupe: only insert one notification per account per 6h
+        const since = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+        const { data: recent } = await supabase
+          .from("notifications").select("id")
+          .eq("title", title)
+          .ilike("message", `%${acc?.email_address || row.account_id}%`)
+          .gte("created_at", since).limit(1).maybeSingle();
+        if (recent) continue;
+        for (const uid of adminIds) {
+          await supabase.from("notifications").insert({
+            user_id: uid, title, message, type: "alert",
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.error("alerting failed:", e);
+  }
+
   return new Response(JSON.stringify({ success: true, count: targets.length, results }), {
     headers: { "Content-Type": "application/json", ...corsHeaders },
   });
