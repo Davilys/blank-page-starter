@@ -36,12 +36,10 @@ interface ServiceActionPanelProps {
 
 const SALARIO_MINIMO_2025 = 1518;
 
-// Próxima segunda-feira a partir de hoje (se hoje for segunda, vai para a próxima)
-function getNextMonday(): Date {
+// Vencimento padrão: hoje + 10 dias corridos
+function getDueDateIn10Days(): Date {
   const d = new Date();
-  const day = d.getDay(); // 0=dom, 1=seg
-  const diff = ((1 - day + 7) % 7) || 7;
-  d.setDate(d.getDate() + diff);
+  d.setDate(d.getDate() + 10);
   d.setHours(12, 0, 0, 0);
   return d;
 }
@@ -62,7 +60,7 @@ Toda e qualquer publicação possui prazo de 60 (sessenta) dias corridos para o 
 
 Conforme informado no atendimento inicial e no contrato assinado, de acordo com a Cláusula 5.2 do seu contrato, o cumprimento de exigências formais constitui serviço adicional. Conforme a Cláusula 10.3, será cobrado o valor correspondente a 1 (um) salário mínimo vigente no ano da publicação, o que ocorreu em seu processo, conforme segue em anexo e publicado no Diário Oficial.
 
-Para dar continuidade ao processo, solicitamos o pagamento da taxa de serviço no valor de R$ ${fmtValor(valor)}. Vencimento: segunda-feira.
+Para dar continuidade ao processo, solicitamos o pagamento da taxa de serviço no valor de R$ ${fmtValor(valor)}. Vencimento em 10 dias.
 
 Caso queira falar com o jurídico, informe o melhor dia e horário, pois precisamos resolver isso o quanto antes.
 
@@ -83,7 +81,7 @@ function generateWhatsAppTemplate(client: ServiceActionPanelProps['client'], _st
 
 Informamos com urgência que o INPI publicou uma exigência referente ao processo da marca "${marca}"${protocolo}.
 
-O prazo para cumprimento é de 60 dias corridos, conforme publicação na RPI. Conforme informado no atendimento inicial e no contrato assinado, de acordo com a Cláusula 5.2 do seu contrato, sendo devido o valor de R$ ${fmtValor(valor)} para continuidade do processo. Vencimento: segunda-feira.
+O prazo para cumprimento é de 60 dias corridos, conforme publicação na RPI. Conforme informado no atendimento inicial e no contrato assinado, de acordo com a Cláusula 5.2 do seu contrato, sendo devido o valor de R$ ${fmtValor(valor)} para continuidade do processo. Vencimento em 10 dias.
 
 O jurídico precisa falar com você com URGÊNCIA, informe o melhor dia e horário. Assim resolveremos esta questão e sanar eventuais dúvidas.
 
@@ -214,8 +212,8 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
 
   const [sending, setSending] = useState(false);
 
-  // Vencimento sempre na próxima segunda-feira
-  const dueDate = getNextMonday();
+  // Vencimento sempre 10 dias corridos após a criação
+  const dueDate = getDueDateIn10Days();
   const dueDateStr = dueDate.toISOString().split('T')[0];
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -625,7 +623,7 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
           {/* Due date info */}
           <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
             <CreditCard className="h-3.5 w-3.5" />
-            <span>Vencimento: <strong>{dueDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</strong> (próxima segunda-feira)</span>
+            <span>Vencimento: <strong>{dueDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</strong> (10 dias corridos)</span>
           </div>
         </div>
         )}
