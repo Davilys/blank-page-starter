@@ -693,6 +693,27 @@ Deno.serve(async (req) => {
       return json({ success: true, updated });
     }
 
+    // ────────────── EXCLUDE DEBTOR (manual remove from list) ──────────────
+    if (action === "exclude-debtor") {
+      const body = bodyJson || (await req.json().catch(() => ({})));
+      const { cliente_cpf_cnpj, asaas_customer_id, bucket } = body || {};
+      if (!bucket || (bucket !== "d30" && bucket !== "d60")) {
+        return json({ error: "bucket inválido (d30 ou d60)" }, 400);
+      }
+      if (!asaas_customer_id && !cliente_cpf_cnpj) {
+        return json({ error: "asaas_customer_id ou cliente_cpf_cnpj obrigatório" }, 400);
+      }
+      let q = admin.from("cobrancas_vencidas")
+        .update({ status: "excluido_manual", updated_at: new Date().toISOString() })
+        .eq("status", "pendente_renegociacao")
+        .eq("bucket", bucket);
+      if (cliente_cpf_cnpj) q = q.eq("cliente_cpf_cnpj", cliente_cpf_cnpj);
+      else q = q.eq("asaas_customer_id", asaas_customer_id);
+      const { error, count } = await q.select("id", { count: "exact" });
+      if (error) throw error;
+      return json({ success: true, updated: count ?? 0 });
+    }
+
     // ────────────── TEST CONNECTION ──────────────
     if (action === "test-connection") {
       const me = await asaas(`/myAccount`);
