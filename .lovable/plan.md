@@ -1,11 +1,12 @@
-# Botão de excluir em Devedores 30 e 60 dias
+# Vencimento de cobrança no ficheiro do cliente: 10 dias corridos
 
-Replicar o botão de remover (lixeira) que existe na aba "Vencidos até 30 dias" também nas listas de Devedores +30 dias e Devedores +60 dias.
+## Objetivo
+Ao criar uma cobrança pela aba "Serviços" (ficheiro do cliente), o vencimento deve ser sempre **hoje + 10 dias corridos**, em vez da próxima segunda-feira.
 
-## Backend
-- `supabase/functions/asaas-debtors-api/index.ts`: nova ação `exclude-debtor` que recebe `asaas_customer_id`, `cliente_cpf_cnpj` e `bucket` (`d30` ou `d60`) e atualiza `cobrancas_vencidas` para `status = 'excluido_manual'` (some das listas que filtram `pendente_renegociacao`).
+## Alterações
+- `src/components/admin/clients/ServiceActionPanel.tsx`
+  - Substituir a função `getNextMonday()` por `getDueDateIn10Days()` que retorna `new Date()` somado de 10 dias corridos.
+  - Atualizar `const dueDate = getNextMonday()` para usar a nova função.
+  - Atualizar qualquer texto/label que mencione "próxima segunda-feira" para "vencimento em 10 dias", se existir.
 
-## Frontend
-- `src/pages/admin/Devedores.tsx`:
-  - Estado `deletingKey` e função `excluir(debtor, bucket)` com confirmação.
-  - Novo botão lixeira nas colunas de Ação das abas `lista` (60d) e `devedor` (30d).
+Nenhuma outra tela é afetada (CreateInvoiceDialog continua usando data manual).
