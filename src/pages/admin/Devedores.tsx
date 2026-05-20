@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, RefreshCw, Loader2, Zap, AlertTriangle, Users, DollarSign, TrendingUp, Search, Mail, MessageCircle } from "lucide-react";
+import { ArrowLeft, RefreshCw, Loader2, Zap, AlertTriangle, Users, DollarSign, TrendingUp, Search, Mail, MessageCircle, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ClientWithProcess } from "@/components/admin/clients/ClientKanbanBoard";
@@ -112,6 +112,26 @@ export default function Devedores({ embedded = false, forceTab }: DevedoresProps
   const [dateFilter, setDateFilter] = useState<DateFilterType>("all");
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [resending, setResending] = useState<string | null>(null);
+  const [deletingKey, setDeletingKey] = useState<string | null>(null);
+
+  const excluirDevedor = async (d: Debtor, bucket: 'd30' | 'd60') => {
+    if (!window.confirm(`Remover ${d.cliente_nome || 'este cliente'} da lista? As parcelas serão marcadas como excluídas.`)) return;
+    setDeletingKey(d.key);
+    try {
+      await callApi("exclude-debtor", {
+        cliente_cpf_cnpj: d.cliente_cpf_cnpj || undefined,
+        asaas_customer_id: d.asaas_customer_id,
+        bucket,
+      });
+      if (bucket === 'd30') setDebtors30((prev) => prev.filter((x) => x.key !== d.key));
+      else setDebtors((prev) => prev.filter((x) => x.key !== d.key));
+      toast.success("Removido da lista");
+    } catch (e: any) {
+      toast.error(`Falha ao remover: ${e.message}`);
+    } finally {
+      setDeletingKey(null);
+    }
+  };
 
   const buildRenegMessage = (nome: string, valor: string, dias: number, link: string) => {
     const firstName = (nome || "Cliente").split(" ")[0];
