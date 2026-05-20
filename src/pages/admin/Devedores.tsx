@@ -745,9 +745,15 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                       <TableCell className="text-right">{fmtBRL(d.total_original)}</TableCell>
                       <TableCell className="text-right font-semibold text-emerald-600">{fmtBRL(d.novo_total)}</TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <Button size="sm" onClick={() => setSelected(d)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                          Renegociar
-                        </Button>
+                        <div className="inline-flex gap-2">
+                          <Button size="sm" onClick={() => setSelected(d)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                            Renegociar
+                          </Button>
+                          <Button size="sm" variant="ghost" disabled={deletingKey !== null}
+                            onClick={() => excluirDevedor(d, 'd60')} title="Remover da lista">
+                            {deletingKey === d.key ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3 text-destructive" />}
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -798,6 +804,10 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => setSelectedCob(d)}>
                             Cobrar
+                          </Button>
+                          <Button size="sm" variant="ghost" disabled={deletingKey !== null}
+                            onClick={() => excluirDevedor(d, 'd30')} title="Remover da lista">
+                            {deletingKey === d.key ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3 text-destructive" />}
                           </Button>
                         </div>
                       </TableCell>
