@@ -156,6 +156,7 @@ Deno.serve(async (req) => {
       let total = 0;
       let kept = 0;
       let skipped_finalized = 0;
+      let skipped_in_history = 0;
       const customerCache = new Map<string, any>();
       const minOverdueDays = 60;
 
@@ -177,6 +178,9 @@ Deno.serve(async (req) => {
           for (const r of existing || []) existingMap.set(r.asaas_payment_id, r.status);
         }
 
+        // Pagamentos com histórico de cobrança não devem ser ressincronizados
+        const inHistorySet = await getPaymentsWithHistory(admin, ids);
+
         for (const p of items) {
           const due = p.dueDate as string;
           if (!due) continue;
@@ -187,6 +191,11 @@ Deno.serve(async (req) => {
           if (prevStatus && prevStatus !== "pendente_renegociacao") {
             // já foi negociada/cobrada/quitada — não tocar
             skipped_finalized++;
+            continue;
+          }
+          if (!prevStatus && inHistorySet.has(p.id)) {
+            // já está no histórico de cobrança e não há linha ativa — não recriar
+            skipped_in_history++;
             continue;
           }
 
@@ -225,7 +234,7 @@ Deno.serve(async (req) => {
       // Cleanup: linhas d60 que NÃO foram tocadas neste sweep podem ter sido
       // reagendadas/quitadas no Asaas. Re-checa cada uma e remove se já não estiver vencida >60d.
       await cleanupBucket(admin, "d60", 60);
-      return json({ success: true, total_overdue: total, kept_over_60d: kept, skipped_finalized });
+      return json({ success: true, total_overdue: total, kept_over_60d: kept, skipped_finalized, skipped_in_history });
     }
 
     // ────────────── SYNC OVERDUE 30 (≤30 dias) ──────────────
@@ -235,6 +244,7 @@ Deno.serve(async (req) => {
       let total = 0;
       let kept = 0;
       let skipped_finalized = 0;
+      let skipped_in_history = 0;
       const customerCache = new Map<string, any>();
 
       while (true) {
@@ -253,6 +263,8 @@ Deno.serve(async (req) => {
           for (const r of existing || []) existingMap.set(r.asaas_payment_id, r.status);
         }
 
+        const inHistorySet = await getPaymentsWithHistory(admin, ids);
+
         for (const p of items) {
           const due = p.dueDate as string;
           if (!due) continue;
@@ -263,6 +275,10 @@ Deno.serve(async (req) => {
           const prevStatus = existingMap.get(p.id);
           if (prevStatus && prevStatus !== "pendente_renegociacao") {
             skipped_finalized++;
+            continue;
+          }
+          if (!prevStatus && inHistorySet.has(p.id)) {
+            skipped_in_history++;
             continue;
           }
 
@@ -297,7 +313,7 @@ Deno.serve(async (req) => {
       }
 
       await cleanupBucket(admin, "d30", 31, 59);
-      return json({ success: true, total_overdue: total, kept_under_30d: kept, skipped_finalized });
+      return json({ success: true, total_overdue: total, kept_under_30d: kept, skipped_finalized, skipped_in_history });
     }
 
     // ────────────── LIST GROUPED ──────────────
