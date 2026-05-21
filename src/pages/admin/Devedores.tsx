@@ -749,7 +749,7 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                       </TableCell>
                     </TableRow>
                   )}
-                  {filteredDebtors.map((d) => (
+                  {pagedDebtors60.map((d) => (
                     <TableRow
                       key={d.key}
                       onClick={() => openClientFile(d)}
