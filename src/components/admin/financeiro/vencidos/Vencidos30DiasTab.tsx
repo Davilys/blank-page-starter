@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { startOfDay, startOfWeek, startOfMonth, subDays } from "date-fns";
 import { loadClientForSheet } from "@/lib/clientSheet";
 import type { ClientWithProcess } from "@/components/admin/clients/ClientKanbanBoard";
+import { PaginationBar, type PageSize } from "@/components/admin/financeiro/PaginationBar";
 
 const ClientDetailSheet = lazy(() =>
   import("@/components/admin/clients/ClientDetailSheet").then((m) => ({ default: m.ClientDetailSheet }))
@@ -58,6 +59,8 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [openClient, setOpenClient] = useState<ClientWithProcess | null>(null);
   const [loadingClient, setLoadingClient] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSize>(10);
 
   const openClientFile = async (userId: string | null | undefined) => {
     if (!userId) { toast.error("Cliente sem perfil vinculado"); return; }
@@ -193,6 +196,12 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
   }, [invoices, period, search, history]);
 
   const total = filtered.reduce((s, i) => s + Number(i.amount || 0), 0);
+  useEffect(() => { setPage(1); }, [search, period, pageSize, filtered.length]);
+  const pagedRows = useMemo(() => {
+    if (pageSize === "all") return filtered;
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
   const recentByInvoice = useMemo(() => {
     const map = new Map<string, CobrancaHist>();
     for (const h of history) if (!map.has(h.invoice_id)) map.set(h.invoice_id, h);
@@ -245,7 +254,7 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
               <TableRow><TableCell colSpan={7} className="text-center py-10"><Loader2 className="h-5 w-5 animate-spin mx-auto" /></TableCell></TableRow>
             ) : filtered.length === 0 ? (
               <TableRow><TableCell colSpan={7} className="text-center py-10 text-muted-foreground">Nenhuma fatura vencida no período</TableCell></TableRow>
-            ) : filtered.map((inv) => {
+            ) : pagedRows.map((inv) => {
               const last = recentByInvoice.get(inv.id);
               const dias = daysAgo(inv.due_date);
               return (
@@ -313,6 +322,13 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
           </TableBody>
         </Table>
       </div>
+      <PaginationBar
+        page={page}
+        pageSize={pageSize}
+        total={filtered.length}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
       </>
       ) : (
         <div className="border rounded-md overflow-auto max-h-[calc(100vh-340px)]">

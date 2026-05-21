@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import type { ClientWithProcess } from "@/components/admin/clients/ClientKanbanB
 import { loadClientForSheet } from "@/lib/clientSheet";
 import { DatePeriodFilter, type DateFilterType } from "@/components/admin/clients/DatePeriodFilter";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import { PaginationBar, type PageSize } from "@/components/admin/financeiro/PaginationBar";
 
 const ClientDetailSheet = lazy(() =>
   import("@/components/admin/clients/ClientDetailSheet").then((m) => ({ default: m.ClientDetailSheet }))
@@ -113,6 +114,10 @@ export default function Devedores({ embedded = false, forceTab }: DevedoresProps
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [resending, setResending] = useState<string | null>(null);
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
+  const [page60, setPage60] = useState(1);
+  const [pageSize60, setPageSize60] = useState<PageSize>(10);
+  const [page30, setPage30] = useState(1);
+  const [pageSize30, setPageSize30] = useState<PageSize>(10);
 
   const excluirDevedor = async (d: Debtor, bucket: 'd30' | 'd60') => {
     if (!window.confirm(`Remover ${d.cliente_nome || 'este cliente'} da lista? As parcelas serão marcadas como excluídas.`)) return;
@@ -551,6 +556,19 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
   const totalOriginal30 = filteredDebtors30.reduce((s, d) => s + d.total_original, 0);
   const totalComAcrescimo30 = filteredDebtors30.reduce((s, d) => s + d.novo_total, 0);
 
+  useEffect(() => { setPage60(1); }, [searchTerm, dateFilter, selectedMonth, pageSize60, totalDevedores]);
+  useEffect(() => { setPage30(1); }, [searchTerm, dateFilter, selectedMonth, pageSize30, totalDevedores30]);
+  const pagedDebtors60 = useMemo(() => {
+    if (pageSize60 === "all") return filteredDebtors;
+    const start = (page60 - 1) * pageSize60;
+    return filteredDebtors.slice(start, start + pageSize60);
+  }, [filteredDebtors, page60, pageSize60]);
+  const pagedDebtors30 = useMemo(() => {
+    if (pageSize30 === "all") return filteredDebtors30;
+    const start = (page30 - 1) * pageSize30;
+    return filteredDebtors30.slice(start, start + pageSize30);
+  }, [filteredDebtors30, page30, pageSize30]);
+
   const [activeTab, setActiveTab] = useState<string>(forceTab ?? "lista");
   const effectiveTab = forceTab ?? activeTab;
   const is30Group = effectiveTab === "devedor" || effectiveTab === "historico-devedor";
@@ -731,7 +749,7 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                       </TableCell>
                     </TableRow>
                   )}
-                  {filteredDebtors.map((d) => (
+                  {pagedDebtors60.map((d) => (
                     <TableRow
                       key={d.key}
                       onClick={() => openClientFile(d)}
@@ -764,6 +782,13 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                   ))}
                 </TableBody>
               </Table>
+              <PaginationBar
+                page={page60}
+                pageSize={pageSize60}
+                total={totalDevedores}
+                onPageChange={setPage60}
+                onPageSizeChange={setPageSize60}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -790,7 +815,7 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                       </TableCell>
                     </TableRow>
                   )}
-                  {filteredDebtors30.map((d) => (
+                  {pagedDebtors30.map((d) => (
                     <TableRow key={d.key} onClick={() => openClientFile(d)} className="cursor-pointer">
                       <TableCell className="font-medium">
                         <span className="inline-flex items-center gap-2 hover:text-primary hover:underline transition-colors">
@@ -820,6 +845,13 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                   ))}
                 </TableBody>
               </Table>
+              <PaginationBar
+                page={page30}
+                pageSize={pageSize30}
+                total={totalDevedores30}
+                onPageChange={setPage30}
+                onPageSizeChange={setPageSize30}
+              />
             </CardContent>
           </Card>
         </TabsContent>
