@@ -78,6 +78,41 @@ function round2(n: number): number {
  * para o futuro, paga ou cancelada — ou seja, não esteja mais vencida na faixa esperada.
  */
 async function cleanupBucket(admin: any, bucket: "d30" | "d60", minDays: number, maxDays?: number) {
+  return _cleanupBucketImpl(admin, bucket, minDays, maxDays);
+}
+
+/**
+ * Retorna um Set de asaas_payment_id que já possuem qualquer registro em
+ * cobranca_historico (cobrança enviada / em acordo / aguardando). Esses pagamentos
+ * NÃO devem ser ressincronizados como devedores em cobrancas_vencidas.
+ */
+async function getPaymentsWithHistory(admin: any, asaasPaymentIds: string[]): Promise<Set<string>> {
+  const result = new Set<string>();
+  if (!asaasPaymentIds || asaasPaymentIds.length === 0) return result;
+  try {
+    const { data: invs } = await admin
+      .from("invoices")
+      .select("id, asaas_invoice_id")
+      .in("asaas_invoice_id", asaasPaymentIds);
+    if (!invs || invs.length === 0) return result;
+    const invoiceIds = invs.map((r: any) => r.id);
+    const { data: hist } = await admin
+      .from("cobranca_historico")
+      .select("invoice_id")
+      .in("invoice_id", invoiceIds);
+    const withHistory = new Set((hist || []).map((h: any) => h.invoice_id));
+    for (const inv of invs) {
+      if (withHistory.has(inv.id) && inv.asaas_invoice_id) {
+        result.add(inv.asaas_invoice_id);
+      }
+    }
+  } catch (e) {
+    console.warn("getPaymentsWithHistory failed", e);
+  }
+  return result;
+}
+
+async function _cleanupBucketImpl(admin: any, bucket: "d30" | "d60", minDays: number, maxDays?: number) {
   const { data: rows } = await admin
     .from("cobrancas_vencidas")
     .select("asaas_payment_id")
