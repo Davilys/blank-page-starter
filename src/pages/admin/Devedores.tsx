@@ -125,7 +125,7 @@ export default function Devedores({ embedded = false, forceTab }: DevedoresProps
       });
       if ((res?.updated ?? 0) === 0) {
         toast.warning(res?.reason || "Nenhuma parcela foi removida — atualizando lista");
-        await load();
+        await fetchDebtors();
       } else {
         if (bucket === 'd30') setDebtors30((prev) => prev.filter((x) => x.key !== d.key));
         else setDebtors((prev) => prev.filter((x) => x.key !== d.key));
