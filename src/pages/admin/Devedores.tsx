@@ -845,6 +845,13 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                   ))}
                 </TableBody>
               </Table>
+              <PaginationBar
+                page={page30}
+                pageSize={pageSize30}
+                total={totalDevedores30}
+                onPageChange={setPage30}
+                onPageSizeChange={setPageSize30}
+              />
             </CardContent>
           </Card>
         </TabsContent>
