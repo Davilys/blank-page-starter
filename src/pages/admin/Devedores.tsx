@@ -556,6 +556,19 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
   const totalOriginal30 = filteredDebtors30.reduce((s, d) => s + d.total_original, 0);
   const totalComAcrescimo30 = filteredDebtors30.reduce((s, d) => s + d.novo_total, 0);
 
+  useEffect(() => { setPage60(1); }, [searchTerm, dateFilter, selectedMonth, pageSize60, totalDevedores]);
+  useEffect(() => { setPage30(1); }, [searchTerm, dateFilter, selectedMonth, pageSize30, totalDevedores30]);
+  const pagedDebtors60 = useMemo(() => {
+    if (pageSize60 === "all") return filteredDebtors;
+    const start = (page60 - 1) * pageSize60;
+    return filteredDebtors.slice(start, start + pageSize60);
+  }, [filteredDebtors, page60, pageSize60]);
+  const pagedDebtors30 = useMemo(() => {
+    if (pageSize30 === "all") return filteredDebtors30;
+    const start = (page30 - 1) * pageSize30;
+    return filteredDebtors30.slice(start, start + pageSize30);
+  }, [filteredDebtors30, page30, pageSize30]);
+
   const [activeTab, setActiveTab] = useState<string>(forceTab ?? "lista");
   const effectiveTab = forceTab ?? activeTab;
   const is30Group = effectiveTab === "devedor" || effectiveTab === "historico-devedor";
