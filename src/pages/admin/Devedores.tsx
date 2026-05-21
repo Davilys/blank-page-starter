@@ -118,14 +118,19 @@ export default function Devedores({ embedded = false, forceTab }: DevedoresProps
     if (!window.confirm(`Remover ${d.cliente_nome || 'este cliente'} da lista? As parcelas serão marcadas como excluídas.`)) return;
     setDeletingKey(d.key);
     try {
-      await callApi("exclude-debtor", {
+      const res = await callApi("exclude-debtor", {
         cliente_cpf_cnpj: d.cliente_cpf_cnpj || undefined,
         asaas_customer_id: d.asaas_customer_id,
         bucket,
       });
-      if (bucket === 'd30') setDebtors30((prev) => prev.filter((x) => x.key !== d.key));
-      else setDebtors((prev) => prev.filter((x) => x.key !== d.key));
-      toast.success("Removido da lista");
+      if ((res?.updated ?? 0) === 0) {
+        toast.warning(res?.reason || "Nenhuma parcela foi removida — atualizando lista");
+        await fetchDebtors();
+      } else {
+        if (bucket === 'd30') setDebtors30((prev) => prev.filter((x) => x.key !== d.key));
+        else setDebtors((prev) => prev.filter((x) => x.key !== d.key));
+        toast.success(`Removido da lista (${res.updated} parcela${res.updated > 1 ? 's' : ''})`);
+      }
     } catch (e: any) {
       toast.error(`Falha ao remover: ${e.message}`);
     } finally {

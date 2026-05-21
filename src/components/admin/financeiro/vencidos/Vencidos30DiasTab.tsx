@@ -149,11 +149,17 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
     if (!window.confirm("Remover esta fatura da lista de vencidos? Ela será marcada como cancelada.")) return;
     setDeletingId(invoice_id);
     try {
-      const { error } = await supabase
+      // Fetch asaas_invoice_id to also clear cobrancas_vencidas
+      const { data: inv } = await supabase
         .from("invoices")
-        .update({ status: "cancelled", updated_at: new Date().toISOString() })
-        .eq("id", invoice_id);
+        .select("asaas_invoice_id")
+        .eq("id", invoice_id)
+        .maybeSingle();
+      const { data, error } = await supabase.functions.invoke("asaas-debtors-api", {
+        body: { action: "exclude-invoice", invoice_id, asaas_payment_id: inv?.asaas_invoice_id || null },
+      });
       if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
       setInvoices((prev) => prev.filter((i) => i.id !== invoice_id));
       toast.success("Fatura removida da lista");
     } catch (e: any) {
