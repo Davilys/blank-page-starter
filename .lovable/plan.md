@@ -1,30 +1,26 @@
-# Corrigir botão "Excluir" nas três abas de devedores
+# Não ressincronizar devedores que já estão no histórico
 
 ## Problema
-Nas abas **Vencidos até 30 dias**, **Devedores +30 dias** e **Devedores +60 dias**, o ícone da lixeira não remove o registro. O clique aparenta não ter efeito.
+Ao rodar "Sincronizar Asaas" nas abas 30 dias / +30 dias / +60 dias, devedores que já tiveram cobrança enviada ou acordo registrado (presentes em `cobranca_historico`) voltam a aparecer porque o Asaas ainda os marca como OVERDUE.
 
-## Diagnóstico
-- A ação `exclude-debtor` em `supabase/functions/asaas-debtors-api/index.ts` usa `.update(...).select("id", { count: "exact" })`. A opção `count` no `.select()` encadeado após `update` não é confiável no supabase-js — em vários casos retorna `null` e, em outros, falha silenciosamente, sem afetar linhas. Não há `console.log` nem retorno detalhado para diagnosticar.
-- A função filtra `status = 'pendente_renegociacao'` rígido, mas quando o cliente tem apenas `asaas_customer_id` (sem CPF/CNPJ na linha) o filtro `cliente_cpf_cnpj` torna a query vazia.
-- Na aba "Vencidos até 30 dias", o `Vencidos30DiasTab.excluir` atualiza `invoices.status = 'cancelled'` direto via RLS. Funciona, mas se a fatura voltar do Asaas no próximo sync ela reaparece — precisa de marcador permanente.
+## Regra de negócio
+Se um pagamento já possui qualquer registro em `cobranca_historico` (independente do canal ou status), ele NÃO deve ser reinserido em `cobrancas_vencidas` durante a sincronização — significa que já foi tratado (cobrado, em acordo, ou aguardando próxima ação).
 
-## Alterações
+## Mudanças
 
-### `supabase/functions/asaas-debtors-api/index.ts` (ação `exclude-debtor`)
-- Buscar (`select id`) as linhas-alvo **antes** do update, com filtro OR `(cliente_cpf_cnpj = X OR asaas_customer_id = Y)` quando ambos forem enviados.
-- Aplicar `update({ status: 'excluido_manual' }).in('id', ids).select('id')` e retornar `updated: data.length`.
-- Adicionar `console.log` de entrada/saída e devolver mensagem clara quando `ids.length === 0` (HTTP 200 com `updated: 0` + `reason`).
+### `supabase/functions/asaas-debtors-api/index.ts`
+Nas actions `sync-overdue` (bucket d60) e `sync-overdue-30` (bucket d30):
 
-### `src/pages/admin/Devedores.tsx`
-- Após `callApi("exclude-debtor", ...)`, se `updated === 0`, mostrar `toast.warning` em vez de remover otimisticamente da lista, e disparar `load()` para reconciliar.
-- Manter remoção otimista quando `updated > 0`.
+1. Para cada página retornada do Asaas, montar a lista de `asaas_payment_id`.
+2. Buscar em `invoices` os pares `(asaas_invoice_id, id)` correspondentes a esses IDs.
+3. Buscar em `cobranca_historico` quais `invoice_id` (da etapa 2) já têm histórico.
+4. Criar um `Set<asaas_payment_id>` dos que já estão no histórico.
+5. No loop de itens: se o `p.id` está nesse Set E ainda não existe linha em `cobrancas_vencidas` para ele, pular (incrementar contador `skipped_in_history`). Se já existe linha, manter o comportamento atual (não regredir status).
+6. Retornar `skipped_in_history` na resposta para diagnóstico.
 
-### `src/components/admin/financeiro/vencidos/Vencidos30DiasTab.tsx`
-- Trocar o update direto por chamada à ação `exclude-invoice` (nova) na mesma edge function, garantindo idempotência e log central.
-- Nova ação `exclude-invoice` em `asaas-debtors-api/index.ts`: marca `invoices.status = 'cancelled'` **e** insere/atualiza linha em `cobrancas_vencidas` (se existir) para `excluido_manual`, evitando reaparição após sync.
+A lógica de upsert atual continua aplicável apenas para pagamentos genuinamente novos (sem histórico e sem linha anterior).
 
-## Validação
-1. `supabase--curl_edge_functions` com `action=exclude-debtor` e payload de um devedor real (consulta prévia via `supabase--read_query`) — esperar `{ success: true, updated: N>0 }`.
-2. Repetir para `exclude-invoice` com uma fatura vencida real.
-3. Conferir nos logs da edge function as linhas de `console.log`.
-4. Recarregar a UI e confirmar que o registro some das três abas.
+## Detalhes técnicos
+- Join lógico: `invoices.asaas_invoice_id = p.id` → pega `invoices.id` → consulta `cobranca_historico.invoice_id IN (...)`.
+- Faturas sem `invoices.asaas_invoice_id` (cobranças avulsas do Asaas que nunca viraram invoice local) seguem fluxo atual — não há histórico possível a verificar.
+- Sem mudanças no frontend nem em outras tabelas.
