@@ -808,7 +808,7 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                       </TableCell>
                     </TableRow>
                   )}
-                  {filteredDebtors30.map((d) => (
+                  {pagedDebtors30.map((d) => (
                     <TableRow key={d.key} onClick={() => openClientFile(d)} className="cursor-pointer">
                       <TableCell className="font-medium">
                         <span className="inline-flex items-center gap-2 hover:text-primary hover:underline transition-colors">
