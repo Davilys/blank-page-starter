@@ -798,7 +798,7 @@ Deno.serve(async (req) => {
       let invErr: any = null;
       if (invoice_id) {
         const { error } = await admin.from("invoices")
-          .update({ status: "cancelled", updated_at: new Date().toISOString() })
+          .update({ status: "canceled", updated_at: new Date().toISOString() })
           .eq("id", invoice_id);
         invErr = error;
       }
