@@ -697,21 +697,71 @@ Deno.serve(async (req) => {
     if (action === "exclude-debtor") {
       const body = bodyJson || (await req.json().catch(() => ({})));
       const { cliente_cpf_cnpj, asaas_customer_id, bucket } = body || {};
+      console.log("[exclude-debtor] input", { cliente_cpf_cnpj, asaas_customer_id, bucket });
       if (!bucket || (bucket !== "d30" && bucket !== "d60")) {
         return json({ error: "bucket inválido (d30 ou d60)" }, 400);
       }
       if (!asaas_customer_id && !cliente_cpf_cnpj) {
         return json({ error: "asaas_customer_id ou cliente_cpf_cnpj obrigatório" }, 400);
       }
-      let q = admin.from("cobrancas_vencidas")
-        .update({ status: "excluido_manual", updated_at: new Date().toISOString() })
+      // 1) Find target rows using OR filter when both identifiers are present
+      const orClauses: string[] = [];
+      if (cliente_cpf_cnpj) orClauses.push(`cliente_cpf_cnpj.eq.${cliente_cpf_cnpj}`);
+      if (asaas_customer_id) orClauses.push(`asaas_customer_id.eq.${asaas_customer_id}`);
+      const { data: rows, error: selErr } = await admin
+        .from("cobrancas_vencidas")
+        .select("id")
         .eq("status", "pendente_renegociacao")
-        .eq("bucket", bucket);
-      if (cliente_cpf_cnpj) q = q.eq("cliente_cpf_cnpj", cliente_cpf_cnpj);
-      else q = q.eq("asaas_customer_id", asaas_customer_id);
-      const { error, count } = await q.select("id", { count: "exact" });
-      if (error) throw error;
-      return json({ success: true, updated: count ?? 0 });
+        .eq("bucket", bucket)
+        .or(orClauses.join(","));
+      if (selErr) {
+        console.error("[exclude-debtor] select error", selErr);
+        throw selErr;
+      }
+      const ids = (rows || []).map((r: any) => r.id);
+      console.log("[exclude-debtor] matched ids", ids.length);
+      if (ids.length === 0) {
+        return json({ success: true, updated: 0, reason: "Nenhuma parcela pendente para este cliente neste bucket" });
+      }
+      const { data: upd, error: updErr } = await admin
+        .from("cobrancas_vencidas")
+        .update({ status: "excluido_manual", updated_at: new Date().toISOString() })
+        .in("id", ids)
+        .select("id");
+      if (updErr) {
+        console.error("[exclude-debtor] update error", updErr);
+        throw updErr;
+      }
+      console.log("[exclude-debtor] updated", upd?.length ?? 0);
+      return json({ success: true, updated: upd?.length ?? 0 });
+    }
+
+    // ────────────── EXCLUDE INVOICE (manual remove from overdue list) ──────────────
+    if (action === "exclude-invoice") {
+      const body = bodyJson || (await req.json().catch(() => ({})));
+      const { invoice_id, asaas_payment_id } = body || {};
+      console.log("[exclude-invoice] input", { invoice_id, asaas_payment_id });
+      if (!invoice_id && !asaas_payment_id) {
+        return json({ error: "invoice_id ou asaas_payment_id obrigatório" }, 400);
+      }
+      let invErr: any = null;
+      if (invoice_id) {
+        const { error } = await admin.from("invoices")
+          .update({ status: "cancelled", updated_at: new Date().toISOString() })
+          .eq("id", invoice_id);
+        invErr = error;
+      }
+      if (invErr) {
+        console.error("[exclude-invoice] invoice update error", invErr);
+        throw invErr;
+      }
+      // Also mark the matching cobranca row to keep it from reappearing after sync
+      if (asaas_payment_id) {
+        await admin.from("cobrancas_vencidas")
+          .update({ status: "excluido_manual", updated_at: new Date().toISOString() })
+          .eq("asaas_payment_id", asaas_payment_id);
+      }
+      return json({ success: true });
     }
 
     // ────────────── TEST CONNECTION ──────────────
