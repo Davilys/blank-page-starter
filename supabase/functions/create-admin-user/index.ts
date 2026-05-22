@@ -40,15 +40,29 @@ serve(async (req) => {
     if (authError) {
       // If user already exists, find them and promote to admin
       if (authError.message?.includes('already been registered')) {
-        const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-        if (listError) throw listError;
-
-        const existingUser = users?.find(u => u.email === email);
-        if (!existingUser) {
-          throw new Error('Usuário não encontrado após verificação de duplicidade.');
+        // Primary lookup: profiles table by email (fast, indexed)
+        let foundId: string | null = null;
+        const { data: profileRow } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .ilike('email', email)
+          .maybeSingle();
+        if (profileRow?.id) {
+          foundId = profileRow.id;
+        } else {
+          // Fallback: paginate auth.admin.listUsers (default page returns only 50)
+          for (let page = 1; page <= 50 && !foundId; page++) {
+            const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+            if (listError) throw listError;
+            const match = data?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
+            if (match) foundId = match.id;
+            if (!data?.users || data.users.length < 1000) break;
+          }
         }
-
-        userId = existingUser.id;
+        if (!foundId) {
+          throw new Error('Usuário já registrado mas não foi possível localizá-lo. Contate o suporte.');
+        }
+        userId = foundId;
 
         // Update password for existing user so the new admin password works
         const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
