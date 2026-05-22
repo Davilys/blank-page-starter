@@ -67,16 +67,18 @@ export default function Emails() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const isMobile = useIsMobile();
-  const { isMasterAdmin, userId } = useAdminPermissions();
+  const { isMasterAdmin, userId, hasPermission } = useAdminPermissions();
+  const canSeeAllEmails = isMasterAdmin || hasPermission('emails', 'can_view');
 
   // Fetch email accounts for current user
   const { data: emailAccounts = [] } = useQuery({
-    queryKey: ['email-accounts-list', userId, isMasterAdmin],
+    queryKey: ['email-accounts-list', userId, canSeeAllEmails],
     queryFn: async () => {
       if (!userId) return [];
       let query = supabase.from('email_accounts').select('id, email_address, display_name, assigned_to');
-      // Admin master sees all, others see only assigned
-      if (!isMasterAdmin) {
+      // Master admin OR admins with 'emails' permission see all accounts.
+      // Others see only accounts assigned to them.
+      if (!canSeeAllEmails) {
         query = query.eq('assigned_to', userId);
       }
       const { data, error } = await query.order('email_address');
