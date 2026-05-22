@@ -51,9 +51,16 @@ serve(async (req) => {
       throw new Error("Administrador master não pode ser excluído");
     }
 
+    // Clean dependent rows first (idempotent)
+    await supabaseAdmin.from("admin_permissions").delete().eq("user_id", userId);
+    await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
+    await supabaseAdmin.from("profiles").delete().eq("id", userId);
+
     // Delete from auth.users
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
-    if (deleteError) throw deleteError;
+    if (deleteError) {
+      throw new Error(`Falha ao excluir usuário do auth: ${deleteError.message}`);
+    }
 
     return new Response(
       JSON.stringify({ success: true }),
