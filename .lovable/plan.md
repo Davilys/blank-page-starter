@@ -1,30 +1,38 @@
-# Paginação 10 por página com opção "Todos" nas listas de vencidos
+## Diagnóstico
 
-## Objetivo
-Nas três abas — **Vencidos até 30 dias**, **Devedores +30 dias** e **Devedores +60 dias** — mostrar a lista de clientes em páginas de 10 itens, com um seletor permitindo ao usuário escolher: 10 (padrão), 25, 50 ou Todos.
+Reproduzi o erro chamando a edge function `create-admin-user` com `joao@webmarcas.net`. Ela retorna:
 
-## Mudanças
+> "Usuário não encontrado após verificação de duplicidade."
 
-### 1. `src/components/admin/financeiro/vencidos/Vencidos30DiasTab.tsx` (aba Vencidos até 30 dias)
-- Adicionar estados `page` (1) e `pageSize` (10, valor "all" representa todos).
-- Derivar `pagedRows` a partir da lista filtrada.
-- Reset de `page = 1` quando filtros (busca, período) ou `pageSize` mudam.
-- Abaixo da tabela, renderizar barra de paginação:
-  - Esquerda: texto "Mostrando X–Y de N".
-  - Centro: `Select` com opções 10 / 25 / 50 / Todos.
-  - Direita: botões Anterior / Próximo + indicador "Página A de B" (oculto quando "Todos").
+O que acontece hoje:
 
-### 2. `src/pages/admin/Devedores.tsx` (abas Devedores +30 e +60 dias)
-- Adicionar dois pares de estados independentes (60d e 30d): `page60`/`pageSize60` e `page30`/`pageSize30`.
-- Aplicar paginação sobre `filteredDebtors` (60d) e `filteredDebtors30` (30d).
-- Resetar página para 1 ao mudar busca, período ou `pageSize`.
-- Inserir a mesma barra de paginação ao final de cada `TabsContent="lista"` e `TabsContent="devedor"`.
-- Histórico mantém comportamento atual (não pedido).
+1. Ao tentar excluir o admin antes, a função `delete-auth-user` falhou silenciosamente — o frontend (`SecuritySettings.tsx` linha 148) chama `supabase.functions.invoke('delete-auth-user', ...)` **sem checar o erro**. Só o `user_roles` e o `admin_permissions` foram apagados; o usuário continuou em `auth.users` (confirmado: `joao@webmarcas.net` ainda existe lá, e o `profiles` continua com o registro).
+2. Ao recriar, `create-admin-user` chama `createUser`, recebe "already been registered", e tenta achar o usuário com `auth.admin.listUsers()`. Esse método retorna apenas a **primeira página (50 usuários)** por padrão — como o João não está na primeira página, `existingUser` fica `undefined` e a função lança o erro.
 
-### 3. Componente compartilhado
-Criar `src/components/admin/financeiro/PaginationBar.tsx` recebendo `page`, `pageSize`, `total`, `onPageChange`, `onPageSizeChange`. Reutilizado nos três pontos.
+## Correções
 
-## Detalhes técnicos
-- `pageSize` é `number | "all"`. Quando `"all"`, exibe todos os itens e oculta navegação.
-- Cards de resumo (totais) continuam baseados na lista filtrada completa, não na página atual.
-- Sem mudanças no backend, edge functions, RLS ou schema.
+### 1. `supabase/functions/create-admin-user/index.ts`
+Substituir a busca por `listUsers()` (que só vê a 1ª página) por uma busca confiável:
+- Primeiro: consultar `public.profiles` por `email` para pegar o `id`.
+- Fallback: paginar `listUsers({ page, perPage: 1000 })` até encontrar.
+- Se mesmo assim não achar, lançar mensagem clara.
+
+### 2. `supabase/functions/delete-auth-user/index.ts`
+Antes do `auth.admin.deleteUser`, garantir limpeza de dependências em ordem segura (idempotente):
+- `admin_permissions` por `user_id`
+- `user_roles` por `user_id`
+- `profiles` por `id`
+- Depois `auth.admin.deleteUser(userId)`; se retornar erro, propagar com mensagem detalhada (não engolir).
+
+### 3. `src/components/admin/settings/SecuritySettings.tsx`
+Na mutation `deleteAdminMutation` (linhas 132-149):
+- Capturar `{ data, error }` do `supabase.functions.invoke('delete-auth-user', …)` e lançar erro se falhar, para o toast mostrar o problema real em vez de "sucesso" enganoso.
+- Mover a limpeza de `admin_permissions`/`profiles` para dentro da edge function (passo 2) e simplificar o frontend para apenas invocar `delete-auth-user` (ela já cuida de tudo).
+
+### 4. Limpeza pontual do João
+Como o registro está órfão, depois de aplicado o fix a UI permitirá recriar. Alternativamente, executar uma migração única para deletar `auth.users` + `profiles` do `joao@webmarcas.net` antes do recadastro — incluo isso na implementação para destravar o caso imediato.
+
+## Resultado esperado
+- Excluir admin remove de fato o usuário do `auth.users`, permitindo recriação com o mesmo e-mail.
+- Se a exclusão falhar por qualquer motivo, o toast mostra o erro real.
+- Recriar um admin com e-mail já existente (caso usuário cliente, por exemplo) funciona mesmo com base grande de usuários (não depende mais da 1ª página do `listUsers`).

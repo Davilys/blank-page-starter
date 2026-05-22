@@ -144,16 +144,17 @@ export function SecuritySettings() {
 
       // If user has NO client role, delete profile and auth user entirely
       if (!clientRole) {
-        await supabase.from('profiles').delete().eq('id', userId);
-        await supabase.functions.invoke('delete-auth-user', { body: { userId } });
+        const { data, error: fnError } = await supabase.functions.invoke('delete-auth-user', { body: { userId } });
+        if (fnError) throw new Error(fnError.message || 'Erro ao excluir usuário do auth');
+        if (data?.error) throw new Error(data.error);
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       toast.success('Acesso de administrador removido!');
     },
-    onError: () => {
-      toast.error('Erro ao remover administrador');
+    onError: (err: Error) => {
+      toast.error(err.message || 'Erro ao remover administrador');
     },
   });
 
