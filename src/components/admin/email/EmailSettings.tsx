@@ -11,6 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Settings, Mail, Server, Check, Loader2, AlertCircle, Wifi, User } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 
 const MASTER_EMAIL = 'davillys@gmail.com';
 
@@ -61,6 +62,8 @@ export function EmailSettings() {
   });
 
   const isMaster = currentUser?.email === MASTER_EMAIL;
+  const { hasPermission } = useAdminPermissions();
+  const canSeeAllEmails = isMaster || hasPermission('emails', 'can_view');
 
   // Fetch admin users
   const { data: admins } = useQuery({
@@ -85,15 +88,15 @@ export function EmailSettings() {
 
   // Fetch email accounts (filtered by permission)
   const { data: accounts, isLoading } = useQuery({
-    queryKey: ['email-accounts', currentUser?.id, isMaster],
+    queryKey: ['email-accounts', currentUser?.id, canSeeAllEmails],
     queryFn: async () => {
       let query = supabase
         .from('email_accounts')
         .select('*')
         .order('created_at', { ascending: false });
 
-      // Non-master admins only see their assigned accounts
-      if (!isMaster && currentUser?.id) {
+      // Master OR admins with 'emails' permission see all; others see only assigned
+      if (!canSeeAllEmails && currentUser?.id) {
         query = query.eq('assigned_to', currentUser.id);
       }
 
