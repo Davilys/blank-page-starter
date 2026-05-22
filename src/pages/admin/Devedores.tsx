@@ -660,6 +660,18 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
       </div>
       )}
 
+      {embedded && (
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={fetchDebtors} disabled={loading} className="gap-2">
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Atualizar
+          </Button>
+          <Button size="sm" onClick={handleSync} disabled={syncing} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+            {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+            {syncing ? "Sincronizando..." : "Sincronizar com Asaas"}
+          </Button>
+        </div>
+      )}
+
       <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
         {is30Group ? (
           <>
