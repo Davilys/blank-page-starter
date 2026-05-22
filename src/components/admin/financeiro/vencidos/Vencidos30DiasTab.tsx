@@ -10,6 +10,7 @@ import { startOfDay, startOfWeek, startOfMonth, subDays } from "date-fns";
 import { loadClientForSheet } from "@/lib/clientSheet";
 import type { ClientWithProcess } from "@/components/admin/clients/ClientKanbanBoard";
 import { PaginationBar, type PageSize } from "@/components/admin/financeiro/PaginationBar";
+import { EditableAmountCell } from "@/components/admin/financeiro/EditableAmountCell";
 
 const ClientDetailSheet = lazy(() =>
   import("@/components/admin/clients/ClientDetailSheet").then((m) => ({ default: m.ClientDetailSheet }))
@@ -272,7 +273,22 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
                     <div className="text-xs text-muted-foreground">{inv.profiles?.phone || "sem telefone"}</div>
                   </TableCell>
                   <TableCell className="max-w-[220px]"><div className="text-sm line-clamp-1">{inv.description || "—"}</div></TableCell>
-                  <TableCell className="font-semibold text-sm">{fmtBRL(Number(inv.amount || 0))}</TableCell>
+                  <TableCell className="font-semibold text-sm">
+                    <EditableAmountCell
+                      value={Number(inv.amount || 0)}
+                      onSave={async (newValue) => {
+                        const { error } = await supabase
+                          .from("invoices")
+                          .update({ amount: newValue })
+                          .eq("id", inv.id);
+                        if (error) throw error;
+                        setInvoices((prev) =>
+                          prev.map((i) => (i.id === inv.id ? { ...i, amount: newValue } : i))
+                        );
+                        toast.success("Valor atualizado");
+                      }}
+                    />
+                  </TableCell>
                   <TableCell className="text-sm">{fmtDate(inv.due_date)}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className={dias > 30 ? "text-red-500 border-red-500/40" : "text-amber-500 border-amber-500/40"}>
