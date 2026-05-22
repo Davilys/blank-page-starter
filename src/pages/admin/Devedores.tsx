@@ -777,7 +777,7 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                               new_total: newValue,
                             });
                             toast.success("Valor atualizado");
-                            await loadDebtors();
+                            await fetchDebtors();
                           }}
                         />
                       </TableCell>
@@ -851,7 +851,7 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                               new_total: newValue,
                             });
                             toast.success("Valor atualizado");
-                            await loadDebtors();
+                            await fetchDebtors();
                           }}
                         />
                       </TableCell>
