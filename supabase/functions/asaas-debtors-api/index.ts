@@ -351,6 +351,63 @@ Deno.serve(async (req) => {
       return json({ success: true, total_overdue: total, kept_under_30d: kept, skipped_finalized, skipped_in_history });
     }
 
+    // ────────────── UPDATE DEBTOR TOTAL AMOUNT ──────────────
+    if (action === "update-debtor-amount") {
+      const body = await req.json();
+      const { asaas_customer_id, cliente_cpf_cnpj, bucket, new_total } = body || {};
+      if (!bucket || (bucket !== "d30" && bucket !== "d60")) {
+        return json({ error: "bucket inválido (use d30 ou d60)" }, 400);
+      }
+      const novo = Number(new_total);
+      if (!isFinite(novo) || novo <= 0) {
+        return json({ error: "new_total inválido" }, 400);
+      }
+      let q = admin
+        .from("cobrancas_vencidas")
+        .select("*")
+        .eq("status", "pendente_renegociacao")
+        .eq("bucket", bucket);
+      if (asaas_customer_id) q = q.eq("asaas_customer_id", asaas_customer_id);
+      else if (cliente_cpf_cnpj) q = q.eq("cliente_cpf_cnpj", cliente_cpf_cnpj);
+      else return json({ error: "asaas_customer_id ou cliente_cpf_cnpj obrigatório" }, 400);
+      const { data: parcelas, error: pErr } = await q;
+      if (pErr) throw pErr;
+      if (!parcelas || parcelas.length === 0) {
+        return json({ error: "Nenhuma parcela encontrada" }, 400);
+      }
+      const totalAtual = round2(parcelas.reduce((s: number, p: any) => s + (Number(p.valor) || 0), 0));
+      const n = parcelas.length;
+      let updates: { id: string; valor: number }[] = [];
+      if (totalAtual <= 0) {
+        // distribui igualmente
+        const each = round2(novo / n);
+        let acc = 0;
+        updates = parcelas.map((p: any, i: number) => {
+          const v = i === n - 1 ? round2(novo - acc) : each;
+          acc = round2(acc + v);
+          return { id: p.id, valor: v };
+        });
+      } else {
+        const factor = novo / totalAtual;
+        let acc = 0;
+        updates = parcelas.map((p: any, i: number) => {
+          const v = i === n - 1
+            ? round2(novo - acc)
+            : round2(Number(p.valor) * factor);
+          acc = round2(acc + v);
+          return { id: p.id, valor: v };
+        });
+      }
+      for (const u of updates) {
+        const { error: uErr } = await admin
+          .from("cobrancas_vencidas")
+          .update({ valor: u.valor, updated_at: new Date().toISOString() })
+          .eq("id", u.id);
+        if (uErr) throw uErr;
+      }
+      return json({ success: true, novo_total: round2(novo), parcelas_atualizadas: updates.length });
+    }
+
     // ────────────── LIST GROUPED ──────────────
     if (action === "list-debtors-grouped") {
       const { data, error } = await admin
