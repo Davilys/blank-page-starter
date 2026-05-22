@@ -1,35 +1,22 @@
 ## Diagnóstico
 
-Conferi o código e o banco. Hoje a página `/admin/emails` decide o que mostrar **apenas** pelo campo `email_accounts.assigned_to`:
+Na página **Central de Vencidos** (`src/pages/admin/FinanceiroVencidos.tsx`):
 
-- `src/pages/admin/Emails.tsx` (linhas 77-87): se o admin **não é o master**, filtra `email_accounts` por `assigned_to = userId`.
-- `src/components/admin/email/EmailSettings.tsx` (linhas 95-98): mesma regra.
+- Aba **Vencidos até 30 dias** → renderiza `<Vencidos30DiasTab>`, que possui o botão "Sincronizar Asaas" (linhas 122-125 chamam `sync-asaas-invoices` + `asaas-debtors-api/sync-overdue-30` + `sync-overdue`).
+- Abas **Devedores +30 dias** e **+60 dias** → renderizam `<Devedores embedded …>`. O componente `Devedores.tsx` já tem `handleSync` e o botão "Sincronizar com Asaas" (linha 655), mas ele está dentro de `{!embedded && (…)}` (linha 633), então fica escondido quando vem das abas.
 
-No banco, todas as contas (`caroline@`, `financeiro@`, `juridico@`, `Ola@`) estão atribuídas ao usuário `1ca389a4-...`. Quando você dá a permissão "Emails" em **Configurações → Segurança → Permissões** para um admin diferente (ex.: João), o `admin_permissions` recebe `emails.can_view=true`, mas o filtro acima continua escondendo todas as contas, porque o `assigned_to` não bate. Resultado: o admin entra na página e não vê nenhuma conta nem mensagem.
+## Correção (apenas UI, sem mexer nas regras de sync já existentes)
 
-## Correção
+### `src/pages/admin/Devedores.tsx`
+- Extrair o trio de botões "Atualizar + Sincronizar com Asaas" para fora do bloco `{!embedded && …}`, mantendo o cabeçalho (título + breadcrumb) ainda condicionado a `!embedded`.
+- Quando `embedded=true`, renderizar um pequeno `<div>` no topo (acima dos `SummaryCard`s) com apenas o botão "Sincronizar com Asaas" (mesmo `handleSync` e mesmo estado `syncing` já existentes — nenhuma mudança na lógica).
+- Botão alinhado à direita (`flex justify-end`) para combinar visualmente com as outras abas.
 
-Tratar a permissão "Emails" como acesso completo (mesma regra do master) e usar o `assigned_to` apenas como classificação organizacional (não como gate de leitura).
+### Sem mudanças em
+- `handleSync` (já chama exatamente as mesmas Edge Functions usadas hoje na aba de 30 dias).
+- Edge Functions (`sync-asaas-invoices`, `asaas-debtors-api`).
+- `FinanceiroVencidos.tsx` (continua passando `embedded`).
 
-### 1. `src/pages/admin/Emails.tsx`
-- Importar `hasPermission` de `useAdminPermissions`.
-- Calcular `canSeeAllEmails = isMasterAdmin || hasPermission('emails', 'can_view')`.
-- Trocar o filtro da query `email-accounts-list`: aplicar `.eq('assigned_to', userId)` **somente quando** `canSeeAllEmails` for `false`.
-
-### 2. `src/components/admin/email/EmailSettings.tsx`
-- Mesmo tratamento: admin com permissão `emails.can_view` lista todas as contas (igual ao master), apenas a edição/criação continua restrita ao master (já controlado por `isMaster`).
-- Passar `canSeeAllEmails` para substituir o `isMaster` na query de listagem (mantém `isMaster` para os botões de adicionar/editar/excluir).
-
-### 3. `src/components/admin/email/EmailSidebar.tsx`
-- Onde aparece "Tools - Only visible for master admin" (linha 233), manter como está (são ferramentas administrativas como sincronizar/limpar — só master).
-
-### 4. Sem mudanças de banco
-- Não precisa migration. RLS já permite admins lerem `email_accounts`/`email_inbox` (controlado pelo `user_roles`); a restrição era apenas no client.
-
-## Resultado esperado
-- Qualquer admin com a permissão "Emails" marcada em Configurações → Segurança passa a ver todas as contas e caixas de entrada na página de Emails.
-- O master continua sendo o único que pode adicionar/editar/excluir contas e usar as ferramentas administrativas.
-- O campo `assigned_to` continua existindo e visível ("Atribuído a: …") para organização, sem mais bloquear o acesso.
-
-## Observação sobre o build
-Os erros `Cannot find name 'loadDebtors'` já foram corrigidos no turno anterior (o arquivo agora usa `fetchDebtors` nas linhas 780 e 854). Eram cache antigo do build — confirmei com busca.
+## Resultado
+- Aba **Devedores +30 dias** e **Devedores +60 dias** passam a ter o mesmo botão "Sincronizar com Asaas" da aba de 30 dias.
+- Regras de sincronização preservadas — apenas exposição do botão.
