@@ -1,38 +1,35 @@
 ## Diagnóstico
 
-Reproduzi o erro chamando a edge function `create-admin-user` com `joao@webmarcas.net`. Ela retorna:
+Conferi o código e o banco. Hoje a página `/admin/emails` decide o que mostrar **apenas** pelo campo `email_accounts.assigned_to`:
 
-> "Usuário não encontrado após verificação de duplicidade."
+- `src/pages/admin/Emails.tsx` (linhas 77-87): se o admin **não é o master**, filtra `email_accounts` por `assigned_to = userId`.
+- `src/components/admin/email/EmailSettings.tsx` (linhas 95-98): mesma regra.
 
-O que acontece hoje:
+No banco, todas as contas (`caroline@`, `financeiro@`, `juridico@`, `Ola@`) estão atribuídas ao usuário `1ca389a4-...`. Quando você dá a permissão "Emails" em **Configurações → Segurança → Permissões** para um admin diferente (ex.: João), o `admin_permissions` recebe `emails.can_view=true`, mas o filtro acima continua escondendo todas as contas, porque o `assigned_to` não bate. Resultado: o admin entra na página e não vê nenhuma conta nem mensagem.
 
-1. Ao tentar excluir o admin antes, a função `delete-auth-user` falhou silenciosamente — o frontend (`SecuritySettings.tsx` linha 148) chama `supabase.functions.invoke('delete-auth-user', ...)` **sem checar o erro**. Só o `user_roles` e o `admin_permissions` foram apagados; o usuário continuou em `auth.users` (confirmado: `joao@webmarcas.net` ainda existe lá, e o `profiles` continua com o registro).
-2. Ao recriar, `create-admin-user` chama `createUser`, recebe "already been registered", e tenta achar o usuário com `auth.admin.listUsers()`. Esse método retorna apenas a **primeira página (50 usuários)** por padrão — como o João não está na primeira página, `existingUser` fica `undefined` e a função lança o erro.
+## Correção
 
-## Correções
+Tratar a permissão "Emails" como acesso completo (mesma regra do master) e usar o `assigned_to` apenas como classificação organizacional (não como gate de leitura).
 
-### 1. `supabase/functions/create-admin-user/index.ts`
-Substituir a busca por `listUsers()` (que só vê a 1ª página) por uma busca confiável:
-- Primeiro: consultar `public.profiles` por `email` para pegar o `id`.
-- Fallback: paginar `listUsers({ page, perPage: 1000 })` até encontrar.
-- Se mesmo assim não achar, lançar mensagem clara.
+### 1. `src/pages/admin/Emails.tsx`
+- Importar `hasPermission` de `useAdminPermissions`.
+- Calcular `canSeeAllEmails = isMasterAdmin || hasPermission('emails', 'can_view')`.
+- Trocar o filtro da query `email-accounts-list`: aplicar `.eq('assigned_to', userId)` **somente quando** `canSeeAllEmails` for `false`.
 
-### 2. `supabase/functions/delete-auth-user/index.ts`
-Antes do `auth.admin.deleteUser`, garantir limpeza de dependências em ordem segura (idempotente):
-- `admin_permissions` por `user_id`
-- `user_roles` por `user_id`
-- `profiles` por `id`
-- Depois `auth.admin.deleteUser(userId)`; se retornar erro, propagar com mensagem detalhada (não engolir).
+### 2. `src/components/admin/email/EmailSettings.tsx`
+- Mesmo tratamento: admin com permissão `emails.can_view` lista todas as contas (igual ao master), apenas a edição/criação continua restrita ao master (já controlado por `isMaster`).
+- Passar `canSeeAllEmails` para substituir o `isMaster` na query de listagem (mantém `isMaster` para os botões de adicionar/editar/excluir).
 
-### 3. `src/components/admin/settings/SecuritySettings.tsx`
-Na mutation `deleteAdminMutation` (linhas 132-149):
-- Capturar `{ data, error }` do `supabase.functions.invoke('delete-auth-user', …)` e lançar erro se falhar, para o toast mostrar o problema real em vez de "sucesso" enganoso.
-- Mover a limpeza de `admin_permissions`/`profiles` para dentro da edge function (passo 2) e simplificar o frontend para apenas invocar `delete-auth-user` (ela já cuida de tudo).
+### 3. `src/components/admin/email/EmailSidebar.tsx`
+- Onde aparece "Tools - Only visible for master admin" (linha 233), manter como está (são ferramentas administrativas como sincronizar/limpar — só master).
 
-### 4. Limpeza pontual do João
-Como o registro está órfão, depois de aplicado o fix a UI permitirá recriar. Alternativamente, executar uma migração única para deletar `auth.users` + `profiles` do `joao@webmarcas.net` antes do recadastro — incluo isso na implementação para destravar o caso imediato.
+### 4. Sem mudanças de banco
+- Não precisa migration. RLS já permite admins lerem `email_accounts`/`email_inbox` (controlado pelo `user_roles`); a restrição era apenas no client.
 
 ## Resultado esperado
-- Excluir admin remove de fato o usuário do `auth.users`, permitindo recriação com o mesmo e-mail.
-- Se a exclusão falhar por qualquer motivo, o toast mostra o erro real.
-- Recriar um admin com e-mail já existente (caso usuário cliente, por exemplo) funciona mesmo com base grande de usuários (não depende mais da 1ª página do `listUsers`).
+- Qualquer admin com a permissão "Emails" marcada em Configurações → Segurança passa a ver todas as contas e caixas de entrada na página de Emails.
+- O master continua sendo o único que pode adicionar/editar/excluir contas e usar as ferramentas administrativas.
+- O campo `assigned_to` continua existindo e visível ("Atribuído a: …") para organização, sem mais bloquear o acesso.
+
+## Observação sobre o build
+Os erros `Cannot find name 'loadDebtors'` já foram corrigidos no turno anterior (o arquivo agora usa `fetchDebtors` nas linhas 780 e 854). Eram cache antigo do build — confirmei com busca.
