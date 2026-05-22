@@ -16,6 +16,7 @@ import { loadClientForSheet } from "@/lib/clientSheet";
 import { DatePeriodFilter, type DateFilterType } from "@/components/admin/clients/DatePeriodFilter";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import { PaginationBar, type PageSize } from "@/components/admin/financeiro/PaginationBar";
+import { EditableAmountCell } from "@/components/admin/financeiro/EditableAmountCell";
 
 const ClientDetailSheet = lazy(() =>
   import("@/components/admin/clients/ClientDetailSheet").then((m) => ({ default: m.ClientDetailSheet }))
@@ -765,7 +766,21 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                       <TableCell className="text-center">
                         <Badge variant="destructive">{d.qtd_parcelas}</Badge>
                       </TableCell>
-                      <TableCell className="text-right">{fmtBRL(d.total_original)}</TableCell>
+                      <TableCell className="text-right">
+                        <EditableAmountCell
+                          value={d.total_original}
+                          onSave={async (newValue) => {
+                            await callApi("update-debtor-amount", {
+                              asaas_customer_id: d.asaas_customer_id,
+                              cliente_cpf_cnpj: d.cliente_cpf_cnpj,
+                              bucket: "d60",
+                              new_total: newValue,
+                            });
+                            toast.success("Valor atualizado");
+                            await loadDebtors();
+                          }}
+                        />
+                      </TableCell>
                       <TableCell className="text-right font-semibold text-emerald-600">{fmtBRL(d.novo_total)}</TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="inline-flex gap-2">
@@ -825,7 +840,21 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{d.cliente_cpf_cnpj || "—"}</TableCell>
                       <TableCell className="text-center"><Badge variant="destructive">{d.qtd_parcelas}</Badge></TableCell>
-                      <TableCell className="text-right">{fmtBRL(d.total_original)}</TableCell>
+                      <TableCell className="text-right">
+                        <EditableAmountCell
+                          value={d.total_original}
+                          onSave={async (newValue) => {
+                            await callApi("update-debtor-amount", {
+                              asaas_customer_id: d.asaas_customer_id,
+                              cliente_cpf_cnpj: d.cliente_cpf_cnpj,
+                              bucket: "d30",
+                              new_total: newValue,
+                            });
+                            toast.success("Valor atualizado");
+                            await loadDebtors();
+                          }}
+                        />
+                      </TableCell>
                       <TableCell className="text-right font-semibold text-emerald-600">{fmtBRL(d.novo_total)}</TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="inline-flex gap-2">
