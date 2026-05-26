@@ -35,11 +35,12 @@ function containsAttorney(text: string): boolean {
 }
 
 function calculateExpectedRpiNumber(): number {
-  const referenceDate = new Date('2024-12-10');
-  const referenceRpi = 2870;
+  // Referência verificada: RPI 2890 publicada em 26/05/2026 (revistas.inpi.gov.br/rpi/)
+  const referenceDate = new Date('2026-05-26');
+  const referenceRpi = 2890;
   const today = new Date();
   const diffWeeks = Math.floor((today.getTime() - referenceDate.getTime()) / (7 * 24 * 60 * 60 * 1000));
-  return referenceRpi + diffWeeks;
+  return referenceRpi + Math.max(0, diffWeeks);
 }
 
 // ========== INPI SESSION MANAGEMENT ==========
