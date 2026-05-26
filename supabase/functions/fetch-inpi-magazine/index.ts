@@ -237,47 +237,55 @@ async function fetchWithSession(url: string, sessionCookies: string | null): Pro
 async function fetchAvailableRpis(sessionCookies: string | null): Promise<{ latest: number; available: number[]; withXml: number[] }> {
   const expectedRpi = calculateExpectedRpiNumber();
   console.log(`Expected RPI based on date: ${expectedRpi}`);
+  const MAX_ALLOWED = expectedRpi + 2; // nunca devolver RPIs muito acima do esperado
+
+  // A tabela em https://revistas.inpi.gov.br/rpi/ é PÚBLICA — tenta primeiro sem sessão.
+  // Só usa cookies de sessão se o acesso público falhar.
+  const tryFetch = async (cookies: string | null) => {
+    try {
+      return await fetchWithSession(`${INPI_BASE_URL}/rpi/`, cookies);
+    } catch (e) {
+      console.error('Fetch /rpi/ failed:', e);
+      return null;
+    }
+  };
 
   try {
-    const response = await fetchWithSession(`${INPI_BASE_URL}/rpi/`, sessionCookies);
+    let response = await tryFetch(null);
+    let html = response && response.ok ? await response.text() : '';
 
-    if (!response.ok) {
-      // If we get a redirect to login, session might have failed
-      const text = await response.text();
-      if (text.includes('login') || response.status === 302) {
-        console.log('Session expired or not authenticated, using fallback');
-        throw new Error('Not authenticated');
-      }
-      throw new Error(`Failed to fetch INPI page: ${response.status}`);
+    const looksLikeLogin = (h: string) => h.includes('id="login_form"') || h.includes('id_username');
+
+    if (!html || looksLikeLogin(html)) {
+      console.log('Public /rpi/ falhou ou retornou login — tentando com sessão autenticada');
+      response = await tryFetch(sessionCookies);
+      html = response && response.ok ? await response.text() : '';
     }
 
-    const html = await response.text();
-    console.log(`Fetched INPI page, length: ${html.length}`);
-
-    // Check if we got the actual RPI page or the login page
-    if (html.includes('id="login_form"') || html.includes('id_username')) {
-      console.log('Got login page instead of RPI page - authentication failed');
-      const fallbackNumbers = Array.from({ length: 20 }, (_, i) => expectedRpi - i);
+    if (!html || looksLikeLogin(html)) {
+      console.log('Nenhuma resposta válida do portal — usando fallback descendente');
+      const fallbackNumbers = Array.from({ length: 20 }, (_, i) => expectedRpi - i).filter(n => n >= 2800);
       return { latest: expectedRpi, available: fallbackNumbers, withXml: [] };
     }
 
+    console.log(`Fetched INPI page, length: ${html.length}`);
+
     // Find all RPI numbers from the page
     const rpiNumbers: number[] = [];
-    const rpiRegex = /(\d{4})/g;
     let match;
-    
+
     // Try to find RPI numbers in table cells or links
     const tdRegex = /<td[^>]*>\s*(\d{4})\s*<\/td>/gi;
     while ((match = tdRegex.exec(html)) !== null) {
       const num = parseInt(match[1]);
-      if (num >= 2800 && num <= 3100) rpiNumbers.push(num);
+      if (num >= 2800 && num <= MAX_ALLOWED) rpiNumbers.push(num);
     }
 
     // Also try links that mention RPI numbers
     const linkRegex = /rpi[\/\-_]?(\d{4})/gi;
     while ((match = linkRegex.exec(html)) !== null) {
       const num = parseInt(match[1]);
-      if (num >= 2800 && num <= 3100 && !rpiNumbers.includes(num)) rpiNumbers.push(num);
+      if (num >= 2800 && num <= MAX_ALLOWED && !rpiNumbers.includes(num)) rpiNumbers.push(num);
     }
 
     // Find which RPIs have XML files for Marcas
@@ -293,7 +301,7 @@ async function fetchAvailableRpis(sessionCookies: string | null): Promise<{ late
     for (const pattern of xmlPatterns) {
       while ((match = pattern.exec(html)) !== null) {
         const num = parseInt(match[1]);
-        if (num >= 2800 && num <= 3100 && !rpWithXml.includes(num)) rpWithXml.push(num);
+        if (num >= 2800 && num <= MAX_ALLOWED && !rpWithXml.includes(num)) rpWithXml.push(num);
       }
     }
 
@@ -324,12 +332,12 @@ async function fetchAvailableRpis(sessionCookies: string | null): Promise<{ late
       return { latest: uniqueNumbers[0], available: uniqueNumbers.slice(0, 20), withXml: sortedWithXml };
     }
 
-    const fallbackNumbers = Array.from({ length: 20 }, (_, i) => expectedRpi - i);
+    const fallbackNumbers = Array.from({ length: 20 }, (_, i) => expectedRpi - i).filter(n => n >= 2800);
     return { latest: expectedRpi, available: fallbackNumbers, withXml: [] };
 
   } catch (error) {
     console.error('Error fetching available RPIs:', error);
-    const fallbackNumbers = Array.from({ length: 20 }, (_, i) => expectedRpi - i);
+    const fallbackNumbers = Array.from({ length: 20 }, (_, i) => expectedRpi - i).filter(n => n >= 2800);
     return { latest: expectedRpi, available: fallbackNumbers, withXml: [] };
   }
 }
