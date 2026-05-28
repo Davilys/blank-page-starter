@@ -223,11 +223,13 @@ async function sendWhatsApp(
   phone: string,
   nome: string,
   message: string,
-  extraData: Record<string, string>
+  extraData: Record<string, string>,
+  webhookOverride?: string
 ): Promise<{ success: boolean; response?: string; error?: string }> {
   if (!settings.enabled) return { success: false, error: 'WhatsApp desativado' };
 
-  const webhookUrl = (settings.webhook_url as string) || '';
+  const webhookUrl = (webhookOverride && webhookOverride.trim())
+    || (settings.webhook_url as string) || '';
   if (!webhookUrl) return { success: false, error: 'URL do Webhook BotConversa não configurada' };
   if (!phone)      return { success: false, error: 'Telefone não informado' };
 
