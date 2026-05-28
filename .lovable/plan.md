@@ -1,64 +1,42 @@
-## Diagnóstico
+## Entendimento
 
-Na aba **Revista INPI** o seletor "Buscar Remota" lista RPIs **2937 → 2946**, mas a última RPI real publicada no portal `revistas.inpi.gov.br/rpi/` é **2890** (26/05/2026 — confirmado na imagem).
+Hoje todas as notificações WhatsApp do sistema passam por:
 
-Causa raiz na edge function `supabase/functions/fetch-inpi-magazine/index.ts`:
+`cobrar-fatura-vencida` → `send-multichannel-notification` → `sendWhatsApp()` → webhook único do BotConversa salvo em `system_settings.botconversa.webhook_url`.
 
-1. **Função `calculateExpectedRpiNumber()` (linhas 37–43)** usa referência desatualizada:
-   ```ts
-   const referenceDate = new Date('2024-12-10');
-   const referenceRpi = 2870;
-   ```
-   Para hoje (26/05/2026) isso devolve `2870 + 76 semanas ≈ 2946` — completamente errado. A cadência real é menor que 1 RPI por semana.
+Você quer que **apenas** as cobranças do Financeiro (Devedores ≤30, +30, +60) sejam enviadas para um webhook BotConversa **diferente e dedicado**:
 
-2. **Fallback fabricado (linhas 259-260, 326-327, 331-332):** quando o scrape falha (login INPI indisponível ou a página `/rpi/` retorna página de login), a função gera 20 números descendentes a partir do "expected" calculado acima. Resultado: o front recebe `[2946, 2945, …, 2927]`, todos inexistentes.
+`https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/17504/cFE9KA4F5Wtm/`
 
-3. **Scrape do portal público não está sendo usado:** a página `https://revistas.inpi.gov.br/rpi/` que lista a tabela "NÚMERO REVISTA / DATA / SEÇÕES" é **pública** (a imagem prova isso) — não precisa de login. Hoje o código só tenta acessar essa página após `loginToInpi()` e, se as credenciais não estão configuradas ou o login falha, ele cai direto no fallback fabricado em vez de tentar buscar sem cookies.
+Todas as outras notificações WhatsApp do CRM (assinatura, contratos, lembretes, etc.) continuam usando o webhook atual em `system_settings.botconversa` sem nenhuma alteração.
 
-## Correções (apenas na edge function `fetch-inpi-magazine`)
+## Mudanças
 
-### 1. Atualizar referência de cálculo
-Trocar para o ponto verificado pela imagem:
-```ts
-const referenceDate = new Date('2026-05-26');
-const referenceRpi = 2890;
-```
-E mudar a cadência para ~7 dias (mantém), mas o resultado passa a ser uma estimativa "no máximo igual a hoje".
+### 1. `supabase/functions/send-multichannel-notification/index.ts`
+- Adicionar um campo opcional no payload: `whatsapp_webhook_override?: string`.
+- Em `sendWhatsApp(...)`, se `override` vier preenchido, usar essa URL em vez de `settings.webhook_url`. Mantém `auth_token` e formato de payload (telefone/nome/mensagem/extra) idênticos — nenhuma outra regra muda.
+- Se `override` estiver vazio/ausente → comportamento atual (webhook do CRM).
 
-### 2. Tentar scrape público ANTES do login
-Em `fetchAvailableRpis`:
-- Primeiro `fetchWithSession('/rpi/', null)` (sem cookies). A tabela é pública.
-- Só tentar `loginToInpi()` se a página pública não retornar uma lista válida (ou se for necessária para baixar o XML).
+### 2. `supabase/functions/cobrar-fatura-vencida/index.ts`
+- Definir constante interna:
+  ```ts
+  const FINANCEIRO_WEBHOOK = "https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/17504/cFE9KA4F5Wtm/";
+  ```
+- Na chamada `supabase.functions.invoke('send-multichannel-notification', { body: { ... } })`, incluir `whatsapp_webhook_override: FINANCEIRO_WEBHOOK`.
+- Toda a lógica de mensagem (texto WhatsApp, e-mail HTML, PIX, idempotência 24h, histórico em `cobranca_historico`) permanece igual.
 
-### 3. Nunca devolver RPIs futuras
-Após scrape/fallback, aplicar:
-```ts
-const cap = Math.max(latest, expectedRpi);
-const available = uniqueNumbers
-  .filter(n => n <= cap)
-  .slice(0, 20);
-```
-E **remover** o fallback que gera números a partir do `expectedRpi` quando o scrape funcionou parcialmente. Se o scrape falhou completamente, gerar fallback **descendente a partir de `expectedRpi`** (que agora estará correto: 2890), nunca futuro.
+### 3. Nenhuma mudança em
+- `system_settings.botconversa` (continua sendo o webhook padrão do CRM).
+- Regras de sincronização Asaas (≤30 / +30 / +60) — intocadas.
+- Templates, dashboard, demais edge functions de notificação.
+- Frontend (Devedores, FinanceiroVencidos): o botão "Cobrar" já invoca `cobrar-fatura-vencida`; passa a usar o novo webhook automaticamente.
 
-### 4. Melhorar parsing da tabela pública
-A tabela atual da imagem mostra os números em `<td>` no formato `2890`, `2889`, etc. O regex `tdRegex` já captura isso, mas atualmente o range é `2800..3100`. Restringir a `2800..(expectedRpi + 2)` para evitar lixo de versões futuras hardcoded na página.
+## Teste pós-deploy
+1. Disparar uma cobrança real (ou de teste) em Devedores +60 → verificar nos logs de `send-multichannel-notification` se a URL chamada foi a nova.
+2. Disparar uma notificação não-financeira (ex.: assinatura) → confirmar que ainda vai para o webhook antigo do `system_settings`.
+3. Conferir `cobranca_historico` registrando `enviada` com sucesso.
 
-### 5. Front-end (nenhuma mudança)
-`src/pages/admin/RevistaINPI.tsx` apenas consome `data.latestRpi` e `data.available` / `data.rpWithXml` — depois do fix da edge function passa a mostrar RPIs reais (2890, 2889, 2888, …).
-
-## Arquivos alterados
-
-- `supabase/functions/fetch-inpi-magazine/index.ts`
-  - `calculateExpectedRpiNumber()`: nova referência 2890/2026-05-26
-  - `fetchAvailableRpis()`: tentar scrape público sem login primeiro; cap em `expectedRpi`; fallback apenas descendente; range do regex restrito
-
-## Não muda
-
-- Regras de download/parsing do XML (`tryDownloadRpiXml`, `parseRpiXml`)
-- Login INPI (continua sendo usado quando preciso para baixar XML autenticado)
-- Lógica de matching com clientes / criação de `rpi_uploads` / `rpi_entries`
-- Componente `RevistaINPI.tsx`
-
-## Resultado esperado
-
-Ao abrir o seletor "Buscar Remota", a lista mostrará **2890 (Última), 2889, 2888, … 2871**, exatamente como aparece em `revistas.inpi.gov.br/rpi/`, sem nenhuma edição futura inexistente.
+## Pergunta antes de implementar
+Confirma esses 2 pontos:
+- (a) Posso deixar a URL **hardcoded** na função `cobrar-fatura-vencida` (mais simples), ou prefere que eu salve como **secret** `BOTCONVERSA_FINANCEIRO_WEBHOOK` para poder trocar depois sem deploy?
+- (b) O `auth_token` (Bearer) configurado hoje em `system_settings.botconversa` também deve ser usado nesse novo webhook, ou ele é público (sem token)?

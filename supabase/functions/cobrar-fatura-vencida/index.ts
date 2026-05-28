@@ -10,6 +10,11 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// Webhook BotConversa DEDICADO às cobranças do Financeiro (Devedores ≤30 / +30 / +60).
+// As demais notificações WhatsApp do CRM continuam usando o webhook padrão em system_settings.botconversa.
+const FINANCEIRO_WEBHOOK =
+  "https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/17504/cFE9KA4F5Wtm/";
+
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—";
   try {
@@ -169,6 +174,7 @@ serve(async (req) => {
           custom_html: emailHtml,
           custom_subject: subject,
           data: { link, marca: invoice.description || "sua fatura" },
+          whatsapp_webhook_override: FINANCEIRO_WEBHOOK,
         },
       },
     );
