@@ -406,7 +406,8 @@ const handler = async (req: Request): Promise<Response> => {
           ...(safeData.marca ? { marca: safeData.marca } : {}),
           ...(safeData.valor ? { valor: safeData.valor } : {}),
         };
-        const waResult = await withRetry(() => sendWhatsApp(botSettings, resolvedPhone, resolvedNome, message, extra));
+        const waOverride = (payload as any).whatsapp_webhook_override as string | undefined;
+        const waResult = await withRetry(() => sendWhatsApp(botSettings, resolvedPhone, resolvedNome, message, extra, waOverride));
         results.whatsapp = waResult;
         await logDispatch(supabase, event_type, 'whatsapp',
           waResult.success ? 'sent' : 'failed', rawPayload,
