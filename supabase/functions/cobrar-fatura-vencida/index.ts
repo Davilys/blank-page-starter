@@ -13,7 +13,7 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // Webhook BotConversa DEDICADO às cobranças do Financeiro (Devedores ≤30 / +30 / +60).
 // As demais notificações WhatsApp do CRM continuam usando o webhook padrão em system_settings.botconversa.
 const FINANCEIRO_WEBHOOK =
-  "https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/17504/cFE9KA4F5Wtm/";
+  "https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/17504/Z6cCNjvBc9uv/";
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—";
