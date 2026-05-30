@@ -1,20 +1,24 @@
-## Mudança
+# Desativar Bônus por Milestone por padrão
 
-Atualizar a constante `FINANCEIRO_WEBHOOK` em `supabase/functions/cobrar-fatura-vencida/index.ts`:
+## Situação atual
+- O toggle `milestone_enabled` **já existe** em Configurações › Premiação (`AwardSettings.tsx`), separado para Publicações e Cobranças.
+- O cálculo em `Premiacao.tsx` (`calcPublicacaoMilestoneBonus` / `calcCobrancaMilestoneBonus`) **já respeita** `milestone_enabled === false` e retorna bônus zero.
+- **Problema:** o valor padrão de `milestone_enabled` é `true`, então o bônus aparece e soma sozinho na aba Premiação mesmo sem o admin ter ativado nada. E o card "Bônus por Milestone — A cada 10 resolvidas" continua visível (apenas esmaecido) quando desligado.
 
-- **De:** `https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/17504/cFE9KA4F5Wtm/`
-- **Para:** `https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/17504/Z6cCNjvBc9uv/`
+## Mudanças
 
-Nenhuma outra lógica muda. `send-multichannel-notification` já suporta `whatsapp_webhook_override` desde a iteração anterior — continua intacto. Demais notificações do CRM seguem usando o webhook padrão em `system_settings.botconversa`.
+### 1. `src/components/admin/settings/AwardSettings.tsx`
+- Trocar defaults `milestone_enabled: true` → `false` (Premium e Corporativo).
+- Manter toggle visual já existente (sem alterações de UI).
 
-## Teste pós-deploy
+### 2. `src/pages/admin/Premiacao.tsx`
+- Trocar defaults `milestone_enabled: true` → `false` nas configurações default (`publicacao` e `cobranca`).
+- Na renderização do bloco "Bônus por Milestone — A cada 10 resolvidas" (linhas ~1066–1180): só renderizar o card de Publicações se `cfg.publicacao.milestone_enabled`, e o de Cobranças se `cfg.cobranca.milestone_enabled`. Se ambos estiverem desativados, **não exibir** a seção inteira.
+- O cálculo já zera quando desativado, então `totalMilestoneBonus`, ranking e totais já ficam corretos sem mais mudanças.
 
-1. Redeploy de `cobrar-fatura-vencida`.
-2. Disparar uma cobrança real pela aba Financeiro → Vencidos (botão "Cobrar") numa fatura de teste.
-3. Verificar nos logs de `send-multichannel-notification` se a URL chamada é a nova (`Z6cCNjvBc9uv`).
-4. Confirmar no painel do BotConversa se o webhook recebeu a requisição e mapeou os campos (telefone, nome, mensagem).
-5. Conferir registro em `cobranca_historico` com `status='enviada'`.
+### 3. Migração de dados existentes
+- Como a configuração fica em `system_settings` (JSON), contas já salvas continuarão com `milestone_enabled: true`. Aplicar migração leve para virar `false` em registros existentes (UPDATE no JSON da chave `awards`/equivalente). Vou confirmar a chave exata antes de gerar a migração.
 
-## Pergunta
-
-Posso disparar o teste com uma fatura real de um devedor existente (vai enviar WhatsApp de verdade ao cliente), ou prefere que eu apenas faça o swap + deploy e você mesmo aciona o botão "Cobrar" em uma fatura de teste para validar?
+## Resultado
+- Por padrão o Bônus por Milestone fica **desligado**.
+- O card só aparece e o bônus só é somado quando o admin ativa em **Configurações › Premiação** (toggle por plano, Publicações e/ou Cobranças).
