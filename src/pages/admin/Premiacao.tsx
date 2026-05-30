@@ -87,7 +87,7 @@ const DEFAULT_CONFIG: AwardConfig = {
     corporativo: { rate_per_brand: 200, monthly_goal: 30, monthly_price: 1621, payment_method: 'boleto' },
   },
   registro_marca: { base_rate: 50, above_goal_avista_rate: 100, above_goal_parcelado_rate: 50, monthly_goal: 30 },
-  publicacao: { base_rate: 50, above_goal_rate: 100, monthly_goal: 50, milestone_interval: 10, milestone_bonus: 100, milestone_enabled: true },
+  publicacao: { base_rate: 50, above_goal_rate: 100, monthly_goal: 50, milestone_interval: 10, milestone_bonus: 100, milestone_enabled: false },
   cobranca: {
     tiers: [
       { min: 199, max: 397, rate: 10 },
@@ -98,7 +98,7 @@ const DEFAULT_CONFIG: AwardConfig = {
     ],
     milestone_interval: 10,
     milestone_bonus: 50,
-    milestone_enabled: true,
+    milestone_enabled: false,
   },
   master_admin_email: 'davillys@gmail.com',
 };
