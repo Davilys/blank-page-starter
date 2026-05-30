@@ -87,7 +87,7 @@ const DEFAULT_CONFIG: AwardConfig = {
     corporativo: { rate_per_brand: 200, monthly_goal: 30, monthly_price: 1621, payment_method: 'boleto' },
   },
   registro_marca: { base_rate: 50, above_goal_avista_rate: 100, above_goal_parcelado_rate: 50, monthly_goal: 30 },
-  publicacao: { base_rate: 50, above_goal_rate: 100, monthly_goal: 50, milestone_interval: 10, milestone_bonus: 100, milestone_enabled: true },
+  publicacao: { base_rate: 50, above_goal_rate: 100, monthly_goal: 50, milestone_interval: 10, milestone_bonus: 100, milestone_enabled: false },
   cobranca: {
     tiers: [
       { min: 199, max: 397, rate: 10 },
@@ -98,7 +98,7 @@ const DEFAULT_CONFIG: AwardConfig = {
     ],
     milestone_interval: 10,
     milestone_bonus: 50,
-    milestone_enabled: true,
+    milestone_enabled: false,
   },
   master_admin_email: 'davillys@gmail.com',
 };
@@ -1064,6 +1064,7 @@ export default function Premiacao() {
             </div>
 
             {/* ── Bônus por Milestone (10 em 10) ── */}
+            {(cfg.publicacao.milestone_enabled || cfg.cobranca.milestone_enabled) && (
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1098,6 +1099,7 @@ export default function Premiacao() {
                 {/* Two milestone cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Publicação milestone */}
+                  {cfg.publicacao.milestone_enabled && (
                   <div className="relative rounded-xl border border-purple-500/20 bg-purple-500/6 p-4 space-y-3 overflow-hidden">
                     <div className="absolute top-0 right-0 w-20 h-20 rounded-full blur-2xl bg-purple-500/10 pointer-events-none" />
                     <div className="flex items-center justify-between">
@@ -1143,8 +1145,10 @@ export default function Premiacao() {
                       </div>
                     )}
                   </div>
+                  )}
 
                   {/* Cobrança milestone */}
+                  {cfg.cobranca.milestone_enabled && (
                   <div className="relative rounded-xl border border-orange-500/20 bg-orange-500/6 p-4 space-y-3 overflow-hidden">
                     <div className="absolute top-0 right-0 w-20 h-20 rounded-full blur-2xl bg-orange-500/10 pointer-events-none" />
                     <div className="flex items-center justify-between">
@@ -1190,6 +1194,7 @@ export default function Premiacao() {
                       </div>
                     )}
                   </div>
+                  )}
                 </div>
 
                 {/* Regra explicativa */}
@@ -1203,6 +1208,7 @@ export default function Premiacao() {
                 </div>
               </div>
             </motion.div>
+            )}
           </TabsContent>
 
           {/* REGISTRO DE MARCA TAB */}
