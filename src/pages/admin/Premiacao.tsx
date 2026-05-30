@@ -1064,6 +1064,7 @@ export default function Premiacao() {
             </div>
 
             {/* ── Bônus por Milestone (10 em 10) ── */}
+            {(cfg.publicacao.milestone_enabled || cfg.cobranca.milestone_enabled) && (
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1098,6 +1099,7 @@ export default function Premiacao() {
                 {/* Two milestone cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Publicação milestone */}
+                  {cfg.publicacao.milestone_enabled && (
                   <div className="relative rounded-xl border border-purple-500/20 bg-purple-500/6 p-4 space-y-3 overflow-hidden">
                     <div className="absolute top-0 right-0 w-20 h-20 rounded-full blur-2xl bg-purple-500/10 pointer-events-none" />
                     <div className="flex items-center justify-between">
@@ -1143,8 +1145,10 @@ export default function Premiacao() {
                       </div>
                     )}
                   </div>
+                  )}
 
                   {/* Cobrança milestone */}
+                  {cfg.cobranca.milestone_enabled && (
                   <div className="relative rounded-xl border border-orange-500/20 bg-orange-500/6 p-4 space-y-3 overflow-hidden">
                     <div className="absolute top-0 right-0 w-20 h-20 rounded-full blur-2xl bg-orange-500/10 pointer-events-none" />
                     <div className="flex items-center justify-between">
@@ -1190,6 +1194,7 @@ export default function Premiacao() {
                       </div>
                     )}
                   </div>
+                  )}
                 </div>
 
                 {/* Regra explicativa */}
@@ -1203,6 +1208,7 @@ export default function Premiacao() {
                 </div>
               </div>
             </motion.div>
+            )}
           </TabsContent>
 
           {/* REGISTRO DE MARCA TAB */}
