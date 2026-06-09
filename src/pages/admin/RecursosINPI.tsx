@@ -2407,7 +2407,7 @@ export default function RecursosINPI() {
                       ]).map((item, i) => (
                         <div key={i} className="p-3 rounded-xl bg-muted/50 border border-border/50">
                           <span className="text-xs text-muted-foreground flex items-center gap-1">{item.icon} {item.label}</span>
-                          <p className="font-medium text-sm mt-1 truncate">{item.value || '-'}</p>
+                          <p className="font-medium text-sm mt-1 truncate">{toSafeString(item.value) || '-'}</p>
                         </div>
                       ))}
                     </div>
@@ -2425,7 +2425,7 @@ export default function RecursosINPI() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="bg-white dark:bg-gray-950 border rounded-xl p-6 max-h-[500px] overflow-y-auto shadow-inner">
-                    <pre className="whitespace-pre-wrap font-serif text-sm leading-relaxed text-foreground">{draftContent}</pre>
+                    <pre className="whitespace-pre-wrap font-serif text-sm leading-relaxed text-foreground">{toSafeString(draftContent)}</pre>
                   </div>
                   
                   <div className="p-4 rounded-xl bg-muted/50 border space-y-3">
