@@ -52,7 +52,7 @@ function generateEmailTemplate(client: ServiceActionPanelProps['client'], _stage
   const nome = client.full_name || 'Cliente';
   const marca = client.brand_name || 'sua marca';
   const protocolo = client.process_number ? ` (Protocolo: ${client.process_number})` : '';
-  return `Prezad@ ${nome},
+  return `Prezado ${nome},
 
 Venho informar, com urgência, que o INPI publicou uma exigência referente ao processo da marca "${marca}"${protocolo}.
 
