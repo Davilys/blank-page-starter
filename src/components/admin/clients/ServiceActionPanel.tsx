@@ -76,18 +76,23 @@ WhatsApp: (11) 91112-0225`;
 function generateWhatsAppTemplate(client: ServiceActionPanelProps['client'], _stage: ServiceActionPanelProps['stage'], valor: number): string {
   const nome = client.full_name || 'Cliente';
   const marca = client.brand_name || 'sua marca';
-  const protocolo = client.process_number ? ` (Protocolo: ${client.process_number})` : '';
-  return `Prezad@ ${nome},
+  const primeiroNome = nome.split(' ')[0];
+  const numero = client.process_number?.trim();
+  const trechoNumero = numero ? `, sob o número ${numero}` : '';
+  void valor;
+  return `Olá, ${primeiroNome}, tudo bem?
 
-Informamos com urgência que o INPI publicou uma exigência referente ao processo da marca "${marca}"${protocolo}.
+Preciso te passar uma atualização importante sobre o seu processo no INPI…
 
-O prazo para cumprimento é de 60 dias corridos, conforme publicação na RPI. Conforme informado no atendimento inicial e no contrato assinado, de acordo com a Cláusula 5.2 do seu contrato, sendo devido o valor de R$ ${fmtValor(valor)} para continuidade do processo. Vencimento em 10 dias.
+Informamos que foi publicada uma exigência referente ao processo da marca ${marca}${trechoNumero}, na data de hoje!
 
-O jurídico precisa falar com você com URGÊNCIA, informe o melhor dia e horário. Assim resolveremos esta questão e sanar eventuais dúvidas.
+Ressaltamos que toda publicação do INPI possui um prazo de 60 (sessenta) dias corridos para cumprimento, contados a partir da data de publicação na Revista da Propriedade Industrial (RPI).
 
-Atenciosamente,
+Para que eu possa explicar os detalhes da publicação e orientá-lo(a) sobre os próximos passos, preciso agendar uma breve reunião.
 
-Equipe WebMarcas`;
+Por gentileza, qual o melhor dia e horário para conversarmos?
+
+Fico no aguardo.`;
 }
 
 function generateArquivadoEmail(client: ServiceActionPanelProps['client']): string {
