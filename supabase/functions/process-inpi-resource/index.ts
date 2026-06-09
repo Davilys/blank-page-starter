@@ -17,6 +17,48 @@ const RESOURCE_TYPE_LABELS: Record<string, string> = {
 };
 
 // ═══════════════════════════════════════════════════════════
+// HELPER: Convert any AI-returned value to a safe string
+// Prevents frontend React error #31 when AI returns an object
+// like { article, description } instead of a plain string.
+// ═══════════════════════════════════════════════════════════
+function toSafeStr(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) {
+    return value.map((v) => toSafeStr(v)).filter(Boolean).join('; ');
+  }
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    if ('article' in obj || 'description' in obj) {
+      const art = obj.article ? `Art. ${toSafeStr(obj.article)}` : '';
+      const desc = obj.description ? toSafeStr(obj.description) : '';
+      return [art, desc].filter(Boolean).join(' — ');
+    }
+    try {
+      return Object.entries(obj)
+        .map(([k, v]) => `${k}: ${toSafeStr(v)}`)
+        .join('; ');
+    } catch {
+      return '';
+    }
+  }
+  return '';
+}
+
+function sanitizeExtracted(raw: any) {
+  const r = raw || {};
+  return {
+    process_number: toSafeStr(r.process_number),
+    brand_name: toSafeStr(r.brand_name),
+    ncl_class: toSafeStr(r.ncl_class),
+    holder: toSafeStr(r.holder),
+    examiner_or_opponent: toSafeStr(r.examiner_or_opponent),
+    legal_basis: toSafeStr(r.legal_basis),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
 // HELPER: Call OpenAI Responses API
 // ═══════════════════════════════════════════════════════════
 async function callOpenAI(
