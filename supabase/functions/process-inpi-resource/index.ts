@@ -1157,7 +1157,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
     // Run extraction and pass 1 in parallel
     const [extractionResult, pass1Result] = await Promise.all([
       callOpenAI(OPENAI_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, 1000, 0.1),
-      callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 16000, 0.25),
+      callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 9000, 0.25),
     ]);
 
     // Parse extracted data
@@ -1198,7 +1198,7 @@ ${resourceType === 'exigencia_merito' ? 'Abaixo está o conteúdo já gerado par
 
 SEÇÕES I A IV JÁ GERADAS:
 ---
-${pass1Content.substring(0, 8000)}
+${pass1Content.substring(0, 4000)}
 ---
 
 Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo e nível de profundidade. ${resourceType === 'exigencia_merito' ? 'O texto total desta parte deve ter NO MÍNIMO 2.500 palavras.' : 'O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.'} Use os dados do caso (marca: ${extractedData.brand_name}, processo: ${extractedData.process_number}, classe: ${extractedData.ncl_class}, titular: ${extractedData.holder}) conforme a Parte 1.` },
@@ -1206,7 +1206,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     ];
 
     console.log('PASS 2: Generating Sections V-VIII...');
-    const pass2Result = await callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 16000, 0.25);
+    const pass2Result = await callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25);
 
     if (pass2Result.error) {
       console.error('PASS 2 failed:', pass2Result.status, pass2Result.error?.substring(0, 300));
