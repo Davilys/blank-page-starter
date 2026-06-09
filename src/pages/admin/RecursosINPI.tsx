@@ -953,7 +953,7 @@ export default function RecursosINPI() {
   };
 
   const currentStepIndex = getVisibleSteps().findIndex(s => s.key === step);
-  const agent = AI_AGENTS[selectedAgent];
+  const agent = AI_AGENTS[selectedAgent] ?? AI_AGENTS.mazzola;
 
   return (
     <>
