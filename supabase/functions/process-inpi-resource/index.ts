@@ -1063,7 +1063,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
 
       return new Response(JSON.stringify({
         success: true,
-        extracted_data: extractedData,
+        extracted_data: sanitizeExtracted(extractedData),
         resource_content: finalContent,
         resource_type: resourceType,
         resource_type_label: RESOURCE_TYPE_LABELS[resourceType]
@@ -1141,7 +1141,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
 
       return new Response(JSON.stringify({
         success: true,
-        extracted_data: extractedData,
+        extracted_data: sanitizeExtracted(extractedData),
         resource_content: finalContent,
         resource_type: resourceType,
         resource_type_label: RESOURCE_TYPE_LABELS[resourceType]
@@ -1262,7 +1262,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
       const normalizedPartial = enforceMandatoryOpening(pass1Content, resourceTypeLabel, enriched);
       return new Response(JSON.stringify({
         success: true,
-        extracted_data: enriched,
+        extracted_data: sanitizeExtracted(enriched),
         resource_content: normalizedPartial,
         resource_type: resourceType,
         resource_type_label: resourceTypeLabel,
@@ -1286,7 +1286,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     return new Response(
       JSON.stringify({
         success: true,
-        extracted_data: enriched,
+        extracted_data: sanitizeExtracted(enriched),
         resource_content: fullContent,
         resource_type: resourceType,
         resource_type_label: resourceTypeLabel
