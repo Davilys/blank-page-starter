@@ -17,6 +17,48 @@ const RESOURCE_TYPE_LABELS: Record<string, string> = {
 };
 
 // ═══════════════════════════════════════════════════════════
+// HELPER: Convert any AI-returned value to a safe string
+// Prevents frontend React error #31 when AI returns an object
+// like { article, description } instead of a plain string.
+// ═══════════════════════════════════════════════════════════
+function toSafeStr(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) {
+    return value.map((v) => toSafeStr(v)).filter(Boolean).join('; ');
+  }
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    if ('article' in obj || 'description' in obj) {
+      const art = obj.article ? `Art. ${toSafeStr(obj.article)}` : '';
+      const desc = obj.description ? toSafeStr(obj.description) : '';
+      return [art, desc].filter(Boolean).join(' — ');
+    }
+    try {
+      return Object.entries(obj)
+        .map(([k, v]) => `${k}: ${toSafeStr(v)}`)
+        .join('; ');
+    } catch {
+      return '';
+    }
+  }
+  return '';
+}
+
+function sanitizeExtracted(raw: any) {
+  const r = raw || {};
+  return {
+    process_number: toSafeStr(r.process_number),
+    brand_name: toSafeStr(r.brand_name),
+    ncl_class: toSafeStr(r.ncl_class),
+    holder: toSafeStr(r.holder),
+    examiner_or_opponent: toSafeStr(r.examiner_or_opponent),
+    legal_basis: toSafeStr(r.legal_basis),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
 // HELPER: Call OpenAI Responses API
 // ═══════════════════════════════════════════════════════════
 async function callOpenAI(
@@ -786,7 +828,12 @@ function buildExtractionPrompt(): string {
   "holder": "nome do titular/requerente",
   "examiner_or_opponent": "Se for oposição: nome do oponente. Se for indeferimento ou exigência de mérito: nome do(a) examinador(a) do INPI que assinou a decisão. Se for notificação extrajudicial: nome do notificado.",
   "legal_basis": "fundamento legal usado pelo INPI na decisão"
-}`;
+}
+
+REGRAS OBRIGATÓRIAS:
+- TODOS os valores devem ser STRINGS. NUNCA retorne objetos, arrays ou null.
+- Para "legal_basis", retorne uma ÚNICA STRING como: "Art. 124, XIX da LPI — colidência com marca anterior". NUNCA retorne { "article": "...", "description": "..." }.
+- Se não conseguir extrair algum dado, retorne string vazia "".`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1016,7 +1063,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
 
       return new Response(JSON.stringify({
         success: true,
-        extracted_data: extractedData,
+        extracted_data: sanitizeExtracted(extractedData),
         resource_content: finalContent,
         resource_type: resourceType,
         resource_type_label: RESOURCE_TYPE_LABELS[resourceType]
@@ -1094,7 +1141,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
 
       return new Response(JSON.stringify({
         success: true,
-        extracted_data: extractedData,
+        extracted_data: sanitizeExtracted(extractedData),
         resource_content: finalContent,
         resource_type: resourceType,
         resource_type_label: RESOURCE_TYPE_LABELS[resourceType]
@@ -1215,7 +1262,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
       const normalizedPartial = enforceMandatoryOpening(pass1Content, resourceTypeLabel, enriched);
       return new Response(JSON.stringify({
         success: true,
-        extracted_data: enriched,
+        extracted_data: sanitizeExtracted(enriched),
         resource_content: normalizedPartial,
         resource_type: resourceType,
         resource_type_label: resourceTypeLabel,
@@ -1239,7 +1286,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     return new Response(
       JSON.stringify({
         success: true,
-        extracted_data: enriched,
+        extracted_data: sanitizeExtracted(enriched),
         resource_content: fullContent,
         resource_type: resourceType,
         resource_type_label: resourceTypeLabel

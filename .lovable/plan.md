@@ -1,30 +1,38 @@
-# Corrigir erro ao final da geração de Recurso INPI
+Diagnóstico encontrado:
 
-## Diagnóstico
+- O erro atual não é mais do agente selecionado.
+- O console mostra `React error #31` com objeto `{ article, description }`, que significa: a tela está tentando renderizar um objeto diretamente no React.
+- A função `process-inpi-resource` finaliza com sucesso (`TWO-PASS GENERATION COMPLETE`), então o backend gera o recurso; o crash acontece depois, ao entrar na etapa de revisão.
+- O ponto crítico é `src/pages/admin/RecursosINPI.tsx`, na grade de “Dados Extraídos do Documento”: `extractedData.legal_basis` às vezes vem da IA como objeto, por exemplo `{ article, description }`, e a tela renderiza esse valor diretamente em `<p>{item.value}</p>`.
 
-Pelos logs da edge function `process-inpi-resource`, a geração leva **~75-80 segundos** (PASS 1 + PASS 2 sequenciais com OpenAI gpt-4o, 16k tokens cada). Está perto do limite do gateway (Cloudflare ~100s). Quando o PDF é maior ou a OpenAI fica lenta, a chamada estoura o timeout do proxy: a função completa no servidor, mas o navegador recebe um erro de rede / resposta vazia, e o `supabase.functions.invoke` retorna sem `data`.
+Plano de correção:
 
-Além disso, o passo `processing` no `RecursosINPI.tsx` referencia `agent.color`, `agent.icon`, `agent.bgGlow`, etc. sem proteção. Se `selectedAgent` ficar fora do mapa `AI_AGENTS` (por exemplo, após reset/refresh), o render lança e o `AdminErrorBoundary` mostra "Algo deu errado" — exatamente o que aparece na imagem.
+1. Normalizar os dados extraídos no frontend
+   - Criar uma função segura para converter qualquer valor da IA em texto.
+   - Converter objetos `{ article, description }` para texto legível, como `Art. ... — descrição`.
+   - Converter arrays/objetos inesperados sem quebrar a tela.
+   - Usar essa normalização antes de `setExtractedData`, antes de salvar no banco e antes de montar o PDF.
 
-## Correções
+2. Proteger o conteúdo do recurso
+   - Garantir que `resource_content` sempre seja string antes de ir para `<pre>` e banco.
+   - Se vier objeto por falha da IA, transformar em texto em vez de derrubar a página.
 
-### 1. `src/pages/admin/RecursosINPI.tsx`
-- Garantir `const agent = AI_AGENTS[selectedAgent] ?? AI_AGENTS.mazzola;` (fallback seguro).
-- No bloco `step === 'processing'` proteger todos os acessos com `agent?.` e valores padrão.
-- No `catch` dos 4 fluxos (`processDocument`, `processNotificacao`, `processRespostaNotificacao`, `processProcurador`) registrar `error.message` no console e exibir mensagem específica para timeout/rede ("A geração demorou mais que o esperado. Tente novamente com um PDF menor ou apenas 1 arquivo.") em vez do erro genérico.
+3. Corrigir a função Edge `process-inpi-resource`
+   - Adicionar sanitização no retorno de `extracted_data`.
+   - Forçar `process_number`, `brand_name`, `ncl_class`, `holder`, `examiner_or_opponent` e `legal_basis` a serem strings.
+   - Ajustar o prompt de extração para pedir explicitamente que `legal_basis` seja string, nunca objeto.
 
-### 2. `supabase/functions/process-inpi-resource/index.ts`
-Reduzir tempo total para ficar bem dentro do limite do gateway:
-- Manter PASS 0 (extração) e PASS 1 em paralelo (já está).
-- Reduzir `max_tokens` de cada passe de 16000 para **9000** (suficiente para ~3.500 palavras por passe; hoje as saídas têm 8-11k chars, ~1.700 palavras).
-- Reduzir o prompt da PASS 2 passando apenas os primeiros 4.000 chars de `pass1Content` em vez de 8.000.
-- Manter o fallback parcial caso PASS 2 falhe (já existe).
+4. Revisar os pontos de renderização
+   - Trocar o render direto de `item.value` por render seguro.
+   - Evitar que qualquer campo futuro retornado pela IA cause novamente `Algo deu errado`.
 
-Esses ajustes mantêm a robustez da peça mas cortam ~30-40% do tempo de resposta, eliminando o estouro de timeout que provoca o erro final.
+Arquivos a alterar:
 
-## Validação
+- `src/pages/admin/RecursosINPI.tsx`
+- `supabase/functions/process-inpi-resource/index.ts`
 
-Após o build, abrir Recursos INPI → "Recurso contra Indeferimento" → escolher um agente → anexar PDF → confirmar que:
-1. A barra de progresso conclui sem mostrar a tela "Algo deu errado".
-2. O passo "Revisão" abre com os dados extraídos e o rascunho.
-3. Em caso de falha real, o toast mostra mensagem clara em vez do ErrorBoundary global.
+Resultado esperado:
+
+- O processamento pode chegar a 100% e abrir a revisão sem cair na tela “Algo deu errado”.
+- O fundamento legal aparecerá em texto mesmo quando a IA retornar `{ article, description }`.
+- A função continuará gerando o recurso, mas com saída mais previsível e segura para a interface.

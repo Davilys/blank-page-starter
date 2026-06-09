@@ -258,6 +258,50 @@ const fadeIn = {
   transition: { duration: 0.4, ease: 'easeOut' as const }
 };
 
+// ────────────────────────────────────────────────────────────
+// Safe stringification for AI-returned values.
+// Garante que campos retornados pela IA nunca sejam objetos
+// renderizados diretamente no JSX (causa do React error #31).
+// ────────────────────────────────────────────────────────────
+function toSafeString(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) {
+    return value.map((v) => toSafeString(v)).filter(Boolean).join('; ');
+  }
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    // Caso comum vindo da IA: { article, description }
+    if ('article' in obj || 'description' in obj) {
+      const art = obj.article ? `Art. ${toSafeString(obj.article)}` : '';
+      const desc = obj.description ? toSafeString(obj.description) : '';
+      return [art, desc].filter(Boolean).join(' — ');
+    }
+    // Fallback: junta pares chave: valor de forma legível
+    try {
+      return Object.entries(obj)
+        .map(([k, v]) => `${k}: ${toSafeString(v)}`)
+        .join('; ');
+    } catch {
+      return '';
+    }
+  }
+  return '';
+}
+
+function sanitizeExtractedData(raw: any): ExtractedData {
+  const r = raw || {};
+  return {
+    process_number: toSafeString(r.process_number),
+    brand_name: toSafeString(r.brand_name),
+    ncl_class: toSafeString(r.ncl_class),
+    holder: toSafeString(r.holder),
+    examiner_or_opponent: toSafeString(r.examiner_or_opponent),
+    legal_basis: toSafeString(r.legal_basis),
+  };
+}
+
 export default function RecursosINPI() {
   const [step, setStep] = useState<Step>('list');
   const [resourceType, setResourceType] = useState('');
@@ -531,8 +575,10 @@ export default function RecursosINPI() {
       if (error) throw error;
       if (!data.success) throw new Error(data.error || 'Erro ao processar documento');
 
-      setExtractedData(data.extracted_data);
-      setDraftContent(data.resource_content);
+      const safeExtracted = sanitizeExtractedData(data.extracted_data);
+      const safeContent = toSafeString(data.resource_content);
+      setExtractedData(safeExtracted);
+      setDraftContent(safeContent);
 
       const { data: { user } } = await supabase.auth.getUser();
 
@@ -541,13 +587,13 @@ export default function RecursosINPI() {
         .insert({
           user_id: user?.id,
           resource_type: resourceType,
-          process_number: data.extracted_data?.process_number,
-          brand_name: data.extracted_data?.brand_name,
-          ncl_class: data.extracted_data?.ncl_class,
-          holder: data.extracted_data?.holder,
-          examiner_or_opponent: data.extracted_data?.examiner_or_opponent,
-          legal_basis: data.extracted_data?.legal_basis,
-          draft_content: data.resource_content,
+          process_number: safeExtracted.process_number || null,
+          brand_name: safeExtracted.brand_name || null,
+          ncl_class: safeExtracted.ncl_class || null,
+          holder: safeExtracted.holder || null,
+          examiner_or_opponent: safeExtracted.examiner_or_opponent || null,
+          legal_basis: safeExtracted.legal_basis || null,
+          draft_content: safeContent,
           status: 'pending_review'
         })
         .select()
@@ -602,8 +648,10 @@ export default function RecursosINPI() {
       if (error) throw error;
       if (!data.success) throw new Error(data.error || 'Erro ao processar notificação');
 
-      setExtractedData(data.extracted_data);
-      setDraftContent(data.resource_content);
+      const safeExtracted = sanitizeExtractedData(data.extracted_data);
+      const safeContent = toSafeString(data.resource_content);
+      setExtractedData(safeExtracted);
+      setDraftContent(safeContent);
 
       const { data: { user } } = await supabase.auth.getUser();
 
@@ -616,7 +664,7 @@ export default function RecursosINPI() {
           brand_name: notificanteData.marca || null,
           holder: notificanteData.nome,
           examiner_or_opponent: notificadoData.nome,
-          draft_content: data.resource_content,
+          draft_content: safeContent,
           status: 'pending_review'
         })
         .select()
@@ -668,8 +716,10 @@ export default function RecursosINPI() {
       if (error) throw error;
       if (!data.success) throw new Error(data.error || 'Erro ao processar resposta');
 
-      setExtractedData(data.extracted_data);
-      setDraftContent(data.resource_content);
+      const safeExtracted = sanitizeExtractedData(data.extracted_data);
+      const safeContent = toSafeString(data.resource_content);
+      setExtractedData(safeExtracted);
+      setDraftContent(safeContent);
 
       const { data: { user } } = await supabase.auth.getUser();
 
@@ -678,11 +728,11 @@ export default function RecursosINPI() {
         .insert({
           user_id: user?.id,
           resource_type: 'resposta_notificacao_extrajudicial',
-          process_number: data.extracted_data?.process_number || null,
-          brand_name: data.extracted_data?.brand_name || null,
-          holder: data.extracted_data?.holder || null,
-          examiner_or_opponent: data.extracted_data?.examiner_or_opponent || null,
-          draft_content: data.resource_content,
+          process_number: safeExtracted.process_number || null,
+          brand_name: safeExtracted.brand_name || null,
+          holder: safeExtracted.holder || null,
+          examiner_or_opponent: safeExtracted.examiner_or_opponent || null,
+          draft_content: safeContent,
           status: 'pending_review'
         })
         .select()
@@ -744,8 +794,10 @@ export default function RecursosINPI() {
       const finalExtracted = data.extracted_data && Object.keys(data.extracted_data).length > 0
         ? { ...fallbackExtracted, ...data.extracted_data }
         : fallbackExtracted;
-      setExtractedData(finalExtracted);
-      setDraftContent(data.resource_content);
+      const safeExtracted = sanitizeExtractedData(finalExtracted);
+      const safeContent = toSafeString(data.resource_content);
+      setExtractedData(safeExtracted);
+      setDraftContent(safeContent);
 
       const { data: { user } } = await supabase.auth.getUser();
 
@@ -759,7 +811,7 @@ export default function RecursosINPI() {
           ncl_class: procuradorData.ncl_class || null,
           holder: procuradorData.titular,
           examiner_or_opponent: 'Davilys Danques de Oliveira Cunha',
-          draft_content: data.resource_content,
+          draft_content: safeContent,
           status: 'pending_review'
         })
         .select()
@@ -2355,7 +2407,7 @@ export default function RecursosINPI() {
                       ]).map((item, i) => (
                         <div key={i} className="p-3 rounded-xl bg-muted/50 border border-border/50">
                           <span className="text-xs text-muted-foreground flex items-center gap-1">{item.icon} {item.label}</span>
-                          <p className="font-medium text-sm mt-1 truncate">{item.value || '-'}</p>
+                          <p className="font-medium text-sm mt-1 truncate">{toSafeString(item.value) || '-'}</p>
                         </div>
                       ))}
                     </div>
@@ -2373,7 +2425,7 @@ export default function RecursosINPI() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="bg-white dark:bg-gray-950 border rounded-xl p-6 max-h-[500px] overflow-y-auto shadow-inner">
-                    <pre className="whitespace-pre-wrap font-serif text-sm leading-relaxed text-foreground">{draftContent}</pre>
+                    <pre className="whitespace-pre-wrap font-serif text-sm leading-relaxed text-foreground">{toSafeString(draftContent)}</pre>
                   </div>
                   
                   <div className="p-4 rounded-xl bg-muted/50 border space-y-3">
