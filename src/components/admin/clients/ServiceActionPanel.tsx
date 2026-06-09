@@ -34,7 +34,7 @@ interface ServiceActionPanelProps {
   alreadySent?: { sent_at: string; description: string } | null;
 }
 
-const SALARIO_MINIMO_2025 = 1518;
+const SALARIO_MINIMO_2026 = 1621;
 
 // Vencimento padrão: hoje + 10 dias corridos
 function getDueDateIn10Days(): Date {
@@ -195,14 +195,14 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
       ? generateDistratoEmail(client)
       : isArquivado
         ? generateArquivadoEmail(client)
-        : generateEmailTemplate(client, stage, SALARIO_MINIMO_2025)
+        : generateEmailTemplate(client, stage, SALARIO_MINIMO_2026)
   );
   const [whatsappMessage, setWhatsappMessage] = useState(() =>
     isDistrato
       ? generateDistratoWhatsApp(client)
       : isArquivado
         ? generateArquivadoWhatsApp(client)
-        : generateWhatsAppTemplate(client, stage, SALARIO_MINIMO_2025)
+        : generateWhatsAppTemplate(client, stage, SALARIO_MINIMO_2026)
   );
   const [sendEmail, setSendEmail] = useState(true);
   const [sendWhatsApp, setSendWhatsApp] = useState(true);
@@ -210,7 +210,7 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Billing
-  const [valor, setValor] = useState(SALARIO_MINIMO_2025);
+  const [valor, setValor] = useState(SALARIO_MINIMO_2026);
   const [paymentType, setPaymentType] = useState<'avista' | 'parcelado'>('avista');
   const [paymentMethod, setPaymentMethod] = useState<'boleto' | 'cartao'>('boleto');
   const [installments, setInstallments] = useState(2);
