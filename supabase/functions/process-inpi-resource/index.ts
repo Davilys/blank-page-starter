@@ -786,7 +786,12 @@ function buildExtractionPrompt(): string {
   "holder": "nome do titular/requerente",
   "examiner_or_opponent": "Se for oposição: nome do oponente. Se for indeferimento ou exigência de mérito: nome do(a) examinador(a) do INPI que assinou a decisão. Se for notificação extrajudicial: nome do notificado.",
   "legal_basis": "fundamento legal usado pelo INPI na decisão"
-}`;
+}
+
+REGRAS OBRIGATÓRIAS:
+- TODOS os valores devem ser STRINGS. NUNCA retorne objetos, arrays ou null.
+- Para "legal_basis", retorne uma ÚNICA STRING como: "Art. 124, XIX da LPI — colidência com marca anterior". NUNCA retorne { "article": "...", "description": "..." }.
+- Se não conseguir extrair algum dado, retorne string vazia "".`;
 }
 
 // ═══════════════════════════════════════════════════════════
