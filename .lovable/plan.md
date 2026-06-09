@@ -1,24 +1,29 @@
-# Desativar Bônus por Milestone por padrão
+## Mudança
 
-## Situação atual
-- O toggle `milestone_enabled` **já existe** em Configurações › Premiação (`AwardSettings.tsx`), separado para Publicações e Cobranças.
-- O cálculo em `Premiacao.tsx` (`calcPublicacaoMilestoneBonus` / `calcCobrancaMilestoneBonus`) **já respeita** `milestone_enabled === false` e retorna bônus zero.
-- **Problema:** o valor padrão de `milestone_enabled` é `true`, então o bônus aparece e soma sozinho na aba Premiação mesmo sem o admin ter ativado nada. E o card "Bônus por Milestone — A cada 10 resolvidas" continua visível (apenas esmaecido) quando desligado.
+Na aba **Serviços** do ficheiro do cliente, ao acionar uma exigência do INPI, o texto do **WhatsApp** será trocado por um tom mais conversacional. O **e-mail permanece exatamente igual** (sem nenhuma alteração).
 
-## Mudanças
+## Arquivo
 
-### 1. `src/components/admin/settings/AwardSettings.tsx`
-- Trocar defaults `milestone_enabled: true` → `false` (Premium e Corporativo).
-- Manter toggle visual já existente (sem alterações de UI).
+- `src/components/admin/clients/ServiceActionPanel.tsx` → função `generateWhatsAppTemplate` (linhas 76–91).
 
-### 2. `src/pages/admin/Premiacao.tsx`
-- Trocar defaults `milestone_enabled: true` → `false` nas configurações default (`publicacao` e `cobranca`).
-- Na renderização do bloco "Bônus por Milestone — A cada 10 resolvidas" (linhas ~1066–1180): só renderizar o card de Publicações se `cfg.publicacao.milestone_enabled`, e o de Cobranças se `cfg.cobranca.milestone_enabled`. Se ambos estiverem desativados, **não exibir** a seção inteira.
-- O cálculo já zera quando desativado, então `totalMilestoneBonus`, ranking e totais já ficam corretos sem mais mudanças.
+## Novo texto do WhatsApp
 
-### 3. Migração de dados existentes
-- Como a configuração fica em `system_settings` (JSON), contas já salvas continuarão com `milestone_enabled: true`. Aplicar migração leve para virar `false` em registros existentes (UPDATE no JSON da chave `awards`/equivalente). Vou confirmar a chave exata antes de gerar a migração.
+```
+Olá, {nome do cliente}, tudo bem? 
 
-## Resultado
-- Por padrão o Bônus por Milestone fica **desligado**.
-- O card só aparece e o bônus só é somado quando o admin ativa em **Configurações › Premiação** (toggle por plano, Publicações e/ou Cobranças).
+Preciso informar uma atualização importante sobre o processo da marca {Nome da marca}, nº {numero do processo}.
+
+O INPI publicou uma exigência referente ao processo, e o prazo para cumprimento é de 60 dias corridos a partir da publicação na Revista da Propriedade Industrial (RPI).
+
+Preciso URGENTE agendar uma reunião para que eu possa atualizá-lo(a) sobre o processo e orientá-lo(a) quanto às providências necessárias.
+
+Por gentileza, informe o melhor dia e horário para conversarmos.
+```
+
+Variáveis preenchidas dinamicamente: `nome` = `client.full_name`, `marca` = `client.brand_name`, `numero do processo` = `client.process_number` (se ausente, omite o trecho "sob o número ...").
+
+## Fora de escopo
+
+- E-mail (`generateEmailTemplate`) — **não tocar**.
+- Valor da cobrança / fluxo de fatura — inalterado (o novo texto do WhatsApp não menciona valor, conforme pedido).
+- Demais templates (arquivado, distrato) — inalterados.
