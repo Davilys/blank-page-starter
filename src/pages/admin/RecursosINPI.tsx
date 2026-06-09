@@ -258,6 +258,50 @@ const fadeIn = {
   transition: { duration: 0.4, ease: 'easeOut' as const }
 };
 
+// ────────────────────────────────────────────────────────────
+// Safe stringification for AI-returned values.
+// Garante que campos retornados pela IA nunca sejam objetos
+// renderizados diretamente no JSX (causa do React error #31).
+// ────────────────────────────────────────────────────────────
+function toSafeString(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) {
+    return value.map((v) => toSafeString(v)).filter(Boolean).join('; ');
+  }
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    // Caso comum vindo da IA: { article, description }
+    if ('article' in obj || 'description' in obj) {
+      const art = obj.article ? `Art. ${toSafeString(obj.article)}` : '';
+      const desc = obj.description ? toSafeString(obj.description) : '';
+      return [art, desc].filter(Boolean).join(' — ');
+    }
+    // Fallback: junta pares chave: valor de forma legível
+    try {
+      return Object.entries(obj)
+        .map(([k, v]) => `${k}: ${toSafeString(v)}`)
+        .join('; ');
+    } catch {
+      return '';
+    }
+  }
+  return '';
+}
+
+function sanitizeExtractedData(raw: any): ExtractedData {
+  const r = raw || {};
+  return {
+    process_number: toSafeString(r.process_number),
+    brand_name: toSafeString(r.brand_name),
+    ncl_class: toSafeString(r.ncl_class),
+    holder: toSafeString(r.holder),
+    examiner_or_opponent: toSafeString(r.examiner_or_opponent),
+    legal_basis: toSafeString(r.legal_basis),
+  };
+}
+
 export default function RecursosINPI() {
   const [step, setStep] = useState<Step>('list');
   const [resourceType, setResourceType] = useState('');
