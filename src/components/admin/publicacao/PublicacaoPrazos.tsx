@@ -127,16 +127,29 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
       });
   }, [publicacoes]);
 
+  const desistiuList = useMemo(() => {
+    return publicacoes
+      .filter(p => p.cumprimento_status === 'desistiu')
+      .map(p => {
+        const deadline = computeDeadline(p);
+        return { ...p, _deadline: deadline, _days: null as number | null, _bucket: 'desistiu' as Bucket };
+      });
+  }, [publicacoes]);
+
   const counts = useMemo(() => {
-    const c: Record<Bucket, number> = { no_prazo: 0, '30dias': 0, ultima_semana: 0, vencidos: 0, cumpridos: 0 };
-    eligible.forEach(p => { if (p._bucket && p._bucket !== 'cumpridos') c[p._bucket as Bucket]++; });
+    const c: Record<Bucket, number> = { no_prazo: 0, '30dias': 0, ultima_semana: 0, vencidos: 0, cumpridos: 0, desistiu: 0 };
+    eligible.forEach(p => { if (p._bucket && p._bucket !== 'cumpridos' && p._bucket !== 'desistiu') c[p._bucket as Bucket]++; });
     c.cumpridos = cumpridosList.length;
+    c.desistiu = desistiuList.length;
     return c;
-  }, [eligible, cumpridosList]);
+  }, [eligible, cumpridosList, desistiuList]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    const source = active === 'cumpridos' ? cumpridosList : eligible.filter(p => p._bucket === active);
+    const source =
+      active === 'cumpridos' ? cumpridosList :
+      active === 'desistiu' ? desistiuList :
+      eligible.filter(p => p._bucket === active);
     return source
       .filter(p => {
         if (!term) return true;
@@ -149,7 +162,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
         );
       })
       .sort((a, b) => (a._days ?? 9999) - (b._days ?? 9999));
-  }, [eligible, cumpridosList, active, search, processMap, clientMap]);
+  }, [eligible, cumpridosList, desistiuList, active, search, processMap, clientMap]);
 
   const handleSetStatus = async (pub: any, status: AndamentoStatus) => {
     const { data: { user } } = await supabase.auth.getUser();
