@@ -11,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Mail, MessageCircle, CheckCircle2, PauseCircle, RotateCcw, Send } from 'lucide-react';
-import { COBRANCA_TEMPLATES, type CobrancaTemplate } from './cobrancaTemplates';
+import { COBRANCA_TEMPLATES, VENCIDO_FORMAL_TEMPLATE, type CobrancaTemplate } from './cobrancaTemplates';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -98,11 +98,29 @@ export function NotificarClienteDialog({ open, onOpenChange, publicacao, client,
 
   const dataInicio = schedule?.data_inicio ? parseISO(schedule.data_inicio) : new Date();
   const daysSince = differenceInDays(new Date(), dataInicio);
+  // Determine if publicacao is vencida (deadline passed)
+  const deadline = publicacao.proximo_prazo_critico
+    ? parseISO(publicacao.proximo_prazo_critico)
+    : publicacao.data_publicacao_rpi
+      ? addDays(parseISO(publicacao.data_publicacao_rpi), 60)
+      : null;
+  const daysToDeadline = deadline ? differenceInDays(deadline, new Date()) : null;
+  const isVencido = daysToDeadline !== null && daysToDeadline < 0;
+  const currentBucket: string =
+    daysToDeadline === null ? 'no_prazo'
+    : daysToDeadline < 0 ? 'vencidos'
+    : daysToDeadline <= 7 ? 'ultima_semana'
+    : daysToDeadline <= 30 ? '30dias'
+    : 'no_prazo';
+
   const tpls = [
     { tpl: COBRANCA_TEMPLATES[0], at: schedule?.notif_1_at, ch: schedule?.notif_1_channel },
     { tpl: COBRANCA_TEMPLATES[1], at: schedule?.notif_2_at, ch: schedule?.notif_2_channel },
     { tpl: COBRANCA_TEMPLATES[2], at: schedule?.notif_3_at, ch: schedule?.notif_3_channel },
   ];
+  const availableTpls: CobrancaTemplate[] = isVencido
+    ? [...COBRANCA_TEMPLATES, VENCIDO_FORMAL_TEMPLATE]
+    : COBRANCA_TEMPLATES;
 
   const handleSend = async () => {
     if (!schedule) return;
@@ -137,6 +155,9 @@ export function NotificarClienteDialog({ open, onOpenChange, publicacao, client,
       if (activeTpl.id === 1) { updates.notif_1_at = now; updates.notif_1_channel = channel; }
       if (activeTpl.id === 2) { updates.notif_2_at = now; updates.notif_2_channel = channel; }
       if (activeTpl.id === 3) { updates.notif_3_at = now; updates.notif_3_channel = channel; }
+      // Always record the bucket of the last notification (covers template 4 too)
+      updates.last_notif_at = now;
+      updates.last_notif_bucket = currentBucket;
 
       const { data: upd } = await supabase
         .from('publicacao_cobranca_schedule')
@@ -146,6 +167,7 @@ export function NotificarClienteDialog({ open, onOpenChange, publicacao, client,
         .single();
       setSchedule(upd as any);
       queryClient.invalidateQueries({ queryKey: ['publicacao-cobranca'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-marcas'] });
       toast.success(`${activeTpl.label} enviada (${channels.join(' + ')})`);
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao enviar notificação');
