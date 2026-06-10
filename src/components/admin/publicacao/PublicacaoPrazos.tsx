@@ -10,14 +10,14 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle2, Clock, AlertTriangle, Archive, Search, Eye, Bell, ChevronDown, CalendarCheck, Wallet, UserPlus, X } from 'lucide-react';
+import { CheckCircle2, Clock, AlertTriangle, Archive, Search, Eye, Bell, ChevronDown, CalendarCheck, Wallet, UserPlus, X, Ban } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { STATUS_CONFIG } from './types';
 import { NotificarClienteDialog } from './NotificarClienteDialog';
 import { VincularClienteDialog } from './VincularClienteDialog';
 
-type Bucket = 'no_prazo' | '30dias' | 'ultima_semana' | 'vencidos' | 'cumpridos';
+type Bucket = 'no_prazo' | '30dias' | 'ultima_semana' | 'vencidos' | 'cumpridos' | 'desistiu';
 
 interface PublicacaoPrazosProps {
   publicacoes: any[];
@@ -50,9 +50,10 @@ const BUCKETS: { id: Bucket; label: string; color: string; ring: string }[] = [
   { id: 'ultima_semana', label: 'Última Semana', color: 'text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/40', ring: 'ring-orange-500' },
   { id: 'vencidos', label: 'Vencidos', color: 'text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/40', ring: 'ring-red-500' },
   { id: 'cumpridos', label: 'Cumpridos', color: 'text-teal-700 dark:text-teal-400 bg-teal-100 dark:bg-teal-900/40', ring: 'ring-teal-500' },
+  { id: 'desistiu', label: 'Desistiu', color: 'text-zinc-700 dark:text-zinc-300 bg-zinc-200 dark:bg-zinc-800/60', ring: 'ring-zinc-500' },
 ];
 
-type AndamentoStatus = 'cumprido' | 'contato_agendado' | 'aguardando_pagamento' | null;
+type AndamentoStatus = 'cumprido' | 'contato_agendado' | 'aguardando_pagamento' | 'desistiu' | null;
 
 const ANDAMENTO_CFG: Record<Exclude<AndamentoStatus, null>, { label: string; trigger: string; icon: any }> = {
   cumprido: {
@@ -69,6 +70,11 @@ const ANDAMENTO_CFG: Record<Exclude<AndamentoStatus, null>, { label: string; tri
     label: 'Aguardando Pagamento',
     trigger: 'border-amber-500/50 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50',
     icon: Wallet,
+  },
+  desistiu: {
+    label: 'Desistiu',
+    trigger: 'border-zinc-500/50 bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800/60 dark:text-zinc-300 dark:hover:bg-zinc-800',
+    icon: Ban,
   },
 };
 
@@ -97,7 +103,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
   // Filter eligible publications for deadline buckets (not certified/archived/cumprido)
   const eligible = useMemo(() => {
     return publicacoes
-      .filter(p => p.status !== 'certificado' && p.status !== 'arquivado' && !p.cumprimento_ok && p.cumprimento_status !== 'cumprido')
+      .filter(p => p.status !== 'certificado' && p.status !== 'arquivado' && !p.cumprimento_ok && p.cumprimento_status !== 'cumprido' && p.cumprimento_status !== 'desistiu')
       .map(p => {
         const deadline = computeDeadline(p);
         const days = deadline ? differenceInDays(parseISO(deadline), new Date()) : null;
@@ -121,16 +127,29 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
       });
   }, [publicacoes]);
 
+  const desistiuList = useMemo(() => {
+    return publicacoes
+      .filter(p => p.cumprimento_status === 'desistiu')
+      .map(p => {
+        const deadline = computeDeadline(p);
+        return { ...p, _deadline: deadline, _days: null as number | null, _bucket: 'desistiu' as Bucket };
+      });
+  }, [publicacoes]);
+
   const counts = useMemo(() => {
-    const c: Record<Bucket, number> = { no_prazo: 0, '30dias': 0, ultima_semana: 0, vencidos: 0, cumpridos: 0 };
-    eligible.forEach(p => { if (p._bucket && p._bucket !== 'cumpridos') c[p._bucket as Bucket]++; });
+    const c: Record<Bucket, number> = { no_prazo: 0, '30dias': 0, ultima_semana: 0, vencidos: 0, cumpridos: 0, desistiu: 0 };
+    eligible.forEach(p => { if (p._bucket && p._bucket !== 'cumpridos' && p._bucket !== 'desistiu') c[p._bucket as Bucket]++; });
     c.cumpridos = cumpridosList.length;
+    c.desistiu = desistiuList.length;
     return c;
-  }, [eligible, cumpridosList]);
+  }, [eligible, cumpridosList, desistiuList]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    const source = active === 'cumpridos' ? cumpridosList : eligible.filter(p => p._bucket === active);
+    const source =
+      active === 'cumpridos' ? cumpridosList :
+      active === 'desistiu' ? desistiuList :
+      eligible.filter(p => p._bucket === active);
     return source
       .filter(p => {
         if (!term) return true;
@@ -143,7 +162,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
         );
       })
       .sort((a, b) => (a._days ?? 9999) - (b._days ?? 9999));
-  }, [eligible, cumpridosList, active, search, processMap, clientMap]);
+  }, [eligible, cumpridosList, desistiuList, active, search, processMap, clientMap]);
 
   const handleSetStatus = async (pub: any, status: AndamentoStatus) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -382,6 +401,9 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleSetStatus(pub, 'aguardando_pagamento')} className="text-amber-700 dark:text-amber-400">
                                 <Wallet className="w-4 h-4 mr-2" /> Aguardando Pagamento
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleSetStatus(pub, 'desistiu')} className="text-zinc-700 dark:text-zinc-300">
+                                <Ban className="w-4 h-4 mr-2" /> Desistiu
                               </DropdownMenuItem>
                               {andamento && (
                                 <>
