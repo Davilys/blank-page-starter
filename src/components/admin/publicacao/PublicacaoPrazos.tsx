@@ -10,14 +10,14 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle2, Clock, AlertTriangle, Archive, Search, Eye, Bell, ChevronDown, CalendarCheck, Wallet, UserPlus, X } from 'lucide-react';
+import { CheckCircle2, Clock, AlertTriangle, Archive, Search, Eye, Bell, ChevronDown, CalendarCheck, Wallet, UserPlus, X, Ban } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { STATUS_CONFIG } from './types';
 import { NotificarClienteDialog } from './NotificarClienteDialog';
 import { VincularClienteDialog } from './VincularClienteDialog';
 
-type Bucket = 'no_prazo' | '30dias' | 'ultima_semana' | 'vencidos' | 'cumpridos';
+type Bucket = 'no_prazo' | '30dias' | 'ultima_semana' | 'vencidos' | 'cumpridos' | 'desistiu';
 
 interface PublicacaoPrazosProps {
   publicacoes: any[];
@@ -50,9 +50,10 @@ const BUCKETS: { id: Bucket; label: string; color: string; ring: string }[] = [
   { id: 'ultima_semana', label: 'Última Semana', color: 'text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/40', ring: 'ring-orange-500' },
   { id: 'vencidos', label: 'Vencidos', color: 'text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/40', ring: 'ring-red-500' },
   { id: 'cumpridos', label: 'Cumpridos', color: 'text-teal-700 dark:text-teal-400 bg-teal-100 dark:bg-teal-900/40', ring: 'ring-teal-500' },
+  { id: 'desistiu', label: 'Desistiu', color: 'text-zinc-700 dark:text-zinc-300 bg-zinc-200 dark:bg-zinc-800/60', ring: 'ring-zinc-500' },
 ];
 
-type AndamentoStatus = 'cumprido' | 'contato_agendado' | 'aguardando_pagamento' | null;
+type AndamentoStatus = 'cumprido' | 'contato_agendado' | 'aguardando_pagamento' | 'desistiu' | null;
 
 const ANDAMENTO_CFG: Record<Exclude<AndamentoStatus, null>, { label: string; trigger: string; icon: any }> = {
   cumprido: {
@@ -69,6 +70,11 @@ const ANDAMENTO_CFG: Record<Exclude<AndamentoStatus, null>, { label: string; tri
     label: 'Aguardando Pagamento',
     trigger: 'border-amber-500/50 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50',
     icon: Wallet,
+  },
+  desistiu: {
+    label: 'Desistiu',
+    trigger: 'border-zinc-500/50 bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800/60 dark:text-zinc-300 dark:hover:bg-zinc-800',
+    icon: Ban,
   },
 };
 
