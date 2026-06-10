@@ -15,6 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { cn } from '@/lib/utils';
 import { STATUS_CONFIG } from './types';
 import { NotificarClienteDialog } from './NotificarClienteDialog';
+import { VincularClienteDialog } from './VincularClienteDialog';
 
 type Bucket = 'no_prazo' | '30dias' | 'ultima_semana' | 'vencidos' | 'cumpridos';
 
@@ -77,8 +78,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
   const queryClient = useQueryClient();
   const [notifyPub, setNotifyPub] = useState<any | null>(null);
   const [schedules, setSchedules] = useState<Record<string, any>>({});
-  const [linkingPubId, setLinkingPubId] = useState<string | null>(null);
-  const [linkSearch, setLinkSearch] = useState('');
+  const [linkDialogPub, setLinkDialogPub] = useState<any | null>(null);
 
   useEffect(() => {
     const ids = publicacoes.map(p => p.id);
@@ -177,8 +177,6 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
       .eq('id', pub.id);
     if (error) { toast.error('Erro ao vincular cliente'); return; }
     toast.success('Cliente vinculado');
-    setLinkingPubId(null);
-    setLinkSearch('');
     queryClient.invalidateQueries({ queryKey: ['publicacoes-marcas'] });
   };
 
@@ -278,63 +276,12 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                           >
                             {client.full_name || client.email}
                           </button>
-                        ) : linkingPubId === pub.id ? (
-                          <div className="relative">
-                            <div className="flex items-center gap-1">
-                              <Input
-                                autoFocus
-                                placeholder="Buscar cliente..."
-                                value={linkSearch}
-                                onChange={(e) => setLinkSearch(e.target.value)}
-                                className="h-7 text-xs"
-                              />
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7"
-                                onClick={() => { setLinkingPubId(null); setLinkSearch(''); }}
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
-                            {linkSearch.length >= 2 && (
-                              <div className="absolute z-50 mt-1 w-64 bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                                {clients
-                                  .filter((c) => {
-                                    const q = linkSearch.toLowerCase();
-                                    return (
-                                      c.full_name?.toLowerCase().includes(q) ||
-                                      c.email?.toLowerCase().includes(q) ||
-                                      (c as any).cpf_cnpj?.toLowerCase?.().includes(q)
-                                    );
-                                  })
-                                  .slice(0, 8)
-                                  .map((c) => (
-                                    <button
-                                      key={c.id}
-                                      type="button"
-                                      className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent border-b last:border-0"
-                                      onClick={() => handleLinkClient(pub, c.id)}
-                                    >
-                                      <div className="font-medium">{c.full_name || 'Sem nome'}</div>
-                                      <div className="text-[10px] text-muted-foreground">{c.email}</div>
-                                    </button>
-                                  ))}
-                                {clients.filter((c) => {
-                                  const q = linkSearch.toLowerCase();
-                                  return c.full_name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q);
-                                }).length === 0 && (
-                                  <div className="px-3 py-2 text-xs text-muted-foreground">Nenhum cliente encontrado</div>
-                                )}
-                              </div>
-                            )}
-                          </div>
                         ) : (
                           <Button
                             size="sm"
                             variant="outline"
                             className="h-7 px-2 text-xs gap-1 border-dashed border-primary/50 text-primary hover:bg-primary/10"
-                            onClick={() => { setLinkingPubId(pub.id); setLinkSearch(''); }}
+                            onClick={() => setLinkDialogPub(pub)}
                           >
                             <UserPlus className="w-3.5 h-3.5" /> Vincular cliente
                           </Button>
@@ -473,6 +420,14 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
         publicacao={notifyPub}
         client={notifyPub?.client_id ? clientMap.get(notifyPub.client_id) : null}
         marca={(notifyPub?.process_id && processMap.get(notifyPub.process_id)?.brand_name) || notifyPub?.brand_name_rpi || 'sua marca'}
+      />
+
+      <VincularClienteDialog
+        open={!!linkDialogPub}
+        onOpenChange={(o) => { if (!o) setLinkDialogPub(null); }}
+        publicacao={linkDialogPub}
+        clients={clients}
+        onLink={async (clientId) => { if (linkDialogPub) await handleLinkClient(linkDialogPub, clientId); }}
       />
     </div>
   );

@@ -1,54 +1,37 @@
 ## Objetivo
-1. Adicionar 5ª aba **Cumpridos** na lista de faixas de prazo.
-2. Sinalização visual clara quando o cliente **já foi notificado** na faixa atual (No Prazo / 30 Dias / Última Semana / Vencidos), para evitar reenvio.
-3. Novo modelo de notificação **"Notificação Formal de Vencimento"** disponível na aba Vencidos, com o texto fornecido pelo usuário.
+Substituir o autocomplete inline da coluna **Vincular cliente** (aba Prazos) por um diálogo robusto no estilo da aba **Revista**, e oferecer o botão **"Novo Cliente"** dentro do diálogo, reaproveitando o `CreateClientDialog` da aba Clientes.
 
-## 1. Nova aba "Cumpridos" em `PublicacaoPrazos.tsx`
-- Adicionar bucket `cumpridos` em `Bucket` e em `BUCKETS` (cor verde escuro / esmeralda, distinta do "No Prazo").
-- Mudar grid de `lg:grid-cols-4` para `lg:grid-cols-5`.
-- Ajustar `eligible`:
-  - Listas de prazo (no_prazo / 30dias / ultima_semana / vencidos) continuam excluindo `cumprimento_ok = true` / `cumprimento_status = 'cumprido'`.
-  - Quando `active === 'cumpridos'`, montar lista separada com publicações onde `cumprimento_status = 'cumprido'` (ou `cumprimento_ok = true`), ordenadas por `cumprimento_at` desc. Essas linhas não recalculam bucket por dias.
-- Counts: incluir `cumpridos` no objeto `counts`.
-- Na tabela, quando `active === 'cumpridos'`:
-  - Mostrar coluna "Cumprido em" no lugar de "Dias Restantes" (ou adicional), exibindo `cumprimento_at` formatado.
-  - Botão de status já mostra "Cumprido" verde; menu permite "Limpar status" para devolver à lista de prazos.
-  - Ocultar botão "Arquivar" (já cumprido).
+## 1. Novo componente `VincularClienteDialog`
+Arquivo: `src/components/admin/publicacao/VincularClienteDialog.tsx`.
 
-## 2. Indicador "Já notificado" por faixa
-Hoje a coluna **Cobrança** mostra apenas `{sentCount}/3 enviadas` global. Vamos enriquecer:
+Props: `open`, `onOpenChange`, `publicacao`, `clients`, `onLink(clientId)`.
 
-- Determinar a **faixa atual** do registro (no_prazo / 30dias / ultima_semana / vencidos) e gravar essa informação no momento de cada notificação. Implementação:
-  - Adicionar coluna `notif_X_bucket` (text) em `publicacao_cobranca_schedule` para cada uma das 3 notificações já existentes — ou, mais simples, uma única coluna `last_notif_bucket` + `last_notif_at`.
-  - Decisão: usar `last_notif_bucket` (text) + `last_notif_at` (timestamptz). Atualizado tanto por envio manual (`NotificarClienteDialog`) quanto pelo cron `check-publicacao-notificacoes`.
-- Na linha da tabela, mostrar badge **"✓ Notificado nesta faixa"** (verde) quando `schedule.last_notif_bucket === pub._bucket`. Caso contrário, badge cinza "Pendente nesta faixa".
-- Esse badge aparece junto do contador `{sentCount}/3`, dentro da coluna "Cobrança".
+Layout (espelha o Vincular Cliente da Revista):
+- Cabeçalho com ícone `UserPlus` + título "Vincular Cliente" + descrição.
+- Bloco resumo da publicação (Marca, Processo, Data publicação RPI).
+- Campo **Buscar Cliente** com ícone, placeholder "Nome, email, empresa, CPF/CNPJ ou telefone…".
+- Label "Selecionar Cliente (N disponíveis, K encontrados)" + botão `CreateClientDialog` (Novo Cliente) ao lado.
+- `ScrollArea` de 240px listando até 50 resultados; cada item exibe nome, email, empresa e CPF/CNPJ; seleção destacada com `bg-primary/10`.
+- Mensagens contextuais ("Digite ao menos 2 letras", "Nenhum cliente encontrado para …. Use Novo Cliente para cadastrar.").
+- Footer: **Cancelar** + **Vincular Cliente** (desabilita até selecionar).
 
-### Onde gravar `last_notif_bucket`
-- `NotificarClienteDialog.tsx` → ao enviar, calcular o bucket atual e atualizar `publicacao_cobranca_schedule` com `last_notif_bucket`, `last_notif_at`.
-- `check-publicacao-notificacoes/index.ts` → mesma lógica antes de retornar.
+Quando `CreateClientDialog.onClientCreated` dispara, invalida `['profiles-pub']` via `useQueryClient` para repopular a lista; o admin então clica no novo cliente.
 
-## 3. Novo template "Notificação Formal de Vencimento"
-- Em `cobrancaTemplates.ts`, adicionar um quarto template `vencido_formal` com o texto fornecido (assinatura WebMarcas + telefones).
-- Em `NotificarClienteDialog.tsx`:
-  - Quando a publicação está **vencida** (dias < 0) ou está na aba **Vencidos**, exibir esse template adicional como opção selecionável (radio/select de templates).
-  - Caso contrário, manter os 3 templates atuais.
+## 2. Integração em `PublicacaoPrazos.tsx`
+- Remover o autocomplete inline (`linkingPubId`, `linkSearch` + dropdown popover) na célula "Cliente" órfã.
+- Adicionar estado `linkDialogPub: any | null`. O botão `+ Vincular cliente` agora abre o diálogo.
+- Renderizar `<VincularClienteDialog open={!!linkDialogPub} onOpenChange={(v) => !v && setLinkDialogPub(null)} publicacao={linkDialogPub} clients={clients} onLink={(id) => handleLinkClient(linkDialogPub, id)} />`.
+- `handleLinkClient` mantém a lógica (resolve `process_id` via `process_number_rpi`, `update publicacoes_marcas`, `invalidateQueries(['publicacoes-marcas'])`).
 
-## 4. Migração de banco
-Nova migration:
-```sql
-ALTER TABLE public.publicacao_cobranca_schedule
-  ADD COLUMN IF NOT EXISTS last_notif_bucket text,
-  ADD COLUMN IF NOT EXISTS last_notif_at timestamptz;
-```
-Sem novas tabelas → sem novos GRANTs.
+## 3. Reuso do `CreateClientDialog`
+- Importar `CreateClientDialog` diretamente; ele já traz seu próprio `DialogTrigger` (botão "Novo Cliente"), zero alterações no arquivo original.
+- Após criação, `onClientCreated` invalida `['profiles-pub']`. A query em `PublicacaoTab` recarrega e o novo cliente aparece na busca.
 
-## 5. Arquivos afetados
-- `src/components/admin/publicacao/PublicacaoPrazos.tsx` — bucket "Cumpridos", coluna "Cumprido em", badge "Notificado nesta faixa".
-- `src/components/admin/publicacao/NotificarClienteDialog.tsx` — novo template para vencidos + gravar `last_notif_bucket`.
-- `src/components/admin/publicacao/cobrancaTemplates.ts` — template `vencido_formal`.
-- `supabase/functions/check-publicacao-notificacoes/index.ts` — gravar `last_notif_bucket`/`last_notif_at`.
-- Nova migration adicionando colunas em `publicacao_cobranca_schedule`.
+## 4. Fora de escopo
+- Sem migrações de banco.
+- Sem mudanças no `CreateClientDialog` da aba Clientes.
+- Sem mudanças no fluxo de notificações ou status.
 
-## 6. Fora de escopo
-Sem mudanças em outras telas, edge functions de email/whatsapp, ou políticas RLS.
+## 5. Arquivos
+- **Criar:** `src/components/admin/publicacao/VincularClienteDialog.tsx`.
+- **Editar:** `src/components/admin/publicacao/PublicacaoPrazos.tsx` (remove autocomplete inline + render do novo diálogo).
