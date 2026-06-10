@@ -1605,6 +1605,26 @@ export default function PublicacaoTab() {
       supabase.from('brand_processes').update(update).eq('id', entry.matched_process_id)
         .then(() => queryClient.invalidateQueries({ queryKey: ['brand-processes-pub'] }));
     }
+
+    // Auto-cadastro de cronograma de cobrança (15/30/50 dias)
+    const clientId = entry.matched_client_id || proc.user_id;
+    if (clientId && entry.publication_date) {
+      // Find the newly created publicacao by rpi_entry_id (best-effort, async)
+      setTimeout(async () => {
+        const { data: pub } = await supabase
+          .from('publicacoes_marcas')
+          .select('id')
+          .eq('rpi_entry_id', entry.id)
+          .maybeSingle();
+        if (!pub) return;
+        await supabase.from('publicacao_cobranca_schedule').upsert({
+          publicacao_id: pub.id,
+          client_id: clientId,
+          data_inicio: entry.publication_date,
+          responsavel_admin_id: currentUserQuery.data?.id || null,
+        }, { onConflict: 'publicacao_id', ignoreDuplicates: true } as any);
+      }, 1500);
+    }
   }, [linkedProcessIds, submittedRpiEntryIds, processMap, resolveStatusFromDispatch, createMutation, currentUserQuery.data]);
 
   const availableRpiEntries = useMemo(() => {
