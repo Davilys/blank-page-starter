@@ -11,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Mail, MessageCircle, CheckCircle2, PauseCircle, RotateCcw, Send } from 'lucide-react';
-import { COBRANCA_TEMPLATES, type CobrancaTemplate } from './cobrancaTemplates';
+import { COBRANCA_TEMPLATES, VENCIDO_FORMAL_TEMPLATE, type CobrancaTemplate } from './cobrancaTemplates';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -98,11 +98,29 @@ export function NotificarClienteDialog({ open, onOpenChange, publicacao, client,
 
   const dataInicio = schedule?.data_inicio ? parseISO(schedule.data_inicio) : new Date();
   const daysSince = differenceInDays(new Date(), dataInicio);
+  // Determine if publicacao is vencida (deadline passed)
+  const deadline = publicacao.proximo_prazo_critico
+    ? parseISO(publicacao.proximo_prazo_critico)
+    : publicacao.data_publicacao_rpi
+      ? addDays(parseISO(publicacao.data_publicacao_rpi), 60)
+      : null;
+  const daysToDeadline = deadline ? differenceInDays(deadline, new Date()) : null;
+  const isVencido = daysToDeadline !== null && daysToDeadline < 0;
+  const currentBucket: string =
+    daysToDeadline === null ? 'no_prazo'
+    : daysToDeadline < 0 ? 'vencidos'
+    : daysToDeadline <= 7 ? 'ultima_semana'
+    : daysToDeadline <= 30 ? '30dias'
+    : 'no_prazo';
+
   const tpls = [
     { tpl: COBRANCA_TEMPLATES[0], at: schedule?.notif_1_at, ch: schedule?.notif_1_channel },
     { tpl: COBRANCA_TEMPLATES[1], at: schedule?.notif_2_at, ch: schedule?.notif_2_channel },
     { tpl: COBRANCA_TEMPLATES[2], at: schedule?.notif_3_at, ch: schedule?.notif_3_channel },
   ];
+  const availableTpls: CobrancaTemplate[] = isVencido
+    ? [...COBRANCA_TEMPLATES, VENCIDO_FORMAL_TEMPLATE]
+    : COBRANCA_TEMPLATES;
 
   const handleSend = async () => {
     if (!schedule) return;
@@ -137,6 +155,9 @@ export function NotificarClienteDialog({ open, onOpenChange, publicacao, client,
       if (activeTpl.id === 1) { updates.notif_1_at = now; updates.notif_1_channel = channel; }
       if (activeTpl.id === 2) { updates.notif_2_at = now; updates.notif_2_channel = channel; }
       if (activeTpl.id === 3) { updates.notif_3_at = now; updates.notif_3_channel = channel; }
+      // Always record the bucket of the last notification (covers template 4 too)
+      updates.last_notif_at = now;
+      updates.last_notif_bucket = currentBucket;
 
       const { data: upd } = await supabase
         .from('publicacao_cobranca_schedule')
@@ -146,6 +167,7 @@ export function NotificarClienteDialog({ open, onOpenChange, publicacao, client,
         .single();
       setSchedule(upd as any);
       queryClient.invalidateQueries({ queryKey: ['publicacao-cobranca'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-marcas'] });
       toast.success(`${activeTpl.label} enviada (${channels.join(' + ')})`);
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao enviar notificação');
@@ -207,7 +229,7 @@ export function NotificarClienteDialog({ open, onOpenChange, publicacao, client,
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className={cn('grid gap-2', isVencido ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-3')}>
               {tpls.map(({ tpl, at, ch }) => {
                 const planned = format(addDays(dataInicio, tpl.dueDays), 'dd/MM/yyyy', { locale: ptBR });
                 const isActive = activeTpl.id === tpl.id;
@@ -233,6 +255,21 @@ export function NotificarClienteDialog({ open, onOpenChange, publicacao, client,
                   </button>
                 );
               })}
+              {isVencido && (
+                <button
+                  key={VENCIDO_FORMAL_TEMPLATE.id}
+                  onClick={() => { setActiveTpl(VENCIDO_FORMAL_TEMPLATE); setCustomMessage(VENCIDO_FORMAL_TEMPLATE.whatsapp(nome)); }}
+                  className={cn(
+                    'rounded-lg border p-2 text-left text-xs space-y-1 transition-all',
+                    activeTpl.id === 4 ? 'ring-2 ring-red-500 border-transparent' : 'border-red-300 hover:border-red-500',
+                    'bg-red-50/50 dark:bg-red-950/20'
+                  )}
+                >
+                  <div className="font-semibold text-red-700 dark:text-red-400">⚠ Notificação Formal</div>
+                  <div className="text-muted-foreground">Prazo vencido</div>
+                  <div className="text-red-700 dark:text-red-400 text-[10px]">Texto formal de encerramento</div>
+                </button>
+              )}
             </div>
 
             <div className="space-y-2">

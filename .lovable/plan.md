@@ -1,50 +1,54 @@
 ## Objetivo
-Na aba **Prazos**, (1) permitir vincular cliente direto na linha para publicações órfãs, (2) trocar o botão "Cumprido" por um seletor de status (Cumprido / Em Contato Agendado / Aguardando Pagamento) com cores distintas, e (3) tornar o nome do cliente e o nome da marca clicáveis para abrir o detalhe.
+1. Adicionar 5ª aba **Cumpridos** na lista de faixas de prazo.
+2. Sinalização visual clara quando o cliente **já foi notificado** na faixa atual (No Prazo / 30 Dias / Última Semana / Vencidos), para evitar reenvio.
+3. Novo modelo de notificação **"Notificação Formal de Vencimento"** disponível na aba Vencidos, com o texto fornecido pelo usuário.
 
-## 1. Banco de dados
-Migration nova adiciona em `publicacoes_marcas`:
-- `cumprimento_status` text — valores: `cumprido`, `contato_agendado`, `aguardando_pagamento`, ou null.
-- Trigger/regra simples: quando `cumprimento_status = 'cumprido'` → `cumprimento_ok = true` (mantém compatibilidade com lógica de arquivamento atual). Os outros dois status **não** marcam `cumprimento_ok`, então a publicação continua aparecendo na lista de prazos com o status visível.
+## 1. Nova aba "Cumpridos" em `PublicacaoPrazos.tsx`
+- Adicionar bucket `cumpridos` em `Bucket` e em `BUCKETS` (cor verde escuro / esmeralda, distinta do "No Prazo").
+- Mudar grid de `lg:grid-cols-4` para `lg:grid-cols-5`.
+- Ajustar `eligible`:
+  - Listas de prazo (no_prazo / 30dias / ultima_semana / vencidos) continuam excluindo `cumprimento_ok = true` / `cumprimento_status = 'cumprido'`.
+  - Quando `active === 'cumpridos'`, montar lista separada com publicações onde `cumprimento_status = 'cumprido'` (ou `cumprimento_ok = true`), ordenadas por `cumprimento_at` desc. Essas linhas não recalculam bucket por dias.
+- Counts: incluir `cumpridos` no objeto `counts`.
+- Na tabela, quando `active === 'cumpridos'`:
+  - Mostrar coluna "Cumprido em" no lugar de "Dias Restantes" (ou adicional), exibindo `cumprimento_at` formatado.
+  - Botão de status já mostra "Cumprido" verde; menu permite "Limpar status" para devolver à lista de prazos.
+  - Ocultar botão "Arquivar" (já cumprido).
 
-## 2. `PublicacaoPrazos.tsx`
+## 2. Indicador "Já notificado" por faixa
+Hoje a coluna **Cobrança** mostra apenas `{sentCount}/3 enviadas` global. Vamos enriquecer:
 
-### Vincular cliente (linha órfã)
-Quando `pub.client_id` for null, a célula "Cliente" mostra um pequeno autocomplete inline (mesmo padrão do `editClientSearch` já usado em PublicacaoTab — buscar por nome/email/CPF, dropdown com até 10 resultados). Ao selecionar, faz `update publicacoes_marcas set client_id = ?` e invalida a query. Também tenta resolver `process_id` automaticamente se houver match por `process_number_rpi`.
+- Determinar a **faixa atual** do registro (no_prazo / 30dias / ultima_semana / vencidos) e gravar essa informação no momento de cada notificação. Implementação:
+  - Adicionar coluna `notif_X_bucket` (text) em `publicacao_cobranca_schedule` para cada uma das 3 notificações já existentes — ou, mais simples, uma única coluna `last_notif_bucket` + `last_notif_at`.
+  - Decisão: usar `last_notif_bucket` (text) + `last_notif_at` (timestamptz). Atualizado tanto por envio manual (`NotificarClienteDialog`) quanto pelo cron `check-publicacao-notificacoes`.
+- Na linha da tabela, mostrar badge **"✓ Notificado nesta faixa"** (verde) quando `schedule.last_notif_bucket === pub._bucket`. Caso contrário, badge cinza "Pendente nesta faixa".
+- Esse badge aparece junto do contador `{sentCount}/3`, dentro da coluna "Cobrança".
 
-### Nome do cliente e marca clicáveis
-- A célula Cliente (quando vinculado) vira `<button>` que chama `onOpenDetail(pub.id)`.
-- A célula Marca/Processo vira `<button>` que chama `onOpenDetail(pub.id)`.
-- Mantém o ícone de olho (Eye) também, mas o foco passa a ser o clique no texto.
+### Onde gravar `last_notif_bucket`
+- `NotificarClienteDialog.tsx` → ao enviar, calcular o bucket atual e atualizar `publicacao_cobranca_schedule` com `last_notif_bucket`, `last_notif_at`.
+- `check-publicacao-notificacoes/index.ts` → mesma lógica antes de retornar.
 
-### Seletor de status (substitui botão Cumprido)
-Substituir o botão único "Cumprido" por um **DropdownMenu** com gatilho colorido conforme o status atual:
+## 3. Novo template "Notificação Formal de Vencimento"
+- Em `cobrancaTemplates.ts`, adicionar um quarto template `vencido_formal` com o texto fornecido (assinatura WebMarcas + telefones).
+- Em `NotificarClienteDialog.tsx`:
+  - Quando a publicação está **vencida** (dias < 0) ou está na aba **Vencidos**, exibir esse template adicional como opção selecionável (radio/select de templates).
+  - Caso contrário, manter os 3 templates atuais.
 
-| Status                 | Cor                          |
-| ---------------------- | ---------------------------- |
-| (nenhum)               | cinza / outline neutro       |
-| Cumprido               | verde (emerald)              |
-| Contato Agendado       | azul (sky/blue)              |
-| Aguardando Pagamento   | amarelo (amber)              |
+## 4. Migração de banco
+Nova migration:
+```sql
+ALTER TABLE public.publicacao_cobranca_schedule
+  ADD COLUMN IF NOT EXISTS last_notif_bucket text,
+  ADD COLUMN IF NOT EXISTS last_notif_at timestamptz;
+```
+Sem novas tabelas → sem novos GRANTs.
 
-O gatilho exibe um badge com o label do status atual (ou "Definir status"). Ao escolher uma opção:
-- Persiste `cumprimento_status` em `publicacoes_marcas`.
-- Se "Cumprido" → também marca `cumprimento_ok=true`, `cumprimento_at`, `cumprimento_by` (igual ao fluxo atual) e some da lista.
-- Se "Contato Agendado" ou "Aguardando Pagamento" → linha permanece visível, mas o badge colorido fica destacado.
-- Opção extra "Limpar status" para reverter.
+## 5. Arquivos afetados
+- `src/components/admin/publicacao/PublicacaoPrazos.tsx` — bucket "Cumpridos", coluna "Cumprido em", badge "Notificado nesta faixa".
+- `src/components/admin/publicacao/NotificarClienteDialog.tsx` — novo template para vencidos + gravar `last_notif_bucket`.
+- `src/components/admin/publicacao/cobrancaTemplates.ts` — template `vencido_formal`.
+- `supabase/functions/check-publicacao-notificacoes/index.ts` — gravar `last_notif_bucket`/`last_notif_at`.
+- Nova migration adicionando colunas em `publicacao_cobranca_schedule`.
 
-A coluna "Status" continua mostrando o despacho INPI; o novo status fica na coluna Ações (ou em nova coluna "Andamento"). Optaremos por **adicionar uma coluna "Andamento"** entre "Cobrança" e "Ações" para o badge colorido — fica visível mesmo sem clicar.
-
-## 3. Filtro de elegibilidade
-Em `eligible`, manter o filtro `!p.cumprimento_ok` (já existe). Itens com `cumprimento_status` `contato_agendado` ou `aguardando_pagamento` continuam elegíveis e aparecem nas faixas normais de prazo.
-
-## 4. Arquivos afetados
-- **Nova migration**: adiciona coluna `cumprimento_status` + trigger de sincronia com `cumprimento_ok`.
-- **`src/components/admin/publicacao/PublicacaoPrazos.tsx`**:
-  - Autocomplete inline para órfãos.
-  - Texto clicável em Cliente e Marca.
-  - DropdownMenu de status colorido substituindo botão "Cumprido".
-  - Nova coluna "Andamento" com badge do status atual.
-- **`src/integrations/supabase/types.ts`** regenerado após a migration.
-
-## 5. Fora de escopo
-- Não mexe em outros locais (Revista, Sheet de detalhe, edge functions). O badge de status pode ser exibido futuramente em outras telas, mas neste passo só vive na aba Prazos.
+## 6. Fora de escopo
+Sem mudanças em outras telas, edge functions de email/whatsapp, ou políticas RLS.

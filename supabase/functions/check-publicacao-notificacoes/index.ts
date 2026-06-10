@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
 
   const { data: schedules, error } = await supabase
     .from('publicacao_cobranca_schedule')
-    .select('*, publicacoes_marcas!inner(id, brand_name_rpi, process_id, status, cumprimento_ok)')
+    .select('*, publicacoes_marcas!inner(id, brand_name_rpi, process_id, status, cumprimento_ok, data_publicacao_rpi, proximo_prazo_critico)')
     .eq('status', 'ativo');
 
   if (error) {
@@ -93,10 +93,19 @@ Deno.serve(async (req) => {
 
     const channel = channels.length === 2 ? 'ambos' : channels[0];
     const now = new Date().toISOString();
+    // Compute current bucket based on deadline
+    let bucket = 'no_prazo';
+    const deadlineStr = pub.proximo_prazo_critico || (pub.data_publicacao_rpi ? new Date(new Date(pub.data_publicacao_rpi).getTime() + 60 * 86400000).toISOString() : null);
+    if (deadlineStr) {
+      const d = Math.floor((new Date(deadlineStr).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      bucket = d < 0 ? 'vencidos' : d <= 7 ? 'ultima_semana' : d <= 30 ? '30dias' : 'no_prazo';
+    }
     const update: any = {};
     if (tpl.id === 1) { update.notif_1_at = now; update.notif_1_channel = channel; }
     if (tpl.id === 2) { update.notif_2_at = now; update.notif_2_channel = channel; }
     if (tpl.id === 3) { update.notif_3_at = now; update.notif_3_channel = channel; }
+    update.last_notif_at = now;
+    update.last_notif_bucket = bucket;
     await supabase.from('publicacao_cobranca_schedule').update(update).eq('id', s.id);
     sent++;
   }

@@ -1,5 +1,5 @@
 export interface CobrancaTemplate {
-  id: 1 | 2 | 3;
+  id: 1 | 2 | 3 | 4;
   label: string;
   dueDays: number;
   subject: (marca: string) => string;
@@ -35,3 +35,12 @@ export const COBRANCA_TEMPLATES: CobrancaTemplate[] = [
     email: (nome, marca) => `<p>Olá, <strong>${safe(nome)}</strong>.</p><p>Informamos que já realizamos diversos contatos por telefone, WhatsApp e e-mail, sem sucesso na obtenção de um posicionamento definitivo sobre o processo da marca <strong>${marca || 'sua marca'}</strong>.</p><p>O prazo da publicação está próximo do encerramento e, caso não haja manifestação, o INPI poderá <strong>arquivar o processo</strong> por ausência de cumprimento da exigência, sendo essa uma consequência decorrente da falta de retorno do titular.</p><p>Também esclarecemos que o <strong>débito de R$ 1.621,00</strong> permanece devido, conforme previsto no contrato assinado. O serviço não foi concluído exclusivamente pela ausência de autorização e regularização por parte do cliente, e não por falha da empresa.</p><p>Nosso objetivo continua sendo resolver a situação de forma amigável. Caso ainda tenha dúvidas, podemos agendar uma reunião para apresentar o histórico, o contrato, a publicação no Diário Oficial e esclarecer todos os pontos necessários.</p><p><strong>Qual é o melhor horário para realizarmos essa reunião?</strong></p><p><em>Caso não haja resposta ainda hoje, considere esta mensagem como notificação formal.</em></p>`,
   },
 ];
+
+export const VENCIDO_FORMAL_TEMPLATE: CobrancaTemplate = {
+  id: 4,
+  label: 'Notificação Formal — Prazo Vencido',
+  dueDays: 60,
+  subject: (marca) => `Notificação Formal — prazo do INPI encerrado (${marca || 'sua marca'})`,
+  whatsapp: (nome) => `Olá, ${safe(nome)}.\n\nInformamos que o prazo concedido pelo INPI para cumprimento da exigência referente ao seu processo foi encerrado.\n\nDurante os 60 dias legais, realizamos diversas tentativas de contato por WhatsApp, telefone e e-mail, incluindo notificações formais, porém não obtivemos retorno dentro do prazo estabelecido.\n\nDessa forma, o processo poderá ser arquivado pelo INPI por falta de manifestação do titular, não sendo esta uma responsabilidade da WebMarcas, uma vez que todas as comunicações foram realizadas e registradas.\n\nCaso deseje mais informações, estamos à disposição para apresentar o histórico completo dos contatos realizados.\n\nEsta mensagem possui caráter formal de notificação.\n\nAtenciosamente,\nWebMarcas – Registro de Marcas e Patentes\n📞 (11) 91112-0225\n📧 ola@webmarcas.net`,
+  email: (nome, marca) => `<p>Olá, <strong>${safe(nome)}</strong>.</p><p>Informamos que o <strong>prazo concedido pelo INPI</strong> para cumprimento da exigência referente ao seu processo da marca <strong>${marca || 'sua marca'}</strong> foi <strong>encerrado</strong>.</p><p>Durante os <strong>60 dias legais</strong>, realizamos diversas tentativas de contato por WhatsApp, telefone e e-mail, incluindo notificações formais, porém não obtivemos retorno dentro do prazo estabelecido.</p><p>Dessa forma, o processo poderá ser arquivado pelo INPI por falta de manifestação do titular, <strong>não sendo esta uma responsabilidade da WebMarcas</strong>, uma vez que todas as comunicações foram realizadas e registradas.</p><p>Caso deseje mais informações, estamos à disposição para apresentar o histórico completo dos contatos realizados.</p><p><em>Esta mensagem possui caráter formal de notificação.</em></p><p>Atenciosamente,<br/><strong>WebMarcas – Registro de Marcas e Patentes</strong><br/>📞 (11) 91112-0225<br/>📧 ola@webmarcas.net</p>`,
+};

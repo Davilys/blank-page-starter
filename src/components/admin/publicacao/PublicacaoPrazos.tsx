@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { STATUS_CONFIG } from './types';
 import { NotificarClienteDialog } from './NotificarClienteDialog';
 
-type Bucket = 'no_prazo' | '30dias' | 'ultima_semana' | 'vencidos';
+type Bucket = 'no_prazo' | '30dias' | 'ultima_semana' | 'vencidos' | 'cumpridos';
 
 interface PublicacaoPrazosProps {
   publicacoes: any[];
@@ -48,6 +48,7 @@ const BUCKETS: { id: Bucket; label: string; color: string; ring: string }[] = [
   { id: '30dias', label: '30 Dias para Vencer', color: 'text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40', ring: 'ring-amber-500' },
   { id: 'ultima_semana', label: 'Última Semana', color: 'text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/40', ring: 'ring-orange-500' },
   { id: 'vencidos', label: 'Vencidos', color: 'text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/40', ring: 'ring-red-500' },
+  { id: 'cumpridos', label: 'Cumpridos', color: 'text-teal-700 dark:text-teal-400 bg-teal-100 dark:bg-teal-900/40', ring: 'ring-teal-500' },
 ];
 
 type AndamentoStatus = 'cumprido' | 'contato_agendado' | 'aguardando_pagamento' | null;
@@ -93,10 +94,10 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
       });
   }, [publicacoes]);
 
-  // Filter eligible publications (not certified/archived/cumprido)
+  // Filter eligible publications for deadline buckets (not certified/archived/cumprido)
   const eligible = useMemo(() => {
     return publicacoes
-      .filter(p => p.status !== 'certificado' && p.status !== 'arquivado' && !p.cumprimento_ok)
+      .filter(p => p.status !== 'certificado' && p.status !== 'arquivado' && !p.cumprimento_ok && p.cumprimento_status !== 'cumprido')
       .map(p => {
         const deadline = computeDeadline(p);
         const days = deadline ? differenceInDays(parseISO(deadline), new Date()) : null;
@@ -105,16 +106,32 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
       .filter(p => p._bucket !== null);
   }, [publicacoes]);
 
+  // Cumpridos list: publications marked as completed
+  const cumpridosList = useMemo(() => {
+    return publicacoes
+      .filter(p => p.cumprimento_status === 'cumprido' || p.cumprimento_ok)
+      .map(p => {
+        const deadline = computeDeadline(p);
+        return { ...p, _deadline: deadline, _days: null as number | null, _bucket: 'cumpridos' as Bucket };
+      })
+      .sort((a, b) => {
+        const ta = a.cumprimento_at ? new Date(a.cumprimento_at).getTime() : 0;
+        const tb = b.cumprimento_at ? new Date(b.cumprimento_at).getTime() : 0;
+        return tb - ta;
+      });
+  }, [publicacoes]);
+
   const counts = useMemo(() => {
-    const c: Record<Bucket, number> = { no_prazo: 0, '30dias': 0, ultima_semana: 0, vencidos: 0 };
-    eligible.forEach(p => { if (p._bucket) c[p._bucket as Bucket]++; });
+    const c: Record<Bucket, number> = { no_prazo: 0, '30dias': 0, ultima_semana: 0, vencidos: 0, cumpridos: 0 };
+    eligible.forEach(p => { if (p._bucket && p._bucket !== 'cumpridos') c[p._bucket as Bucket]++; });
+    c.cumpridos = cumpridosList.length;
     return c;
-  }, [eligible]);
+  }, [eligible, cumpridosList]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return eligible
-      .filter(p => p._bucket === active)
+    const source = active === 'cumpridos' ? cumpridosList : eligible.filter(p => p._bucket === active);
+    return source
       .filter(p => {
         if (!term) return true;
         const proc = p.process_id ? processMap.get(p.process_id) : null;
@@ -126,7 +143,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
         );
       })
       .sort((a, b) => (a._days ?? 9999) - (b._days ?? 9999));
-  }, [eligible, active, search, processMap, clientMap]);
+  }, [eligible, cumpridosList, active, search, processMap, clientMap]);
 
   const handleSetStatus = async (pub: any, status: AndamentoStatus) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -187,7 +204,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
   return (
     <div className="space-y-4">
       {/* Bucket tabs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
         {BUCKETS.map(b => (
           <button
             key={b.id}
@@ -221,7 +238,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                   <TableHead className="text-xs">Marca / Processo</TableHead>
                   <TableHead className="text-xs">Publicação RPI</TableHead>
                   <TableHead className="text-xs">Prazo Final</TableHead>
-                  <TableHead className="text-xs">Dias Restantes</TableHead>
+                  <TableHead className="text-xs">{active === 'cumpridos' ? 'Cumprido em' : 'Dias Restantes'}</TableHead>
                   <TableHead className="text-xs">Status</TableHead>
                   <TableHead className="text-xs">Cobrança</TableHead>
                   <TableHead className="text-xs text-right">Ações</TableHead>
@@ -340,10 +357,17 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                         {pub._deadline ? format(parseISO(pub._deadline), 'dd/MM/yyyy', { locale: ptBR }) : '—'}
                       </TableCell>
                       <TableCell className={cn('text-sm', daysColor)}>
-                        <div className="flex items-center gap-1.5">
-                          {days !== null && days < 0 ? <AlertTriangle className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
-                          {days === null ? '—' : days < 0 ? `${Math.abs(days)}d atrasado` : `${days}d restantes`}
-                        </div>
+                        {active === 'cumpridos' ? (
+                          <div className="flex items-center gap-1.5 text-teal-700 dark:text-teal-400">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            {pub.cumprimento_at ? format(parseISO(pub.cumprimento_at), 'dd/MM/yyyy', { locale: ptBR }) : '—'}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            {days !== null && days < 0 ? <AlertTriangle className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
+                            {days === null ? '—' : days < 0 ? `${Math.abs(days)}d atrasado` : `${days}d restantes`}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell>
                         <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', stCfg.bg, stCfg.color)}>{stCfg.label}</span>
@@ -355,6 +379,19 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                           <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 text-[10px]">pausado · respondeu</Badge>
                         ) : (
                           <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 text-[10px]">{sentCount}/3 enviadas</Badge>
+                        )}
+                        {sch && active !== 'cumpridos' && (
+                          <div className="mt-1">
+                            {sch.last_notif_bucket === pub._bucket ? (
+                              <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 text-[10px] gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> Notificado nesta faixa
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-muted text-muted-foreground text-[10px]">
+                                Pendente nesta faixa
+                              </Badge>
+                            )}
+                          </div>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
