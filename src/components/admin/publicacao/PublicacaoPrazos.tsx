@@ -94,10 +94,10 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
       });
   }, [publicacoes]);
 
-  // Filter eligible publications (not certified/archived/cumprido)
+  // Filter eligible publications for deadline buckets (not certified/archived/cumprido)
   const eligible = useMemo(() => {
     return publicacoes
-      .filter(p => p.status !== 'certificado' && p.status !== 'arquivado' && !p.cumprimento_ok)
+      .filter(p => p.status !== 'certificado' && p.status !== 'arquivado' && !p.cumprimento_ok && p.cumprimento_status !== 'cumprido')
       .map(p => {
         const deadline = computeDeadline(p);
         const days = deadline ? differenceInDays(parseISO(deadline), new Date()) : null;
@@ -106,16 +106,32 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
       .filter(p => p._bucket !== null);
   }, [publicacoes]);
 
+  // Cumpridos list: publications marked as completed
+  const cumpridosList = useMemo(() => {
+    return publicacoes
+      .filter(p => p.cumprimento_status === 'cumprido' || p.cumprimento_ok)
+      .map(p => {
+        const deadline = computeDeadline(p);
+        return { ...p, _deadline: deadline, _days: null as number | null, _bucket: 'cumpridos' as Bucket };
+      })
+      .sort((a, b) => {
+        const ta = a.cumprimento_at ? new Date(a.cumprimento_at).getTime() : 0;
+        const tb = b.cumprimento_at ? new Date(b.cumprimento_at).getTime() : 0;
+        return tb - ta;
+      });
+  }, [publicacoes]);
+
   const counts = useMemo(() => {
-    const c: Record<Bucket, number> = { no_prazo: 0, '30dias': 0, ultima_semana: 0, vencidos: 0 };
-    eligible.forEach(p => { if (p._bucket) c[p._bucket as Bucket]++; });
+    const c: Record<Bucket, number> = { no_prazo: 0, '30dias': 0, ultima_semana: 0, vencidos: 0, cumpridos: 0 };
+    eligible.forEach(p => { if (p._bucket && p._bucket !== 'cumpridos') c[p._bucket as Bucket]++; });
+    c.cumpridos = cumpridosList.length;
     return c;
-  }, [eligible]);
+  }, [eligible, cumpridosList]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return eligible
-      .filter(p => p._bucket === active)
+    const source = active === 'cumpridos' ? cumpridosList : eligible.filter(p => p._bucket === active);
+    return source
       .filter(p => {
         if (!term) return true;
         const proc = p.process_id ? processMap.get(p.process_id) : null;
@@ -127,7 +143,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
         );
       })
       .sort((a, b) => (a._days ?? 9999) - (b._days ?? 9999));
-  }, [eligible, active, search, processMap, clientMap]);
+  }, [eligible, cumpridosList, active, search, processMap, clientMap]);
 
   const handleSetStatus = async (pub: any, status: AndamentoStatus) => {
     const { data: { user } } = await supabase.auth.getUser();
