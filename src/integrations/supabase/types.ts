@@ -3556,6 +3556,68 @@ export type Database = {
         }
         Relationships: []
       }
+      publicacao_cobranca_schedule: {
+        Row: {
+          client_id: string | null
+          client_responded_at: string | null
+          created_at: string
+          data_inicio: string
+          id: string
+          notif_1_at: string | null
+          notif_1_channel: string | null
+          notif_2_at: string | null
+          notif_2_channel: string | null
+          notif_3_at: string | null
+          notif_3_channel: string | null
+          publicacao_id: string
+          responsavel_admin_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          client_responded_at?: string | null
+          created_at?: string
+          data_inicio?: string
+          id?: string
+          notif_1_at?: string | null
+          notif_1_channel?: string | null
+          notif_2_at?: string | null
+          notif_2_channel?: string | null
+          notif_3_at?: string | null
+          notif_3_channel?: string | null
+          publicacao_id: string
+          responsavel_admin_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          client_responded_at?: string | null
+          created_at?: string
+          data_inicio?: string
+          id?: string
+          notif_1_at?: string | null
+          notif_1_channel?: string | null
+          notif_2_at?: string | null
+          notif_2_channel?: string | null
+          notif_3_at?: string | null
+          notif_3_channel?: string | null
+          publicacao_id?: string
+          responsavel_admin_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publicacao_cobranca_schedule_publicacao_id_fkey"
+            columns: ["publicacao_id"]
+            isOneToOne: true
+            referencedRelation: "publicacoes_marcas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       publicacao_logs: {
         Row: {
           admin_email: string | null
