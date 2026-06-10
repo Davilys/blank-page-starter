@@ -32,6 +32,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { StatsCard } from '@/components/admin/dashboard/StatsCard';
 import { PublicacaoCharts } from '@/components/admin/publicacao/PublicacaoCharts';
 import { PublicacaoKanban } from '@/components/admin/publicacao/PublicacaoKanban';
+import { PublicacaoPrazos } from '@/components/admin/publicacao/PublicacaoPrazos';
 import { BulkActionsBar } from '@/components/admin/publicacao/BulkActionsBar';
 import { exportPublicacaoPDF } from '@/components/admin/publicacao/PublicacaoPDFExport';
 import { ClientDetailSheet } from '@/components/admin/clients/ClientDetailSheet';
