@@ -357,10 +357,17 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                         {pub._deadline ? format(parseISO(pub._deadline), 'dd/MM/yyyy', { locale: ptBR }) : '—'}
                       </TableCell>
                       <TableCell className={cn('text-sm', daysColor)}>
-                        <div className="flex items-center gap-1.5">
-                          {days !== null && days < 0 ? <AlertTriangle className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
-                          {days === null ? '—' : days < 0 ? `${Math.abs(days)}d atrasado` : `${days}d restantes`}
-                        </div>
+                        {active === 'cumpridos' ? (
+                          <div className="flex items-center gap-1.5 text-teal-700 dark:text-teal-400">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            {pub.cumprimento_at ? format(parseISO(pub.cumprimento_at), 'dd/MM/yyyy', { locale: ptBR }) : '—'}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            {days !== null && days < 0 ? <AlertTriangle className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
+                            {days === null ? '—' : days < 0 ? `${Math.abs(days)}d atrasado` : `${days}d restantes`}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell>
                         <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', stCfg.bg, stCfg.color)}>{stCfg.label}</span>
@@ -372,6 +379,19 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                           <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 text-[10px]">pausado · respondeu</Badge>
                         ) : (
                           <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 text-[10px]">{sentCount}/3 enviadas</Badge>
+                        )}
+                        {sch && active !== 'cumpridos' && (
+                          <div className="mt-1">
+                            {sch.last_notif_bucket === pub._bucket ? (
+                              <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 text-[10px] gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> Notificado nesta faixa
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-muted text-muted-foreground text-[10px]">
+                                Pendente nesta faixa
+                              </Badge>
+                            )}
+                          </div>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
