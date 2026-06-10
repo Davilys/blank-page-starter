@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { STATUS_CONFIG } from './types';
 import { NotificarClienteDialog } from './NotificarClienteDialog';
 
-type Bucket = 'no_prazo' | '30dias' | 'ultima_semana' | 'vencidos';
+type Bucket = 'no_prazo' | '30dias' | 'ultima_semana' | 'vencidos' | 'cumpridos';
 
 interface PublicacaoPrazosProps {
   publicacoes: any[];
@@ -48,6 +48,7 @@ const BUCKETS: { id: Bucket; label: string; color: string; ring: string }[] = [
   { id: '30dias', label: '30 Dias para Vencer', color: 'text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40', ring: 'ring-amber-500' },
   { id: 'ultima_semana', label: 'Última Semana', color: 'text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/40', ring: 'ring-orange-500' },
   { id: 'vencidos', label: 'Vencidos', color: 'text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/40', ring: 'ring-red-500' },
+  { id: 'cumpridos', label: 'Cumpridos', color: 'text-teal-700 dark:text-teal-400 bg-teal-100 dark:bg-teal-900/40', ring: 'ring-teal-500' },
 ];
 
 type AndamentoStatus = 'cumprido' | 'contato_agendado' | 'aguardando_pagamento' | null;
