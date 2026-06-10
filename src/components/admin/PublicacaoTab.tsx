@@ -1576,6 +1576,35 @@ export default function PublicacaoTab() {
       process_number_rpi: entry.process_number || null,
       descricao_prazo: entry.dispatch_text || null,
     });
+
+    // Sync the client Kanban stage on brand_processes.status (matches client kanban stage IDs)
+    const pubToKanban: Record<string, string> = {
+      '003': 'publicado_rpi',
+      oposicao: 'publicado_rpi',
+      exigencia_merito: 'em_exame',
+      deferimento: 'deferido',
+      indeferimento: 'indeferido',
+      certificado: 'concedido',
+      arquivado: 'arquivado',
+    };
+    const pubToPipeline: Record<string, string> = {
+      '003': '003',
+      oposicao: 'oposicao',
+      exigencia_merito: 'exigencia_merito',
+      deferimento: 'deferimento',
+      certificado: 'certificados',
+      indeferimento: 'indeferimento',
+      arquivado: 'distrato',
+    };
+    const kanbanStage = pubToKanban[status];
+    const pipelineStage = pubToPipeline[status];
+    if (entry.matched_process_id && (kanbanStage || pipelineStage)) {
+      const update: any = { updated_at: new Date().toISOString() };
+      if (kanbanStage) update.status = kanbanStage;
+      if (pipelineStage) update.pipeline_stage = pipelineStage;
+      supabase.from('brand_processes').update(update).eq('id', entry.matched_process_id)
+        .then(() => queryClient.invalidateQueries({ queryKey: ['brand-processes-pub'] }));
+    }
   }, [linkedProcessIds, submittedRpiEntryIds, processMap, resolveStatusFromDispatch, createMutation, currentUserQuery.data]);
 
   const availableRpiEntries = useMemo(() => {
