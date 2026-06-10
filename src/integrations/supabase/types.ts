@@ -3604,6 +3604,9 @@ export type Database = {
           client_id: string | null
           comentarios_internos: string | null
           created_at: string
+          cumprimento_at: string | null
+          cumprimento_by: string | null
+          cumprimento_ok: boolean
           data_certificado: string | null
           data_decisao: string | null
           data_deposito: string | null
@@ -3635,6 +3638,9 @@ export type Database = {
           client_id?: string | null
           comentarios_internos?: string | null
           created_at?: string
+          cumprimento_at?: string | null
+          cumprimento_by?: string | null
+          cumprimento_ok?: boolean
           data_certificado?: string | null
           data_decisao?: string | null
           data_deposito?: string | null
@@ -3666,6 +3672,9 @@ export type Database = {
           client_id?: string | null
           comentarios_internos?: string | null
           created_at?: string
+          cumprimento_at?: string | null
+          cumprimento_by?: string | null
+          cumprimento_ok?: boolean
           data_certificado?: string | null
           data_decisao?: string | null
           data_deposito?: string | null
