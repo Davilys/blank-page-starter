@@ -1875,6 +1875,22 @@ export default function PublicacaoTab() {
             <div className="flex items-center justify-center py-16">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
             </div>
+          ) : viewMode === 'prazos' ? (
+            <PublicacaoPrazos
+              publicacoes={publicacoes as any}
+              processMap={processMap}
+              clientMap={clientMap}
+              onOpenDetail={(id) => {
+                const pub = publicacoes.find(p => p.id === id);
+                if (pub?.client_id) {
+                  setSheetPubId(id);
+                  fetchClientForSheet(pub.client_id).then(() => {
+                    setShowClientSheet(true);
+                    setShowProcessDetailFromSheet(true);
+                  });
+                }
+              }}
+            />
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <Newspaper className="w-10 h-10 mb-2 opacity-30" />
