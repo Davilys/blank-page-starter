@@ -204,7 +204,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
   return (
     <div className="space-y-4">
       {/* Bucket tabs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
         {BUCKETS.map(b => (
           <button
             key={b.id}
@@ -238,7 +238,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                   <TableHead className="text-xs">Marca / Processo</TableHead>
                   <TableHead className="text-xs">Publicação RPI</TableHead>
                   <TableHead className="text-xs">Prazo Final</TableHead>
-                  <TableHead className="text-xs">Dias Restantes</TableHead>
+                  <TableHead className="text-xs">{active === 'cumpridos' ? 'Cumprido em' : 'Dias Restantes'}</TableHead>
                   <TableHead className="text-xs">Status</TableHead>
                   <TableHead className="text-xs">Cobrança</TableHead>
                   <TableHead className="text-xs text-right">Ações</TableHead>
