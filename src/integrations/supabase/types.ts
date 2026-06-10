@@ -3563,6 +3563,8 @@ export type Database = {
           created_at: string
           data_inicio: string
           id: string
+          last_notif_at: string | null
+          last_notif_bucket: string | null
           notif_1_at: string | null
           notif_1_channel: string | null
           notif_2_at: string | null
@@ -3580,6 +3582,8 @@ export type Database = {
           created_at?: string
           data_inicio?: string
           id?: string
+          last_notif_at?: string | null
+          last_notif_bucket?: string | null
           notif_1_at?: string | null
           notif_1_channel?: string | null
           notif_2_at?: string | null
@@ -3597,6 +3601,8 @@ export type Database = {
           created_at?: string
           data_inicio?: string
           id?: string
+          last_notif_at?: string | null
+          last_notif_bucket?: string | null
           notif_1_at?: string | null
           notif_1_channel?: string | null
           notif_2_at?: string | null
