@@ -1858,11 +1858,14 @@ export default function PublicacaoTab() {
                 <Plus className="w-3.5 h-3.5" /> Nova
               </Button>
               <div className="flex border rounded-md overflow-hidden">
-                <Button variant={viewMode === 'lista' ? 'default' : 'ghost'} size="sm" className="h-8 px-2.5 rounded-none" onClick={() => setViewMode('lista')}>
+                <Button variant={viewMode === 'lista' ? 'default' : 'ghost'} size="sm" className="h-8 px-2.5 rounded-none" onClick={() => setViewMode('lista')} title="Lista">
                   <List className="w-3.5 h-3.5" />
                 </Button>
-                <Button variant={viewMode === 'kanban' ? 'default' : 'ghost'} size="sm" className="h-8 px-2.5 rounded-none" onClick={() => setViewMode('kanban')}>
+                <Button variant={viewMode === 'kanban' ? 'default' : 'ghost'} size="sm" className="h-8 px-2.5 rounded-none" onClick={() => setViewMode('kanban')} title="Kanban">
                   <LayoutGrid className="w-3.5 h-3.5" />
+                </Button>
+                <Button variant={viewMode === 'prazos' ? 'default' : 'ghost'} size="sm" className="h-8 px-2.5 rounded-none gap-1 text-xs" onClick={() => setViewMode('prazos')} title="Prazos">
+                  <CalendarClock className="w-3.5 h-3.5" /> Prazos
                 </Button>
               </div>
             </div>
