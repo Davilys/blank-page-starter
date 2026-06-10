@@ -103,7 +103,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
   // Filter eligible publications for deadline buckets (not certified/archived/cumprido)
   const eligible = useMemo(() => {
     return publicacoes
-      .filter(p => p.status !== 'certificado' && p.status !== 'arquivado' && !p.cumprimento_ok && p.cumprimento_status !== 'cumprido')
+      .filter(p => p.status !== 'certificado' && p.status !== 'arquivado' && !p.cumprimento_ok && p.cumprimento_status !== 'cumprido' && p.cumprimento_status !== 'desistiu')
       .map(p => {
         const deadline = computeDeadline(p);
         const days = deadline ? differenceInDays(parseISO(deadline), new Date()) : null;
@@ -401,6 +401,9 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleSetStatus(pub, 'aguardando_pagamento')} className="text-amber-700 dark:text-amber-400">
                                 <Wallet className="w-4 h-4 mr-2" /> Aguardando Pagamento
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleSetStatus(pub, 'desistiu')} className="text-zinc-700 dark:text-zinc-300">
+                                <Ban className="w-4 h-4 mr-2" /> Desistiu
                               </DropdownMenuItem>
                               {andamento && (
                                 <>
