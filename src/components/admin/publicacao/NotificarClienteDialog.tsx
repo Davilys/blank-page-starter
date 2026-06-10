@@ -229,7 +229,7 @@ export function NotificarClienteDialog({ open, onOpenChange, publicacao, client,
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className={cn('grid gap-2', isVencido ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-3')}>
               {tpls.map(({ tpl, at, ch }) => {
                 const planned = format(addDays(dataInicio, tpl.dueDays), 'dd/MM/yyyy', { locale: ptBR });
                 const isActive = activeTpl.id === tpl.id;
@@ -255,6 +255,21 @@ export function NotificarClienteDialog({ open, onOpenChange, publicacao, client,
                   </button>
                 );
               })}
+              {isVencido && (
+                <button
+                  key={VENCIDO_FORMAL_TEMPLATE.id}
+                  onClick={() => { setActiveTpl(VENCIDO_FORMAL_TEMPLATE); setCustomMessage(VENCIDO_FORMAL_TEMPLATE.whatsapp(nome)); }}
+                  className={cn(
+                    'rounded-lg border p-2 text-left text-xs space-y-1 transition-all',
+                    activeTpl.id === 4 ? 'ring-2 ring-red-500 border-transparent' : 'border-red-300 hover:border-red-500',
+                    'bg-red-50/50 dark:bg-red-950/20'
+                  )}
+                >
+                  <div className="font-semibold text-red-700 dark:text-red-400">⚠ Notificação Formal</div>
+                  <div className="text-muted-foreground">Prazo vencido</div>
+                  <div className="text-red-700 dark:text-red-400 text-[10px]">Texto formal de encerramento</div>
+                </button>
+              )}
             </div>
 
             <div className="space-y-2">
