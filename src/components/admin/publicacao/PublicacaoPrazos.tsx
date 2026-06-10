@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle2, Clock, AlertTriangle, Archive, Search, Eye, Bell } from 'lucide-react';
+import { CheckCircle2, Clock, AlertTriangle, Archive, Search, Eye, Bell, ChevronDown, CalendarCheck, Wallet, UserPlus, X } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { STATUS_CONFIG } from './types';
 import { NotificarClienteDialog } from './NotificarClienteDialog';
@@ -23,6 +24,7 @@ interface PublicacaoPrazosProps {
   clientMap: Map<string, any>;
   onOpenDetail?: (pubId: string) => void;
   initialBucket?: Bucket;
+  clients?: any[];
 }
 
 function computeDeadline(pub: any): string | null {
@@ -48,12 +50,34 @@ const BUCKETS: { id: Bucket; label: string; color: string; ring: string }[] = [
   { id: 'vencidos', label: 'Vencidos', color: 'text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/40', ring: 'ring-red-500' },
 ];
 
-export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDetail, initialBucket }: PublicacaoPrazosProps) {
+type AndamentoStatus = 'cumprido' | 'contato_agendado' | 'aguardando_pagamento' | null;
+
+const ANDAMENTO_CFG: Record<Exclude<AndamentoStatus, null>, { label: string; trigger: string; icon: any }> = {
+  cumprido: {
+    label: 'Cumprido',
+    trigger: 'border-emerald-500/50 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/50',
+    icon: CheckCircle2,
+  },
+  contato_agendado: {
+    label: 'Contato Agendado',
+    trigger: 'border-sky-500/50 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:bg-sky-900/30 dark:text-sky-300 dark:hover:bg-sky-900/50',
+    icon: CalendarCheck,
+  },
+  aguardando_pagamento: {
+    label: 'Aguardando Pagamento',
+    trigger: 'border-amber-500/50 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50',
+    icon: Wallet,
+  },
+};
+
+export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDetail, initialBucket, clients = [] }: PublicacaoPrazosProps) {
   const [active, setActive] = useState<Bucket>(initialBucket || 'no_prazo');
   const [search, setSearch] = useState('');
   const queryClient = useQueryClient();
   const [notifyPub, setNotifyPub] = useState<any | null>(null);
   const [schedules, setSchedules] = useState<Record<string, any>>({});
+  const [linkingPubId, setLinkingPubId] = useState<string | null>(null);
+  const [linkSearch, setLinkSearch] = useState('');
 
   useEffect(() => {
     const ids = publicacoes.map(p => p.id);
@@ -104,18 +128,40 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
       .sort((a, b) => (a._days ?? 9999) - (b._days ?? 9999));
   }, [eligible, active, search, processMap, clientMap]);
 
-  const handleConfirmCumprimento = async (pub: any) => {
+  const handleSetStatus = async (pub: any, status: AndamentoStatus) => {
     const { data: { user } } = await supabase.auth.getUser();
+    const payload: any = { cumprimento_status: status };
+    if (status === 'cumprido') payload.cumprimento_by = user?.id || null;
     const { error } = await supabase
       .from('publicacoes_marcas')
-      .update({
-        cumprimento_ok: true,
-        cumprimento_at: new Date().toISOString(),
-        cumprimento_by: user?.id || null,
-      } as any)
+      .update(payload)
       .eq('id', pub.id);
-    if (error) { toast.error('Erro ao confirmar cumprimento'); return; }
-    toast.success('Cumprimento confirmado — saiu do controle de prazos');
+    if (error) { toast.error('Erro ao atualizar andamento'); return; }
+    if (status === 'cumprido') toast.success('Marcado como Cumprido — saiu do controle de prazos');
+    else if (status === null) toast.success('Status limpo');
+    else toast.success(`Andamento atualizado: ${ANDAMENTO_CFG[status].label}`);
+    queryClient.invalidateQueries({ queryKey: ['publicacoes-marcas'] });
+  };
+
+  const handleLinkClient = async (pub: any, clientId: string) => {
+    // Try resolve a matching process by process_number_rpi
+    let processId: string | null = pub.process_id || null;
+    if (!processId && pub.process_number_rpi) {
+      for (const [pid, p] of processMap.entries()) {
+        if (p?.process_number === pub.process_number_rpi && p?.user_id === clientId) {
+          processId = pid;
+          break;
+        }
+      }
+    }
+    const { error } = await supabase
+      .from('publicacoes_marcas')
+      .update({ client_id: clientId, process_id: processId } as any)
+      .eq('id', pub.id);
+    if (error) { toast.error('Erro ao vincular cliente'); return; }
+    toast.success('Cliente vinculado');
+    setLinkingPubId(null);
+    setLinkSearch('');
     queryClient.invalidateQueries({ queryKey: ['publicacoes-marcas'] });
   };
 
@@ -201,14 +247,91 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                     days <= 7 ? 'text-orange-600 dark:text-orange-400 font-semibold' :
                     days <= 30 ? 'text-amber-600 dark:text-amber-400 font-medium' :
                     'text-emerald-600 dark:text-emerald-400';
+                  const andamento = (pub.cumprimento_status || null) as AndamentoStatus;
+                  const andCfg = andamento ? ANDAMENTO_CFG[andamento] : null;
+                  const AndIcon = andCfg?.icon;
                   return (
                     <TableRow key={pub.id}>
                       <TableCell className="text-sm">
-                        <div className="font-medium">{client?.full_name || client?.email || '—'}</div>
+                        {client ? (
+                          <button
+                            type="button"
+                            onClick={() => onOpenDetail?.(pub.id)}
+                            className="font-medium text-left hover:text-primary hover:underline transition-colors"
+                          >
+                            {client.full_name || client.email}
+                          </button>
+                        ) : linkingPubId === pub.id ? (
+                          <div className="relative">
+                            <div className="flex items-center gap-1">
+                              <Input
+                                autoFocus
+                                placeholder="Buscar cliente..."
+                                value={linkSearch}
+                                onChange={(e) => setLinkSearch(e.target.value)}
+                                className="h-7 text-xs"
+                              />
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                onClick={() => { setLinkingPubId(null); setLinkSearch(''); }}
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                            {linkSearch.length >= 2 && (
+                              <div className="absolute z-50 mt-1 w-64 bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                                {clients
+                                  .filter((c) => {
+                                    const q = linkSearch.toLowerCase();
+                                    return (
+                                      c.full_name?.toLowerCase().includes(q) ||
+                                      c.email?.toLowerCase().includes(q) ||
+                                      (c as any).cpf_cnpj?.toLowerCase?.().includes(q)
+                                    );
+                                  })
+                                  .slice(0, 8)
+                                  .map((c) => (
+                                    <button
+                                      key={c.id}
+                                      type="button"
+                                      className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent border-b last:border-0"
+                                      onClick={() => handleLinkClient(pub, c.id)}
+                                    >
+                                      <div className="font-medium">{c.full_name || 'Sem nome'}</div>
+                                      <div className="text-[10px] text-muted-foreground">{c.email}</div>
+                                    </button>
+                                  ))}
+                                {clients.filter((c) => {
+                                  const q = linkSearch.toLowerCase();
+                                  return c.full_name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q);
+                                }).length === 0 && (
+                                  <div className="px-3 py-2 text-xs text-muted-foreground">Nenhum cliente encontrado</div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs gap-1 border-dashed border-primary/50 text-primary hover:bg-primary/10"
+                            onClick={() => { setLinkingPubId(pub.id); setLinkSearch(''); }}
+                          >
+                            <UserPlus className="w-3.5 h-3.5" /> Vincular cliente
+                          </Button>
+                        )}
                       </TableCell>
                       <TableCell className="text-sm">
-                        <div className="font-medium">{proc?.brand_name || pub.brand_name_rpi || '—'}</div>
-                        <div className="text-xs text-muted-foreground">{proc?.process_number || pub.process_number_rpi || ''}</div>
+                        <button
+                          type="button"
+                          onClick={() => onOpenDetail?.(pub.id)}
+                          className="text-left hover:text-primary transition-colors group"
+                        >
+                          <div className="font-medium group-hover:underline">{proc?.brand_name || pub.brand_name_rpi || '—'}</div>
+                          <div className="text-xs text-muted-foreground">{proc?.process_number || pub.process_number_rpi || ''}</div>
+                        </button>
                       </TableCell>
                       <TableCell className="text-xs">
                         {pub.data_publicacao_rpi ? format(parseISO(pub.data_publicacao_rpi), 'dd/MM/yyyy', { locale: ptBR }) : '—'}
@@ -251,14 +374,41 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                               <Eye className="w-3.5 h-3.5" />
                             </Button>
                           )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 px-2 text-xs gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
-                            onClick={() => handleConfirmCumprimento(pub)}
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Cumprido
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className={cn(
+                                  'h-7 px-2 text-xs gap-1',
+                                  andCfg ? andCfg.trigger : 'border-muted-foreground/30 text-muted-foreground hover:bg-muted'
+                                )}
+                              >
+                                {AndIcon ? <AndIcon className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                                {andCfg ? andCfg.label : 'Definir status'}
+                                <ChevronDown className="w-3 h-3 opacity-70" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                              <DropdownMenuItem onClick={() => handleSetStatus(pub, 'cumprido')} className="text-emerald-700 dark:text-emerald-400">
+                                <CheckCircle2 className="w-4 h-4 mr-2" /> Cumprido
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleSetStatus(pub, 'contato_agendado')} className="text-sky-700 dark:text-sky-400">
+                                <CalendarCheck className="w-4 h-4 mr-2" /> Em Contato Agendado
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleSetStatus(pub, 'aguardando_pagamento')} className="text-amber-700 dark:text-amber-400">
+                                <Wallet className="w-4 h-4 mr-2" /> Aguardando Pagamento
+                              </DropdownMenuItem>
+                              {andamento && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => handleSetStatus(pub, null)} className="text-muted-foreground">
+                                    <X className="w-4 h-4 mr-2" /> Limpar status
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                           {active === 'vencidos' && (
                             <Button
                               size="sm"

@@ -1956,6 +1956,7 @@ export default function PublicacaoTab() {
               publicacoes={publicacoes as any}
               processMap={processMap}
               clientMap={clientMap}
+              clients={clients as any}
               onOpenDetail={(id) => {
                 const pub = publicacoes.find(p => p.id === id);
                 if (pub?.client_id) {

@@ -3669,6 +3669,7 @@ export type Database = {
           cumprimento_at: string | null
           cumprimento_by: string | null
           cumprimento_ok: boolean
+          cumprimento_status: string | null
           data_certificado: string | null
           data_decisao: string | null
           data_deposito: string | null
@@ -3703,6 +3704,7 @@ export type Database = {
           cumprimento_at?: string | null
           cumprimento_by?: string | null
           cumprimento_ok?: boolean
+          cumprimento_status?: string | null
           data_certificado?: string | null
           data_decisao?: string | null
           data_deposito?: string | null
@@ -3737,6 +3739,7 @@ export type Database = {
           cumprimento_at?: string | null
           cumprimento_by?: string | null
           cumprimento_ok?: boolean
+          cumprimento_status?: string | null
           data_certificado?: string | null
           data_decisao?: string | null
           data_deposito?: string | null

@@ -1,100 +1,50 @@
-# Notificações de Publicação (15/30/50 dias) + Botão Prazos em Destaque
+## Objetivo
+Na aba **Prazos**, (1) permitir vincular cliente direto na linha para publicações órfãs, (2) trocar o botão "Cumprido" por um seletor de status (Cumprido / Em Contato Agendado / Aguardando Pagamento) com cores distintas, e (3) tornar o nome do cliente e o nome da marca clicáveis para abrir o detalhe.
 
-## 1. Destaque visual do botão "Prazos"
+## 1. Banco de dados
+Migration nova adiciona em `publicacoes_marcas`:
+- `cumprimento_status` text — valores: `cumprido`, `contato_agendado`, `aguardando_pagamento`, ou null.
+- Trigger/regra simples: quando `cumprimento_status = 'cumprido'` → `cumprimento_ok = true` (mantém compatibilidade com lógica de arquivamento atual). Os outros dois status **não** marcam `cumprimento_ok`, então a publicação continua aparecendo na lista de prazos com o status visível.
 
-No `PublicacaoTab.tsx`, criar um **banner de destaque** logo abaixo do banner "Auto-vincular" (linhas ~1641–1656), só visível quando `viewMode !== 'prazos'`:
+## 2. `PublicacaoPrazos.tsx`
 
-- Card com gradiente sutil (token semântico: `bg-primary/5` + borda `border-primary/30`).
-- Ícone `CalendarClock`, título "Controle de Prazos das Publicações".
-- Mostra contagem dinâmica: `X publicações vencendo em 7 dias · Y vencidas`.
-- Botão CTA grande "Abrir Prazos" que faz `setViewMode('prazos')`.
+### Vincular cliente (linha órfã)
+Quando `pub.client_id` for null, a célula "Cliente" mostra um pequeno autocomplete inline (mesmo padrão do `editClientSearch` já usado em PublicacaoTab — buscar por nome/email/CPF, dropdown com até 10 resultados). Ao selecionar, faz `update publicacoes_marcas set client_id = ?` e invalida a query. Também tenta resolver `process_id` automaticamente se houver match por `process_number_rpi`.
 
-Manter o botão pequeno na barra de view (lista/kanban/prazos) como atalho secundário.
+### Nome do cliente e marca clicáveis
+- A célula Cliente (quando vinculado) vira `<button>` que chama `onOpenDetail(pub.id)`.
+- A célula Marca/Processo vira `<button>` que chama `onOpenDetail(pub.id)`.
+- Mantém o ícone de olho (Eye) também, mas o foco passa a ser o clique no texto.
 
-## 2. Cadastro de cronograma de cobrança por publicação
+### Seletor de status (substitui botão Cumprido)
+Substituir o botão único "Cumprido" por um **DropdownMenu** com gatilho colorido conforme o status atual:
 
-Migração — nova tabela `publicacao_cobranca_schedule`:
+| Status                 | Cor                          |
+| ---------------------- | ---------------------------- |
+| (nenhum)               | cinza / outline neutro       |
+| Cumprido               | verde (emerald)              |
+| Contato Agendado       | azul (sky/blue)              |
+| Aguardando Pagamento   | amarelo (amber)              |
 
-| Coluna | Tipo | Descrição |
-|---|---|---|
-| id | uuid PK | |
-| publicacao_id | uuid FK → publicacoes_marcas | unique |
-| client_id | uuid | denormalizado p/ leitura rápida |
-| data_inicio | date | data do primeiro contato (default = data_publicacao_rpi) |
-| notif_1_at, notif_2_at, notif_3_at | timestamptz | datas reais de envio |
-| notif_1_channel, notif_2_channel, notif_3_channel | text | 'email' \| 'whatsapp' \| 'ambos' |
-| status | text | 'ativo' \| 'pausado_resposta' \| 'concluido' |
-| client_responded_at | timestamptz | quando cliente respondeu (pausa o cronograma) |
-| responsavel_admin_id | uuid | quem está cobrando |
-| created_at / updated_at | timestamptz | |
+O gatilho exibe um badge com o label do status atual (ou "Definir status"). Ao escolher uma opção:
+- Persiste `cumprimento_status` em `publicacoes_marcas`.
+- Se "Cumprido" → também marca `cumprimento_ok=true`, `cumprimento_at`, `cumprimento_by` (igual ao fluxo atual) e some da lista.
+- Se "Contato Agendado" ou "Aguardando Pagamento" → linha permanece visível, mas o badge colorido fica destacado.
+- Opção extra "Limpar status" para reverter.
 
-Datas planejadas (calculadas): `data_inicio + 15`, `data_inicio + 30`, `data_inicio + 50`.
+A coluna "Status" continua mostrando o despacho INPI; o novo status fica na coluna Ações (ou em nova coluna "Andamento"). Optaremos por **adicionar uma coluna "Andamento"** entre "Cobrança" e "Ações" para o badge colorido — fica visível mesmo sem clicar.
 
-GRANTs + RLS: admins gerenciam tudo; clientes leem somente o próprio (`client_id = auth.uid()`).
+## 3. Filtro de elegibilidade
+Em `eligible`, manter o filtro `!p.cumprimento_ok` (já existe). Itens com `cumprimento_status` `contato_agendado` ou `aguardando_pagamento` continuam elegíveis e aparecem nas faixas normais de prazo.
 
-## 3. UI — Ação por linha em `PublicacaoPrazos.tsx`
+## 4. Arquivos afetados
+- **Nova migration**: adiciona coluna `cumprimento_status` + trigger de sincronia com `cumprimento_ok`.
+- **`src/components/admin/publicacao/PublicacaoPrazos.tsx`**:
+  - Autocomplete inline para órfãos.
+  - Texto clicável em Cliente e Marca.
+  - DropdownMenu de status colorido substituindo botão "Cumprido".
+  - Nova coluna "Andamento" com badge do status atual.
+- **`src/integrations/supabase/types.ts`** regenerado após a migration.
 
-Em cada linha da lista, adicionar botão "Notificar Cliente" que abre um **dialog** `NotificarClienteDialog`:
-
-- Mostra dados do cliente (nome, email, telefone).
-- Mostra o cronograma atual (1ª/2ª/3ª) com indicação `pendente`, `enviada em XX/XX`, `vence em Xd`.
-- Para cada notificação ainda não enviada:
-  - Pré-visualização da mensagem (templates abaixo, com `{{NOME_CLIENTE}}` substituído).
-  - Selector de canal: ☑ Email · ☑ WhatsApp (multi-select).
-  - Botão "Enviar agora" → chama `send-multichannel-notification` (já existe) com `custom_message` e `custom_subject`; grava `notif_X_at` e `notif_X_channel` em `publicacao_cobranca_schedule`.
-- Botões finais: "Marcar como respondido pelo cliente" (seta `status='pausado_resposta'` + `client_responded_at`), "Reiniciar cronograma" (admin manual).
-
-### Templates (armazenados como constantes no front, com merge `{{NOME_CLIENTE}}`)
-
-- **1ª notificação (15 dias):** texto fornecido pelo usuário (versão amigável de lembrete dos 60 dias).
-- **2ª notificação (30 dias):** versão de cobrança mais firme (39 dias).
-- **3ª notificação (50 dias):** notificação formal com débito R$ 1.621,00 e arquivamento iminente.
-
-Assunto do email:
-- 1ª: "Lembrete: prazo de 60 dias junto ao INPI — {{MARCA}}"
-- 2ª: "Atenção: prazo do INPI próximo de vencer — {{MARCA}}"
-- 3ª: "Notificação formal: cumprimento de exigência INPI — {{MARCA}}"
-
-## 4. Disparo automático — flow "NOTIFICAÇÃO PUBLICAÇÃO"
-
-Nova edge function `check-publicacao-notificacoes` agendada via `pg_cron` (1×/dia, 09:00 BRT):
-
-Para cada `publicacao_cobranca_schedule` com `status='ativo'`:
-1. Calcula dias desde `data_inicio`.
-2. Se `>=15` e `notif_1_at` nulo → envia 1ª via canais default (email + whatsapp do cliente).
-3. Se `>=30` e `notif_2_at` nulo → envia 2ª.
-4. Se `>=50` e `notif_3_at` nulo → envia 3ª.
-5. Atualiza `notif_X_at` na tabela.
-
-A função reusa `send-multichannel-notification` (já existe, suporta email + whatsapp + crm).
-
-Auto-cadastro: ao criar publicação vinculada a cliente (em `handleAutoPopulateFromRPI`), inserir automaticamente uma linha em `publicacao_cobranca_schedule` com `data_inicio = data_publicacao_rpi` e `responsavel_admin_id = admin atual`.
-
-## 5. Pausa automática por resposta do cliente
-
-Adicionar trigger Postgres em `chat_messages` (e/ou `email_inbox`) que, ao receber mensagem do cliente (`sender_role='client'`), atualiza todos os `publicacao_cobranca_schedule` desse `client_id` para `status='pausado_resposta'` + `client_responded_at = now()`. A função cron passa a ignorá-los; admin precisa retomar manualmente.
-
-Se a tabela exata de mensagens recebidas não tiver coluna direta, faremos um trigger leve apenas em `chat_messages` (admin pode marcar manualmente quando vier por outro canal).
-
-## 6. Indicadores no dialog e na lista
-
-Coluna extra opcional "Cobrança" na lista de prazos:
-- 🟢 ativo — próx. envio em Xd
-- 🟡 pausado — cliente respondeu
-- ⚪ não iniciado
-
-## Arquivos afetados
-
-- `src/components/admin/PublicacaoTab.tsx` — banner CTA Prazos.
-- `src/components/admin/publicacao/PublicacaoPrazos.tsx` — coluna + botão "Notificar".
-- `src/components/admin/publicacao/NotificarClienteDialog.tsx` — novo.
-- `src/components/admin/publicacao/cobrancaTemplates.ts` — novo (3 templates).
-- `supabase/functions/check-publicacao-notificacoes/index.ts` — novo (cron).
-- Migration nova: tabela `publicacao_cobranca_schedule` + grants + RLS + trigger de pausa por resposta + agendamento `pg_cron`.
-
-## Validações finais
-
-- Dialog dispara e-mail + WhatsApp manualmente com templates corretos.
-- Cron processa apenas pendentes e respeita `status`.
-- Resposta de cliente pausa o cronograma.
-- Cronograma é criado automaticamente ao vincular publicação a cliente.
+## 5. Fora de escopo
+- Não mexe em outros locais (Revista, Sheet de detalhe, edge functions). O badge de status pode ser exibido futuramente em outras telas, mas neste passo só vive na aba Prazos.
