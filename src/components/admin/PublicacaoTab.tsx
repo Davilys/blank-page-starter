@@ -485,6 +485,7 @@ export default function PublicacaoTab() {
 
     const expired = publicacoes.filter(p => {
       if (p.status === 'arquivado' || p.status === 'certificado') return false;
+      if ((p as any).cumprimento_ok) return false;
       let dl = p.proximo_prazo_critico;
       if (!dl && p.data_publicacao_rpi) {
         dl = format(addDays(parseISO(p.data_publicacao_rpi), 60), 'yyyy-MM-dd');
@@ -502,12 +503,14 @@ export default function PublicacaoTab() {
       await Promise.all(expired.map(async (pub) => {
         await supabase.from('publicacoes_marcas').update({
           status: 'arquivado',
+          descricao_prazo: 'Arquivado por decurso de prazo',
           updated_at: now,
         }).eq('id', pub.id);
 
         if (pub.process_id) {
           await supabase.from('brand_processes').update({
             pipeline_stage: 'arquivado',
+            status: 'arquivado',
             updated_at: now,
           }).eq('id', pub.process_id);
         }
