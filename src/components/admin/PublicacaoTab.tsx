@@ -12,7 +12,7 @@ import {
   FileText, Eye, ArrowRight, RotateCcw, Shield, Gavel, Award, RefreshCw,
   ExternalLink, Trash2, Users, Zap, BellRing, Hash, Paperclip,
   ArrowUpDown, ArrowUp, ArrowDown, List, LayoutGrid, FileDown,
-  ChevronLeft, Activity, Wallet, Receipt, FileCheck, TrendingUp, Star, Check, Package,
+  ChevronLeft, Activity, Wallet, Receipt, FileCheck, TrendingUp, Star, Check, Package, CalendarClock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,7 +46,7 @@ type PubTipo = 'publicacao_rpi' | 'decisao' | 'certificado' | 'renovacao';
 type PrazoFilter = 'todos' | 'hoje' | '7dias' | '30dias' | 'atrasados';
 type SortKey = 'cliente' | 'marca' | 'data_pub' | 'prazo' | 'status';
 type SortDir = 'asc' | 'desc';
-type ViewMode = 'lista' | 'kanban';
+type ViewMode = 'lista' | 'kanban' | 'prazos';
 
 interface Publicacao {
   id: string;
