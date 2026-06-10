@@ -15,6 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { cn } from '@/lib/utils';
 import { STATUS_CONFIG } from './types';
 import { NotificarClienteDialog } from './NotificarClienteDialog';
+import { VincularClienteDialog } from './VincularClienteDialog';
 
 type Bucket = 'no_prazo' | '30dias' | 'ultima_semana' | 'vencidos' | 'cumpridos';
 
@@ -77,8 +78,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
   const queryClient = useQueryClient();
   const [notifyPub, setNotifyPub] = useState<any | null>(null);
   const [schedules, setSchedules] = useState<Record<string, any>>({});
-  const [linkingPubId, setLinkingPubId] = useState<string | null>(null);
-  const [linkSearch, setLinkSearch] = useState('');
+  const [linkDialogPub, setLinkDialogPub] = useState<any | null>(null);
 
   useEffect(() => {
     const ids = publicacoes.map(p => p.id);
@@ -177,8 +177,6 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
       .eq('id', pub.id);
     if (error) { toast.error('Erro ao vincular cliente'); return; }
     toast.success('Cliente vinculado');
-    setLinkingPubId(null);
-    setLinkSearch('');
     queryClient.invalidateQueries({ queryKey: ['publicacoes-marcas'] });
   };
 
