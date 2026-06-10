@@ -1,77 +1,100 @@
-# Aba "Prazos" em Publicação + Automação de Arquivamento
+# Notificações de Publicação (15/30/50 dias) + Botão Prazos em Destaque
 
-## 1. Nova sub-aba "Prazos" em `PublicacaoTab.tsx`
+## 1. Destaque visual do botão "Prazos"
 
-Adicionar `'prazos'` ao `ViewMode` (hoje `'lista' | 'kanban'`) e um botão na toolbar ao lado de Lista/Kanban.
+No `PublicacaoTab.tsx`, criar um **banner de destaque** logo abaixo do banner "Auto-vincular" (linhas ~1641–1656), só visível quando `viewMode !== 'prazos'`:
 
-Conteúdo do novo componente `PublicacaoPrazos.tsx` (em `src/components/admin/publicacao/`):
+- Card com gradiente sutil (token semântico: `bg-primary/5` + borda `border-primary/30`).
+- Ícone `CalendarClock`, título "Controle de Prazos das Publicações".
+- Mostra contagem dinâmica: `X publicações vencendo em 7 dias · Y vencidas`.
+- Botão CTA grande "Abrir Prazos" que faz `setViewMode('prazos')`.
 
-- 4 tabs (filtros segmentados) com contagem em badges:
-  1. **No Prazo** — verde — `> 30 dias` restantes
-  2. **30 Dias para Vencer** — amarelo — `8–30 dias`
-  3. **Última Semana** — laranja — `0–7 dias`
-  4. **Vencidos** — vermelho — `< 0 dias` (ainda não marcados como cumpridos/arquivados)
-- Cálculo do prazo: usa `proximo_prazo_critico`; se nulo, calcula `data_publicacao_rpi + 60 dias`.
-- Exclui publicações com `status = 'certificado'` ou `cumprimento_ok = true`.
+Manter o botão pequeno na barra de view (lista/kanban/prazos) como atalho secundário.
 
-Cada linha exibe: Cliente, Marca, Nº processo, Data publicação RPI, Prazo final, Dias restantes (contador colorido), Status atual e badge do estágio Kanban. Ações:
-- **Confirmar Cumprimento** (botão verde, ícone CheckCircle2): seta `cumprimento_ok = true`, `cumprimento_at = now()`, `cumprimento_by = admin.id` em `publicacoes_marcas`. Remove a linha da lista de prazos.
-- **Ver detalhe** (abre o `PublicacaoDetailPanel` já existente).
-- **Arquivar agora** (somente em "Vencidos") — arquiva manualmente.
+## 2. Cadastro de cronograma de cobrança por publicação
 
-Busca por marca/cliente e ordenação por dias restantes (asc).
+Migração — nova tabela `publicacao_cobranca_schedule`:
 
-## 2. Migration (SQL)
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| id | uuid PK | |
+| publicacao_id | uuid FK → publicacoes_marcas | unique |
+| client_id | uuid | denormalizado p/ leitura rápida |
+| data_inicio | date | data do primeiro contato (default = data_publicacao_rpi) |
+| notif_1_at, notif_2_at, notif_3_at | timestamptz | datas reais de envio |
+| notif_1_channel, notif_2_channel, notif_3_channel | text | 'email' \| 'whatsapp' \| 'ambos' |
+| status | text | 'ativo' \| 'pausado_resposta' \| 'concluido' |
+| client_responded_at | timestamptz | quando cliente respondeu (pausa o cronograma) |
+| responsavel_admin_id | uuid | quem está cobrando |
+| created_at / updated_at | timestamptz | |
 
-Adicionar em `publicacoes_marcas`:
-- `cumprimento_ok boolean not null default false`
-- `cumprimento_at timestamptz`
-- `cumprimento_by uuid`
-- índice em `(cumprimento_ok, proximo_prazo_critico)`
+Datas planejadas (calculadas): `data_inicio + 15`, `data_inicio + 30`, `data_inicio + 50`.
 
-## 3. Lógica de prazo de 60 dias
+GRANTs + RLS: admins gerenciam tudo; clientes leem somente o próprio (`client_id = auth.uid()`).
 
-No `handleAutoPopulateFromRPI` e no fluxo de criação manual: garantir que `proximo_prazo_critico = data_publicacao_rpi + 60` quando ainda não houver descrição específica de prazo (a função `calcAutoFields` já trata isso — apenas reforçar o default para 60 quando o dispatch não mapeia para nada).
+## 3. UI — Ação por linha em `PublicacaoPrazos.tsx`
 
-## 4. Auto-arquivamento (ajustar bloco já existente, linhas 482–519)
+Em cada linha da lista, adicionar botão "Notificar Cliente" que abre um **dialog** `NotificarClienteDialog`:
 
-Alterar o filtro para também respeitar `cumprimento_ok`:
+- Mostra dados do cliente (nome, email, telefone).
+- Mostra o cronograma atual (1ª/2ª/3ª) com indicação `pendente`, `enviada em XX/XX`, `vence em Xd`.
+- Para cada notificação ainda não enviada:
+  - Pré-visualização da mensagem (templates abaixo, com `{{NOME_CLIENTE}}` substituído).
+  - Selector de canal: ☑ Email · ☑ WhatsApp (multi-select).
+  - Botão "Enviar agora" → chama `send-multichannel-notification` (já existe) com `custom_message` e `custom_subject`; grava `notif_X_at` e `notif_X_channel` em `publicacao_cobranca_schedule`.
+- Botões finais: "Marcar como respondido pelo cliente" (seta `status='pausado_resposta'` + `client_responded_at`), "Reiniciar cronograma" (admin manual).
 
-```ts
-if (p.status === 'arquivado' || p.status === 'certificado' || p.cumprimento_ok) return false;
-```
+### Templates (armazenados como constantes no front, com merge `{{NOME_CLIENTE}}`)
 
-Ao arquivar publicação vencida, além de já atualizar `pipeline_stage = 'arquivado'` em `brand_processes`, também atualizar `status = 'arquivado'` (campo lido pelo `ClientProcessKanban`), gravar `descricao_prazo = 'Arquivado por decurso de prazo'` e inserir entrada em `publicacao_logs`.
+- **1ª notificação (15 dias):** texto fornecido pelo usuário (versão amigável de lembrete dos 60 dias).
+- **2ª notificação (30 dias):** versão de cobrança mais firme (39 dias).
+- **3ª notificação (50 dias):** notificação formal com débito R$ 1.621,00 e arquivamento iminente.
 
-## 5. Vínculo inicial (Revista → Cliente)
+Assunto do email:
+- 1ª: "Lembrete: prazo de 60 dias junto ao INPI — {{MARCA}}"
+- 2ª: "Atenção: prazo do INPI próximo de vencer — {{MARCA}}"
+- 3ª: "Notificação formal: cumprimento de exigência INPI — {{MARCA}}"
 
-Em `handleAutoPopulateFromRPI` (PublicacaoTab.tsx), após criar a publicação atualizar `brand_processes` do processo vinculado:
-- `pipeline_stage` = mapeamento do status detectado (já existe `PIPELINE_TO_PUB` reverso; criar `PUB_TO_PIPELINE`).
-- `status` = mesmo id do estágio do Kanban do cliente (`em_andamento`, `publicado_rpi`, `em_exame`, `deferido`, `indeferido`, `arquivado`), derivado do status da publicação:
-  - `003`/`oposicao`/`exigencia_merito` → `publicado_rpi`
-  - `deferimento` → `deferido`
-  - `indeferimento` → `indeferido`
-  - `certificado` → `concedido`
-  - `arquivado` → `arquivado`
+## 4. Disparo automático — flow "NOTIFICAÇÃO PUBLICAÇÃO"
 
-## 6. Dashboard — Alerta de Prazos Críticos
+Nova edge function `check-publicacao-notificacoes` agendada via `pg_cron` (1×/dia, 09:00 BRT):
 
-No `Dashboard.tsx` admin, adicionar card "Prazos Críticos (< 7d)" com contagem clicável que leva a `/admin/publicacao?view=prazos&tab=ultima-semana` (via query string lido no PublicacaoTab para preselecionar view/tab).
+Para cada `publicacao_cobranca_schedule` com `status='ativo'`:
+1. Calcula dias desde `data_inicio`.
+2. Se `>=15` e `notif_1_at` nulo → envia 1ª via canais default (email + whatsapp do cliente).
+3. Se `>=30` e `notif_2_at` nulo → envia 2ª.
+4. Se `>=50` e `notif_3_at` nulo → envia 3ª.
+5. Atualiza `notif_X_at` na tabela.
 
-## 7. Cores e UX
+A função reusa `send-multichannel-notification` (já existe, suporta email + whatsapp + crm).
 
-Seguir tokens semânticos do `index.css` (`bg-emerald-*`, `bg-amber-*`, `bg-orange-*`, `bg-destructive`). Sem cores hardcoded fora do esquema.
+Auto-cadastro: ao criar publicação vinculada a cliente (em `handleAutoPopulateFromRPI`), inserir automaticamente uma linha em `publicacao_cobranca_schedule` com `data_inicio = data_publicacao_rpi` e `responsavel_admin_id = admin atual`.
+
+## 5. Pausa automática por resposta do cliente
+
+Adicionar trigger Postgres em `chat_messages` (e/ou `email_inbox`) que, ao receber mensagem do cliente (`sender_role='client'`), atualiza todos os `publicacao_cobranca_schedule` desse `client_id` para `status='pausado_resposta'` + `client_responded_at = now()`. A função cron passa a ignorá-los; admin precisa retomar manualmente.
+
+Se a tabela exata de mensagens recebidas não tiver coluna direta, faremos um trigger leve apenas em `chat_messages` (admin pode marcar manualmente quando vier por outro canal).
+
+## 6. Indicadores no dialog e na lista
+
+Coluna extra opcional "Cobrança" na lista de prazos:
+- 🟢 ativo — próx. envio em Xd
+- 🟡 pausado — cliente respondeu
+- ⚪ não iniciado
 
 ## Arquivos afetados
 
-- `src/components/admin/PublicacaoTab.tsx` — ViewMode, render, auto-archive filter, sync Kanban no vínculo, leitura de query string.
-- `src/components/admin/publicacao/PublicacaoPrazos.tsx` — novo.
-- `src/components/admin/publicacao/types.ts` — `ViewMode` + novos campos opcionais.
-- `src/pages/admin/Dashboard.tsx` — card de prazos críticos.
-- Nova migration em `supabase/migrations/` com colunas de cumprimento.
+- `src/components/admin/PublicacaoTab.tsx` — banner CTA Prazos.
+- `src/components/admin/publicacao/PublicacaoPrazos.tsx` — coluna + botão "Notificar".
+- `src/components/admin/publicacao/NotificarClienteDialog.tsx` — novo.
+- `src/components/admin/publicacao/cobrancaTemplates.ts` — novo (3 templates).
+- `supabase/functions/check-publicacao-notificacoes/index.ts` — novo (cron).
+- Migration nova: tabela `publicacao_cobranca_schedule` + grants + RLS + trigger de pausa por resposta + agendamento `pg_cron`.
 
-## Validação
+## Validações finais
 
-- Confirmar que ao expirar 60 dias a marca aparece como "Arquivado" no Kanban do cliente (`ClientProcessKanban` lê `brand_processes.status`).
-- Confirmar Cumprimento remove da lista e impede o auto-archive.
-- Ao vincular publicação na Revista, processo já abre na fase correta no Kanban do cliente.
+- Dialog dispara e-mail + WhatsApp manualmente com templates corretos.
+- Cron processa apenas pendentes e respeita `status`.
+- Resposta de cliente pausa o cronograma.
+- Cronograma é criado automaticamente ao vincular publicação a cliente.

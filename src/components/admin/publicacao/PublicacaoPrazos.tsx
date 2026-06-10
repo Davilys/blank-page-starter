@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { format, parseISO, differenceInDays, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -10,9 +10,10 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle2, Clock, AlertTriangle, Archive, Search, Eye } from 'lucide-react';
+import { CheckCircle2, Clock, AlertTriangle, Archive, Search, Eye, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { STATUS_CONFIG } from './types';
+import { NotificarClienteDialog } from './NotificarClienteDialog';
 
 type Bucket = 'no_prazo' | '30dias' | 'ultima_semana' | 'vencidos';
 
@@ -51,6 +52,22 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
   const [active, setActive] = useState<Bucket>(initialBucket || 'no_prazo');
   const [search, setSearch] = useState('');
   const queryClient = useQueryClient();
+  const [notifyPub, setNotifyPub] = useState<any | null>(null);
+  const [schedules, setSchedules] = useState<Record<string, any>>({});
+
+  useEffect(() => {
+    const ids = publicacoes.map(p => p.id);
+    if (ids.length === 0) { setSchedules({}); return; }
+    supabase
+      .from('publicacao_cobranca_schedule')
+      .select('*')
+      .in('publicacao_id', ids)
+      .then(({ data }) => {
+        const map: Record<string, any> = {};
+        (data || []).forEach((s: any) => { map[s.publicacao_id] = s; });
+        setSchedules(map);
+      });
+  }, [publicacoes]);
 
   // Filter eligible publications (not certified/archived/cumprido)
   const eligible = useMemo(() => {
@@ -160,13 +177,14 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                   <TableHead className="text-xs">Prazo Final</TableHead>
                   <TableHead className="text-xs">Dias Restantes</TableHead>
                   <TableHead className="text-xs">Status</TableHead>
+                  <TableHead className="text-xs">Cobrança</TableHead>
                   <TableHead className="text-xs text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-12 text-sm">
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-12 text-sm">
                       Nenhuma publicação nesta faixa de prazo.
                     </TableCell>
                   </TableRow>
@@ -175,6 +193,8 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                   const client = pub.client_id ? clientMap.get(pub.client_id) : null;
                   const stCfg = STATUS_CONFIG[pub.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG['003'];
                   const days = pub._days as number | null;
+                  const sch = schedules[pub.id];
+                  const sentCount = sch ? [sch.notif_1_at, sch.notif_2_at, sch.notif_3_at].filter(Boolean).length : 0;
                   const daysColor =
                     days === null ? 'text-muted-foreground' :
                     days < 0 ? 'text-red-600 dark:text-red-400 font-semibold' :
@@ -205,8 +225,27 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                       <TableCell>
                         <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', stCfg.bg, stCfg.color)}>{stCfg.label}</span>
                       </TableCell>
+                      <TableCell>
+                        {!sch ? (
+                          <span className="text-xs text-muted-foreground">não iniciado</span>
+                        ) : sch.status === 'pausado_resposta' ? (
+                          <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 text-[10px]">pausado · respondeu</Badge>
+                        ) : (
+                          <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 text-[10px]">{sentCount}/3 enviadas</Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs gap-1 border-primary/40 text-primary hover:bg-primary/10"
+                            onClick={() => setNotifyPub(pub)}
+                            disabled={!pub.client_id}
+                            title={pub.client_id ? 'Enviar notificação' : 'Vincule um cliente primeiro'}
+                          >
+                            <Bell className="w-3.5 h-3.5" /> Notificar
+                          </Button>
                           {onOpenDetail && (
                             <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => onOpenDetail(pub.id)} title="Ver detalhe">
                               <Eye className="w-3.5 h-3.5" />
@@ -240,6 +279,14 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
           </ScrollArea>
         </CardContent>
       </Card>
+
+      <NotificarClienteDialog
+        open={!!notifyPub}
+        onOpenChange={(o) => { if (!o) setNotifyPub(null); }}
+        publicacao={notifyPub}
+        client={notifyPub?.client_id ? clientMap.get(notifyPub.client_id) : null}
+        marca={(notifyPub?.process_id && processMap.get(notifyPub.process_id)?.brand_name) || notifyPub?.brand_name_rpi || 'sua marca'}
+      />
     </div>
   );
 }

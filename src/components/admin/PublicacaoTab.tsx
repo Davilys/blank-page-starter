@@ -1605,6 +1605,26 @@ export default function PublicacaoTab() {
       supabase.from('brand_processes').update(update).eq('id', entry.matched_process_id)
         .then(() => queryClient.invalidateQueries({ queryKey: ['brand-processes-pub'] }));
     }
+
+    // Auto-cadastro de cronograma de cobrança (15/30/50 dias)
+    const clientId = entry.matched_client_id || proc.user_id;
+    if (clientId && entry.publication_date) {
+      // Find the newly created publicacao by rpi_entry_id (best-effort, async)
+      setTimeout(async () => {
+        const { data: pub } = await supabase
+          .from('publicacoes_marcas')
+          .select('id')
+          .eq('rpi_entry_id', entry.id)
+          .maybeSingle();
+        if (!pub) return;
+        await supabase.from('publicacao_cobranca_schedule').upsert({
+          publicacao_id: pub.id,
+          client_id: clientId,
+          data_inicio: entry.publication_date,
+          responsavel_admin_id: currentUserQuery.data?.id || null,
+        }, { onConflict: 'publicacao_id', ignoreDuplicates: true } as any);
+      }, 1500);
+    }
   }, [linkedProcessIds, submittedRpiEntryIds, processMap, resolveStatusFromDispatch, createMutation, currentUserQuery.data]);
 
   const availableRpiEntries = useMemo(() => {
@@ -1683,6 +1703,30 @@ export default function PublicacaoTab() {
             </div>
             <Button size="sm" variant="default" className="text-xs gap-1.5" onClick={handleAutoLinkClients} disabled={isAutoLinking}>
               {isAutoLinking ? <><div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" /> Vinculando...</> : <><Zap className="w-3 h-3" /> Auto-vincular</>}
+            </Button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ─── PRAZOS CTA BANNER ─── */}
+      {viewMode !== 'prazos' && (
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+          className="mb-4 p-4 rounded-xl border-2 border-primary/40 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent shadow-sm">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-primary/15 flex items-center justify-center">
+                <CalendarClock className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <p className="font-semibold text-sm">Controle de Prazos das Publicações</p>
+                <p className="text-xs text-muted-foreground">
+                  <span className="text-orange-600 dark:text-orange-400 font-semibold">{kpiStats.urgentes}</span> vencendo em 7 dias ·{' '}
+                  <span className="text-red-600 dark:text-red-400 font-semibold">{kpiStats.atrasados}</span> vencidos · Notifique o cliente em 15/30/50 dias
+                </p>
+              </div>
+            </div>
+            <Button size="lg" className="gap-2 shadow-md" onClick={() => setViewMode('prazos')}>
+              <CalendarClock className="w-4 h-4" /> Abrir Prazos
             </Button>
           </div>
         </motion.div>
