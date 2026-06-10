@@ -12,7 +12,7 @@ import {
   FileText, Eye, ArrowRight, RotateCcw, Shield, Gavel, Award, RefreshCw,
   ExternalLink, Trash2, Users, Zap, BellRing, Hash, Paperclip,
   ArrowUpDown, ArrowUp, ArrowDown, List, LayoutGrid, FileDown,
-  ChevronLeft, Activity, Wallet, Receipt, FileCheck, TrendingUp, Star, Check, Package,
+  ChevronLeft, Activity, Wallet, Receipt, FileCheck, TrendingUp, Star, Check, Package, CalendarClock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +32,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { StatsCard } from '@/components/admin/dashboard/StatsCard';
 import { PublicacaoCharts } from '@/components/admin/publicacao/PublicacaoCharts';
 import { PublicacaoKanban } from '@/components/admin/publicacao/PublicacaoKanban';
+import { PublicacaoPrazos } from '@/components/admin/publicacao/PublicacaoPrazos';
 import { BulkActionsBar } from '@/components/admin/publicacao/BulkActionsBar';
 import { exportPublicacaoPDF } from '@/components/admin/publicacao/PublicacaoPDFExport';
 import { ClientDetailSheet } from '@/components/admin/clients/ClientDetailSheet';
@@ -46,7 +47,7 @@ type PubTipo = 'publicacao_rpi' | 'decisao' | 'certificado' | 'renovacao';
 type PrazoFilter = 'todos' | 'hoje' | '7dias' | '30dias' | 'atrasados';
 type SortKey = 'cliente' | 'marca' | 'data_pub' | 'prazo' | 'status';
 type SortDir = 'asc' | 'desc';
-type ViewMode = 'lista' | 'kanban';
+type ViewMode = 'lista' | 'kanban' | 'prazos';
 
 interface Publicacao {
   id: string;
@@ -484,6 +485,7 @@ export default function PublicacaoTab() {
 
     const expired = publicacoes.filter(p => {
       if (p.status === 'arquivado' || p.status === 'certificado') return false;
+      if ((p as any).cumprimento_ok) return false;
       let dl = p.proximo_prazo_critico;
       if (!dl && p.data_publicacao_rpi) {
         dl = format(addDays(parseISO(p.data_publicacao_rpi), 60), 'yyyy-MM-dd');
@@ -501,12 +503,14 @@ export default function PublicacaoTab() {
       await Promise.all(expired.map(async (pub) => {
         await supabase.from('publicacoes_marcas').update({
           status: 'arquivado',
+          descricao_prazo: 'Arquivado por decurso de prazo',
           updated_at: now,
         }).eq('id', pub.id);
 
         if (pub.process_id) {
           await supabase.from('brand_processes').update({
             pipeline_stage: 'arquivado',
+            status: 'arquivado',
             updated_at: now,
           }).eq('id', pub.process_id);
         }
@@ -1572,6 +1576,35 @@ export default function PublicacaoTab() {
       process_number_rpi: entry.process_number || null,
       descricao_prazo: entry.dispatch_text || null,
     });
+
+    // Sync the client Kanban stage on brand_processes.status (matches client kanban stage IDs)
+    const pubToKanban: Record<string, string> = {
+      '003': 'publicado_rpi',
+      oposicao: 'publicado_rpi',
+      exigencia_merito: 'em_exame',
+      deferimento: 'deferido',
+      indeferimento: 'indeferido',
+      certificado: 'concedido',
+      arquivado: 'arquivado',
+    };
+    const pubToPipeline: Record<string, string> = {
+      '003': '003',
+      oposicao: 'oposicao',
+      exigencia_merito: 'exigencia_merito',
+      deferimento: 'deferimento',
+      certificado: 'certificados',
+      indeferimento: 'indeferimento',
+      arquivado: 'distrato',
+    };
+    const kanbanStage = pubToKanban[status];
+    const pipelineStage = pubToPipeline[status];
+    if (entry.matched_process_id && (kanbanStage || pipelineStage)) {
+      const update: any = { updated_at: new Date().toISOString() };
+      if (kanbanStage) update.status = kanbanStage;
+      if (pipelineStage) update.pipeline_stage = pipelineStage;
+      supabase.from('brand_processes').update(update).eq('id', entry.matched_process_id)
+        .then(() => queryClient.invalidateQueries({ queryKey: ['brand-processes-pub'] }));
+    }
   }, [linkedProcessIds, submittedRpiEntryIds, processMap, resolveStatusFromDispatch, createMutation, currentUserQuery.data]);
 
   const availableRpiEntries = useMemo(() => {
@@ -1857,11 +1890,14 @@ export default function PublicacaoTab() {
                 <Plus className="w-3.5 h-3.5" /> Nova
               </Button>
               <div className="flex border rounded-md overflow-hidden">
-                <Button variant={viewMode === 'lista' ? 'default' : 'ghost'} size="sm" className="h-8 px-2.5 rounded-none" onClick={() => setViewMode('lista')}>
+                <Button variant={viewMode === 'lista' ? 'default' : 'ghost'} size="sm" className="h-8 px-2.5 rounded-none" onClick={() => setViewMode('lista')} title="Lista">
                   <List className="w-3.5 h-3.5" />
                 </Button>
-                <Button variant={viewMode === 'kanban' ? 'default' : 'ghost'} size="sm" className="h-8 px-2.5 rounded-none" onClick={() => setViewMode('kanban')}>
+                <Button variant={viewMode === 'kanban' ? 'default' : 'ghost'} size="sm" className="h-8 px-2.5 rounded-none" onClick={() => setViewMode('kanban')} title="Kanban">
                   <LayoutGrid className="w-3.5 h-3.5" />
+                </Button>
+                <Button variant={viewMode === 'prazos' ? 'default' : 'ghost'} size="sm" className="h-8 px-2.5 rounded-none gap-1 text-xs" onClick={() => setViewMode('prazos')} title="Prazos">
+                  <CalendarClock className="w-3.5 h-3.5" /> Prazos
                 </Button>
               </div>
             </div>
@@ -1871,6 +1907,22 @@ export default function PublicacaoTab() {
             <div className="flex items-center justify-center py-16">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
             </div>
+          ) : viewMode === 'prazos' ? (
+            <PublicacaoPrazos
+              publicacoes={publicacoes as any}
+              processMap={processMap}
+              clientMap={clientMap}
+              onOpenDetail={(id) => {
+                const pub = publicacoes.find(p => p.id === id);
+                if (pub?.client_id) {
+                  setSheetPubId(id);
+                  fetchClientForSheet(pub.client_id).then(() => {
+                    setShowClientSheet(true);
+                    setShowProcessDetailFromSheet(true);
+                  });
+                }
+              }}
+            />
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <Newspaper className="w-10 h-10 mb-2 opacity-30" />
