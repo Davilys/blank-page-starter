@@ -60,7 +60,7 @@ Toda e qualquer publicação possui prazo de 60 (sessenta) dias corridos para o 
 
 Conforme informado no atendimento inicial e no contrato assinado, de acordo com a Cláusula 5.2 do seu contrato, o cumprimento de exigências formais constitui serviço adicional. Conforme a Cláusula 10.3, será cobrado o valor correspondente a 1 (um) salário mínimo vigente no ano da publicação, o que ocorreu em seu processo, conforme segue em anexo e publicado no Diário Oficial.
 
-Para dar continuidade ao processo, solicitamos o pagamento da taxa de serviço no valor de R$ ${fmtValor(valor)}. Vencimento em 10 dias.
+Para dar continuidade ao processo, solicitamos o pagamento da taxa de serviço no valor de R$ ${fmtValor(valor)}. Vencimento em 10 dias. Segue link da cobrança conforme consta em contrato: [LINK_BOLETO]
 
 Caso queira falar com o jurídico, informe o melhor dia e horário, pois precisamos resolver isso o quanto antes.
 
@@ -79,7 +79,6 @@ function generateWhatsAppTemplate(client: ServiceActionPanelProps['client'], _st
   const primeiroNome = nome.split(' ')[0];
   const numero = client.process_number?.trim();
   const trechoNumero = numero ? `, sob o número ${numero}` : '';
-  void valor;
   return `Olá, ${primeiroNome}, tudo bem?
 
 Preciso te passar uma atualização importante sobre o seu processo no INPI…
@@ -87,6 +86,8 @@ Preciso te passar uma atualização importante sobre o seu processo no INPI…
 Informamos que foi publicada uma exigência referente ao processo da marca ${marca}${trechoNumero}, na data de hoje!
 
 Ressaltamos que toda publicação do INPI possui um prazo de 60 (sessenta) dias corridos para cumprimento, contados a partir da data de publicação na Revista da Propriedade Industrial (RPI).
+
+Para dar continuidade ao processo, solicitamos o pagamento da taxa de serviço no valor de R$ ${fmtValor(valor)}. Vencimento em 10 dias. Segue link da cobrança conforme consta em contrato: [LINK_BOLETO]
 
 Para que eu possa explicar os detalhes da publicação e orientá-lo(a) sobre os próximos passos, preciso agendar uma breve reunião.
 
@@ -358,9 +359,9 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
         finalEmailMessage = message.split(DISTRATO_LINK_PLACEHOLDER).join(distratoSignatureUrl || '(link indisponível)');
         finalWhatsappMessage = whatsappMessage.split(DISTRATO_LINK_PLACEHOLDER).join(distratoSignatureUrl || '(link indisponível)');
       } else {
-        const linkBlock = paymentLink ? `\n\nLink de pagamento:\n${paymentLink}` : '';
-        finalEmailMessage = message + linkBlock;
-        finalWhatsappMessage = whatsappMessage + linkBlock;
+        const linkValue = paymentLink || '(link indisponível)';
+        finalEmailMessage = message.split('[LINK_BOLETO]').join(linkValue);
+        finalWhatsappMessage = whatsappMessage.split('[LINK_BOLETO]').join(linkValue);
       }
 
       // 3. Send multichannel notification (CRM + WhatsApp)
