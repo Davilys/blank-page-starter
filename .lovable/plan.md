@@ -1,37 +1,28 @@
-## Objetivo
-Substituir o autocomplete inline da coluna **Vincular cliente** (aba Prazos) por um diálogo robusto no estilo da aba **Revista**, e oferecer o botão **"Novo Cliente"** dentro do diálogo, reaproveitando o `CreateClientDialog` da aba Clientes.
+## Editar nome da marca quando não identificado
 
-## 1. Novo componente `VincularClienteDialog`
-Arquivo: `src/components/admin/publicacao/VincularClienteDialog.tsx`.
+Quando o sistema importa uma publicação RPI e não consegue identificar o nome da marca (mostra "—"), o usuário precisa poder editar manualmente e inserir o nome correto.
 
-Props: `open`, `onOpenChange`, `publicacao`, `clients`, `onLink(clientId)`.
+### O que será feito
 
-Layout (espelha o Vincular Cliente da Revista):
-- Cabeçalho com ícone `UserPlus` + título "Vincular Cliente" + descrição.
-- Bloco resumo da publicação (Marca, Processo, Data publicação RPI).
-- Campo **Buscar Cliente** com ícone, placeholder "Nome, email, empresa, CPF/CNPJ ou telefone…".
-- Label "Selecionar Cliente (N disponíveis, K encontrados)" + botão `CreateClientDialog` (Novo Cliente) ao lado.
-- `ScrollArea` de 240px listando até 50 resultados; cada item exibe nome, email, empresa e CPF/CNPJ; seleção destacada com `bg-primary/10`.
-- Mensagens contextuais ("Digite ao menos 2 letras", "Nenhum cliente encontrado para …. Use Novo Cliente para cadastrar.").
-- Footer: **Cancelar** + **Vincular Cliente** (desabilita até selecionar).
+Na aba **Prazos** (`PublicacaoPrazos.tsx`), na coluna **Marca / Processo**:
 
-Quando `CreateClientDialog.onClientCreated` dispara, invalida `['profiles-pub']` via `useQueryClient` para repopular a lista; o admin então clica no novo cliente.
+1. Adicionar um pequeno botão de lápis (ícone `Pencil`) ao lado do nome da marca, visível em hover.
+2. Ao clicar, abrir um diálogo simples (`EditarMarcaDialog`) com:
+   - Campo de texto pré-preenchido com o nome atual (ou vazio se "—")
+   - Exibição do processo nº como referência (read-only)
+   - Botões **Cancelar** e **Salvar**
+3. Ao salvar, atualizar `brand_name_rpi` na tabela `publicacoes_marcas` para a publicação em questão.
+4. Quando a publicação já tem `process_id` vinculado, também oferecer (checkbox) atualizar o `brand_name` do processo correspondente em `brand_processes`.
+5. Invalidar as queries `['publicacoes-marcas']` e `['brand-processes-pub']` para refletir na UI.
 
-## 2. Integração em `PublicacaoPrazos.tsx`
-- Remover o autocomplete inline (`linkingPubId`, `linkSearch` + dropdown popover) na célula "Cliente" órfã.
-- Adicionar estado `linkDialogPub: any | null`. O botão `+ Vincular cliente` agora abre o diálogo.
-- Renderizar `<VincularClienteDialog open={!!linkDialogPub} onOpenChange={(v) => !v && setLinkDialogPub(null)} publicacao={linkDialogPub} clients={clients} onLink={(id) => handleLinkClient(linkDialogPub, id)} />`.
-- `handleLinkClient` mantém a lógica (resolve `process_id` via `process_number_rpi`, `update publicacoes_marcas`, `invalidateQueries(['publicacoes-marcas'])`).
+### Onde aparece
 
-## 3. Reuso do `CreateClientDialog`
-- Importar `CreateClientDialog` diretamente; ele já traz seu próprio `DialogTrigger` (botão "Novo Cliente"), zero alterações no arquivo original.
-- Após criação, `onClientCreated` invalida `['profiles-pub']`. A query em `PublicacaoTab` recarrega e o novo cliente aparece na busca.
+- **Sempre** na coluna Marca/Processo da aba Prazos (todas as faixas: No Prazo, 30 dias, Última Semana, Vencidos, Cumpridos, Desistiu).
+- O destaque visual fica mais evidente quando o nome está vazio ("—"): nesse caso o botão aparece como link "Editar nome da marca" em vez de só o ícone.
 
-## 4. Fora de escopo
-- Sem migrações de banco.
-- Sem mudanças no `CreateClientDialog` da aba Clientes.
-- Sem mudanças no fluxo de notificações ou status.
+### Detalhes técnicos
 
-## 5. Arquivos
-- **Criar:** `src/components/admin/publicacao/VincularClienteDialog.tsx`.
-- **Editar:** `src/components/admin/publicacao/PublicacaoPrazos.tsx` (remove autocomplete inline + render do novo diálogo).
+- Novo componente: `src/components/admin/publicacao/EditarMarcaDialog.tsx`.
+- Update SQL: `update publicacoes_marcas set brand_name_rpi = ? where id = ?` via cliente Supabase (sem migration — coluna já existe).
+- Update opcional do processo: `update brand_processes set brand_name = ? where id = ?`.
+- Sem alteração de schema, sem mudanças no backend.
