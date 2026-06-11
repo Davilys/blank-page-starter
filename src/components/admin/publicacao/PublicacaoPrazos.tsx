@@ -10,12 +10,13 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle2, Clock, AlertTriangle, Archive, Search, Eye, Bell, ChevronDown, CalendarCheck, Wallet, UserPlus, X, Ban } from 'lucide-react';
+import { CheckCircle2, Clock, AlertTriangle, Archive, Search, Eye, Bell, ChevronDown, CalendarCheck, Wallet, UserPlus, X, Ban, Pencil } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { STATUS_CONFIG } from './types';
 import { NotificarClienteDialog } from './NotificarClienteDialog';
 import { VincularClienteDialog } from './VincularClienteDialog';
+import { EditarMarcaDialog } from './EditarMarcaDialog';
 
 type Bucket = 'no_prazo' | '30dias' | 'ultima_semana' | 'vencidos' | 'cumpridos' | 'desistiu';
 
@@ -85,6 +86,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
   const [notifyPub, setNotifyPub] = useState<any | null>(null);
   const [schedules, setSchedules] = useState<Record<string, any>>({});
   const [linkDialogPub, setLinkDialogPub] = useState<any | null>(null);
+  const [editMarcaPub, setEditMarcaPub] = useState<any | null>(null);
 
   useEffect(() => {
     const ids = publicacoes.map(p => p.id);
@@ -315,6 +317,27 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                           <div className="font-medium group-hover:underline">{proc?.brand_name || pub.brand_name_rpi || '—'}</div>
                           <div className="text-xs text-muted-foreground">{proc?.process_number || pub.process_number_rpi || ''}</div>
                         </button>
+                        {(() => {
+                          const hasName = !!(proc?.brand_name || pub.brand_name_rpi);
+                          return hasName ? (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setEditMarcaPub(pub); }}
+                              className="ml-1 inline-flex items-center text-muted-foreground hover:text-primary opacity-60 hover:opacity-100 transition"
+                              title="Editar nome da marca"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setEditMarcaPub(pub); }}
+                              className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+                            >
+                              <Pencil className="w-3 h-3" /> Editar nome da marca
+                            </button>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="text-xs">
                         {pub.data_publicacao_rpi ? format(parseISO(pub.data_publicacao_rpi), 'dd/MM/yyyy', { locale: ptBR }) : '—'}
@@ -450,6 +473,13 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
         publicacao={linkDialogPub}
         clients={clients}
         onLink={async (clientId) => { if (linkDialogPub) await handleLinkClient(linkDialogPub, clientId); }}
+      />
+
+      <EditarMarcaDialog
+        open={!!editMarcaPub}
+        onOpenChange={(o) => { if (!o) setEditMarcaPub(null); }}
+        publicacao={editMarcaPub}
+        processBrandName={editMarcaPub?.process_id ? processMap.get(editMarcaPub.process_id)?.brand_name : null}
       />
     </div>
   );
