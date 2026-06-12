@@ -253,14 +253,15 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
               <TableHead>Vencimento</TableHead>
               <TableHead>Atraso</TableHead>
               <TableHead>Última cobrança</TableHead>
+              <TableHead>Responsável</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-10"><Loader2 className="h-5 w-5 animate-spin mx-auto" /></TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-10"><Loader2 className="h-5 w-5 animate-spin mx-auto" /></TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-10 text-muted-foreground">Nenhuma fatura vencida no período</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-10 text-muted-foreground">Nenhuma fatura vencida no período</TableCell></TableRow>
             ) : pagedRows.map((inv) => {
               const last = recentByInvoice.get(inv.id);
               const dias = daysAgo(inv.due_date);
@@ -313,6 +314,13 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
                         <div className="text-muted-foreground">{last.canais.join(", ")}</div>
                       </div>
                     ) : <span className="text-xs text-muted-foreground">—</span>}
+                  </TableCell>
+                  <TableCell>
+                    <ResponsavelChip
+                      entidade="invoice"
+                      entidadeId={inv.id}
+                      responsavel={responsaveisMap[inv.id]}
+                    />
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
