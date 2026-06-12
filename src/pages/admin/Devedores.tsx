@@ -758,13 +758,14 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                     <TableHead className="text-center">Parcelas</TableHead>
                     <TableHead className="text-right">Total devido</TableHead>
                     <TableHead className="text-right">Total + 10%</TableHead>
+                    <TableHead>Responsável</TableHead>
                     <TableHead className="text-right">Ação</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredDebtors.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                         {loading ? "Carregando..." : "Nenhum devedor com mais de 60 dias. Clique em Sincronizar para buscar no Asaas."}
                       </TableCell>
                     </TableRow>
@@ -801,9 +802,16 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                         />
                       </TableCell>
                       <TableCell className="text-right font-semibold text-emerald-600">{fmtBRL(d.novo_total)}</TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <ResponsavelChip
+                          entidade="devedor"
+                          entidadeId={d.asaas_customer_id}
+                          responsavel={responsaveisDevedores[d.asaas_customer_id]}
+                        />
+                      </TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="inline-flex gap-2">
-                          <Button size="sm" onClick={() => setSelected(d)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                          <Button size="sm" onClick={() => { setSelected(d); atribuirResponsavel("devedor", d.asaas_customer_id, { acao: "negociou", somenteSeVazio: true }).catch(() => {}); }} className="bg-emerald-600 hover:bg-emerald-700 text-white">
                             Renegociar
                           </Button>
                           <Button size="sm" variant="ghost" disabled={deletingKey !== null}
