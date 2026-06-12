@@ -370,11 +370,12 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
                 <TableHead>Canais</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Próx. ação</TableHead>
+                <TableHead>Responsável</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {history.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">Sem cobranças registradas</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center py-10 text-muted-foreground">Sem cobranças registradas</TableCell></TableRow>
               ) : history.map((h) => (
                 <TableRow key={h.id} className="hover:bg-muted/40">
                   <TableCell className="text-sm">{new Date(h.enviada_em).toLocaleString("pt-BR")}</TableCell>
@@ -399,6 +400,13 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {h.proxima_acao_em ? new Date(h.proxima_acao_em).toLocaleDateString("pt-BR") : "—"}
+                  </TableCell>
+                  <TableCell>
+                    <ResponsavelChip
+                      entidade="invoice"
+                      entidadeId={h.invoice_id}
+                      responsavel={responsaveisMap[h.invoice_id]}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

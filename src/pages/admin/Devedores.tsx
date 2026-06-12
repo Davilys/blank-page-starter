@@ -43,6 +43,7 @@ interface Renegociacao {
   id: string;
   cliente_nome: string | null;
   cliente_cpf_cnpj: string | null;
+  asaas_customer_id: string | null;
   valor_original_total: number;
   valor_acrescimo: number;
   valor_renegociado: number;
@@ -932,11 +933,12 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                     <TableHead className="text-right">Acréscimo</TableHead>
                     <TableHead className="text-right">Renegociado</TableHead>
                     <TableHead className="text-center">Parcelas</TableHead>
+                    <TableHead>Responsável</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredHistory.length === 0 && (
-                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nenhuma renegociação ainda.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhuma renegociação ainda.</TableCell></TableRow>
                   )}
                   {filteredHistory.map((h) => (
                     <TableRow
@@ -992,6 +994,17 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                       <TableCell className="text-center">
                         <Badge variant="outline">{h.parcelas_renegociadas?.length || 0}/5</Badge>
                       </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        {h.asaas_customer_id ? (
+                          <ResponsavelChip
+                            entidade="devedor"
+                            entidadeId={h.asaas_customer_id}
+                            responsavel={responsaveisDevedores[h.asaas_customer_id]}
+                          />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1013,11 +1026,12 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                     <TableHead className="text-right">Acréscimo</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead className="text-center">Parcelas</TableHead>
+                    <TableHead>Responsável</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredHistory30.length === 0 && (
-                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhuma negociação ainda.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Nenhuma negociação ainda.</TableCell></TableRow>
                   )}
                   {filteredHistory30.map((h) => (
                     <TableRow
@@ -1066,6 +1080,17 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                       <TableCell className="text-right text-amber-600">{fmtBRL(h.valor_acrescimo)}</TableCell>
                       <TableCell className="text-right font-semibold">{fmtBRL(h.valor_total)}</TableCell>
                       <TableCell className="text-center"><Badge variant="outline">{h.parcelas_devedor?.length || 0}</Badge></TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        {h.asaas_customer_id ? (
+                          <ResponsavelChip
+                            entidade="devedor"
+                            entidadeId={h.asaas_customer_id}
+                            responsavel={responsaveisDevedores[h.asaas_customer_id]}
+                          />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
