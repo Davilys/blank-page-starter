@@ -17,6 +17,8 @@ import { DatePeriodFilter, type DateFilterType } from "@/components/admin/client
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import { PaginationBar, type PageSize } from "@/components/admin/financeiro/PaginationBar";
 import { EditableAmountCell } from "@/components/admin/financeiro/EditableAmountCell";
+import { ResponsavelChip } from "@/components/admin/shared/ResponsavelChip";
+import { useResponsaveis, atribuirResponsavel } from "@/hooks/useResponsaveis";
 
 const ClientDetailSheet = lazy(() =>
   import("@/components/admin/clients/ClientDetailSheet").then((m) => ({ default: m.ClientDetailSheet }))
