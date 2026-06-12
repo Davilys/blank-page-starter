@@ -933,11 +933,12 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                     <TableHead className="text-right">Acréscimo</TableHead>
                     <TableHead className="text-right">Renegociado</TableHead>
                     <TableHead className="text-center">Parcelas</TableHead>
+                    <TableHead>Responsável</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredHistory.length === 0 && (
-                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nenhuma renegociação ainda.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhuma renegociação ainda.</TableCell></TableRow>
                   )}
                   {filteredHistory.map((h) => (
                     <TableRow
