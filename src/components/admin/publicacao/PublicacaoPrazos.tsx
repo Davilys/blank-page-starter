@@ -388,13 +388,23 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                           </div>
                         )}
                       </TableCell>
+                      <TableCell>
+                        <ResponsavelChip
+                          entidade="publicacao"
+                          entidadeId={pub.id}
+                          responsavel={responsaveisMap[pub.id]}
+                        />
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button
                             size="sm"
                             variant="outline"
                             className="h-7 px-2 text-xs gap-1 border-primary/40 text-primary hover:bg-primary/10"
-                            onClick={() => setNotifyPub(pub)}
+                            onClick={() => {
+                              setNotifyPub(pub);
+                              atribuirResponsavel('publicacao', pub.id, { acao: 'cobrou', somenteSeVazio: true }).catch(() => {});
+                            }}
                             disabled={!pub.client_id}
                             title={pub.client_id ? 'Enviar notificação' : 'Vincule um cliente primeiro'}
                           >
