@@ -17,6 +17,8 @@ import { DatePeriodFilter, type DateFilterType } from "@/components/admin/client
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import { PaginationBar, type PageSize } from "@/components/admin/financeiro/PaginationBar";
 import { EditableAmountCell } from "@/components/admin/financeiro/EditableAmountCell";
+import { ResponsavelChip } from "@/components/admin/shared/ResponsavelChip";
+import { useResponsaveis, atribuirResponsavel } from "@/hooks/useResponsaveis";
 
 const ClientDetailSheet = lazy(() =>
   import("@/components/admin/clients/ClientDetailSheet").then((m) => ({ default: m.ClientDetailSheet }))
@@ -119,6 +121,11 @@ export default function Devedores({ embedded = false, forceTab }: DevedoresProps
   const [pageSize60, setPageSize60] = useState<PageSize>(10);
   const [page30, setPage30] = useState(1);
   const [pageSize30, setPageSize30] = useState<PageSize>(10);
+  const devedoresIds = useMemo(
+    () => [...debtors, ...debtors30].map(d => d.asaas_customer_id).filter(Boolean),
+    [debtors, debtors30],
+  );
+  const responsaveisDevedores = useResponsaveis("devedor", devedoresIds);
 
   const excluirDevedor = async (d: Debtor, bucket: 'd30' | 'd60') => {
     if (!window.confirm(`Remover ${d.cliente_nome || 'este cliente'} da lista? As parcelas serão marcadas como excluídas.`)) return;
@@ -751,13 +758,14 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                     <TableHead className="text-center">Parcelas</TableHead>
                     <TableHead className="text-right">Total devido</TableHead>
                     <TableHead className="text-right">Total + 10%</TableHead>
+                    <TableHead>Responsável</TableHead>
                     <TableHead className="text-right">Ação</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredDebtors.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                         {loading ? "Carregando..." : "Nenhum devedor com mais de 60 dias. Clique em Sincronizar para buscar no Asaas."}
                       </TableCell>
                     </TableRow>
@@ -794,9 +802,16 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                         />
                       </TableCell>
                       <TableCell className="text-right font-semibold text-emerald-600">{fmtBRL(d.novo_total)}</TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <ResponsavelChip
+                          entidade="devedor"
+                          entidadeId={d.asaas_customer_id}
+                          responsavel={responsaveisDevedores[d.asaas_customer_id]}
+                        />
+                      </TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="inline-flex gap-2">
-                          <Button size="sm" onClick={() => setSelected(d)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                          <Button size="sm" onClick={() => { setSelected(d); atribuirResponsavel("devedor", d.asaas_customer_id, { acao: "negociou", somenteSeVazio: true }).catch(() => {}); }} className="bg-emerald-600 hover:bg-emerald-700 text-white">
                             Renegociar
                           </Button>
                           <Button size="sm" variant="ghost" disabled={deletingKey !== null}
@@ -831,13 +846,14 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                     <TableHead className="text-center">Parcelas</TableHead>
                     <TableHead className="text-right">Total devido</TableHead>
                     <TableHead className="text-right">Total + 10%</TableHead>
+                    <TableHead>Responsável</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredDebtors30.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                         Nenhum vencido recente. Clique em Sincronizar para buscar no Asaas.
                       </TableCell>
                     </TableRow>
@@ -868,12 +884,19 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                         />
                       </TableCell>
                       <TableCell className="text-right font-semibold text-emerald-600">{fmtBRL(d.novo_total)}</TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <ResponsavelChip
+                          entidade="devedor"
+                          entidadeId={d.asaas_customer_id}
+                          responsavel={responsaveisDevedores[d.asaas_customer_id]}
+                        />
+                      </TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="inline-flex gap-2">
-                          <Button size="sm" onClick={() => setSelectedNeg(d)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                          <Button size="sm" onClick={() => { setSelectedNeg(d); atribuirResponsavel("devedor", d.asaas_customer_id, { acao: "negociou", somenteSeVazio: true }).catch(() => {}); }} className="bg-emerald-600 hover:bg-emerald-700 text-white">
                             Negociar
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => setSelectedCob(d)}>
+                          <Button size="sm" variant="outline" onClick={() => { setSelectedCob(d); atribuirResponsavel("devedor", d.asaas_customer_id, { acao: "cobrou", somenteSeVazio: true }).catch(() => {}); }}>
                             Cobrar
                           </Button>
                           <Button size="sm" variant="ghost" disabled={deletingKey !== null}

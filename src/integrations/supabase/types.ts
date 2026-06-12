@@ -3826,6 +3826,72 @@ export type Database = {
         }
         Relationships: []
       }
+      responsavel_atribuicao: {
+        Row: {
+          atribuido_em: string
+          atribuido_por: string | null
+          entidade: string
+          entidade_id: string
+          id: string
+          updated_at: string
+          user_id: string | null
+          user_nome: string | null
+        }
+        Insert: {
+          atribuido_em?: string
+          atribuido_por?: string | null
+          entidade: string
+          entidade_id: string
+          id?: string
+          updated_at?: string
+          user_id?: string | null
+          user_nome?: string | null
+        }
+        Update: {
+          atribuido_em?: string
+          atribuido_por?: string | null
+          entidade?: string
+          entidade_id?: string
+          id?: string
+          updated_at?: string
+          user_id?: string | null
+          user_nome?: string | null
+        }
+        Relationships: []
+      }
+      responsavel_historico: {
+        Row: {
+          acao: string
+          created_at: string
+          entidade: string
+          entidade_id: string
+          id: string
+          observacao: string | null
+          user_id: string | null
+          user_nome: string | null
+        }
+        Insert: {
+          acao: string
+          created_at?: string
+          entidade: string
+          entidade_id: string
+          id?: string
+          observacao?: string | null
+          user_id?: string | null
+          user_nome?: string | null
+        }
+        Update: {
+          acao?: string
+          created_at?: string
+          entidade?: string
+          entidade_id?: string
+          id?: string
+          observacao?: string | null
+          user_id?: string | null
+          user_nome?: string | null
+        }
+        Relationships: []
+      }
       rpi_entries: {
         Row: {
           attorney_name: string | null

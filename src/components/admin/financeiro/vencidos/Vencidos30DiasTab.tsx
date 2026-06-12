@@ -11,6 +11,8 @@ import { loadClientForSheet } from "@/lib/clientSheet";
 import type { ClientWithProcess } from "@/components/admin/clients/ClientKanbanBoard";
 import { PaginationBar, type PageSize } from "@/components/admin/financeiro/PaginationBar";
 import { EditableAmountCell } from "@/components/admin/financeiro/EditableAmountCell";
+import { ResponsavelChip } from "@/components/admin/shared/ResponsavelChip";
+import { useResponsaveis, atribuirResponsavel } from "@/hooks/useResponsaveis";
 
 const ClientDetailSheet = lazy(() =>
   import("@/components/admin/clients/ClientDetailSheet").then((m) => ({ default: m.ClientDetailSheet }))
@@ -62,6 +64,8 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
   const [loadingClient, setLoadingClient] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSize>(10);
+  const invoiceIds = useMemo(() => invoices.map(i => i.id), [invoices]);
+  const responsaveisMap = useResponsaveis("invoice", invoiceIds);
 
   const openClientFile = async (userId: string | null | undefined) => {
     if (!userId) { toast.error("Cliente sem perfil vinculado"); return; }
@@ -135,6 +139,8 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
   const cobrar = async (invoice_id: string, channelsOverride?: Array<"whatsapp" | "email">) => {
     setSendingId(invoice_id + (channelsOverride?.join("") || ""));
     try {
+      // Marca o usuário logado como responsável (não sobrescreve se já tiver um)
+      atribuirResponsavel("invoice", invoice_id, { acao: "cobrou", somenteSeVazio: true }).catch(() => {});
       const { data, error } = await supabase.functions.invoke("cobrar-fatura-vencida", {
         body: { invoice_id, channels: channelsOverride },
       });
@@ -247,14 +253,15 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
               <TableHead>Vencimento</TableHead>
               <TableHead>Atraso</TableHead>
               <TableHead>Última cobrança</TableHead>
+              <TableHead>Responsável</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-10"><Loader2 className="h-5 w-5 animate-spin mx-auto" /></TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-10"><Loader2 className="h-5 w-5 animate-spin mx-auto" /></TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-10 text-muted-foreground">Nenhuma fatura vencida no período</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-10 text-muted-foreground">Nenhuma fatura vencida no período</TableCell></TableRow>
             ) : pagedRows.map((inv) => {
               const last = recentByInvoice.get(inv.id);
               const dias = daysAgo(inv.due_date);
@@ -307,6 +314,13 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
                         <div className="text-muted-foreground">{last.canais.join(", ")}</div>
                       </div>
                     ) : <span className="text-xs text-muted-foreground">—</span>}
+                  </TableCell>
+                  <TableCell>
+                    <ResponsavelChip
+                      entidade="invoice"
+                      entidadeId={inv.id}
+                      responsavel={responsaveisMap[inv.id]}
+                    />
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
