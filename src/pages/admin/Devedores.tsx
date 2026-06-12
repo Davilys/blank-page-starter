@@ -121,6 +121,11 @@ export default function Devedores({ embedded = false, forceTab }: DevedoresProps
   const [pageSize60, setPageSize60] = useState<PageSize>(10);
   const [page30, setPage30] = useState(1);
   const [pageSize30, setPageSize30] = useState<PageSize>(10);
+  const devedoresIds = useMemo(
+    () => [...debtors, ...debtors30].map(d => d.asaas_customer_id).filter(Boolean),
+    [debtors, debtors30],
+  );
+  const responsaveisDevedores = useResponsaveis("devedor", devedoresIds);
 
   const excluirDevedor = async (d: Debtor, bucket: 'd30' | 'd60') => {
     if (!window.confirm(`Remover ${d.cliente_nome || 'este cliente'} da lista? As parcelas serão marcadas como excluídas.`)) return;
