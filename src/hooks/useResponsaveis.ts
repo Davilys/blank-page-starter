@@ -24,16 +24,18 @@ export function useResponsaveis(entidade: Entidade, ids: string[]) {
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      if (ids.length === 0) {
-        setMap({});
-        return;
-      }
-      const { data } = await supabase
+      // Fetch all assignments for this entidade. The table only has rows for
+      // items that actually have a responsible user, so it stays small.
+      // Avoids URL-length issues when ids has hundreds/thousands of UUIDs.
+      const { data, error } = await supabase
         .from("responsavel_atribuicao")
         .select("entidade_id, user_id, user_nome, atribuido_em")
-        .eq("entidade", entidade)
-        .in("entidade_id", ids);
+        .eq("entidade", entidade);
       if (cancelled) return;
+      if (error) {
+        console.error("[useResponsaveis] load error", error);
+        return;
+      }
       const next: Record<string, ResponsavelInfo> = {};
       for (const row of data || []) {
         next[(row as any).entidade_id] = {
@@ -47,14 +49,13 @@ export function useResponsaveis(entidade: Entidade, ids: string[]) {
     load();
 
     const channel = supabase
-      .channel(`resp_${entidade}_${ids.length}`)
+      .channel(`resp_${entidade}_${Math.random().toString(36).slice(2)}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "responsavel_atribuicao", filter: `entidade=eq.${entidade}` },
         (payload: any) => {
           const row = payload.new || payload.old;
           if (!row) return;
-          if (!ids.includes(row.entidade_id)) return;
           setMap((prev) => {
             const next = { ...prev };
             if (payload.eventType === "DELETE") {
@@ -77,7 +78,7 @@ export function useResponsaveis(entidade: Entidade, ids: string[]) {
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entidade, idsKey]);
+  }, [entidade]);
 
   return map;
 }
