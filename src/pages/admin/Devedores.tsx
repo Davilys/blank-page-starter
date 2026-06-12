@@ -994,6 +994,17 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                       <TableCell className="text-center">
                         <Badge variant="outline">{h.parcelas_renegociadas?.length || 0}/5</Badge>
                       </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        {h.asaas_customer_id ? (
+                          <ResponsavelChip
+                            entidade="devedor"
+                            entidadeId={h.asaas_customer_id}
+                            responsavel={responsaveisDevedores[h.asaas_customer_id]}
+                          />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
