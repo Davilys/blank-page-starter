@@ -17,6 +17,8 @@ import { STATUS_CONFIG } from './types';
 import { NotificarClienteDialog } from './NotificarClienteDialog';
 import { VincularClienteDialog } from './VincularClienteDialog';
 import { EditarMarcaDialog } from './EditarMarcaDialog';
+import { ResponsavelChip } from '@/components/admin/shared/ResponsavelChip';
+import { useResponsaveis, atribuirResponsavel } from '@/hooks/useResponsaveis';
 
 type Bucket = 'no_prazo' | '30dias' | 'ultima_semana' | 'vencidos' | 'cumpridos' | 'desistiu';
 
@@ -87,6 +89,8 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
   const [schedules, setSchedules] = useState<Record<string, any>>({});
   const [linkDialogPub, setLinkDialogPub] = useState<any | null>(null);
   const [editMarcaPub, setEditMarcaPub] = useState<any | null>(null);
+  const pubIds = useMemo(() => publicacoes.map(p => p.id), [publicacoes]);
+  const responsaveisMap = useResponsaveis('publicacao', pubIds);
 
   useEffect(() => {
     const ids = publicacoes.map(p => p.id);
@@ -260,13 +264,14 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                   <TableHead className="text-xs">{active === 'cumpridos' ? 'Cumprido em' : 'Dias Restantes'}</TableHead>
                   <TableHead className="text-xs">Status</TableHead>
                   <TableHead className="text-xs">Cobrança</TableHead>
+                  <TableHead className="text-xs">Responsável</TableHead>
                   <TableHead className="text-xs text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-12 text-sm">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-12 text-sm">
                       Nenhuma publicação nesta faixa de prazo.
                     </TableCell>
                   </TableRow>
