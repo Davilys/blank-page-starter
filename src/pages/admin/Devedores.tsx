@@ -43,6 +43,7 @@ interface Renegociacao {
   id: string;
   cliente_nome: string | null;
   cliente_cpf_cnpj: string | null;
+  asaas_customer_id: string | null;
   valor_original_total: number;
   valor_acrescimo: number;
   valor_renegociado: number;
