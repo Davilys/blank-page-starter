@@ -677,9 +677,6 @@ export type Database = {
           descricao: string | null
           dias_atraso: number | null
           id: string
-          responsavel_atribuido_em: string | null
-          responsavel_nome: string | null
-          responsavel_user_id: string | null
           status: string
           updated_at: string
           valor: number
@@ -696,9 +693,6 @@ export type Database = {
           descricao?: string | null
           dias_atraso?: number | null
           id?: string
-          responsavel_atribuido_em?: string | null
-          responsavel_nome?: string | null
-          responsavel_user_id?: string | null
           status?: string
           updated_at?: string
           valor?: number
@@ -715,9 +709,6 @@ export type Database = {
           descricao?: string | null
           dias_atraso?: number | null
           id?: string
-          responsavel_atribuido_em?: string | null
-          responsavel_nome?: string | null
-          responsavel_user_id?: string | null
           status?: string
           updated_at?: string
           valor?: number
@@ -3702,9 +3693,6 @@ export type Database = {
           process_id: string | null
           process_number_rpi: string | null
           proximo_prazo_critico: string | null
-          responsavel_atribuido_em: string | null
-          responsavel_nome: string | null
-          responsavel_user_id: string | null
           rpi_entry_id: string | null
           rpi_link: string | null
           rpi_number: string | null
@@ -3740,9 +3728,6 @@ export type Database = {
           process_id?: string | null
           process_number_rpi?: string | null
           proximo_prazo_critico?: string | null
-          responsavel_atribuido_em?: string | null
-          responsavel_nome?: string | null
-          responsavel_user_id?: string | null
           rpi_entry_id?: string | null
           rpi_link?: string | null
           rpi_number?: string | null
@@ -3778,9 +3763,6 @@ export type Database = {
           process_id?: string | null
           process_number_rpi?: string | null
           proximo_prazo_critico?: string | null
-          responsavel_atribuido_em?: string | null
-          responsavel_nome?: string | null
-          responsavel_user_id?: string | null
           rpi_entry_id?: string | null
           rpi_link?: string | null
           rpi_number?: string | null
@@ -3841,6 +3823,39 @@ export type Database = {
           valor_acrescimo?: number
           valor_original_total?: number
           valor_renegociado?: number
+        }
+        Relationships: []
+      }
+      responsavel_atribuicao: {
+        Row: {
+          atribuido_em: string
+          atribuido_por: string | null
+          entidade: string
+          entidade_id: string
+          id: string
+          updated_at: string
+          user_id: string | null
+          user_nome: string | null
+        }
+        Insert: {
+          atribuido_em?: string
+          atribuido_por?: string | null
+          entidade: string
+          entidade_id: string
+          id?: string
+          updated_at?: string
+          user_id?: string | null
+          user_nome?: string | null
+        }
+        Update: {
+          atribuido_em?: string
+          atribuido_por?: string | null
+          entidade?: string
+          entidade_id?: string
+          id?: string
+          updated_at?: string
+          user_id?: string | null
+          user_nome?: string | null
         }
         Relationships: []
       }
