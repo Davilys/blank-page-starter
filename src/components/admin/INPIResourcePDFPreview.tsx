@@ -547,6 +547,61 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         pdf.text('CPF 393.239.118-79', pageWidth / 2, yPos + 12, { align: 'center' });
       }
 
+      // ── ANEXOS DOCUMENTAIS ──
+      if (annexEvidences.length > 0) {
+        pdf.addPage();
+        yPos = margin;
+        pdf.setFillColor(30, 58, 95);
+        pdf.rect(margin, yPos, contentWidth, 10, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(12);
+        pdf.text('ANEXOS DOCUMENTAIS', pageWidth / 2, yPos + 7, { align: 'center' });
+        yPos += 18;
+        pdf.setTextColor(30, 30, 30);
+        pdf.setFont('helvetica', 'normal');
+
+        for (const ev of annexEvidences) {
+          if (!ev.dataUrl) continue;
+          // One page per doc
+          pdf.addPage();
+          yPos = margin;
+          pdf.setFontSize(11);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(30, 58, 95);
+          const title = `Doc. ${String(ev.docNumber).padStart(2, '0')} — ${ev.caption || ev.source_file_name || ''}`;
+          const titleLines = pdf.splitTextToSize(title, contentWidth);
+          for (const tl of titleLines) {
+            pdf.text(tl, pageWidth / 2, yPos, { align: 'center' });
+            yPos += 6;
+          }
+          yPos += 4;
+          pdf.setFont('helvetica', 'normal');
+
+          const availableH = pageHeight - yPos - margin - 20;
+          const availableW = contentWidth;
+          const ratio = ev.width && ev.height ? ev.width / ev.height : 0.75;
+          let imgW = availableW;
+          let imgH = imgW / ratio;
+          if (imgH > availableH) { imgH = availableH; imgW = imgH * ratio; }
+          const xImg = (pageWidth - imgW) / 2;
+          try {
+            pdf.addImage(ev.dataUrl, 'PNG', xImg, yPos, imgW, imgH);
+          } catch (e) {
+            console.warn('addImage annex failed', e);
+          }
+          yPos += imgH + 4;
+          if (ev.source_file_name) {
+            pdf.setFontSize(8);
+            pdf.setTextColor(120, 120, 120);
+            pdf.text(
+              `Origem: ${ev.source_file_name}${ev.page_number ? ` — pág. ${ev.page_number}` : ''}`,
+              pageWidth / 2, yPos, { align: 'center' },
+            );
+          }
+        }
+      }
+
       // ── Footers on all pages ──
       const totalPages = pdf.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
