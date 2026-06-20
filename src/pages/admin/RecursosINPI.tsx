@@ -2668,6 +2668,16 @@ export default function RecursosINPI() {
       </button>
 
       <INPILegalChatDialog open={showLegalChat} onOpenChange={setShowLegalChat} />
+
+      {currentResourceId && (
+        <EvidenceGallery
+          open={showEvidenceGallery}
+          onOpenChange={setShowEvidenceGallery}
+          resourceId={currentResourceId}
+          onChanged={(rows) => setEvidenceCount(rows.filter((r) => r.included).length)}
+          onRegenerate={handleRegenerateWithEvidences}
+        />
+      )}
     </>
   );
 }
