@@ -943,6 +943,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }
