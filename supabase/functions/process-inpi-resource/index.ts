@@ -59,119 +59,57 @@ function sanitizeExtracted(raw: any) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// HELPER: Call Anthropic Claude Messages API
+// HELPER: Call OpenAI Responses API (supports PDFs natively via input_file)
 // ═══════════════════════════════════════════════════════════
-async function callClaude(
+async function callOpenAI(
   apiKey: string,
   systemPrompt: string,
   userParts: any[],
   maxTokens: number = 16000,
   temperature?: number
 ): Promise<{ content: string; error?: string; status?: number }> {
-  const claudeContent = convertToClaudeFormat(userParts);
+  const responsesContent = convertToResponsesFormat(userParts);
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-5',
-      system: systemPrompt,
-      max_tokens: maxTokens,
+      model: 'gpt-4o',
+      max_output_tokens: maxTokens,
       ...(typeof temperature === 'number' ? { temperature } : {}),
-      messages: [{ role: 'user', content: claudeContent }],
+      input: [
+        { role: 'system', content: [{ type: 'input_text', text: systemPrompt }] },
+        { role: 'user', content: responsesContent },
+      ],
     }),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('Anthropic API error:', response.status, errorText.substring(0, 500));
+    console.error('OpenAI API error:', response.status, errorText.substring(0, 500));
     return { content: '', error: errorText, status: response.status };
   }
 
   const data = await response.json();
   let content = '';
-  if (Array.isArray(data.content)) {
-    for (const block of data.content) {
-      if (block.type === 'text' && typeof block.text === 'string') {
-        content += block.text;
+  if (typeof data.output_text === 'string' && data.output_text.length > 0) {
+    content = data.output_text;
+  } else if (Array.isArray(data.output)) {
+    for (const item of data.output) {
+      if (item.type === 'message' && Array.isArray(item.content)) {
+        for (const block of item.content) {
+          if ((block.type === 'output_text' || block.type === 'text') && typeof block.text === 'string') {
+            content += block.text;
+          }
+        }
       }
     }
   }
 
   return { content };
-}
-
-// ═══════════════════════════════════════════════════════════
-// HELPER: Convert internal parts to Anthropic content blocks
-// Accepts both internal {text|file|image_url} and Responses-format {input_text|input_file|input_image}
-// ═══════════════════════════════════════════════════════════
-function convertToClaudeFormat(userContent: any[]): any[] {
-  const parseDataUrl = (dataUrl: string): { mediaType: string; data: string } | null => {
-    const m = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
-    if (!m) return null;
-    return { mediaType: m[1], data: m[2] };
-  };
-
-  const blocks: any[] = [];
-  for (const part of userContent) {
-    // text variants
-    if (part.type === 'text' && typeof part.text === 'string') {
-      blocks.push({ type: 'text', text: part.text });
-    } else if (part.type === 'input_text' && typeof part.text === 'string') {
-      blocks.push({ type: 'text', text: part.text });
-    }
-    // PDF variants
-    else if (part.type === 'file' && part.file?.file_data) {
-      const parsed = parseDataUrl(part.file.file_data);
-      if (parsed) {
-        blocks.push({
-          type: 'document',
-          source: { type: 'base64', media_type: parsed.mediaType || 'application/pdf', data: parsed.data },
-        });
-      }
-    } else if (part.type === 'input_file' && part.file_data) {
-      const parsed = parseDataUrl(part.file_data);
-      if (parsed) {
-        blocks.push({
-          type: 'document',
-          source: { type: 'base64', media_type: parsed.mediaType || 'application/pdf', data: parsed.data },
-        });
-      }
-    }
-    // image variants
-    else if (part.type === 'image_url' && part.image_url?.url) {
-      const url: string = part.image_url.url;
-      if (url.startsWith('data:')) {
-        const parsed = parseDataUrl(url);
-        if (parsed) {
-          blocks.push({
-            type: 'image',
-            source: { type: 'base64', media_type: parsed.mediaType, data: parsed.data },
-          });
-        }
-      } else {
-        blocks.push({ type: 'image', source: { type: 'url', url } });
-      }
-    } else if (part.type === 'input_image' && part.image_url) {
-      const url: string = part.image_url;
-      if (url.startsWith('data:')) {
-        const parsed = parseDataUrl(url);
-        if (parsed) {
-          blocks.push({
-            type: 'image',
-            source: { type: 'base64', media_type: parsed.mediaType, data: parsed.data },
-          });
-        }
-      } else {
-        blocks.push({ type: 'image', source: { type: 'url', url } });
-      }
-    }
-  }
-  return blocks;
 }
 
 // ═══════════════════════════════════════════════════════════
