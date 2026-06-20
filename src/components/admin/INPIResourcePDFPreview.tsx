@@ -396,6 +396,80 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       }
       yPos += 4;
 
+      // ── Identificação visual do processo (logo + consulta INPI) ──
+      if (brandLogos.length > 0 || inpiConsultas.length > 0) {
+        const boxX = margin;
+        const boxY = yPos;
+        let innerY = boxY + 6;
+        // Title
+        pdf.setFontSize(9);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(30, 58, 95);
+        pdf.text('IDENTIFICAÇÃO VISUAL DO PROCESSO', boxX + 4, innerY);
+        innerY += 5;
+
+        // Logo + metadata side by side
+        const logo = brandLogos[0];
+        const logoW = 28, logoH = 28;
+        const metaX = logo?.dataUrl ? boxX + 4 + logoW + 6 : boxX + 4;
+        if (logo?.dataUrl) {
+          try { pdf.addImage(logo.dataUrl, 'PNG', boxX + 4, innerY, logoW, logoH); } catch { /* ignore */ }
+        }
+        pdf.setFontSize(9);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(40, 40, 40);
+        const metaLines: string[] = [];
+        if (resource.brand_name) metaLines.push(`Marca: ${resource.brand_name}`);
+        if (resource.process_number) metaLines.push(`Processo INPI nº: ${resource.process_number}`);
+        if (resource.ncl_class) metaLines.push(`Classe NCL: ${resource.ncl_class}`);
+        if (resource.holder) metaLines.push(`Titular: ${resource.holder}`);
+        let mY = innerY + 4;
+        for (const ml of metaLines) {
+          pdf.text(ml, metaX, mY);
+          mY += 5;
+        }
+        innerY += Math.max(logoH, metaLines.length * 5 + 4) + 4;
+
+        // Consulta INPI prints (inside the box)
+        for (let i = 0; i < inpiConsultas.length; i++) {
+          const ev = inpiConsultas[i];
+          if (!ev.dataUrl) continue;
+          const maxW = contentWidth - 8;
+          const maxH = 110;
+          const ratio = ev.width && ev.height ? ev.width / ev.height : 0.75;
+          let imgW = maxW;
+          let imgH = imgW / ratio;
+          if (imgH > maxH) { imgH = maxH; imgW = imgH * ratio; }
+          if (innerY + imgH + 14 > pageHeight - 30) {
+            // Close current box, new page, restart box
+            pdf.setDrawColor(200, 175, 55);
+            pdf.setLineWidth(0.5);
+            pdf.roundedRect(boxX, boxY, contentWidth, innerY - boxY + 4, 1.5, 1.5, 'S');
+            pdf.addPage();
+            yPos = margin;
+            innerY = yPos;
+          }
+          const xImg = boxX + (contentWidth - imgW) / 2;
+          try { pdf.addImage(ev.dataUrl, 'PNG', xImg, innerY, imgW, imgH); } catch { /* ignore */ }
+          innerY += imgH + 2;
+          pdf.setFontSize(7.5);
+          pdf.setTextColor(110, 110, 110);
+          const cap = `Fig. ${i + 1} — ${ev.caption || 'Consulta à base de dados do INPI'}`;
+          const capLines = pdf.splitTextToSize(cap, contentWidth - 8);
+          for (const cl of capLines) {
+            pdf.text(cl, pageWidth / 2, innerY + 3, { align: 'center' });
+            innerY += 4;
+          }
+          innerY += 3;
+        }
+
+        // Draw the box border
+        pdf.setDrawColor(200, 175, 55);
+        pdf.setLineWidth(0.5);
+        pdf.roundedRect(boxX, boxY, contentWidth, innerY - boxY + 2, 1.5, 1.5, 'S');
+        yPos = innerY + 8;
+      }
+
       // ── Content Body ──
       pdf.setFont('helvetica', 'normal');
       const paragraphs = bodyContent.split('\n\n').filter(p => p.trim());
