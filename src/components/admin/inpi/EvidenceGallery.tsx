@@ -21,7 +21,6 @@ export interface EvidenceRow {
   placement: 'inline' | 'annex';
   display_order: number;
   included: boolean;
-  kind?: 'brand_logo' | 'inpi_consulta' | 'evidence';
 }
 
 interface Props {
@@ -149,7 +148,7 @@ export function EvidenceGallery({ open, onOpenChange, resourceId, onChanged, onR
   const docNumbers = useMemo(() => {
     const map: Record<string, number> = {};
     let n = 1;
-    rows.filter((r) => r.included && (r.kind || 'evidence') === 'evidence').forEach((r) => { map[r.id] = n++; });
+    rows.filter((r) => r.included).forEach((r) => { map[r.id] = n++; });
     return map;
   }, [rows]);
 
@@ -247,15 +246,9 @@ export function EvidenceGallery({ open, onOpenChange, resourceId, onChanged, onR
                 </div>
 
                 <div className="flex items-center gap-2 text-xs">
-                  {r.included && docNumbers[r.id] && (
+                  {r.included && (
                     <Badge variant="default">Doc. {String(docNumbers[r.id]).padStart(2, '0')}</Badge>
                   )}
-                  {(() => {
-                    const k = r.kind || 'evidence';
-                    if (k === 'brand_logo') return <Badge className="bg-blue-600">🏷️ Logo da marca</Badge>;
-                    if (k === 'inpi_consulta') return <Badge className="bg-emerald-600">📄 Consulta INPI</Badge>;
-                    return <Badge variant="outline">📎 Evidência</Badge>;
-                  })()}
                   <span className="text-muted-foreground truncate flex-1">
                     {r.source_file_name}{r.page_number ? ` — pág. ${r.page_number}` : ''}
                   </span>
@@ -267,19 +260,6 @@ export function EvidenceGallery({ open, onOpenChange, resourceId, onChanged, onR
                   onChange={(e) => setRows((p) => p.map((x) => x.id === r.id ? { ...x, caption: e.target.value } : x))}
                   onBlur={(e) => updateRow(r.id, { caption: e.target.value })}
                 />
-
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-muted-foreground">Tipo:</span>
-                  <select
-                    value={r.kind || 'evidence'}
-                    onChange={(e) => updateRow(r.id, { kind: e.target.value as any })}
-                    className="text-xs border rounded px-2 py-1 bg-background"
-                  >
-                    <option value="evidence">Evidência (anexo / inline)</option>
-                    <option value="brand_logo">Logo da marca (header)</option>
-                    <option value="inpi_consulta">Consulta INPI (header)</option>
-                  </select>
-                </div>
 
                 <div className="flex items-center gap-4 text-xs">
                   <label className="flex items-center gap-2">

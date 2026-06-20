@@ -59,7 +59,7 @@ function sanitizeExtracted(raw: any) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// HELPER: Call OpenAI Responses API (supports PDFs natively via input_file)
+// HELPER: Call OpenAI Responses API
 // ═══════════════════════════════════════════════════════════
 async function callOpenAI(
   apiKey: string,
@@ -68,7 +68,10 @@ async function callOpenAI(
   maxTokens: number = 16000,
   temperature?: number
 ): Promise<{ content: string; error?: string; status?: number }> {
-  const responsesContent = convertToResponsesFormat(userParts);
+  const inputMessages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userParts },
+  ];
 
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
@@ -77,13 +80,10 @@ async function callOpenAI(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4o',
+      model: 'gpt-4o-2024-11-20',
+      input: inputMessages,
       max_output_tokens: maxTokens,
       ...(typeof temperature === 'number' ? { temperature } : {}),
-      input: [
-        { role: 'system', content: [{ type: 'input_text', text: systemPrompt }] },
-        { role: 'user', content: responsesContent },
-      ],
     }),
   });
 
@@ -95,14 +95,12 @@ async function callOpenAI(
 
   const data = await response.json();
   let content = '';
-  if (typeof data.output_text === 'string' && data.output_text.length > 0) {
-    content = data.output_text;
-  } else if (Array.isArray(data.output)) {
+  if (data.output && Array.isArray(data.output)) {
     for (const item of data.output) {
-      if (item.type === 'message' && Array.isArray(item.content)) {
-        for (const block of item.content) {
-          if ((block.type === 'output_text' || block.type === 'text') && typeof block.text === 'string') {
-            content += block.text;
+      if (item.type === 'message' && item.content) {
+        for (const part of item.content) {
+          if (part.type === 'output_text') {
+            content += part.text;
           }
         }
       }

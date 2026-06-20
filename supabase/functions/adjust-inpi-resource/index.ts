@@ -102,30 +102,13 @@ REGRAS:
 ` : ''}`;
 
     const evidenceBlock = hasEvidences
-      ? (() => {
-          // Only "evidence" kind gets numbered [DOC:NN]. brand_logo / inpi_consulta
-          // são renderizados visualmente no cabeçalho e NÃO devem receber marcador.
-          const docEvs = evidences.filter((e: any) => (e.kind || 'evidence') === 'evidence');
-          const inpiEv = evidences.find((e: any) => e.kind === 'inpi_consulta');
-          const logoEv = evidences.find((e: any) => e.kind === 'brand_logo');
-          const lines: string[] = [];
-          if (logoEv || inpiEv) {
-            lines.push('CABEÇALHO VISUAL (renderizado automaticamente no PDF — NÃO cite com [DOC:N], apenas reforce na seção de fatos):');
-            if (logoEv) lines.push(`- Logo da marca: ${logoEv.caption || logoEv.source_file_name || ''}`);
-            if (inpiEv) lines.push(`- Print da Consulta INPI: ${inpiEv.caption || ''}${inpiEv.ocr_text ? ` — extrato: "${String(inpiEv.ocr_text).replace(/\s+/g, ' ').trim().slice(0, 600)}"` : ''}`);
-            lines.push('Use os dados da Consulta INPI na seção I — DOS FATOS para descrever a situação processual atual, sem inserir marcador [DOC:N].');
-          }
-          if (docEvs.length > 0) {
-            lines.push('\nEVIDÊNCIAS DOCUMENTAIS (insira marcadores [DOC:N] no corpo do recurso, na seção argumentativa adequada):');
-            docEvs.forEach((e: any, i: number) => {
-              const n = String(i + 1).padStart(2, '0');
-              const cap = (e.caption || e.source_file_name || 'evidência').toString().slice(0, 200);
-              const ocr = (e.ocr_text || '').toString().slice(0, 400);
-              lines.push(`[DOC:${n}] — ${cap}${ocr ? ` — Texto da página: "${ocr.replace(/\s+/g, ' ').trim()}"` : ''}`);
-            });
-          }
-          return '\n\n' + lines.join('\n');
-        })()
+      ? '\n\nEVIDÊNCIAS DOCUMENTAIS ANEXADAS (insira marcadores [DOC:N] no corpo do recurso, na seção argumentativa adequada):\n' +
+        evidences.map((e: any, i: number) => {
+          const n = String(i + 1).padStart(2, '0');
+          const cap = (e.caption || e.source_file_name || 'evidência').toString().slice(0, 200);
+          const ocr = (e.ocr_text || '').toString().slice(0, 400);
+          return `[DOC:${n}] — ${cap}${ocr ? ` — Texto da página: "${ocr.replace(/\s+/g, ' ').trim()}"` : ''}`;
+        }).join('\n')
       : '';
 
     const userPrompt = `RECURSO ATUAL (mantenha TODO este conteúdo e ACRESCENTE os ajustes):

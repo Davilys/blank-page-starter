@@ -1774,7 +1774,6 @@ export type Database = {
           display_order: number
           id: string
           included: boolean
-          kind: string
           mime_type: string
           ocr_text: string | null
           page_number: number | null
@@ -1790,7 +1789,6 @@ export type Database = {
           display_order?: number
           id?: string
           included?: boolean
-          kind?: string
           mime_type?: string
           ocr_text?: string | null
           page_number?: number | null
@@ -1806,7 +1804,6 @@ export type Database = {
           display_order?: number
           id?: string
           included?: boolean
-          kind?: string
           mime_type?: string
           ocr_text?: string | null
           page_number?: number | null
