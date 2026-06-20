@@ -322,6 +322,8 @@ export default function RecursosINPI() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchDate, setSearchDate] = useState('');
   const [showLegalChat, setShowLegalChat] = useState(false);
+  const [showEvidenceGallery, setShowEvidenceGallery] = useState(false);
+  const [evidenceCount, setEvidenceCount] = useState(0);
 
   // Client search for Notificante
   const [clientSearchQuery, setClientSearchQuery] = useState('');
