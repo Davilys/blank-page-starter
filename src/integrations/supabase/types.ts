@@ -1767,6 +1767,62 @@ export type Database = {
         }
         Relationships: []
       }
+      inpi_resource_evidences: {
+        Row: {
+          caption: string | null
+          created_at: string
+          display_order: number
+          id: string
+          included: boolean
+          mime_type: string
+          ocr_text: string | null
+          page_number: number | null
+          placement: string
+          resource_id: string
+          source_file_name: string | null
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          included?: boolean
+          mime_type?: string
+          ocr_text?: string | null
+          page_number?: number | null
+          placement?: string
+          resource_id: string
+          source_file_name?: string | null
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          included?: boolean
+          mime_type?: string
+          ocr_text?: string | null
+          page_number?: number | null
+          placement?: string
+          resource_id?: string
+          source_file_name?: string | null
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inpi_resource_evidences_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "inpi_resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inpi_resources: {
         Row: {
           adjustments_history: Json | null
