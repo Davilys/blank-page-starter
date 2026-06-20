@@ -24,6 +24,7 @@ interface EvidenceRow {
   placement: 'inline' | 'annex';
   display_order: number;
   included: boolean;
+  kind: 'brand_logo' | 'inpi_consulta' | 'evidence';
 }
 
 async function ensureBucket(supabase: ReturnType<typeof createClient>) {
@@ -86,9 +87,22 @@ async function extractPdfEmbeddedImages(pdfBytes: Uint8Array): Promise<Array<{ b
   return out;
 }
 
-async function ocrAndCaptionImage(pngBytes: Uint8Array, contextHint: string, mime: string = 'image/png'): Promise<{ caption: string; ocr: string }> {
+function classifyByOcr(ocr: string, width?: number, height?: number): 'brand_logo' | 'inpi_consulta' | 'evidence' {
+  const t = (ocr || '').toLowerCase();
+  if (/consulta\s+(à|a)\s+base\s+de\s+dados\s+do\s+inpi/.test(t)
+      || (/n[ºo°]\s*do\s*processo/.test(t) && /situa[çc][ãa]o/.test(t))
+      || /instituto\s+nacional\s+da\s+propriedade\s+industrial/.test(t)) {
+    return 'inpi_consulta';
+  }
+  // brand logo: very small image with no/short OCR
+  const small = (width && height) ? (width < 700 && height < 700) : true;
+  if (small && t.trim().length < 40) return 'brand_logo';
+  return 'evidence';
+}
+
+async function ocrAndCaptionImage(pngBytes: Uint8Array, contextHint: string, mime: string = 'image/png'): Promise<{ caption: string; ocr: string; kind: 'brand_logo' | 'inpi_consulta' | 'evidence' }> {
   const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-  if (!LOVABLE_API_KEY) return { caption: contextHint, ocr: '' };
+  if (!LOVABLE_API_KEY) return { caption: contextHint, ocr: '', kind: 'evidence' };
 
   // Convert to base64
   let bin = '';
@@ -107,7 +121,7 @@ async function ocrAndCaptionImage(pngBytes: Uint8Array, contextHint: string, mim
         messages: [
           {
             role: 'system',
-            content: 'Você analisa páginas de documentos jurídicos do INPI. Responda em JSON: {"caption": "legenda curta (até 120 caracteres) descrevendo o que a página mostra como evidência (ex.: \\"Print do site do concorrente em 12/2024\\", \\"Decisão de indeferimento INPI fls. 03\\", \\"Foto do rótulo do produto\\")", "ocr": "texto integral visível na página (máx. 3000 chars)"}. Apenas JSON válido.',
+            content: 'Você analisa páginas de documentos jurídicos do INPI. Responda em JSON: {"caption": "legenda curta até 120 chars (ex.: \\"Logo da marca Elbratec Eco Charge\\", \\"Consulta INPI — Processo 942829000\\", \\"Print do site do concorrente em 12/2024\\")", "ocr": "texto integral visível (máx 3000 chars)", "kind": "brand_logo | inpi_consulta | evidence"}. Use brand_logo quando a imagem for o logo/figura nominativa da marca (geralmente pequena, sem texto extenso). Use inpi_consulta quando for um print da página \\"Consulta à Base de Dados do INPI\\" (contém Nº do Processo, Situação, Marca, Classe). Use evidence para qualquer outra coisa (prints de concorrentes, fotos de produto, decisões avulsas, etc). Apenas JSON válido.',
           },
           {
             role: 'user',
@@ -121,24 +135,29 @@ async function ocrAndCaptionImage(pngBytes: Uint8Array, contextHint: string, mim
     });
     if (!resp.ok) {
       console.warn('OCR gateway non-200:', resp.status);
-      return { caption: contextHint, ocr: '' };
+      return { caption: contextHint, ocr: '', kind: 'evidence' };
     }
     const data = await resp.json();
     const txt: string = data?.choices?.[0]?.message?.content || '';
     const m = txt.match(/\{[\s\S]*\}/);
-    if (!m) return { caption: contextHint, ocr: txt.slice(0, 3000) };
+    if (!m) return { caption: contextHint, ocr: txt.slice(0, 3000), kind: classifyByOcr(txt) };
     try {
       const obj = JSON.parse(m[0]);
+      const rawKind = String(obj.kind || '').toLowerCase();
+      const kind = (rawKind === 'brand_logo' || rawKind === 'inpi_consulta' || rawKind === 'evidence')
+        ? rawKind as 'brand_logo' | 'inpi_consulta' | 'evidence'
+        : classifyByOcr(String(obj.ocr || ''));
       return {
         caption: String(obj.caption || contextHint).slice(0, 160),
         ocr: String(obj.ocr || '').slice(0, 3000),
+        kind,
       };
     } catch {
-      return { caption: contextHint, ocr: txt.slice(0, 3000) };
+      return { caption: contextHint, ocr: txt.slice(0, 3000), kind: classifyByOcr(txt) };
     }
   } catch (e) {
     console.warn('OCR error:', (e as Error).message);
-    return { caption: contextHint, ocr: '' };
+    return { caption: contextHint, ocr: '', kind: 'evidence' };
   }
 }
 
@@ -210,7 +229,9 @@ Deno.serve(async (req) => {
           contentType: f.type, upsert: false,
         });
         if (upErr) { console.warn('upload img err:', upErr.message); continue; }
-        const meta = doOcr ? await ocrAndCaptionImage(bytes, `Imagem anexa: ${f.name}`, f.type) : { caption: f.name, ocr: '' };
+        const meta = doOcr
+          ? await ocrAndCaptionImage(bytes, `Imagem anexa: ${f.name}`, f.type)
+          : { caption: f.name, ocr: '', kind: 'evidence' as const };
         const row: EvidenceRow = {
           resource_id: resourceId,
           storage_path: path,
@@ -219,9 +240,10 @@ Deno.serve(async (req) => {
           mime_type: f.type,
           caption: meta.caption,
           ocr_text: meta.ocr,
-          placement: 'annex',
+          placement: meta.kind === 'inpi_consulta' || meta.kind === 'brand_logo' ? 'inline' : 'annex',
           display_order: order++,
           included: true,
+          kind: meta.kind,
         };
         const { data: ins } = await admin.from('inpi_resource_evidences').insert(row).select().single();
         if (ins) inserted.push(ins as unknown as EvidenceRow);
@@ -245,7 +267,7 @@ Deno.serve(async (req) => {
           // OCR only for jpeg (gateway accepts data:image/jpeg). Skip jp2.
           const meta = (doOcr && im.mime === 'image/jpeg')
             ? await ocrAndCaptionImage(im.bytes, `${f.name} — pág. ${im.page}`, 'image/jpeg')
-            : { caption: `${f.name} — pág. ${im.page}`, ocr: '' };
+            : { caption: `${f.name} — pág. ${im.page}`, ocr: '', kind: 'evidence' as const };
           const row: EvidenceRow = {
             resource_id: resourceId,
             storage_path: path,
@@ -254,9 +276,10 @@ Deno.serve(async (req) => {
             mime_type: im.mime,
             caption: meta.caption,
             ocr_text: meta.ocr,
-            placement: 'annex',
+            placement: meta.kind === 'inpi_consulta' || meta.kind === 'brand_logo' ? 'inline' : 'annex',
             display_order: order++,
             included: true,
+            kind: meta.kind,
           };
           const { data: ins } = await admin.from('inpi_resource_evidences').insert(row).select().single();
           if (ins) inserted.push(ins as unknown as EvidenceRow);
