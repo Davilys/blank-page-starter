@@ -560,6 +560,46 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       
       // Short lines (e.g. "EXCELENTÍSSIMO...") should not be stretched by justify
       const isShort = trimmed.length < 120;
+      // [DOC:N] marker handling — split paragraph and insert <figure>
+      const docRegex = /\[DOC:(\d{1,3})\]/g;
+      if (docRegex.test(trimmed)) {
+        docRegex.lastIndex = 0;
+        const parts: Array<{ type: 'text' | 'doc'; value: string; n?: number }> = [];
+        let last = 0;
+        let m: RegExpExecArray | null;
+        while ((m = docRegex.exec(trimmed)) !== null) {
+          if (m.index > last) parts.push({ type: 'text', value: trimmed.slice(last, m.index) });
+          parts.push({ type: 'doc', value: m[0], n: parseInt(m[1], 10) });
+          last = m.index + m[0].length;
+        }
+        if (last < trimmed.length) parts.push({ type: 'text', value: trimmed.slice(last) });
+        return (
+          <div key={idx} className="mb-4">
+            <p className={isShort ? '' : 'text-justify'} style={{ textIndent: '2cm', textAlignLast: 'left' }}>
+              {parts.map((p, i) => p.type === 'text'
+                ? <span key={i}>{p.value}</span>
+                : <span key={i} className="font-semibold" style={{ color: '#1e3a5f' }}>(Doc. {String(p.n).padStart(2, '0')})</span>)}
+            </p>
+            {parts.filter(p => p.type === 'doc').map((p, i) => {
+              const ev = evidenceByNum(p.n!);
+              if (!ev?.signedUrl) return null;
+              return (
+                <figure key={`fig-${i}`} className="my-4 mx-auto text-center">
+                  <img
+                    src={ev.signedUrl}
+                    alt={ev.caption || `Doc. ${p.n}`}
+                    className="mx-auto border rounded"
+                    style={{ maxWidth: '70%', maxHeight: '340px', objectFit: 'contain' }}
+                  />
+                  <figcaption className="text-xs mt-2" style={{ color: '#555' }}>
+                    <strong>Doc. {String(p.n).padStart(2, '0')}</strong> — {ev.caption || ev.source_file_name}
+                  </figcaption>
+                </figure>
+              );
+            })}
+          </div>
+        );
+      }
       return (
         <p key={idx} className={`mb-4 ${isShort ? '' : 'text-justify'}`} style={{ textIndent: '2cm', textAlignLast: 'left' }}>
           {trimmed}
