@@ -873,6 +873,46 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
             )}
           </div>
 
+          {/* Identificação visual do processo (logo da marca + print da consulta INPI) */}
+          {(brandLogos.length > 0 || inpiConsultas.length > 0) && (
+            <div className="mb-8 border rounded-lg p-4" style={{ borderColor: '#c8af37', background: '#fafaf3' }}>
+              <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: '#1e3a5f' }}>
+                Identificação visual do processo
+              </p>
+              {(brandLogos.length > 0 || resource.brand_name) && (
+                <div className="flex items-center gap-5 mb-4">
+                  {brandLogos[0]?.signedUrl && (
+                    <img
+                      src={brandLogos[0].signedUrl}
+                      alt={`Logo ${resource.brand_name || ''}`}
+                      className="object-contain bg-white border rounded"
+                      style={{ width: '110px', height: '110px', padding: '4px' }}
+                    />
+                  )}
+                  <div className="text-sm" style={{ color: '#333', lineHeight: 1.6 }}>
+                    {resource.brand_name && <p><strong>Marca:</strong> {resource.brand_name}</p>}
+                    {resource.process_number && <p><strong>Processo INPI nº:</strong> {resource.process_number}</p>}
+                    {resource.ncl_class && <p><strong>Classe NCL:</strong> {resource.ncl_class}</p>}
+                    {resource.holder && <p><strong>Titular:</strong> {resource.holder}</p>}
+                  </div>
+                </div>
+              )}
+              {inpiConsultas.map((ev, i) => ev.signedUrl ? (
+                <figure key={ev.id} className="mt-3 text-center">
+                  <img
+                    src={ev.signedUrl}
+                    alt={ev.caption || 'Consulta INPI'}
+                    className="mx-auto border rounded"
+                    style={{ maxWidth: '100%', maxHeight: '420px', objectFit: 'contain' }}
+                  />
+                  <figcaption className="text-xs mt-2" style={{ color: '#555' }}>
+                    <strong>Fig. {i + 1}</strong> — {ev.caption || 'Consulta à base de dados do INPI'}
+                  </figcaption>
+                </figure>
+              ) : null)}
+            </div>
+          )}
+
           {/* Content */}
           <div className="text-justify" style={{ color: '#1a1a1a' }}>
             {renderContent()}
