@@ -452,13 +452,49 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           const isList = /^[-–•]\s/.test(trimmedParagraph);
           const indent = isList ? margin + 5 : margin;
           const lineWidth = isList ? contentWidth - 5 : contentWidth;
-          
-          const lines = pdf.splitTextToSize(trimmedParagraph, lineWidth);
+
+          const docNums: number[] = [];
+          const renderText = trimmedParagraph.replace(/\[DOC:(\d{1,3})\]/g, (_full: string, n: string) => {
+            const num = parseInt(n, 10);
+            docNums.push(num);
+            return `(Doc. ${String(num).padStart(2, '0')})`;
+          });
+          const lines = pdf.splitTextToSize(renderText, lineWidth);
           
           for (const line of lines) {
             if (yPos > bottomLimit) { pdf.addPage(); yPos = margin; }
             pdf.text(line, indent, yPos);
             yPos += 6;
+          }
+          for (const n of docNums) {
+            const ev = evidenceByNum(n);
+            if (!ev?.dataUrl) continue;
+            const maxImgW = contentWidth * 0.7;
+            const maxImgH = 75;
+            const ratio = ev.width && ev.height ? ev.width / ev.height : 0.75;
+            let imgW = maxImgW;
+            let imgH = imgW / ratio;
+            if (imgH > maxImgH) { imgH = maxImgH; imgW = imgH * ratio; }
+            if (yPos + imgH + 12 > bottomLimit) { pdf.addPage(); yPos = margin; }
+            yPos += 3;
+            const xImg = (pageWidth - imgW) / 2;
+            try {
+              pdf.addImage(ev.dataUrl, 'PNG', xImg, yPos, imgW, imgH);
+              yPos += imgH + 2;
+              pdf.setFontSize(8);
+              pdf.setTextColor(80, 80, 80);
+              const cap = `Doc. ${String(n).padStart(2, '0')} — ${ev.caption || ev.source_file_name || ''}`;
+              const capLines = pdf.splitTextToSize(cap, contentWidth);
+              for (const cl of capLines) {
+                if (yPos > bottomLimit) { pdf.addPage(); yPos = margin; }
+                pdf.text(cl, pageWidth / 2, yPos, { align: 'center' });
+                yPos += 4;
+              }
+              pdf.setFontSize(11);
+              pdf.setTextColor(30, 30, 30);
+            } catch (e) {
+              console.warn('addImage inline failed', e);
+            }
           }
           yPos += 3;
         }
