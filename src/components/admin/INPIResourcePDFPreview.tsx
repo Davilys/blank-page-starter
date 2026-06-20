@@ -19,6 +19,7 @@ interface ResourceEvidence {
   placement: 'inline' | 'annex';
   display_order: number;
   included: boolean;
+  kind?: 'brand_logo' | 'inpi_consulta' | 'evidence';
   docNumber?: number;
   signedUrl?: string;
   dataUrl?: string;
@@ -183,8 +184,13 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         .eq('included', true)
         .order('display_order', { ascending: true });
       const list = ((data as any[]) || []) as ResourceEvidence[];
+      // Only "evidence" kind gets a [DOC:NN] number. brand_logo / inpi_consulta
+      // are rendered visually in the header block, no numbering, no annex page.
       let n = 1;
-      const numbered = list.map((r) => ({ ...r, docNumber: n++ }));
+      const numbered = list.map((r) => {
+        const k = (r.kind as any) || 'evidence';
+        return { ...r, docNumber: k === 'evidence' ? n++ : undefined };
+      });
       // sign + dataurl
       await Promise.all(
         numbered.map(async (r) => {
@@ -220,8 +226,11 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   }, [resource.id]);
 
   const evidenceByNum = (n: number) => evidences.find((e) => e.docNumber === n);
-  const inlineEvidences = evidences.filter((e) => e.placement === 'inline');
-  const annexEvidences = evidences; // all included evidences also appear in annex
+  const brandLogos = evidences.filter((e) => (e.kind || 'evidence') === 'brand_logo');
+  const inpiConsultas = evidences.filter((e) => (e.kind || 'evidence') === 'inpi_consulta');
+  const docEvidences = evidences.filter((e) => (e.kind || 'evidence') === 'evidence');
+  const inlineEvidences = docEvidences.filter((e) => e.placement === 'inline');
+  const annexEvidences = docEvidences; // only generic evidences go to the annex
 
   const isNotif = isNotificacao(resourceType);
   const isRespostaNotif = isRespostaNotificacao(resourceType);
