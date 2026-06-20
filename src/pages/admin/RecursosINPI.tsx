@@ -23,6 +23,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { INPIResourcePDFPreview } from '@/components/admin/INPIResourcePDFPreview';
 import { INPILegalChatDialog } from '@/components/admin/inpi/INPILegalChatDialog';
+import { EvidenceGallery, type EvidenceRow } from '@/components/admin/inpi/EvidenceGallery';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface ExtractedData {
