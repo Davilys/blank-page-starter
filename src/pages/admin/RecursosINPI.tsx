@@ -903,6 +903,57 @@ export default function RecursosINPI() {
   };
 
   const handleApproveResource = async () => {
+    return _handleApproveResource();
+  };
+
+  const handleRegenerateWithEvidences = async (rows: EvidenceRow[]) => {
+    if (!currentResourceId) {
+      toast.error('Recurso não encontrado');
+      return;
+    }
+    if (rows.length === 0) {
+      toast.info('Nenhuma evidência marcada como incluída');
+      return;
+    }
+    setIsAdjusting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('adjust-inpi-resource', {
+        body: {
+          currentContent: draftContent,
+          adjustmentInstructions: '',
+          evidences: rows.map((r) => ({
+            caption: r.caption,
+            ocr_text: r.ocr_text,
+            source_file_name: r.source_file_name,
+            page_number: r.page_number,
+          })),
+          resourceType: resourceType || selectedResource?.resource_type,
+          extractedData: extractedData || {
+            process_number: selectedResource?.process_number,
+            brand_name: selectedResource?.brand_name,
+            ncl_class: selectedResource?.ncl_class,
+            holder: selectedResource?.holder,
+            examiner_or_opponent: selectedResource?.examiner_or_opponent || '',
+          },
+        },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Falha ao regenerar');
+      setDraftContent(data.adjusted_content);
+      await supabase
+        .from('inpi_resources')
+        .update({ draft_content: data.adjusted_content })
+        .eq('id', currentResourceId);
+      toast.success('Recurso regenerado citando as evidências!');
+    } catch (e) {
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : 'Erro ao regenerar');
+    } finally {
+      setIsAdjusting(false);
+    }
+  };
+
+  const _handleApproveResource = async () => {
     if (!currentResourceId) return;
     try {
       const { data: updatedResource, error } = await supabase
