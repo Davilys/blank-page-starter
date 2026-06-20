@@ -2506,6 +2506,19 @@ export default function RecursosINPI() {
                       {isAdjusting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Edit3 className="h-4 w-4" />}
                       Ajustar com IA
                     </Button>
+                    {(resourceType === 'indeferimento' || resourceType === 'exigencia_merito' || resourceType === 'oposicao') && currentResourceId && (
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowEvidenceGallery(true)}
+                        className="gap-2 rounded-xl"
+                      >
+                        <ImageIcon className="h-4 w-4" />
+                        Anexar evidências (prints/imagens)
+                        {evidenceCount > 0 && (
+                          <Badge variant="secondary" className="ml-1">{evidenceCount}</Badge>
+                        )}
+                      </Button>
+                    )}
                     <Button onClick={handleApproveResource} className="flex-1 gap-2 rounded-xl h-11 shadow-lg shadow-primary/15">
                       <CheckCircle2 className="h-4 w-4" />
                       {resourceType === 'notificacao_extrajudicial'
