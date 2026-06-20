@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, Printer, Loader2 } from 'lucide-react';
+import { Download, Printer, Loader2, Pencil, Save, X } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import logoWebmarcas from '@/assets/webmarcas-logo-new.png';
