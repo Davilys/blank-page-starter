@@ -86,7 +86,7 @@ async function extractPdfEmbeddedImages(pdfBytes: Uint8Array): Promise<Array<{ b
   return out;
 }
 
-async function ocrAndCaptionImage(pngBytes: Uint8Array, contextHint: string): Promise<{ caption: string; ocr: string }> {
+async function ocrAndCaptionImage(pngBytes: Uint8Array, contextHint: string, mime: string = 'image/png'): Promise<{ caption: string; ocr: string }> {
   const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
   if (!LOVABLE_API_KEY) return { caption: contextHint, ocr: '' };
 
@@ -113,7 +113,7 @@ async function ocrAndCaptionImage(pngBytes: Uint8Array, contextHint: string): Pr
             role: 'user',
             content: [
               { type: 'text', text: `Contexto: ${contextHint}` },
-              { type: 'image_url', image_url: { url: `data:image/png;base64,${b64}` } },
+              { type: 'image_url', image_url: { url: `data:${mime};base64,${b64}` } },
             ],
           },
         ],
