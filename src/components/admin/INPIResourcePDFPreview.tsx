@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Download, Printer, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -6,6 +6,23 @@ import { ptBR } from 'date-fns/locale';
 import logoWebmarcas from '@/assets/webmarcas-logo-new.png';
 import signatureImage from '@/assets/davilys-signature.png';
 import jsPDF from 'jspdf';
+import { supabase } from '@/integrations/supabase/client';
+
+interface ResourceEvidence {
+  id: string;
+  storage_path: string;
+  caption: string | null;
+  source_file_name: string | null;
+  page_number: number | null;
+  placement: 'inline' | 'annex';
+  display_order: number;
+  included: boolean;
+  docNumber?: number;
+  signedUrl?: string;
+  dataUrl?: string;
+  width?: number;
+  height?: number;
+}
 
 interface ResourceData {
   id: string;
