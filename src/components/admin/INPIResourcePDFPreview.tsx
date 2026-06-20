@@ -715,6 +715,16 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   return (
     <div className="space-y-4">
       <div className="flex gap-3 justify-end print:hidden">
+        {!isEditing && (
+          <Button
+            variant="outline"
+            onClick={() => { setDraftEdit(editableContent); setIsEditing(true); }}
+            className="gap-2 rounded-xl"
+          >
+            <Pencil className="h-4 w-4" />
+            Editar texto
+          </Button>
+        )}
         <Button variant="outline" onClick={handlePrint} className="gap-2 rounded-xl">
           <Printer className="h-4 w-4" />
           Imprimir
@@ -734,6 +744,63 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         </Button>
       </div>
 
+      {isEditing && (
+        <div className="rounded-lg border bg-card p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-sm">Editar texto do recurso</h3>
+              <p className="text-xs text-muted-foreground">
+                O cabeçalho timbrado (logo, CNPJ, marca, processo) é fixo. Aqui você ajusta o corpo do recurso.
+                Marcadores como <code>[DOC:01]</code> continuam funcionando.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => { setDraftEdit(editableContent); setIsEditing(false); }}
+                className="gap-2 rounded-xl"
+                disabled={savingEdit}
+              >
+                <X className="h-4 w-4" />
+                Cancelar
+              </Button>
+              <Button
+                onClick={async () => {
+                  setSavingEdit(true);
+                  try {
+                    const { error } = await supabase
+                      .from('inpi_resources')
+                      .update({ final_content: draftEdit })
+                      .eq('id', resource.id);
+                    if (error) throw error;
+                    setEditableContent(draftEdit);
+                    setIsEditing(false);
+                    toast.success('Texto do recurso atualizado');
+                  } catch (e) {
+                    console.error(e);
+                    toast.error(e instanceof Error ? e.message : 'Erro ao salvar alterações');
+                  } finally {
+                    setSavingEdit(false);
+                  }
+                }}
+                disabled={savingEdit || draftEdit === editableContent}
+                className="gap-2 rounded-xl"
+              >
+                {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Salvar alterações
+              </Button>
+            </div>
+          </div>
+          <Textarea
+            value={draftEdit}
+            onChange={(e) => setDraftEdit(e.target.value)}
+            className="font-serif text-sm leading-relaxed"
+            style={{ minHeight: '70vh' }}
+          />
+        </div>
+      )}
+
+      {!isEditing && (
       <div 
         ref={printRef}
         className="bg-white text-gray-900 shadow-2xl mx-auto overflow-hidden rounded-lg"
