@@ -210,7 +210,7 @@ Deno.serve(async (req) => {
           contentType: f.type, upsert: false,
         });
         if (upErr) { console.warn('upload img err:', upErr.message); continue; }
-        const meta = doOcr ? await ocrAndCaptionImage(bytes, `Imagem anexa: ${f.name}`) : { caption: f.name, ocr: '' };
+        const meta = doOcr ? await ocrAndCaptionImage(bytes, `Imagem anexa: ${f.name}`, f.type) : { caption: f.name, ocr: '' };
         const row: EvidenceRow = {
           resource_id: resourceId,
           storage_path: path,
