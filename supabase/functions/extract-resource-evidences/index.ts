@@ -231,23 +231,27 @@ Deno.serve(async (req) => {
       // PDF
       try {
         const pdfBytes = base64ToBytes(f.base64);
-        const pages = await renderPdfPagesToPng(pdfBytes);
-        for (let i = 0; i < pages.length; i++) {
-          const pageNum = i + 1;
-          const path = `${resourceId}/${crypto.randomUUID()}_p${pageNum}.png`;
-          const { error: upErr } = await admin.storage.from(BUCKET).upload(path, pages[i], {
-            contentType: 'image/png', upsert: false,
+        const imgs = await extractPdfEmbeddedImages(pdfBytes);
+        if (imgs.length === 0) {
+          console.log('No embedded images in PDF:', f.name);
+        }
+        for (const im of imgs) {
+          const ext = im.mime === 'image/jpeg' ? 'jpg' : (im.mime === 'image/jp2' ? 'jp2' : 'bin');
+          const path = `${resourceId}/${crypto.randomUUID()}_p${im.page}.${ext}`;
+          const { error: upErr } = await admin.storage.from(BUCKET).upload(path, im.bytes, {
+            contentType: im.mime, upsert: false,
           });
-          if (upErr) { console.warn('upload pg err:', upErr.message); continue; }
-          const meta = doOcr
-            ? await ocrAndCaptionImage(pages[i], `${f.name} — página ${pageNum}`)
-            : { caption: `${f.name} — pág. ${pageNum}`, ocr: '' };
+          if (upErr) { console.warn('upload img err:', upErr.message); continue; }
+          // OCR only for jpeg (gateway accepts data:image/jpeg). Skip jp2.
+          const meta = (doOcr && im.mime === 'image/jpeg')
+            ? await ocrAndCaptionImage(im.bytes, `${f.name} — pág. ${im.page}`, 'image/jpeg')
+            : { caption: `${f.name} — pág. ${im.page}`, ocr: '' };
           const row: EvidenceRow = {
             resource_id: resourceId,
             storage_path: path,
-            page_number: pageNum,
+            page_number: im.page,
             source_file_name: f.name,
-            mime_type: 'image/png',
+            mime_type: im.mime,
             caption: meta.caption,
             ocr_text: meta.ocr,
             placement: 'annex',
