@@ -157,6 +157,58 @@ const imageToBase64 = (src: string): Promise<string> => {
 export function INPIResourcePDFPreview({ resource, content, resourceType }: INPIResourcePDFPreviewProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [evidences, setEvidences] = useState<ResourceEvidence[]>([]);
+
+  // Fetch evidences for this resource + sign URLs + preload data URLs
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('inpi_resource_evidences' as any)
+        .select('*')
+        .eq('resource_id', resource.id)
+        .eq('included', true)
+        .order('display_order', { ascending: true });
+      const list = ((data as any[]) || []) as ResourceEvidence[];
+      let n = 1;
+      const numbered = list.map((r) => ({ ...r, docNumber: n++ }));
+      // sign + dataurl
+      await Promise.all(
+        numbered.map(async (r) => {
+          const { data: s } = await supabase.storage
+            .from('inpi-resource-evidence')
+            .createSignedUrl(r.storage_path, 3600);
+          if (s?.signedUrl) {
+            r.signedUrl = s.signedUrl;
+            try {
+              const resp = await fetch(s.signedUrl);
+              const blob = await resp.blob();
+              r.dataUrl = await new Promise<string>((resolve, reject) => {
+                const fr = new FileReader();
+                fr.onload = () => resolve(fr.result as string);
+                fr.onerror = reject;
+                fr.readAsDataURL(blob);
+              });
+              const dims = await new Promise<{ w: number; h: number }>((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+                img.onerror = () => resolve({ w: 800, h: 1000 });
+                img.src = r.dataUrl!;
+              });
+              r.width = dims.w;
+              r.height = dims.h;
+            } catch { /* ignore */ }
+          }
+        }),
+      );
+      if (!cancelled) setEvidences(numbered);
+    })();
+    return () => { cancelled = true; };
+  }, [resource.id]);
+
+  const evidenceByNum = (n: number) => evidences.find((e) => e.docNumber === n);
+  const inlineEvidences = evidences.filter((e) => e.placement === 'inline');
+  const annexEvidences = evidences; // all included evidences also appear in annex
 
   const isNotif = isNotificacao(resourceType);
   const isRespostaNotif = isRespostaNotificacao(resourceType);
