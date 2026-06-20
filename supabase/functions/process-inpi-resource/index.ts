@@ -59,55 +59,119 @@ function sanitizeExtracted(raw: any) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// HELPER: Call OpenAI Responses API
+// HELPER: Call Anthropic Claude Messages API
 // ═══════════════════════════════════════════════════════════
-async function callOpenAI(
+async function callClaude(
   apiKey: string,
   systemPrompt: string,
   userParts: any[],
   maxTokens: number = 16000,
   temperature?: number
 ): Promise<{ content: string; error?: string; status?: number }> {
-  const inputMessages = [
-    { role: 'system', content: systemPrompt },
-    { role: 'user', content: userParts },
-  ];
+  const claudeContent = convertToClaudeFormat(userParts);
 
-  const response = await fetch('https://api.openai.com/v1/responses', {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4o-2024-11-20',
-      input: inputMessages,
-      max_output_tokens: maxTokens,
+      model: 'claude-sonnet-4-5',
+      system: systemPrompt,
+      max_tokens: maxTokens,
       ...(typeof temperature === 'number' ? { temperature } : {}),
+      messages: [{ role: 'user', content: claudeContent }],
     }),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('OpenAI API error:', response.status, errorText.substring(0, 500));
+    console.error('Anthropic API error:', response.status, errorText.substring(0, 500));
     return { content: '', error: errorText, status: response.status };
   }
 
   const data = await response.json();
   let content = '';
-  if (data.output && Array.isArray(data.output)) {
-    for (const item of data.output) {
-      if (item.type === 'message' && item.content) {
-        for (const part of item.content) {
-          if (part.type === 'output_text') {
-            content += part.text;
-          }
-        }
+  if (Array.isArray(data.content)) {
+    for (const block of data.content) {
+      if (block.type === 'text' && typeof block.text === 'string') {
+        content += block.text;
       }
     }
   }
 
   return { content };
+}
+
+// ═══════════════════════════════════════════════════════════
+// HELPER: Convert internal parts to Anthropic content blocks
+// Accepts both internal {text|file|image_url} and Responses-format {input_text|input_file|input_image}
+// ═══════════════════════════════════════════════════════════
+function convertToClaudeFormat(userContent: any[]): any[] {
+  const parseDataUrl = (dataUrl: string): { mediaType: string; data: string } | null => {
+    const m = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
+    if (!m) return null;
+    return { mediaType: m[1], data: m[2] };
+  };
+
+  const blocks: any[] = [];
+  for (const part of userContent) {
+    // text variants
+    if (part.type === 'text' && typeof part.text === 'string') {
+      blocks.push({ type: 'text', text: part.text });
+    } else if (part.type === 'input_text' && typeof part.text === 'string') {
+      blocks.push({ type: 'text', text: part.text });
+    }
+    // PDF variants
+    else if (part.type === 'file' && part.file?.file_data) {
+      const parsed = parseDataUrl(part.file.file_data);
+      if (parsed) {
+        blocks.push({
+          type: 'document',
+          source: { type: 'base64', media_type: parsed.mediaType || 'application/pdf', data: parsed.data },
+        });
+      }
+    } else if (part.type === 'input_file' && part.file_data) {
+      const parsed = parseDataUrl(part.file_data);
+      if (parsed) {
+        blocks.push({
+          type: 'document',
+          source: { type: 'base64', media_type: parsed.mediaType || 'application/pdf', data: parsed.data },
+        });
+      }
+    }
+    // image variants
+    else if (part.type === 'image_url' && part.image_url?.url) {
+      const url: string = part.image_url.url;
+      if (url.startsWith('data:')) {
+        const parsed = parseDataUrl(url);
+        if (parsed) {
+          blocks.push({
+            type: 'image',
+            source: { type: 'base64', media_type: parsed.mediaType, data: parsed.data },
+          });
+        }
+      } else {
+        blocks.push({ type: 'image', source: { type: 'url', url } });
+      }
+    } else if (part.type === 'input_image' && part.image_url) {
+      const url: string = part.image_url;
+      if (url.startsWith('data:')) {
+        const parsed = parseDataUrl(url);
+        if (parsed) {
+          blocks.push({
+            type: 'image',
+            source: { type: 'base64', media_type: parsed.mediaType, data: parsed.data },
+          });
+        }
+      } else {
+        blocks.push({ type: 'image', source: { type: 'url', url } });
+      }
+    }
+  }
+  return blocks;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -890,10 +954,10 @@ serve(async (req) => {
       );
     }
 
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    if (!OPENAI_API_KEY) {
+    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+    if (!ANTHROPIC_API_KEY) {
       return new Response(
-        JSON.stringify({ error: 'OPENAI_API_KEY não configurada' }),
+        JSON.stringify({ error: 'ANTHROPIC_API_KEY não configurada' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -921,7 +985,7 @@ serve(async (req) => {
       }
 
       const parts = convertToResponsesFormat(userContent);
-      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25);
+      const result = await callClaude(ANTHROPIC_API_KEY, systemPrompt, parts, 16000, 0.25);
       if (result.error) {
         return new Response(JSON.stringify({ error: `Erro IA: ${result.status}` }), { status: result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
@@ -1045,7 +1109,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
       }
 
       const parts = convertToResponsesFormat(userContent);
-      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000);
+      const result = await callClaude(ANTHROPIC_API_KEY, systemPrompt, parts, 16000);
       
       if (result.error) {
         console.error('OpenAI error for resposta_notificacao:', result.status, result.error.substring(0, 300));
@@ -1090,7 +1154,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
       }
 
       const parts = convertToResponsesFormat(userContent);
-      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25);
+      const result = await callClaude(ANTHROPIC_API_KEY, systemPrompt, parts, 16000, 0.25);
       if (result.error) {
         return new Response(JSON.stringify({ error: `Erro IA: ${result.status}` }), { status: result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
@@ -1203,8 +1267,8 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
     
     // Run extraction and pass 1 in parallel
     const [extractionResult, pass1Result] = await Promise.all([
-      callOpenAI(OPENAI_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, 1000, 0.1),
-      callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 9000, 0.25),
+      callClaude(ANTHROPIC_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, 1000, 0.1),
+      callClaude(ANTHROPIC_API_KEY, pass1System, pass1User, 9000, 0.25),
     ]);
 
     // Parse extracted data
@@ -1253,7 +1317,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     ];
 
     console.log('PASS 2: Generating Sections V-VIII...');
-    const pass2Result = await callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25);
+    const pass2Result = await callClaude(ANTHROPIC_API_KEY, pass2System, pass2User, 9000, 0.25);
 
     if (pass2Result.error) {
       console.error('PASS 2 failed:', pass2Result.status, pass2Result.error?.substring(0, 300));
