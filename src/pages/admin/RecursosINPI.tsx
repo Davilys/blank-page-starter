@@ -23,6 +23,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { INPIResourcePDFPreview } from '@/components/admin/INPIResourcePDFPreview';
 import { INPILegalChatDialog } from '@/components/admin/inpi/INPILegalChatDialog';
+import { EvidenceGallery, type EvidenceRow } from '@/components/admin/inpi/EvidenceGallery';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface ExtractedData {
@@ -321,6 +322,8 @@ export default function RecursosINPI() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchDate, setSearchDate] = useState('');
   const [showLegalChat, setShowLegalChat] = useState(false);
+  const [showEvidenceGallery, setShowEvidenceGallery] = useState(false);
+  const [evidenceCount, setEvidenceCount] = useState(0);
 
   // Client search for Notificante
   const [clientSearchQuery, setClientSearchQuery] = useState('');
@@ -900,6 +903,57 @@ export default function RecursosINPI() {
   };
 
   const handleApproveResource = async () => {
+    return _handleApproveResource();
+  };
+
+  const handleRegenerateWithEvidences = async (rows: EvidenceRow[]) => {
+    if (!currentResourceId) {
+      toast.error('Recurso não encontrado');
+      return;
+    }
+    if (rows.length === 0) {
+      toast.info('Nenhuma evidência marcada como incluída');
+      return;
+    }
+    setIsAdjusting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('adjust-inpi-resource', {
+        body: {
+          currentContent: draftContent,
+          adjustmentInstructions: '',
+          evidences: rows.map((r) => ({
+            caption: r.caption,
+            ocr_text: r.ocr_text,
+            source_file_name: r.source_file_name,
+            page_number: r.page_number,
+          })),
+          resourceType: resourceType || selectedResource?.resource_type,
+          extractedData: extractedData || {
+            process_number: selectedResource?.process_number,
+            brand_name: selectedResource?.brand_name,
+            ncl_class: selectedResource?.ncl_class,
+            holder: selectedResource?.holder,
+            examiner_or_opponent: selectedResource?.examiner_or_opponent || '',
+          },
+        },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Falha ao regenerar');
+      setDraftContent(data.adjusted_content);
+      await supabase
+        .from('inpi_resources')
+        .update({ draft_content: data.adjusted_content })
+        .eq('id', currentResourceId);
+      toast.success('Recurso regenerado citando as evidências!');
+    } catch (e) {
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : 'Erro ao regenerar');
+    } finally {
+      setIsAdjusting(false);
+    }
+  };
+
+  const _handleApproveResource = async () => {
     if (!currentResourceId) return;
     try {
       const { data: updatedResource, error } = await supabase
@@ -948,6 +1002,8 @@ export default function RecursosINPI() {
     setNotificadoData({ nome: '', cpf_cnpj: '', endereco: '' });
     setUserInstructions('');
     setProcuradorData({ marca: '', processo_inpi: '', ncl_class: '', titular: '', cpf_cnpj_titular: '', endereco_titular: '', procurador_antigo: '', motivo: '' });
+    setEvidenceCount(0);
+    setShowEvidenceGallery(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (multiFileInputRef.current) multiFileInputRef.current.value = '';
   };
@@ -2452,6 +2508,19 @@ export default function RecursosINPI() {
                       {isAdjusting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Edit3 className="h-4 w-4" />}
                       Ajustar com IA
                     </Button>
+                    {(resourceType === 'indeferimento' || resourceType === 'exigencia_merito' || resourceType === 'oposicao') && currentResourceId && (
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowEvidenceGallery(true)}
+                        className="gap-2 rounded-xl"
+                      >
+                        <ImageIcon className="h-4 w-4" />
+                        Anexar evidências (prints/imagens)
+                        {evidenceCount > 0 && (
+                          <Badge variant="secondary" className="ml-1">{evidenceCount}</Badge>
+                        )}
+                      </Button>
+                    )}
                     <Button onClick={handleApproveResource} className="flex-1 gap-2 rounded-xl h-11 shadow-lg shadow-primary/15">
                       <CheckCircle2 className="h-4 w-4" />
                       {resourceType === 'notificacao_extrajudicial'
@@ -2601,6 +2670,16 @@ export default function RecursosINPI() {
       </button>
 
       <INPILegalChatDialog open={showLegalChat} onOpenChange={setShowLegalChat} />
+
+      {currentResourceId && (
+        <EvidenceGallery
+          open={showEvidenceGallery}
+          onOpenChange={setShowEvidenceGallery}
+          resourceId={currentResourceId}
+          onChanged={(rows) => setEvidenceCount(rows.filter((r) => r.included).length)}
+          onRegenerate={handleRegenerateWithEvidences}
+        />
+      )}
     </>
   );
 }

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Download, Printer, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -6,6 +6,23 @@ import { ptBR } from 'date-fns/locale';
 import logoWebmarcas from '@/assets/webmarcas-logo-new.png';
 import signatureImage from '@/assets/davilys-signature.png';
 import jsPDF from 'jspdf';
+import { supabase } from '@/integrations/supabase/client';
+
+interface ResourceEvidence {
+  id: string;
+  storage_path: string;
+  caption: string | null;
+  source_file_name: string | null;
+  page_number: number | null;
+  placement: 'inline' | 'annex';
+  display_order: number;
+  included: boolean;
+  docNumber?: number;
+  signedUrl?: string;
+  dataUrl?: string;
+  width?: number;
+  height?: number;
+}
 
 interface ResourceData {
   id: string;
@@ -140,6 +157,58 @@ const imageToBase64 = (src: string): Promise<string> => {
 export function INPIResourcePDFPreview({ resource, content, resourceType }: INPIResourcePDFPreviewProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [evidences, setEvidences] = useState<ResourceEvidence[]>([]);
+
+  // Fetch evidences for this resource + sign URLs + preload data URLs
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('inpi_resource_evidences' as any)
+        .select('*')
+        .eq('resource_id', resource.id)
+        .eq('included', true)
+        .order('display_order', { ascending: true });
+      const list = ((data as any[]) || []) as ResourceEvidence[];
+      let n = 1;
+      const numbered = list.map((r) => ({ ...r, docNumber: n++ }));
+      // sign + dataurl
+      await Promise.all(
+        numbered.map(async (r) => {
+          const { data: s } = await supabase.storage
+            .from('inpi-resource-evidence')
+            .createSignedUrl(r.storage_path, 3600);
+          if (s?.signedUrl) {
+            r.signedUrl = s.signedUrl;
+            try {
+              const resp = await fetch(s.signedUrl);
+              const blob = await resp.blob();
+              r.dataUrl = await new Promise<string>((resolve, reject) => {
+                const fr = new FileReader();
+                fr.onload = () => resolve(fr.result as string);
+                fr.onerror = reject;
+                fr.readAsDataURL(blob);
+              });
+              const dims = await new Promise<{ w: number; h: number }>((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+                img.onerror = () => resolve({ w: 800, h: 1000 });
+                img.src = r.dataUrl!;
+              });
+              r.width = dims.w;
+              r.height = dims.h;
+            } catch { /* ignore */ }
+          }
+        }),
+      );
+      if (!cancelled) setEvidences(numbered);
+    })();
+    return () => { cancelled = true; };
+  }, [resource.id]);
+
+  const evidenceByNum = (n: number) => evidences.find((e) => e.docNumber === n);
+  const inlineEvidences = evidences.filter((e) => e.placement === 'inline');
+  const annexEvidences = evidences; // all included evidences also appear in annex
 
   const isNotif = isNotificacao(resourceType);
   const isRespostaNotif = isRespostaNotificacao(resourceType);
@@ -383,13 +452,49 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           const isList = /^[-–•]\s/.test(trimmedParagraph);
           const indent = isList ? margin + 5 : margin;
           const lineWidth = isList ? contentWidth - 5 : contentWidth;
-          
-          const lines = pdf.splitTextToSize(trimmedParagraph, lineWidth);
+
+          const docNums: number[] = [];
+          const renderText = trimmedParagraph.replace(/\[DOC:(\d{1,3})\]/g, (_full: string, n: string) => {
+            const num = parseInt(n, 10);
+            docNums.push(num);
+            return `(Doc. ${String(num).padStart(2, '0')})`;
+          });
+          const lines = pdf.splitTextToSize(renderText, lineWidth);
           
           for (const line of lines) {
             if (yPos > bottomLimit) { pdf.addPage(); yPos = margin; }
             pdf.text(line, indent, yPos);
             yPos += 6;
+          }
+          for (const n of docNums) {
+            const ev = evidenceByNum(n);
+            if (!ev?.dataUrl) continue;
+            const maxImgW = contentWidth * 0.7;
+            const maxImgH = 75;
+            const ratio = ev.width && ev.height ? ev.width / ev.height : 0.75;
+            let imgW = maxImgW;
+            let imgH = imgW / ratio;
+            if (imgH > maxImgH) { imgH = maxImgH; imgW = imgH * ratio; }
+            if (yPos + imgH + 12 > bottomLimit) { pdf.addPage(); yPos = margin; }
+            yPos += 3;
+            const xImg = (pageWidth - imgW) / 2;
+            try {
+              pdf.addImage(ev.dataUrl, 'PNG', xImg, yPos, imgW, imgH);
+              yPos += imgH + 2;
+              pdf.setFontSize(8);
+              pdf.setTextColor(80, 80, 80);
+              const cap = `Doc. ${String(n).padStart(2, '0')} — ${ev.caption || ev.source_file_name || ''}`;
+              const capLines = pdf.splitTextToSize(cap, contentWidth);
+              for (const cl of capLines) {
+                if (yPos > bottomLimit) { pdf.addPage(); yPos = margin; }
+                pdf.text(cl, pageWidth / 2, yPos, { align: 'center' });
+                yPos += 4;
+              }
+              pdf.setFontSize(11);
+              pdf.setTextColor(30, 30, 30);
+            } catch (e) {
+              console.warn('addImage inline failed', e);
+            }
           }
           yPos += 3;
         }
@@ -442,6 +547,61 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         pdf.text('CPF 393.239.118-79', pageWidth / 2, yPos + 12, { align: 'center' });
       }
 
+      // ── ANEXOS DOCUMENTAIS ──
+      if (annexEvidences.length > 0) {
+        pdf.addPage();
+        yPos = margin;
+        pdf.setFillColor(30, 58, 95);
+        pdf.rect(margin, yPos, contentWidth, 10, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(12);
+        pdf.text('ANEXOS DOCUMENTAIS', pageWidth / 2, yPos + 7, { align: 'center' });
+        yPos += 18;
+        pdf.setTextColor(30, 30, 30);
+        pdf.setFont('helvetica', 'normal');
+
+        for (const ev of annexEvidences) {
+          if (!ev.dataUrl) continue;
+          // One page per doc
+          pdf.addPage();
+          yPos = margin;
+          pdf.setFontSize(11);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(30, 58, 95);
+          const title = `Doc. ${String(ev.docNumber).padStart(2, '0')} — ${ev.caption || ev.source_file_name || ''}`;
+          const titleLines = pdf.splitTextToSize(title, contentWidth);
+          for (const tl of titleLines) {
+            pdf.text(tl, pageWidth / 2, yPos, { align: 'center' });
+            yPos += 6;
+          }
+          yPos += 4;
+          pdf.setFont('helvetica', 'normal');
+
+          const availableH = pageHeight - yPos - margin - 20;
+          const availableW = contentWidth;
+          const ratio = ev.width && ev.height ? ev.width / ev.height : 0.75;
+          let imgW = availableW;
+          let imgH = imgW / ratio;
+          if (imgH > availableH) { imgH = availableH; imgW = imgH * ratio; }
+          const xImg = (pageWidth - imgW) / 2;
+          try {
+            pdf.addImage(ev.dataUrl, 'PNG', xImg, yPos, imgW, imgH);
+          } catch (e) {
+            console.warn('addImage annex failed', e);
+          }
+          yPos += imgH + 4;
+          if (ev.source_file_name) {
+            pdf.setFontSize(8);
+            pdf.setTextColor(120, 120, 120);
+            pdf.text(
+              `Origem: ${ev.source_file_name}${ev.page_number ? ` — pág. ${ev.page_number}` : ''}`,
+              pageWidth / 2, yPos, { align: 'center' },
+            );
+          }
+        }
+      }
+
       // ── Footers on all pages ──
       const totalPages = pdf.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
@@ -491,6 +651,46 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       
       // Short lines (e.g. "EXCELENTÍSSIMO...") should not be stretched by justify
       const isShort = trimmed.length < 120;
+      // [DOC:N] marker handling — split paragraph and insert <figure>
+      const docRegex = /\[DOC:(\d{1,3})\]/g;
+      if (docRegex.test(trimmed)) {
+        docRegex.lastIndex = 0;
+        const parts: Array<{ type: 'text' | 'doc'; value: string; n?: number }> = [];
+        let last = 0;
+        let m: RegExpExecArray | null;
+        while ((m = docRegex.exec(trimmed)) !== null) {
+          if (m.index > last) parts.push({ type: 'text', value: trimmed.slice(last, m.index) });
+          parts.push({ type: 'doc', value: m[0], n: parseInt(m[1], 10) });
+          last = m.index + m[0].length;
+        }
+        if (last < trimmed.length) parts.push({ type: 'text', value: trimmed.slice(last) });
+        return (
+          <div key={idx} className="mb-4">
+            <p className={isShort ? '' : 'text-justify'} style={{ textIndent: '2cm', textAlignLast: 'left' }}>
+              {parts.map((p, i) => p.type === 'text'
+                ? <span key={i}>{p.value}</span>
+                : <span key={i} className="font-semibold" style={{ color: '#1e3a5f' }}>(Doc. {String(p.n).padStart(2, '0')})</span>)}
+            </p>
+            {parts.filter(p => p.type === 'doc').map((p, i) => {
+              const ev = evidenceByNum(p.n!);
+              if (!ev?.signedUrl) return null;
+              return (
+                <figure key={`fig-${i}`} className="my-4 mx-auto text-center">
+                  <img
+                    src={ev.signedUrl}
+                    alt={ev.caption || `Doc. ${p.n}`}
+                    className="mx-auto border rounded"
+                    style={{ maxWidth: '70%', maxHeight: '340px', objectFit: 'contain' }}
+                  />
+                  <figcaption className="text-xs mt-2" style={{ color: '#555' }}>
+                    <strong>Doc. {String(p.n).padStart(2, '0')}</strong> — {ev.caption || ev.source_file_name}
+                  </figcaption>
+                </figure>
+              );
+            })}
+          </div>
+        );
+      }
       return (
         <p key={idx} className={`mb-4 ${isShort ? '' : 'text-justify'}`} style={{ textIndent: '2cm', textAlignLast: 'left' }}>
           {trimmed}
@@ -626,6 +826,41 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
               <span>🌐 www.webmarcas.net</span>
             </div>
           </div>
+
+          {/* ANEXOS DOCUMENTAIS */}
+          {annexEvidences.length > 0 && (
+            <div className="mt-16">
+              <div className="text-center mb-6">
+                <div className="inline-block px-8 py-2 rounded" style={{ background: '#1e3a5f' }}>
+                  <p className="text-white font-bold tracking-wide text-sm uppercase">
+                    Anexos Documentais
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-10">
+                {annexEvidences.map((ev) => (
+                  <div key={ev.id} className="text-center break-inside-avoid page-break-before-always">
+                    <p className="text-sm font-semibold mb-2" style={{ color: '#1e3a5f' }}>
+                      Doc. {String(ev.docNumber).padStart(2, '0')} — {ev.caption || ev.source_file_name}
+                    </p>
+                    {ev.signedUrl && (
+                      <img
+                        src={ev.signedUrl}
+                        alt={ev.caption || `Doc. ${ev.docNumber}`}
+                        className="mx-auto border rounded shadow"
+                        style={{ maxWidth: '90%', maxHeight: '600px', objectFit: 'contain' }}
+                      />
+                    )}
+                    {ev.source_file_name && (
+                      <p className="text-xs mt-2" style={{ color: '#777' }}>
+                        Origem: {ev.source_file_name}{ev.page_number ? ` — página ${ev.page_number}` : ''}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

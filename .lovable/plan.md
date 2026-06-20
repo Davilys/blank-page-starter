@@ -1,35 +1,65 @@
 ## Objetivo
-Mostrar a coluna **Responsável** também na visão de **Histórico** das três abas de Vencidos (até 30d, +30, +60), com o mesmo chip já usado na Lista — clicável para reatribuir.
 
-## Por que é fácil agora
-O hook `useResponsaveis` foi refatorado e já carrega **todas** as atribuições da entidade (`invoice` ou `devedor`) sem filtrar por IDs. Então o mapa já tem o responsável de qualquer item — basta consumir nas tabelas de histórico.
+Tornar o gerador de recursos da aba **Recursos INPI** muito mais elaborado nos três tipos pedidos — **Indeferimento, Exigência de Mérito e Oposição** — extraindo **imagens, prints e fotos** dos PDFs anexados, deixando você **escolher e ordenar** essas evidências numa galeria, e gerando um PDF de defesa com as imagens **embutidas no corpo do argumento** + **anexo numerado de documentos** (Doc. 01, Doc. 02…) no estilo de escritórios grandes.
 
-## Mudanças
+## Fluxo final que você vai usar
 
-### 1. `src/components/admin/financeiro/vencidos/Vencidos30DiasTab.tsx` (Histórico até 30d)
-- Adicionar coluna **Responsável** ao header da tabela do histórico (linhas 365–406).
-- Em cada linha, renderizar `<ResponsavelChip entidade="invoice" entidadeId={h.invoice_id} responsavel={responsaveisMap[h.invoice_id]} />`.
-- Ajustar `colSpan` do empty state de 5 para 6.
+1. Abre o recurso (indeferimento / exigência / oposição), clica **Anexar PDFs**.
+2. Sistema processa cada anexo:
+   - Extrai **texto** (já faz hoje).
+   - Extrai **cada página como imagem** (PNG 200dpi).
+   - Extrai **imagens embutidas** (logos, rótulos, fotos).
+   - Roda **OCR** via Gemini multimodal em prints/escaneados sem texto.
+3. Abre **"Galeria de Evidências"** — grid com todas as imagens extraídas:
+   - Marcar/desmarcar quais entram.
+   - Reordenar (drag-and-drop).
+   - Editar legenda ("Print do site do concorrente em 12/2024").
+   - Escolher **posição**: *Inline* (no meio do argumento) ou *Só no anexo final*.
+4. Clica **Gerar Recurso com IA**:
+   - IA recebe texto + lista de imagens com legenda/OCR.
+   - Insere marcadores `[DOC: 03]` nos parágrafos certos (uso anterior, distintividade, convivência, comparação visual).
+5. PDF final tem: capa → argumentação com **prints inline numerados** → **anexo de documentos** (1 doc por página, tamanho cheio) → assinatura.
 
-### 2. `src/pages/admin/Devedores.tsx` — Histórico Devedores +60d (`TabsContent value="historico"`, linhas 923–1001)
-- Adicionar coluna **Responsável** no header (depois de "Cliente").
-- Adicionar a interface `Renegociacao` o campo `asaas_customer_id: string | null` (já vem do `select *`).
-- Renderizar o chip na linha usando `responsaveisDevedores[h.asaas_customer_id]`.
-- Ajustar `colSpan` do empty state de 6 para 7.
+## Mudanças técnicas
 
-### 3. `src/pages/admin/Devedores.tsx` — Histórico Devedores +30d (`TabsContent value="historico-devedor"`, linhas 1003–1075)
-- Mesmo: adicionar coluna **Responsável** no header.
-- Renderizar chip com `responsaveisDevedores[h.asaas_customer_id]`.
-- Ajustar `colSpan` do empty state de 7 para 8.
+### Banco
+- Nova tabela `inpi_resource_evidences`:
+  - `id`, `resource_id` (FK `inpi_resources`), `storage_path`, `page_number`, `source_file_name`, `mime_type`, `caption`, `ocr_text`, `placement` ('inline' | 'annex'), `display_order`, `included` (bool), `created_at`.
+  - RLS: admin/staff via `has_role`. GRANTs para `authenticated` + `service_role`.
+- Bucket privado `inpi-resource-evidence` (Storage) com policies por role admin.
 
-### 4. Comportamento
+### Edge Functions
+- **Nova: `extract-resource-evidences`** — recebe `resource_id` + lista de PDFs do storage. Para cada PDF:
+  - `pdfjs-dist` (já usado no projeto) → renderiza páginas em PNG via canvas Deno.
+  - Detecta páginas com imagem dominante / pouco texto → marca como "print".
+  - Para escaneados, manda a página pro Gemini 2.5 (multimodal) com prompt de OCR + descrição.
+  - Salva imagens no bucket, insere linhas em `inpi_resource_evidences`.
+- **Atualizar: `process-inpi-resource`** (geração final) — passa a receber também `evidences[]` selecionadas. Prompt de sistema reforçado: "Quando argumentar Y, cite Doc. N referente à evidência Z". IA retorna texto com marcadores `[DOC:n]`.
+- **Atualizar: `adjust-inpi-resource`** — mesmo: preserva marcadores `[DOC:n]` ao reescrever.
 
-- **Sem nova chamada de banco**: os dados já vêm via `responsaveisMap` / `responsaveisDevedores`.
-- O chip permite reatribuir (mesmo popover de admins).
-- Realtime continua funcionando — qualquer atribuição feita na Lista aparece automaticamente no Histórico, e vice-versa, porque o histórico não tem um "responsável por renegociação" próprio: ele reflete o responsável atual daquele invoice / devedor.
+### Frontend
+- **Novo: `src/components/admin/inpi/EvidenceGallery.tsx`** — grid com checkbox, drag-and-drop (`dnd-kit` já no projeto), edição de legenda, toggle placement.
+- **Atualizar: `RecursosINPI.tsx`** + dialog de criação:
+  - Após upload dos PDFs, chamar `extract-resource-evidences`.
+  - Mostrar galeria antes do botão "Gerar".
+  - Passar seleção pro `process-inpi-resource`.
+- **Atualizar: `INPIResourcePDFPreview.tsx`** — trocar render texto-only por `@react-pdf/renderer` com componente que:
+  - Parseia `[DOC:n]` → insere `<Image>` inline com caption "Doc. n — …".
+  - Ao final, renderiza seção "ANEXOS DOCUMENTAIS" com 1 doc por página em tamanho cheio.
+  - Mantém cabeçalho/rodapé/assinatura atuais.
+
+## Modelos de IA (Lovable AI Gateway)
+- OCR de prints/escaneados → `google/gemini-2.5-flash` (multimodal, barato).
+- Geração de recurso → mantém modelo atual (`gpt-4o` via OPENAI_API_KEY ou migra pro gateway — sua escolha; sem mudança de chave necessária se mantiver).
+
+## Limites honestos
+- IA não inventa prints que você não anexar — ela organiza/legenda/cita o que veio nos PDFs.
+- PDFs escaneados muito ruins podem ter OCR imperfeito (a legenda fica editável pra você corrigir antes de gerar).
+- Cada extração de PDF grande (>50 páginas) leva 30-60s; mostro progresso.
 
 ## Fora do escopo
-- Não vou criar "responsável por registro de histórico" (ex.: quem fez aquela cobrança específica naquela data). Hoje o conceito é "responsável atual pelo cliente/fatura", consistente com a Lista. Se você quiser registrar o autor de cada ação de cobrança/renegociação individualmente, é outra feature (precisa coluna no `cobranca_historico` / `renegociacoes` etc.).
-- Sem mudanças no banco, edge functions, ou no Publicações (já está OK).
+- Comparativo automático com banco do INPI (busca de marca anterior, fonética etc.) — feature separada, podemos planejar depois.
+- Vídeos / áudio como evidência.
+- Os outros tipos (notificação extrajudicial, procurador) — ficam como estão.
 
-Confirma para eu aplicar?
+Confirma pra eu aplicar?

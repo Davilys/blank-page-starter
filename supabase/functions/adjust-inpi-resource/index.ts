@@ -48,9 +48,9 @@ serve(async (req) => {
       );
     }
 
-    const { currentContent, adjustmentInstructions, resourceType, extractedData: passedData } = await req.json();
+    const { currentContent, adjustmentInstructions, resourceType, extractedData: passedData, evidences } = await req.json();
 
-    if (!currentContent || !adjustmentInstructions) {
+    if (!currentContent || (!adjustmentInstructions && !evidences)) {
       return new Response(
         JSON.stringify({ error: 'Parâmetros obrigatórios ausentes' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -64,6 +64,8 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const hasEvidences = Array.isArray(evidences) && evidences.length > 0;
 
     const systemPrompt = `Você é um ADVOGADO ESPECIALISTA EM PROPRIEDADE INDUSTRIAL de ELITE da WEBMARCAS.
 
@@ -83,7 +85,31 @@ Sua tarefa é INCORPORAR os ajustes solicitados pelo usuário ao recurso adminis
 10. NUNCA retorne um texto resumido, abreviado ou mais curto que o original
 
 IMPORTANTE: O resultado final deve conter TODO o conteúdo original MAIS as melhorias/ajustes solicitados.
-O recurso ajustado DEVE ser mais robusto que o original.`;
+O recurso ajustado DEVE ser mais robusto que o original.
+
+${hasEvidences ? `
+⚠️ INSTRUÇÕES PARA EVIDÊNCIAS DOCUMENTAIS (PRINTS / FOTOS / DECISÕES ANEXAS):
+
+O usuário anexou EVIDÊNCIAS (imagens, prints de site, fotos de produto, páginas de decisão do INPI). Cada evidência tem um NÚMERO DE DOC e uma LEGENDA. Sua tarefa é CITAR essas evidências no corpo do recurso, INSERINDO marcadores literais [DOC:N] (onde N é o número do doc) no parágrafo onde a evidência reforça o argumento.
+
+REGRAS:
+- Use a forma EXATA: [DOC:01], [DOC:02], [DOC:03]… (com dois dígitos, entre colchetes, sem espaços).
+- Cite cada doc PELO MENOS UMA VEZ no parágrafo argumentativo apropriado, ex.: "conforme se verifica do print do site do concorrente, anexado a esta peça como [DOC:03]…"
+- Use a legenda da evidência (e o texto OCR quando útil) para escolher ONDE inserir o marcador. Print de site → seções de uso anterior/concorrência/diluição. Foto de produto/rótulo → distintividade e uso comercial. Página de decisão INPI → história processual.
+- Os marcadores [DOC:N] serão substituídos automaticamente pela imagem real ao gerar o PDF — NÃO escreva descrições da imagem, apenas o marcador, opcionalmente seguido por uma referência como "(Doc. 03, anexo)".
+- NÃO altere a numeração que o sistema atribuiu — use exatamente o número fornecido.
+- Preserve todos os marcadores [DOC:N] que já estiverem no texto original.
+` : ''}`;
+
+    const evidenceBlock = hasEvidences
+      ? '\n\nEVIDÊNCIAS DOCUMENTAIS ANEXADAS (insira marcadores [DOC:N] no corpo do recurso, na seção argumentativa adequada):\n' +
+        evidences.map((e: any, i: number) => {
+          const n = String(i + 1).padStart(2, '0');
+          const cap = (e.caption || e.source_file_name || 'evidência').toString().slice(0, 200);
+          const ocr = (e.ocr_text || '').toString().slice(0, 400);
+          return `[DOC:${n}] — ${cap}${ocr ? ` — Texto da página: "${ocr.replace(/\s+/g, ' ').trim()}"` : ''}`;
+        }).join('\n')
+      : '';
 
     const userPrompt = `RECURSO ATUAL (mantenha TODO este conteúdo e ACRESCENTE os ajustes):
 
@@ -92,7 +118,8 @@ ${currentContent}
 ---FIM DO RECURSO---
 
 AJUSTES SOLICITADOS PELO USUÁRIO (incorpore DENTRO do recurso acima, enriquecendo-o):
-${adjustmentInstructions}
+${adjustmentInstructions || (hasEvidences ? 'Insira referências às evidências documentais abaixo nos parágrafos adequados, usando os marcadores [DOC:N] exatos. Reforce a argumentação citando cada evidência ao menos uma vez.' : '')}
+${evidenceBlock}
 
 INSTRUÇÕES FINAIS:
 - Retorne o recurso COMPLETO com os ajustes INCORPORADOS
