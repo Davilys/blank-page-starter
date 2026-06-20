@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, Printer, Loader2 } from 'lucide-react';
+import { Download, Printer, Loader2, Pencil, Save, X } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import logoWebmarcas from '@/assets/webmarcas-logo-new.png';
@@ -158,6 +160,17 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   const printRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [evidences, setEvidences] = useState<ResourceEvidence[]>([]);
+  const [editableContent, setEditableContent] = useState<string>(content);
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftEdit, setDraftEdit] = useState<string>(content);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Keep internal state in sync if the prop content changes (e.g. opening a different resource)
+  useEffect(() => {
+    setEditableContent(content);
+    setDraftEdit(content);
+    setIsEditing(false);
+  }, [content, resource.id]);
 
   // Fetch evidences for this resource + sign URLs + preload data URLs
   useEffect(() => {
@@ -214,7 +227,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   const isRespostaNotif = isRespostaNotificacao(resourceType);
   const isExtrajudicialDoc = isExtrajudicial(resourceType);
   const isProcuradorPetition = resourceType === 'troca_procurador' || resourceType === 'nomeacao_procurador';
-  const cleanedContent = stripOpeningMarkers(cleanMarkdown(content));
+  const cleanedContent = stripOpeningMarkers(cleanMarkdown(editableContent));
   const bodyContent = stripClosingFromContent(cleanedContent, resourceType);
 
   const approvalDate = resource.approved_at 
@@ -702,6 +715,16 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   return (
     <div className="space-y-4">
       <div className="flex gap-3 justify-end print:hidden">
+        {!isEditing && (
+          <Button
+            variant="outline"
+            onClick={() => { setDraftEdit(editableContent); setIsEditing(true); }}
+            className="gap-2 rounded-xl"
+          >
+            <Pencil className="h-4 w-4" />
+            Editar texto
+          </Button>
+        )}
         <Button variant="outline" onClick={handlePrint} className="gap-2 rounded-xl">
           <Printer className="h-4 w-4" />
           Imprimir
@@ -721,6 +744,63 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         </Button>
       </div>
 
+      {isEditing && (
+        <div className="rounded-lg border bg-card p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-sm">Editar texto do recurso</h3>
+              <p className="text-xs text-muted-foreground">
+                O cabeçalho timbrado (logo, CNPJ, marca, processo) é fixo. Aqui você ajusta o corpo do recurso.
+                Marcadores como <code>[DOC:01]</code> continuam funcionando.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => { setDraftEdit(editableContent); setIsEditing(false); }}
+                className="gap-2 rounded-xl"
+                disabled={savingEdit}
+              >
+                <X className="h-4 w-4" />
+                Cancelar
+              </Button>
+              <Button
+                onClick={async () => {
+                  setSavingEdit(true);
+                  try {
+                    const { error } = await supabase
+                      .from('inpi_resources')
+                      .update({ final_content: draftEdit })
+                      .eq('id', resource.id);
+                    if (error) throw error;
+                    setEditableContent(draftEdit);
+                    setIsEditing(false);
+                    toast.success('Texto do recurso atualizado');
+                  } catch (e) {
+                    console.error(e);
+                    toast.error(e instanceof Error ? e.message : 'Erro ao salvar alterações');
+                  } finally {
+                    setSavingEdit(false);
+                  }
+                }}
+                disabled={savingEdit || draftEdit === editableContent}
+                className="gap-2 rounded-xl"
+              >
+                {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Salvar alterações
+              </Button>
+            </div>
+          </div>
+          <Textarea
+            value={draftEdit}
+            onChange={(e) => setDraftEdit(e.target.value)}
+            className="font-serif text-sm leading-relaxed"
+            style={{ minHeight: '70vh' }}
+          />
+        </div>
+      )}
+
+      {!isEditing && (
       <div 
         ref={printRef}
         className="bg-white text-gray-900 shadow-2xl mx-auto overflow-hidden rounded-lg"
@@ -863,6 +943,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }
