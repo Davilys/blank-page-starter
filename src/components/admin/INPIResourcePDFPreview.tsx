@@ -19,6 +19,7 @@ interface ResourceEvidence {
   placement: 'inline' | 'annex';
   display_order: number;
   included: boolean;
+  kind?: 'brand_logo' | 'inpi_consulta' | 'evidence';
   docNumber?: number;
   signedUrl?: string;
   dataUrl?: string;
@@ -183,8 +184,13 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         .eq('included', true)
         .order('display_order', { ascending: true });
       const list = ((data as any[]) || []) as ResourceEvidence[];
+      // Only "evidence" kind gets a [DOC:NN] number. brand_logo / inpi_consulta
+      // are rendered visually in the header block, no numbering, no annex page.
       let n = 1;
-      const numbered = list.map((r) => ({ ...r, docNumber: n++ }));
+      const numbered = list.map((r) => {
+        const k = (r.kind as any) || 'evidence';
+        return { ...r, docNumber: k === 'evidence' ? n++ : undefined };
+      });
       // sign + dataurl
       await Promise.all(
         numbered.map(async (r) => {
@@ -220,8 +226,11 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   }, [resource.id]);
 
   const evidenceByNum = (n: number) => evidences.find((e) => e.docNumber === n);
-  const inlineEvidences = evidences.filter((e) => e.placement === 'inline');
-  const annexEvidences = evidences; // all included evidences also appear in annex
+  const brandLogos = evidences.filter((e) => (e.kind || 'evidence') === 'brand_logo');
+  const inpiConsultas = evidences.filter((e) => (e.kind || 'evidence') === 'inpi_consulta');
+  const docEvidences = evidences.filter((e) => (e.kind || 'evidence') === 'evidence');
+  const inlineEvidences = docEvidences.filter((e) => e.placement === 'inline');
+  const annexEvidences = docEvidences; // only generic evidences go to the annex
 
   const isNotif = isNotificacao(resourceType);
   const isRespostaNotif = isRespostaNotificacao(resourceType);
@@ -386,6 +395,80 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         yPos += 6;
       }
       yPos += 4;
+
+      // ── Identificação visual do processo (logo + consulta INPI) ──
+      if (brandLogos.length > 0 || inpiConsultas.length > 0) {
+        const boxX = margin;
+        const boxY = yPos;
+        let innerY = boxY + 6;
+        // Title
+        pdf.setFontSize(9);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(30, 58, 95);
+        pdf.text('IDENTIFICAÇÃO VISUAL DO PROCESSO', boxX + 4, innerY);
+        innerY += 5;
+
+        // Logo + metadata side by side
+        const logo = brandLogos[0];
+        const logoW = 28, logoH = 28;
+        const metaX = logo?.dataUrl ? boxX + 4 + logoW + 6 : boxX + 4;
+        if (logo?.dataUrl) {
+          try { pdf.addImage(logo.dataUrl, 'PNG', boxX + 4, innerY, logoW, logoH); } catch { /* ignore */ }
+        }
+        pdf.setFontSize(9);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(40, 40, 40);
+        const metaLines: string[] = [];
+        if (resource.brand_name) metaLines.push(`Marca: ${resource.brand_name}`);
+        if (resource.process_number) metaLines.push(`Processo INPI nº: ${resource.process_number}`);
+        if (resource.ncl_class) metaLines.push(`Classe NCL: ${resource.ncl_class}`);
+        if (resource.holder) metaLines.push(`Titular: ${resource.holder}`);
+        let mY = innerY + 4;
+        for (const ml of metaLines) {
+          pdf.text(ml, metaX, mY);
+          mY += 5;
+        }
+        innerY += Math.max(logoH, metaLines.length * 5 + 4) + 4;
+
+        // Consulta INPI prints (inside the box)
+        for (let i = 0; i < inpiConsultas.length; i++) {
+          const ev = inpiConsultas[i];
+          if (!ev.dataUrl) continue;
+          const maxW = contentWidth - 8;
+          const maxH = 110;
+          const ratio = ev.width && ev.height ? ev.width / ev.height : 0.75;
+          let imgW = maxW;
+          let imgH = imgW / ratio;
+          if (imgH > maxH) { imgH = maxH; imgW = imgH * ratio; }
+          if (innerY + imgH + 14 > pageHeight - 30) {
+            // Close current box, new page, restart box
+            pdf.setDrawColor(200, 175, 55);
+            pdf.setLineWidth(0.5);
+            pdf.roundedRect(boxX, boxY, contentWidth, innerY - boxY + 4, 1.5, 1.5, 'S');
+            pdf.addPage();
+            yPos = margin;
+            innerY = yPos;
+          }
+          const xImg = boxX + (contentWidth - imgW) / 2;
+          try { pdf.addImage(ev.dataUrl, 'PNG', xImg, innerY, imgW, imgH); } catch { /* ignore */ }
+          innerY += imgH + 2;
+          pdf.setFontSize(7.5);
+          pdf.setTextColor(110, 110, 110);
+          const cap = `Fig. ${i + 1} — ${ev.caption || 'Consulta à base de dados do INPI'}`;
+          const capLines = pdf.splitTextToSize(cap, contentWidth - 8);
+          for (const cl of capLines) {
+            pdf.text(cl, pageWidth / 2, innerY + 3, { align: 'center' });
+            innerY += 4;
+          }
+          innerY += 3;
+        }
+
+        // Draw the box border
+        pdf.setDrawColor(200, 175, 55);
+        pdf.setLineWidth(0.5);
+        pdf.roundedRect(boxX, boxY, contentWidth, innerY - boxY + 2, 1.5, 1.5, 'S');
+        yPos = innerY + 8;
+      }
 
       // ── Content Body ──
       pdf.setFont('helvetica', 'normal');
@@ -863,6 +946,46 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
               </p>
             )}
           </div>
+
+          {/* Identificação visual do processo (logo da marca + print da consulta INPI) */}
+          {(brandLogos.length > 0 || inpiConsultas.length > 0) && (
+            <div className="mb-8 border rounded-lg p-4" style={{ borderColor: '#c8af37', background: '#fafaf3' }}>
+              <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: '#1e3a5f' }}>
+                Identificação visual do processo
+              </p>
+              {(brandLogos.length > 0 || resource.brand_name) && (
+                <div className="flex items-center gap-5 mb-4">
+                  {brandLogos[0]?.signedUrl && (
+                    <img
+                      src={brandLogos[0].signedUrl}
+                      alt={`Logo ${resource.brand_name || ''}`}
+                      className="object-contain bg-white border rounded"
+                      style={{ width: '110px', height: '110px', padding: '4px' }}
+                    />
+                  )}
+                  <div className="text-sm" style={{ color: '#333', lineHeight: 1.6 }}>
+                    {resource.brand_name && <p><strong>Marca:</strong> {resource.brand_name}</p>}
+                    {resource.process_number && <p><strong>Processo INPI nº:</strong> {resource.process_number}</p>}
+                    {resource.ncl_class && <p><strong>Classe NCL:</strong> {resource.ncl_class}</p>}
+                    {resource.holder && <p><strong>Titular:</strong> {resource.holder}</p>}
+                  </div>
+                </div>
+              )}
+              {inpiConsultas.map((ev, i) => ev.signedUrl ? (
+                <figure key={ev.id} className="mt-3 text-center">
+                  <img
+                    src={ev.signedUrl}
+                    alt={ev.caption || 'Consulta INPI'}
+                    className="mx-auto border rounded"
+                    style={{ maxWidth: '100%', maxHeight: '420px', objectFit: 'contain' }}
+                  />
+                  <figcaption className="text-xs mt-2" style={{ color: '#555' }}>
+                    <strong>Fig. {i + 1}</strong> — {ev.caption || 'Consulta à base de dados do INPI'}
+                  </figcaption>
+                </figure>
+              ) : null)}
+            </div>
+          )}
 
           {/* Content */}
           <div className="text-justify" style={{ color: '#1a1a1a' }}>
