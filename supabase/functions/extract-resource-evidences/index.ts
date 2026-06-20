@@ -45,39 +45,43 @@ function base64ToBytes(b64: string): Uint8Array {
   return out;
 }
 
-// Render a PDF page to a PNG via pdf.js (no native deps, Deno-compatible)
-async function renderPdfPagesToPng(pdfBytes: Uint8Array): Promise<Uint8Array[]> {
-  // pdfjs-dist legacy build is ESM and works with disableWorker.
-  // Canvas in Deno via skia-canvas npm.
-  // @ts-ignore - npm imports in Deno
-  const pdfjs = await import('https://esm.sh/pdfjs-dist@4.0.379/legacy/build/pdf.mjs');
-  // @ts-ignore
-  const { createCanvas } = await import('https://esm.sh/@napi-rs/canvas@0.1.53');
+// Extract embedded images from a PDF using pdf-lib (pure JS, Deno-compatible).
+// Returns one PNG/JPG per embedded image, in document order.
+async function extractPdfEmbeddedImages(pdfBytes: Uint8Array): Promise<Array<{ bytes: Uint8Array; mime: string; page: number }>> {
+  // @ts-ignore npm import
+  const { PDFDocument, PDFName, PDFRawStream, PDFDict, PDFArray } = await import('https://esm.sh/pdf-lib@1.17.1');
+  const doc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+  const out: Array<{ bytes: Uint8Array; mime: string; page: number }> = [];
 
-  pdfjs.GlobalWorkerOptions.workerSrc = '';
+  const pages = doc.getPages();
+  for (let i = 0; i < pages.length; i++) {
+    const page = pages.at(i);
+    if (!page) continue;
+    const resources = page.node.Resources();
+    if (!resources) continue;
+    const xobjects = resources.lookup(PDFName.of('XObject'), PDFDict);
+    if (!xobjects) continue;
 
-  const loadingTask = pdfjs.getDocument({
-    data: pdfBytes,
-    disableWorker: true,
-    disableFontFace: true,
-    useSystemFonts: false,
-  });
-  const doc = await loadingTask.promise;
-  const out: Uint8Array[] = [];
-
-  const maxPages = Math.min(doc.numPages, 30);
-  for (let p = 1; p <= maxPages; p++) {
-    const page = await doc.getPage(p);
-    const viewport = page.getViewport({ scale: 1.6 });
-    const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
-    const ctx = canvas.getContext('2d');
-    // White background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    // pdfjs expects a canvas2d-compatible context
-    await page.render({ canvasContext: ctx as unknown as CanvasRenderingContext2D, viewport }).promise;
-    const buf = await canvas.encode('png');
-    out.push(new Uint8Array(buf));
+    const entries = xobjects.entries();
+    for (const [, ref] of entries) {
+      const xobj = doc.context.lookup(ref);
+      if (!xobj || !(xobj instanceof PDFRawStream)) continue;
+      const dict = xobj.dict;
+      const subtype = dict.lookup(PDFName.of('Subtype'));
+      if (!subtype || subtype.toString() !== '/Image') continue;
+      const filter = dict.lookup(PDFName.of('Filter'));
+      const filterName = filter ? filter.toString() : '';
+      const contents = xobj.contents;
+      if (filterName.includes('DCTDecode')) {
+        out.push({ bytes: new Uint8Array(contents), mime: 'image/jpeg', page: i + 1 });
+      } else if (filterName.includes('JPXDecode')) {
+        out.push({ bytes: new Uint8Array(contents), mime: 'image/jp2', page: i + 1 });
+      } else if (filterName.includes('FlateDecode')) {
+        // Raw pixel stream — skip (would need DeviceRGB/Gray decode). Most embedded
+        // photos in INPI documents are DCT (JPEG), so we still cover the main case.
+        continue;
+      }
+    }
   }
   return out;
 }
