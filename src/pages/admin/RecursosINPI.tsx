@@ -1002,6 +1002,8 @@ export default function RecursosINPI() {
     setNotificadoData({ nome: '', cpf_cnpj: '', endereco: '' });
     setUserInstructions('');
     setProcuradorData({ marca: '', processo_inpi: '', ncl_class: '', titular: '', cpf_cnpj_titular: '', endereco_titular: '', procurador_antigo: '', motivo: '' });
+    setEvidenceCount(0);
+    setShowEvidenceGallery(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (multiFileInputRef.current) multiFileInputRef.current.value = '';
   };
