@@ -83,21 +83,45 @@ async function callClaude(
       max_tokens: maxTokens,
       ...(typeof temperature === 'number' ? { temperature } : {}),
       messages: [{ role: 'user', content: claudeContent }],
+      stream: true,
     }),
   });
 
-  if (!response.ok) {
+  if (!response.ok || !response.body) {
     const errorText = await response.text();
     console.error('Anthropic API error:', response.status, errorText.substring(0, 500));
     return { content: '', error: errorText, status: response.status };
   }
 
-  const data = await response.json();
+  // Parse Anthropic SSE stream — keeps the socket active so the edge
+  // function's 150s idle timeout is not triggered on long generations.
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
   let content = '';
-  if (Array.isArray(data.content)) {
-    for (const block of data.content) {
-      if (block.type === 'text' && typeof block.text === 'string') {
-        content += block.text;
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let nlIdx: number;
+    while ((nlIdx = buffer.indexOf('\n')) !== -1) {
+      const line = buffer.slice(0, nlIdx).trim();
+      buffer = buffer.slice(nlIdx + 1);
+      if (!line.startsWith('data:')) continue;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === '[DONE]') continue;
+      try {
+        const evt = JSON.parse(payload);
+        if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+          content += evt.delta.text || '';
+        } else if (evt.type === 'error') {
+          console.error('Anthropic stream error:', JSON.stringify(evt.error).substring(0, 500));
+          return { content, error: JSON.stringify(evt.error), status: 500 };
+        }
+      } catch (_) {
+        // ignore non-JSON keep-alive lines
       }
     }
   }
