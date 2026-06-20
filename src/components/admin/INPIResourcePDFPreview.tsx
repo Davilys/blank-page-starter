@@ -160,6 +160,17 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   const printRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [evidences, setEvidences] = useState<ResourceEvidence[]>([]);
+  const [editableContent, setEditableContent] = useState<string>(content);
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftEdit, setDraftEdit] = useState<string>(content);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Keep internal state in sync if the prop content changes (e.g. opening a different resource)
+  useEffect(() => {
+    setEditableContent(content);
+    setDraftEdit(content);
+    setIsEditing(false);
+  }, [content, resource.id]);
 
   // Fetch evidences for this resource + sign URLs + preload data URLs
   useEffect(() => {
