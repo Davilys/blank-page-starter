@@ -749,27 +749,27 @@ ${getAgentIdentity(agentName, agentStrategy)}
 CONTINUE DIRETAMENTE com a Seção V (sem repetir cabeçalho):
 
 V – DA CONFORMIDADE DA ESPECIFICAÇÃO COM O MANUAL DE MARCAS E A CLASSIFICAÇÃO DE NICE
-(MÍNIMO 900 palavras)
+(250 a 400 palavras)
 - Demonstrar por que a redação apresentada atende aos critérios do INPI
 - Explicar a compatibilidade da especificação final com a classe NCL indicada
 - Evidenciar clareza, precisão, objetividade e aderência à atividade econômica do requerente
 - Indicar, quando cabível, que a genericidade anteriormente apontada foi superada
 
 VI – DA BOA-FÉ PROCESSUAL, DA COOPERAÇÃO ADMINISTRATIVA E DA SUFICIÊNCIA DO CUMPRIMENTO
-(MÍNIMO 700 palavras)
+(200 a 350 palavras)
 - Demonstrar a postura colaborativa do requerente perante o exame de mérito
 - Reforçar que o atendimento da exigência foi completo, específico e tecnicamente fundamentado
 - Mostrar que a manifestação fornece elementos suficientes para o regular prosseguimento do exame
 - Sustentar eventual esclarecimento adicional apenas se vinculado ao conteúdo da exigência
 
 VII – DA CONCLUSÃO
-(MÍNIMO 600 palavras)
+(150 a 250 palavras)
 - Sintetizar os pontos centrais da exigência e como cada um foi atendido
 - Reforçar a adequação da especificação e da classificação adotada
 - Concluir de forma objetiva que o cumprimento apresentado é apto a sanar integralmente a exigência
 
 VIII – DOS PEDIDOS
-(MÍNIMO 300 palavras)
+(150 a 250 palavras)
 
 Ante o exposto, requer:
 
@@ -793,7 +793,7 @@ CPF: 393.239.118-79
 
 ⚠️ RESPONDA APENAS com o texto jurídico das Seções V a VIII + encerramento. SEM JSON. SEM explicações. Apenas o documento jurídico, COM formatação markdown leve conforme #formatacao_visual_obrigatoria (negrito, itálico, tabelas e marcadores [IMG:] / [DOC:NN]).
 ⚠️ Para EXIGÊNCIA DE MÉRITO, mantenha foco exclusivo no CUMPRIMENTO/ESCLARECIMENTO da exigência real do despacho.
-⚠️ O texto desta parte deve ter NO MÍNIMO 2.500 palavras.`;
+⚠️ O texto desta parte deve ter entre 800 e 1.400 palavras. SEJA OBJETIVO — cumprimento de exigência não exige tese; foque em resolver o ponto pedido pelo examinador. NÃO chame a peça de "Recurso Administrativo".`;
   }
 
   return `#instruction
