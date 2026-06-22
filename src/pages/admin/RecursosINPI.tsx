@@ -309,6 +309,7 @@ export default function RecursosINPI() {
   const [selectedAgent, setSelectedAgent] = useState<AgentId>('mazzola');
   const [file, setFile] = useState<File | null>(null);
   const [multipleFiles, setMultipleFiles] = useState<File[]>([]);
+  const [userOrientation, setUserOrientation] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
   const [draftContent, setDraftContent] = useState('');
