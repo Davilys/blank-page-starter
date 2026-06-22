@@ -8,7 +8,7 @@ const corsHeaders = {
 
 const RESOURCE_TYPE_LABELS: Record<string, string> = {
   indeferimento: 'RECURSO CONTRA INDEFERIMENTO',
-  exigencia_merito: 'CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO / RECURSO ADMINISTRATIVO',
+  exigencia_merito: 'CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO',
   oposicao: 'MANIFESTAÇÃO À OPOSIÇÃO',
   notificacao_extrajudicial: 'NOTIFICAÇÃO EXTRAJUDICIAL',
   resposta_notificacao_extrajudicial: 'RESPOSTA A NOTIFICAÇÃO EXTRAJUDICIAL',
@@ -216,9 +216,13 @@ function buildMandatoryOpeningBlock(
   const holder = data.holder || 'N/I';
   const examinerOrOpponent = data.examiner_or_opponent || 'N/I';
   const isOposicao = /OPOSIÇÃO/i.test(resourceTypeLabel);
+  const isExigenciaMerito = /EXIGÊNCIA DE MÉRITO/i.test(resourceTypeLabel);
   const personLabel = isOposicao ? 'Oponente' : 'Examinador(a)';
+  const headerTitle = isExigenciaMerito
+    ? resourceTypeLabel
+    : `RECURSO ADMINISTRATIVO – ${resourceTypeLabel}`;
 
-  return `RECURSO ADMINISTRATIVO – ${resourceTypeLabel}
+  return `${headerTitle}
 
 MARCA: ${brandUpper}
 
@@ -556,7 +560,7 @@ ${getAgentIdentity(agentName, agentStrategy)}
 COMECE O DOCUMENTO COM:
 
 ═══════════════════════════════════════════════════════════
-RECURSO ADMINISTRATIVO – ${resourceTypeLabel}
+${resourceTypeLabel}
 MARCA: [NOME DA MARCA EXTRAÍDO DO PDF]
 ═══════════════════════════════════════════════════════════
 
@@ -574,7 +578,7 @@ Procurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79
 ═══════════════════════════════════════════════════════════
 
 I – SÍNTESE DA EXIGÊNCIA FORMULADA E DO HISTÓRICO PROCESSUAL
-(MÍNIMO 700 palavras)
+(300 a 500 palavras — seja objetivo)
 - Narrar cronologicamente o histórico do pedido
 - Transcrever e explicar, com fidelidade, a exigência formulada pelo INPI
 - Identificar o ponto técnico exato a ser cumprido (ex.: especificação genérica, necessidade de detalhamento, adequação da classe, correção formal)
@@ -582,14 +586,14 @@ I – SÍNTESE DA EXIGÊNCIA FORMULADA E DO HISTÓRICO PROCESSUAL
 - Descrever a marca, o titular, a classe e o objeto do pedido com precisão
 
 II – DA TEMPESTIVIDADE, CABIMENTO E REGULARIDADE DA PRESENTE MANIFESTAÇÃO
-(MÍNIMO 300 palavras)
+(150 a 250 palavras)
 - Demonstrar a tempestividade do cumprimento/manifestação
 - Confirmar a legitimidade do requerente e do procurador constituído
 - Fundamentar o cabimento à luz da LPI, do Manual de Marcas e das regras procedimentais do INPI
 - Mencionar recolhimento de GRU apenas se compatível com o ato descrito no caso
 
 III – DO EFETIVO CUMPRIMENTO DA EXIGÊNCIA DE MÉRITO
-(MÍNIMO 1.200 palavras — SEÇÃO MAIS IMPORTANTE)
+(500 a 800 palavras — SEÇÃO MAIS IMPORTANTE, mas direta e técnica)
 - Responder PONTO A PONTO ao que o(a) examinador(a) solicitou
 - Se a exigência envolver especificação genérica, APRESENTAR a redação corrigida e detalhada da especificação
 - Se houver exemplos no despacho, utilizá-los como referência técnica, sem copiar cegamente quando o documento exigir adaptação ao caso concreto
@@ -599,7 +603,7 @@ III – DO EFETIVO CUMPRIMENTO DA EXIGÊNCIA DE MÉRITO
 - NÃO discutir oposição, colidência com terceiros ou risco de confusão, salvo se isso estiver literalmente no despacho
 
 IV – DA ADEQUAÇÃO TÉCNICA DA ESPECIFICAÇÃO, CLASSIFICAÇÃO E DELIMITAÇÃO DO ESCOPO
-(MÍNIMO 900 palavras)
+(300 a 500 palavras)
 - Demonstrar tecnicamente a correção do enquadramento na classe NCL pertinente
 - Explicar como a especificação retificada elimina genericidade, ambiguidade ou excesso
 - Relacionar a redação proposta com a atividade do requerente e com os parâmetros do INPI
@@ -608,7 +612,7 @@ IV – DA ADEQUAÇÃO TÉCNICA DA ESPECIFICAÇÃO, CLASSIFICAÇÃO E DELIMITAÇ�
 
 ⚠️ RESPONDA APENAS com o texto jurídico completo das Seções I a IV. SEM JSON. SEM explicações. Apenas o documento jurídico, COM formatação markdown leve conforme #formatacao_visual_obrigatoria (negrito, itálico, tabelas e marcadores [IMG:] / [DOC:NN]).
 ⚠️ Para EXIGÊNCIA DE MÉRITO, mantenha foco exclusivo no CUMPRIMENTO/ESCLARECIMENTO da exigência real do despacho.
-⚠️ O texto desta parte deve ter NO MÍNIMO 3.200 palavras.`;
+⚠️ O texto desta parte deve ter entre 1.300 e 2.000 palavras. EVITE prolixidade: cumprimento de exigência é peça objetiva, não tese acadêmica. NÃO chame a peça de "Recurso Administrativo" no corpo do texto — use "Cumprimento de Exigência de Mérito" ou "Manifestação".`;
   }
 
   return `#instruction
@@ -745,27 +749,27 @@ ${getAgentIdentity(agentName, agentStrategy)}
 CONTINUE DIRETAMENTE com a Seção V (sem repetir cabeçalho):
 
 V – DA CONFORMIDADE DA ESPECIFICAÇÃO COM O MANUAL DE MARCAS E A CLASSIFICAÇÃO DE NICE
-(MÍNIMO 900 palavras)
+(250 a 400 palavras)
 - Demonstrar por que a redação apresentada atende aos critérios do INPI
 - Explicar a compatibilidade da especificação final com a classe NCL indicada
 - Evidenciar clareza, precisão, objetividade e aderência à atividade econômica do requerente
 - Indicar, quando cabível, que a genericidade anteriormente apontada foi superada
 
 VI – DA BOA-FÉ PROCESSUAL, DA COOPERAÇÃO ADMINISTRATIVA E DA SUFICIÊNCIA DO CUMPRIMENTO
-(MÍNIMO 700 palavras)
+(200 a 350 palavras)
 - Demonstrar a postura colaborativa do requerente perante o exame de mérito
 - Reforçar que o atendimento da exigência foi completo, específico e tecnicamente fundamentado
 - Mostrar que a manifestação fornece elementos suficientes para o regular prosseguimento do exame
 - Sustentar eventual esclarecimento adicional apenas se vinculado ao conteúdo da exigência
 
 VII – DA CONCLUSÃO
-(MÍNIMO 600 palavras)
+(150 a 250 palavras)
 - Sintetizar os pontos centrais da exigência e como cada um foi atendido
 - Reforçar a adequação da especificação e da classificação adotada
 - Concluir de forma objetiva que o cumprimento apresentado é apto a sanar integralmente a exigência
 
 VIII – DOS PEDIDOS
-(MÍNIMO 300 palavras)
+(150 a 250 palavras)
 
 Ante o exposto, requer:
 
@@ -789,7 +793,7 @@ CPF: 393.239.118-79
 
 ⚠️ RESPONDA APENAS com o texto jurídico das Seções V a VIII + encerramento. SEM JSON. SEM explicações. Apenas o documento jurídico, COM formatação markdown leve conforme #formatacao_visual_obrigatoria (negrito, itálico, tabelas e marcadores [IMG:] / [DOC:NN]).
 ⚠️ Para EXIGÊNCIA DE MÉRITO, mantenha foco exclusivo no CUMPRIMENTO/ESCLARECIMENTO da exigência real do despacho.
-⚠️ O texto desta parte deve ter NO MÍNIMO 2.500 palavras.`;
+⚠️ O texto desta parte deve ter entre 800 e 1.400 palavras. SEJA OBJETIVO — cumprimento de exigência não exige tese; foque em resolver o ponto pedido pelo examinador. NÃO chame a peça de "Recurso Administrativo".`;
   }
 
   return `#instruction
@@ -1225,9 +1229,16 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
     // STANDARD INPI RESOURCE FLOW — TWO-PASS GENERATION
     // (indeferimento, exigencia_merito, oposicao)
     // ═════════════════════════════════════════════════════
-    const { fileBase64, fileType, files: multiFiles, generationPass, pass1Content: providedPass1Content, extractedData: providedExtractedData } = body;
+    const { fileBase64, fileType, files: multiFiles, generationPass, pass1Content: providedPass1Content, extractedData: providedExtractedData, userOrientation } = body;
     const requestedPass = generationPass || body.pass;
     const resourceTypeLabel = RESOURCE_TYPE_LABELS[resourceType] || 'RECURSO ADMINISTRATIVO';
+
+    // Block injected when the user provides custom orientations (currently
+    // surfaced on the UI only for exigência de mérito). It carries the highest
+    // priority so the agent follows the user's strategy literally.
+    const userOrientationBlock = (typeof userOrientation === 'string' && userOrientation.trim().length > 0)
+      ? `\n\n⚠️⚠️⚠️ ORIENTAÇÕES OBRIGATÓRIAS DO USUÁRIO (PRIORIDADE MÁXIMA — SIGA À RISCA, sobrepõem-se a qualquer instrução genérica de extensão/estrutura/tom):\n"""\n${userOrientation.trim().slice(0, 4000)}\n"""\nIMPORTANTE: Estas orientações são a diretriz principal desta peça. Se conflitarem com tamanhos mínimos/seções sugeridos, PRIORIZE as orientações do usuário.\n`
+      : '';
 
     // Build file parts for all calls
     const fileParts: any[] = [];
@@ -1272,7 +1283,7 @@ SEÇÕES I A IV JÁ GERADAS:
 ${basePass1Content.substring(0, 6000)}
 ---
 
-Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo e nível de profundidade. ${resourceType === 'exigencia_merito' ? 'O texto total desta parte deve ter NO MÍNIMO 2.500 palavras.' : 'O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.'}` },
+Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo e nível de profundidade. ${resourceType === 'exigencia_merito' ? 'O texto total desta parte deve ter entre 800 e 1.400 palavras — SEJA OBJETIVO.' : 'O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.'}${userOrientationBlock}` },
       ];
 
       console.log('PASS 2 only: Generating Sections V-VIII...');
@@ -1311,7 +1322,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     const pass1System = buildPass1SystemPrompt(resourceType, resourceTypeLabel, currentDate, agentName, agentStrategy);
     const pass1User = [
       { type: 'input_text', text: resourceType === 'exigencia_merito'
-        ? `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Identifique exatamente o que o(a) examinador(a) exigiu e responda a isso com precisão técnica. Se a exigência pedir detalhamento de especificação, apresente a redação corrigida adequada à classe. NÃO transforme a peça em oposição, conflito marcário, cotejo com marcas de terceiros ou defesa de colidência, salvo se isso constar expressamente no despacho. O texto desta parte deve ter NO MÍNIMO 3.200 palavras.`
+        ? `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Identifique exatamente o que o(a) examinador(a) exigiu e responda a isso com precisão técnica e OBJETIVA. Se a exigência pedir detalhamento de especificação, apresente a redação corrigida adequada à classe. NÃO transforme a peça em oposição, conflito marcário, cotejo com marcas de terceiros ou defesa de colidência, salvo se isso constar expressamente no despacho. A peça deve ser ENXUTA: entre 1.300 e 2.000 palavras nesta parte. NÃO chame a peça de "Recurso Administrativo"; trata-se de "Cumprimento de Exigência de Mérito".${userOrientationBlock}`
         : `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do recurso administrativo. CADA seção deve ter a extensão MÍNIMA especificada. O texto total desta parte deve ter NO MÍNIMO 3.800 palavras. Desenvolva CADA argumento com máxima profundidade, como um escritório de PI de elite faria.` },
       ...fileResponseParts,
     ];
@@ -1319,7 +1330,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     const pass2System = buildPass2SystemPrompt(resourceType, resourceTypeLabel, currentDate, agentName, agentStrategy);
     const pass2User = [
       { type: 'input_text', text: resourceType === 'exigencia_merito'
-        ? `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Foque EXCLUSIVAMENTE no atendimento da exigência formulada pelo(a) examinador(a), sem inserir argumentos de oposição, conflito entre marcas, convivência marcária ou risco de confusão, salvo se isso constar expressamente no despacho. O texto total desta parte deve ter NO MÍNIMO 2.500 palavras.`
+        ? `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Foque EXCLUSIVAMENTE no atendimento da exigência formulada pelo(a) examinador(a), sem inserir argumentos de oposição, conflito entre marcas, convivência marcária ou risco de confusão, salvo se isso constar expressamente no despacho. O texto total desta parte deve ter entre 800 e 1.400 palavras — SEJA OBJETIVO. NÃO chame a peça de "Recurso Administrativo".${userOrientationBlock}`
         : `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do recurso administrativo. Mantenha tom técnico, fundamentação robusta e conclusões objetivas. O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.` },
       ...fileResponseParts,
     ];
