@@ -80,10 +80,10 @@ async function callOpenAI(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4o-2024-11-20',
+      model: 'gpt-5',
       input: inputMessages,
       max_output_tokens: maxTokens,
-      ...(typeof temperature === 'number' ? { temperature } : {}),
+      // gpt-5 only accepts default temperature (1). Omit user-supplied temperature.
     }),
   });
 
