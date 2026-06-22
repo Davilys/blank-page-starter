@@ -216,9 +216,13 @@ function buildMandatoryOpeningBlock(
   const holder = data.holder || 'N/I';
   const examinerOrOpponent = data.examiner_or_opponent || 'N/I';
   const isOposicao = /OPOSIÇÃO/i.test(resourceTypeLabel);
+  const isExigenciaMerito = /EXIGÊNCIA DE MÉRITO/i.test(resourceTypeLabel);
   const personLabel = isOposicao ? 'Oponente' : 'Examinador(a)';
+  const headerTitle = isExigenciaMerito
+    ? resourceTypeLabel
+    : `RECURSO ADMINISTRATIVO – ${resourceTypeLabel}`;
 
-  return `RECURSO ADMINISTRATIVO – ${resourceTypeLabel}
+  return `${headerTitle}
 
 MARCA: ${brandUpper}
 
