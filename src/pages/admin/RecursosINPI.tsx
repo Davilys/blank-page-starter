@@ -2371,6 +2371,29 @@ export default function RecursosINPI() {
                   )}
 
                   {/* Agent badge */}
+                  {resourceType === 'exigencia_merito' && (
+                    <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-3">
+                      <div className="flex items-start gap-3">
+                        <Brain className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                        <div className="flex-1">
+                          <p className="font-semibold text-sm">Orientações para o Agente <span className="text-muted-foreground font-normal">(opcional)</span></p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Descreva como o Agente Mazzola deve elaborar o cumprimento desta exigência: pontos a enfatizar, especificação corrigida sugerida, tom desejado, extensão preferida, argumentos específicos, etc. O agente seguirá estas orientações com prioridade.
+                          </p>
+                        </div>
+                      </div>
+                      <Textarea
+                        value={userOrientation}
+                        onChange={(e) => setUserOrientation(e.target.value.slice(0, 4000))}
+                        rows={6}
+                        placeholder="Ex.: A exigência pede detalhamento da especificação na classe 35. Apresentar a redação: 'serviços de comércio varejista de vestuário e acessórios de moda...'. Manter peça enxuta (3 a 5 páginas), sem teses de oposição. Reforçar boa-fé e aderência ao Manual de Marcas."
+                        className="resize-y text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground text-right">{userOrientation.length}/4000</p>
+                    </div>
+                  )}
+
+                  {/* Agent badge */}
                   <div className={`p-4 rounded-xl border-2 ${agent.borderColor} bg-gradient-to-r ${agent.color}/5`}>
                     <div className="flex items-center gap-3">
                       <div className={`h-10 w-10 rounded-xl bg-gradient-to-br ${agent.color} flex items-center justify-center text-white`}>
@@ -2400,7 +2423,7 @@ export default function RecursosINPI() {
                   </div>
 
                   <div className="flex gap-3">
-                    <Button variant="outline" onClick={() => { setMultipleFiles([]); setStep('select-agent'); }} className="rounded-xl">Voltar</Button>
+                    <Button variant="outline" onClick={() => { setMultipleFiles([]); setUserOrientation(''); setStep('select-agent'); }} className="rounded-xl">Voltar</Button>
                     <Button 
                       onClick={processDocument} 
                       disabled={multipleFiles.length === 0}
