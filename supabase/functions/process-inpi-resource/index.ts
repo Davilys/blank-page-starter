@@ -718,6 +718,8 @@ mantendo foco estrito na exigência formulada pelo(a) examinador(a) do INPI.
 
 ${LEGAL_KNOWLEDGE}
 
+${FORMATTING_INSTRUCTIONS}
+
 ${getAgentIdentity(agentName, agentStrategy)}
 
 #estrutura_obrigatoria_parte_2
@@ -767,7 +769,7 @@ Davilys Danques de Oliveira Cunha
 Procurador(a) Constituído(a)
 CPF: 393.239.118-79
 
-⚠️ RESPONDA APENAS com o texto jurídico das Seções V a VIII + encerramento. SEM JSON. SEM explicações. SEM markdown. Apenas o texto jurídico profissional.
+⚠️ RESPONDA APENAS com o texto jurídico das Seções V a VIII + encerramento. SEM JSON. SEM explicações. Apenas o documento jurídico, COM formatação markdown leve conforme #formatacao_visual_obrigatoria (negrito, itálico, tabelas e marcadores [IMG:] / [DOC:NN]).
 ⚠️ Para EXIGÊNCIA DE MÉRITO, mantenha foco exclusivo no CUMPRIMENTO/ESCLARECIMENTO da exigência real do despacho.
 ⚠️ O texto desta parte deve ter NO MÍNIMO 2.500 palavras.`;
   }
@@ -790,6 +792,8 @@ O usuário já gerou as Seções I a IV. Agora você deve continuar com as Seç�
 #tipo_recurso: ${resourceTypeLabel}
 
 ${LEGAL_KNOWLEDGE}
+
+${FORMATTING_INSTRUCTIONS}
 
 ${getAgentIdentity(agentName, agentStrategy)}
 
