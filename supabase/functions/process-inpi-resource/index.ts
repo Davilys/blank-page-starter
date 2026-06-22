@@ -552,6 +552,34 @@ ou, quando estritamente necessário, uma MANIFESTAÇÃO TÉCNICA LIMITADA aos po
 - EXCEÇÃO ÚNICA: se o próprio despacho do(a) examinador(a) discutir tese substantiva de direito marcário, doutrina/jurisprudência pode aparecer — sempre vinculada ao ponto exigido
 - 📏 LIMITE DE EXTENSÃO: a peça completa (Parte 1 + Parte 2) deve caber em no MÁXIMO 5 páginas A4 — seja ENXUTO e objetivo
 
+🛑 PROIBIÇÃO ABSOLUTA NESTA PARTE 1 (CAUSA DUPLICAÇÃO NO PDF):
+- NÃO escreva "Termos em que", "Nestes termos", "Pede deferimento", "São Paulo, __/__/____", linha de assinatura, "_______", "Davilys Danques", "Procurador(a) Constituído(a)" nem "CPF:" nesta parte.
+- NÃO emita lista de documentos "(Doc. 01) – …", "(Doc. 02) – …" ao final desta parte. Os marcadores [DOC:NN] no corpo são suficientes.
+- O encerramento, a data, a assinatura e a relação de documentos serão emitidos APENAS na Parte 2. Termine a Parte 1 ao fim da Seção IV, sem fechamento.
+
+🧭 PASSO 1 — CLASSIFIQUE A EXIGÊNCIA antes de redigir (mentalmente, NÃO escreva a classificação no texto):
+• TIPO A = Especificação / Classificação (ajuste de redação, enquadramento NCL, detalhamento de produtos/serviços).
+• TIPO B = Prova de atividade / titularidade (necessita documentos, cronologia, demonstração fática).
+• TIPO C = Oposição (necessita defesa completa, imagens, quadros comparativos).
+
+➡️ SE TIPO A:
+- Máximo 2 páginas A4 no documento INTEIRO (Parte 1 + Parte 2 somadas).
+- NÃO citar jurisprudência. NÃO citar doutrina. NÃO criar seções de boa-fé. NÃO criar conclusão extensa.
+- NÃO citar nome do(a) examinador(a). NÃO ampliar o escopo da atividade do requerente.
+- APENAS corrigir a especificação: apresentar a nova redação e justificá-la de forma objetiva com base no Manual de Marcas e na Classificação de Nice.
+- Nesta Parte 1 (TIPO A): produza APENAS Seção I (síntese curta, 120-200 palavras) e Seção III renomeada para "II – DO CUMPRIMENTO DA EXIGÊNCIA" (300-500 palavras com a nova especificação). PULE as Seções II e IV originais. Total Parte 1 (TIPO A): 450-700 palavras NO MÁXIMO.
+
+➡️ SE TIPO B:
+- Utilizar os documentos efetivamente anexados.
+- Demonstrar fatos com cronologia objetiva.
+- Mantenha a estrutura I–IV abaixo, mas SEM doutrina/jurisprudência.
+
+➡️ SE TIPO C:
+- Elaborar defesa completa, com quadros comparativos e referências a imagens [IMG:NN] dos documentos.
+- Mantenha a estrutura I–IV abaixo.
+
+🔒 REGRA ABSOLUTA: Nunca inventar produtos, serviços, documentos ou atividades que não estejam EXPRESSAMENTE presentes no processo ou nos documentos anexados.
+
 #tipo_recurso: ${resourceTypeLabel}
 
 ${LEGAL_KNOWLEDGE}
