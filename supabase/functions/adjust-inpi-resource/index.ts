@@ -135,7 +135,8 @@ INSTRUÇÕES FINAIS:
 - Retorne o recurso COMPLETO com os ajustes INCORPORADOS
 - O texto deve ser MAIOR que o original, não menor
 - NÃO retorne explicações, apenas o recurso ajustado completo
-- NÃO omita nenhuma seção do recurso original`;
+- NÃO omita nenhuma seção do recurso original
+${formattingRules}`;
 
     console.log('Calling AI to adjust INPI resource, original length:', currentContent.length, 'chars');
 
