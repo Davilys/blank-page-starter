@@ -1229,9 +1229,16 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
     // STANDARD INPI RESOURCE FLOW — TWO-PASS GENERATION
     // (indeferimento, exigencia_merito, oposicao)
     // ═════════════════════════════════════════════════════
-    const { fileBase64, fileType, files: multiFiles, generationPass, pass1Content: providedPass1Content, extractedData: providedExtractedData } = body;
+    const { fileBase64, fileType, files: multiFiles, generationPass, pass1Content: providedPass1Content, extractedData: providedExtractedData, userOrientation } = body;
     const requestedPass = generationPass || body.pass;
     const resourceTypeLabel = RESOURCE_TYPE_LABELS[resourceType] || 'RECURSO ADMINISTRATIVO';
+
+    // Block injected when the user provides custom orientations (currently
+    // surfaced on the UI only for exigência de mérito). It carries the highest
+    // priority so the agent follows the user's strategy literally.
+    const userOrientationBlock = (typeof userOrientation === 'string' && userOrientation.trim().length > 0)
+      ? `\n\n⚠️⚠️⚠️ ORIENTAÇÕES OBRIGATÓRIAS DO USUÁRIO (PRIORIDADE MÁXIMA — SIGA À RISCA, sobrepõem-se a qualquer instrução genérica de extensão/estrutura/tom):\n"""\n${userOrientation.trim().slice(0, 4000)}\n"""\nIMPORTANTE: Estas orientações são a diretriz principal desta peça. Se conflitarem com tamanhos mínimos/seções sugeridos, PRIORIZE as orientações do usuário.\n`
+      : '';
 
     // Build file parts for all calls
     const fileParts: any[] = [];
