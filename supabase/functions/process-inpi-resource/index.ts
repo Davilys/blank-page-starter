@@ -683,7 +683,7 @@ IV – ANÁLISE TÉCNICA DO CONJUNTO MARCÁRIO
 - TABELA COMPARATIVA detalhada: coluna marca requerente vs. marca citada com análise ponto a ponto
 - Conclusão parcial demonstrando distinção suficiente
 
-⚠️ RESPONDA APENAS com o texto jurídico completo das Seções I a IV. SEM JSON. SEM explicações. SEM markdown. Apenas o texto jurídico profissional.
+⚠️ RESPONDA APENAS com o texto jurídico completo das Seções I a IV. SEM JSON. SEM explicações. Apenas o documento jurídico, COM formatação markdown leve conforme #formatacao_visual_obrigatoria (negrito, itálico, tabelas e marcadores [IMG:] / [DOC:NN]).
 ⚠️ NÃO termine com "continuação na próxima parte" ou similar — termine a Seção IV normalmente.
 ⚠️ O texto desta parte deve ter NO MÍNIMO 3.800 palavras.`;
 }
