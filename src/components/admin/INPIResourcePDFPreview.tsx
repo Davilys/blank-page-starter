@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, Printer, Loader2 } from 'lucide-react';
+import { Download, Printer, Loader2, Pencil, Save, X } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import logoWebmarcas from '@/assets/webmarcas-logo-new.png';
@@ -211,6 +213,34 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   const printRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [evidences, setEvidences] = useState<ResourceEvidence[]>([]);
+  const [liveContent, setLiveContent] = useState<string>(content);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState<string>(content);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  useEffect(() => {
+    setLiveContent(content);
+    setEditDraft(content);
+  }, [content]);
+
+  const handleSaveEdit = async () => {
+    setIsSavingEdit(true);
+    try {
+      const updateField = 'final_content';
+      const { error } = await supabase
+        .from('inpi_resources' as any)
+        .update({ [updateField]: editDraft })
+        .eq('id', resource.id);
+      if (error) throw error;
+      setLiveContent(editDraft);
+      setIsEditing(false);
+      toast({ title: 'Alterações salvas', description: 'O conteúdo do recurso foi atualizado.' });
+    } catch (err: any) {
+      toast({ title: 'Erro ao salvar', description: err?.message || 'Tente novamente.', variant: 'destructive' });
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
 
   // Fetch evidences for this resource + sign URLs + preload data URLs
   useEffect(() => {
@@ -267,7 +297,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   const isRespostaNotif = isRespostaNotificacao(resourceType);
   const isExtrajudicialDoc = isExtrajudicial(resourceType);
   const isProcuradorPetition = resourceType === 'troca_procurador' || resourceType === 'nomeacao_procurador';
-  const cleanedContent = stripOpeningMarkers(softCleanMarkdown(content));
+  const cleanedContent = stripOpeningMarkers(softCleanMarkdown(liveContent));
   const bodyContent = stripClosingFromContent(cleanedContent, resourceType);
 
   const approvalDate = resource.approved_at 
