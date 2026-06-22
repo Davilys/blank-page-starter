@@ -69,23 +69,30 @@ serve(async (req) => {
 
     const systemPrompt = `Você é um ADVOGADO ESPECIALISTA EM PROPRIEDADE INDUSTRIAL de ELITE da WEBMARCAS.
 
-Sua tarefa é INCORPORAR os ajustes solicitados pelo usuário ao recurso administrativo existente, tornando-o MAIS ROBUSTO e COMPLETO.
+Sua tarefa é APLICAR FIELMENTE as ORIENTAÇÕES DE AJUSTE do usuário ao RASCUNHO do recurso administrativo, comparando ponto a ponto e editando o texto onde for necessário.
 
-⚠️ REGRAS ABSOLUTAS E INVIOLÁVEIS:
+⚠️ FLUXO OBRIGATÓRIO (siga nesta ordem, sem pular passos):
 
-1. INCORPORE os ajustes solicitados DENTRO do recurso existente — NÃO substitua, ACRESCENTE e ENRIQUEÇA
-2. O texto ajustado deve ser MAIOR ou IGUAL ao original — NUNCA menor
-3. Mantenha TODA a estrutura, formatação e seções do recurso original
-4. Preserve TODOS os dados extraídos (número do processo, marca, classe NCL, titular, etc.)
-5. Preserve a assinatura e encerramento originais
-6. Os novos argumentos ou correções devem ser INTEGRADOS naturalmente ao texto existente
-7. Se o ajuste pede para adicionar um argumento, INSIRA-O na seção mais adequada
-8. Se o ajuste pede para corrigir algo, CORRIJA mantendo o restante intacto
-9. Se o ajuste pede para fortalecer uma seção, EXPANDA-A com mais fundamentação
-10. NUNCA retorne um texto resumido, abreviado ou mais curto que o original
+PASSO 1 — LEIA as ORIENTAÇÕES DE AJUSTE do usuário palavra por palavra e LISTE INTERNAMENTE cada pedido (adicionar X, remover Y, corrigir Z, encurtar W, reorganizar K).
+PASSO 2 — LEIA o RASCUNHO inteiro e LOCALIZE, para cada pedido do Passo 1, a seção/parágrafo/frase exata impactada.
+PASSO 3 — APLIQUE cada ajuste fielmente, conforme a intenção do verbo usado pelo usuário:
+  • "adicione / insira / inclua / reforce / acrescente / amplie" → EXPANDA a seção indicada com o conteúdo solicitado.
+  • "remova / retire / exclua / corte / apague / suprima" → APAGUE o trecho indicado, mesmo que isso encurte a peça.
+  • "corrija / troque / substitua / altere / ajuste para" → SUBSTITUA o trecho antigo pelo novo conteúdo pedido.
+  • "deixe mais objetivo / curto / conciso / enxuto / direto / resumido" → REESCREVA a seção de forma mais enxuta, podendo encurtar significativamente.
+  • "reorganize / mova / inverta / reordene" → REORDENE as seções conforme pedido.
+PASSO 4 — Devolva o RECURSO COMPLETO já com TODOS os ajustes aplicados. NÃO devolva o texto sem aplicar. NÃO devolva uma lista de mudanças. NÃO devolva comentários.
 
-IMPORTANTE: O resultado final deve conter TODO o conteúdo original MAIS as melhorias/ajustes solicitados.
-O recurso ajustado DEVE ser mais robusto que o original.
+REGRAS DE PRESERVAÇÃO (não alterar a menos que o usuário peça expressamente):
+- Mantenha o cabeçalho determinístico (processo, marca, classe NCL, titular, examinador/oponente, procurador).
+- Preserve TODOS os marcadores literais [DOC:NN], [IMG:marca_cliente], [IMG:marca_opositora] exatamente como aparecem.
+- Preserve tabelas markdown (| col | col |), **negrito** e *itálico*.
+- Mantenha o encerramento ("Termos em que, pede deferimento" + assinatura) UMA ÚNICA vez ao final.
+
+⚠️ O TAMANHO FINAL É CONSEQUÊNCIA DOS AJUSTES PEDIDOS:
+- Se o usuário pediu remoção / objetividade / corte, o texto DEVE ficar menor.
+- Se o usuário pediu reforço / expansão / inserção, o texto DEVE ficar maior.
+- NUNCA devolva o rascunho inalterado quando há orientações a aplicar.
 
 ${hasEvidences ? `
 ⚠️ INSTRUÇÕES PARA EVIDÊNCIAS DOCUMENTAIS (PRINTS / FOTOS / DECISÕES ANEXAS):
@@ -121,21 +128,24 @@ REGRAS DE FORMATAÇÃO (preserve OU adicione conforme o ajuste pedir):
         }).join('\n')
       : '';
 
-    const userPrompt = `RECURSO ATUAL (mantenha TODO este conteúdo e ACRESCENTE os ajustes):
+    const userPrompt = `ORIENTAÇÕES DE AJUSTE DO USUÁRIO (LEIA PRIMEIRO, interprete cada pedido e aplique COMPLETAMENTE ao rascunho abaixo):
 
----INÍCIO DO RECURSO---
-${currentContent}
----FIM DO RECURSO---
-
-AJUSTES SOLICITADOS PELO USUÁRIO (incorpore DENTRO do recurso acima, enriquecendo-o):
+---INÍCIO DAS ORIENTAÇÕES---
 ${adjustmentInstructions || (hasEvidences ? 'Insira referências às evidências documentais abaixo nos parágrafos adequados, usando os marcadores [DOC:N] exatos. Reforce a argumentação citando cada evidência ao menos uma vez.' : '')}
+---FIM DAS ORIENTAÇÕES---
 ${evidenceBlock}
 
+RASCUNHO ATUAL DO RECURSO (compare com as orientações acima e aplique cada ajuste no LOCAL CORRETO):
+
+---INÍCIO DO RASCUNHO---
+${currentContent}
+---FIM DO RASCUNHO---
+
 INSTRUÇÕES FINAIS:
-- Retorne o recurso COMPLETO com os ajustes INCORPORADOS
-- O texto deve ser MAIOR que o original, não menor
-- NÃO retorne explicações, apenas o recurso ajustado completo
-- NÃO omita nenhuma seção do recurso original
+- Aplique TODAS as orientações listadas, fielmente — adicionar, remover, corrigir, encurtar ou reorganizar conforme cada pedido.
+- Devolva APENAS o recurso final ajustado, sem comentários e sem listar as mudanças.
+- Mantenha cabeçalho, marcadores [DOC:NN], tabelas e encerramento.
+- Se uma orientação implicar encurtar a peça, encurte sem hesitação.
 ${formattingRules}`;
 
     console.log('Calling AI to adjust INPI resource, original length:', currentContent.length, 'chars');
@@ -152,7 +162,7 @@ ${formattingRules}`;
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        max_completion_tokens: 16000,
+        max_completion_tokens: 32000,
       }),
     });
 
@@ -187,9 +197,12 @@ ${formattingRules}`;
     let trimmed = adjustedContent.trim();
     console.log('Adjusted content length:', trimmed.length, 'chars (original:', currentContent.length, 'chars)');
 
-    // Warn if adjusted is significantly shorter than original
-    if (trimmed.length < currentContent.length * 0.7) {
-      console.warn('WARNING: Adjusted content is significantly shorter than original!');
+    // Diagnóstico: avisar se o modelo devolveu texto idêntico ao rascunho (ajustes não aplicados)
+    if (trimmed === currentContent.trim()) {
+      console.warn('WARNING: Adjusted content is IDENTICAL to original — model may not have applied the instructions.');
+    } else {
+      const delta = trimmed.length - currentContent.length;
+      console.log('Adjustment delta:', delta, 'chars (', delta >= 0 ? '+' : '', delta, ')');
     }
 
     // ═══ ENFORCE MANDATORY OPENING BLOCK ═══
