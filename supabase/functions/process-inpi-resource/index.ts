@@ -8,7 +8,7 @@ const corsHeaders = {
 
 const RESOURCE_TYPE_LABELS: Record<string, string> = {
   indeferimento: 'RECURSO CONTRA INDEFERIMENTO',
-  exigencia_merito: 'CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO / RECURSO ADMINISTRATIVO',
+  exigencia_merito: 'CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO',
   oposicao: 'MANIFESTAÇÃO À OPOSIÇÃO',
   notificacao_extrajudicial: 'NOTIFICAÇÃO EXTRAJUDICIAL',
   resposta_notificacao_extrajudicial: 'RESPOSTA A NOTIFICAÇÃO EXTRAJUDICIAL',
