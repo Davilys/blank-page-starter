@@ -1285,7 +1285,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
       const pass2System = buildPass2SystemPrompt(resourceType, resourceTypeLabel, currentDate, agentName, agentStrategy);
       const pass2User = [
         { type: 'input_text', text: `${resourceType === 'exigencia_merito'
-          ? 'Contexto: Você já gerou as Seções I a IV do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Continue com foco EXCLUSIVO no atendimento da exigência formulada pelo(a) examinador(a), sem inserir argumentos de oposição, conflito entre marcas, convivência marcária ou risco de confusão, salvo se isso constar expressamente no despacho.'
+          ? 'Contexto: Você já gerou as Seções I a IV do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Continue com foco EXCLUSIVO no atendimento da exigência formulada pelo(a) examinador(a), sem inserir argumentos de oposição, conflito entre marcas, convivência marcária ou risco de confusão, salvo se isso constar expressamente no despacho. 🚫 NÃO cite doutrinadores (Denis Borges Barbosa, Gama Cerqueira, etc.) nem jurisprudência do STJ/TRF — fundamentação restrita a LPI + Manual de Marcas + Nice. A peça completa deve caber em até 5 páginas A4.'
           : 'Contexto: Você já gerou as Seções I a IV do recurso. Abaixo está o conteúdo já gerado para referência de dados e continuidade de estilo.'}
 
 SEÇÕES I A IV JÁ GERADAS:
