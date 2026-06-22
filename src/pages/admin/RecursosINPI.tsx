@@ -1031,6 +1031,7 @@ export default function RecursosINPI() {
     setSelectedAgent('mazzola');
     setFile(null);
     setMultipleFiles([]);
+    setUserOrientation('');
     setExtractedData(null);
     setDraftContent('');
     setAdjustmentNotes('');
