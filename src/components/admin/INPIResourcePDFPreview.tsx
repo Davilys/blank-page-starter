@@ -434,6 +434,8 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           ? documentTitleUpper
         : isOposicao
           ? 'MANIFESTAÇÃO À OPOSIÇÃO'
+        : isExigenciaMerito
+          ? 'CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO'
           : 'RECURSO ADMINISTRATIVO';
 
       // Draw navy badge
