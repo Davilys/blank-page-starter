@@ -101,6 +101,16 @@ REGRAS:
 - Preserve todos os marcadores [DOC:N] que já estiverem no texto original.
 ` : ''}`;
 
+    const formattingRules = `
+
+REGRAS DE FORMATAÇÃO (preserve OU adicione conforme o ajuste pedir):
+- Mantenha **negrito** (**texto**) em conclusões parciais, nomes de marcas em cotejo e termos jurídicos-chave.
+- Mantenha *itálico* (*texto*) em transcrições literais de lei, expressões em latim e citações doutrinárias.
+- PRESERVE tabelas markdown (| col | col |) intactas. Se o ajuste pedir cotejo de marcas e não houver tabela, ADICIONE uma.
+- PRESERVE marcadores literais [IMG:marca_cliente], [IMG:marca_opositora] e [DOC:NN] exatamente como aparecem — esses marcadores serão substituídos por imagens reais no PDF.
+- Títulos de seção em CAIXA-ALTA, sem # de cabeçalho markdown.
+`;
+
     const evidenceBlock = hasEvidences
       ? '\n\nEVIDÊNCIAS DOCUMENTAIS ANEXADAS (insira marcadores [DOC:N] no corpo do recurso, na seção argumentativa adequada):\n' +
         evidences.map((e: any, i: number) => {
@@ -125,7 +135,8 @@ INSTRUÇÕES FINAIS:
 - Retorne o recurso COMPLETO com os ajustes INCORPORADOS
 - O texto deve ser MAIOR que o original, não menor
 - NÃO retorne explicações, apenas o recurso ajustado completo
-- NÃO omita nenhuma seção do recurso original`;
+- NÃO omita nenhuma seção do recurso original
+${formattingRules}`;
 
     console.log('Calling AI to adjust INPI resource, original length:', currentContent.length, 'chars');
 
@@ -136,13 +147,12 @@ INSTRUÇÕES FINAIS:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-5',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        max_tokens: 16000,
-        temperature: 0.25,
+        max_completion_tokens: 16000,
       }),
     });
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Download, Printer, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -68,6 +68,59 @@ const cleanMarkdown = (text: string): string => {
     .replace(/#{1,6}\s*/g, '')
     .replace(/[\u2500-\u257F\u2580-\u259F\u2550-\u256C]/g, '')
     .trim();
+};
+
+// Soft clean: preserves **bold**, *italic*, tables (| ... |), and [IMG:]/[DOC:] markers.
+// Strips only headings (#), inline code (`), and box-drawing chars.
+const softCleanMarkdown = (text: string): string => {
+  return text
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/[\u2500-\u257F\u2580-\u259F\u2550-\u256C]/g, '')
+    .trim();
+};
+
+// Parse a string with **bold** and *italic* markers into React inline nodes.
+const renderInlineMarkdown = (text: string): React.ReactNode[] => {
+  const nodes: React.ReactNode[] = [];
+  // Combined regex: **bold** | *italic*
+  const regex = /(\*\*([^*]+)\*\*|\*([^*\n]+)\*)/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let key = 0;
+  while ((m = regex.exec(text)) !== null) {
+    if (m.index > last) nodes.push(<span key={`t${key++}`}>{text.slice(last, m.index)}</span>);
+    if (m[2] !== undefined) {
+      nodes.push(<strong key={`b${key++}`}>{m[2]}</strong>);
+    } else if (m[3] !== undefined) {
+      nodes.push(<em key={`i${key++}`}>{m[3]}</em>);
+    }
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) nodes.push(<span key={`t${key++}`}>{text.slice(last)}</span>);
+  return nodes;
+};
+
+// Detect markdown table block (paragraph composed of table rows)
+const isMarkdownTable = (paragraph: string): boolean => {
+  const lines = paragraph.split('\n').map((l) => l.trim()).filter(Boolean);
+  if (lines.length < 2) return false;
+  const rowLike = lines.filter((l) => /^\|.+\|$/.test(l));
+  return rowLike.length >= 2;
+};
+
+const parseMarkdownTable = (paragraph: string): { headers: string[]; rows: string[][] } | null => {
+  const lines = paragraph.split('\n').map((l) => l.trim()).filter((l) => /^\|.+\|$/.test(l));
+  if (lines.length < 2) return null;
+  const splitRow = (l: string) =>
+    l.replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+  const headers = splitRow(lines[0]);
+  // lines[1] is separator like |:---|:---|
+  const dataLines = lines.slice(1).filter((l) => !/^\|?\s*:?-{2,}/.test(l.split('|').filter(Boolean)[0] || ''));
+  // Filter out separator rows
+  const isSep = (l: string) => splitRow(l).every((c) => /^:?-{2,}:?$/.test(c));
+  const rows = lines.slice(1).filter((l) => !isSep(l)).map(splitRow);
+  return { headers, rows };
 };
 
 const stripOpeningMarkers = (text: string): string => {
@@ -214,7 +267,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   const isRespostaNotif = isRespostaNotificacao(resourceType);
   const isExtrajudicialDoc = isExtrajudicial(resourceType);
   const isProcuradorPetition = resourceType === 'troca_procurador' || resourceType === 'nomeacao_procurador';
-  const cleanedContent = stripOpeningMarkers(cleanMarkdown(content));
+  const cleanedContent = stripOpeningMarkers(softCleanMarkdown(content));
   const bodyContent = stripClosingFromContent(cleanedContent, resourceType);
 
   const approvalDate = resource.approved_at 
@@ -402,6 +455,49 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         if (!trimmedParagraph) continue;
         if (/^(Av\.\s*Brigadeiro|Tel:\s*\(11\))/.test(trimmedParagraph)) continue;
 
+        // ── Markdown table → simple grid in jsPDF ──
+        if (isMarkdownTable(trimmedParagraph)) {
+          const tbl = parseMarkdownTable(trimmedParagraph);
+          if (tbl) {
+            const cols = Math.max(tbl.headers.length, 1);
+            const colW = contentWidth / cols;
+            const rowH = 7;
+            const headerH = 8;
+            // Header
+            if (yPos + headerH > bottomLimit) { pdf.addPage(); yPos = margin; }
+            pdf.setFillColor(30, 58, 95);
+            pdf.rect(margin, yPos, contentWidth, headerH, 'F');
+            pdf.setTextColor(255, 255, 255);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setFontSize(9);
+            tbl.headers.forEach((h, i) => {
+              const txt = h.replace(/\*\*/g, '').replace(/\*/g, '');
+              pdf.text(txt, margin + i * colW + 2, yPos + 5.5);
+            });
+            yPos += headerH;
+            // Rows
+            pdf.setTextColor(30, 30, 30);
+            pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(9);
+            tbl.rows.forEach((row, ri) => {
+              if (yPos + rowH > bottomLimit) { pdf.addPage(); yPos = margin; }
+              if (ri % 2 === 0) {
+                pdf.setFillColor(247, 249, 252);
+                pdf.rect(margin, yPos, contentWidth, rowH, 'F');
+              }
+              row.forEach((c, ci) => {
+                const txt = (c || '').replace(/\*\*/g, '').replace(/\*/g, '');
+                const lines = pdf.splitTextToSize(txt, colW - 4);
+                pdf.text(lines[0] || '', margin + ci * colW + 2, yPos + 5);
+              });
+              yPos += rowH;
+            });
+            yPos += 4;
+            pdf.setFontSize(11);
+            continue;
+          }
+        }
+
         // Handle metadata block: split into individual lines rendered compactly
         const metadataLines = trimmedParagraph.split('\n').filter(l => l.trim());
         const hasMetadata = metadataLines.some(l => isMetadataLine(l));
@@ -454,11 +550,18 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           const lineWidth = isList ? contentWidth - 5 : contentWidth;
 
           const docNums: number[] = [];
-          const renderText = trimmedParagraph.replace(/\[DOC:(\d{1,3})\]/g, (_full: string, n: string) => {
+          const imgSlugs: string[] = [];
+          let renderText = trimmedParagraph.replace(/\[DOC:(\d{1,3})\]/g, (_full: string, n: string) => {
             const num = parseInt(n, 10);
             docNums.push(num);
             return `(Doc. ${String(num).padStart(2, '0')})`;
           });
+          renderText = renderText.replace(/\[IMG:([a-z0-9_\-]+)\]/gi, (_full, slug) => {
+            imgSlugs.push(String(slug).toLowerCase());
+            return '';
+          });
+          // Strip markdown bold/italic markers for jsPDF (rendered as plain text)
+          renderText = renderText.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*\n]+)\*/g, '$1');
           const lines = pdf.splitTextToSize(renderText, lineWidth);
           
           for (const line of lines) {
@@ -494,6 +597,39 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
               pdf.setTextColor(30, 30, 30);
             } catch (e) {
               console.warn('addImage inline failed', e);
+            }
+          }
+          // Render [IMG:slug] markers as inline figures matched by caption/filename
+          for (const slug of imgSlugs) {
+            const ev = evidences.find((e) => {
+              const cap = (e.caption || '').toLowerCase();
+              const src = (e.source_file_name || '').toLowerCase();
+              return cap.includes(slug.replace(/_/g, ' ')) || src.includes(slug);
+            });
+            if (!ev?.dataUrl) continue;
+            const maxImgW = contentWidth * 0.55;
+            const maxImgH = 65;
+            const ratio = ev.width && ev.height ? ev.width / ev.height : 0.75;
+            let imgW = maxImgW;
+            let imgH = imgW / ratio;
+            if (imgH > maxImgH) { imgH = maxImgH; imgW = imgH * ratio; }
+            if (yPos + imgH + 10 > bottomLimit) { pdf.addPage(); yPos = margin; }
+            yPos += 3;
+            const xImg = (pageWidth - imgW) / 2;
+            try {
+              pdf.addImage(ev.dataUrl, 'PNG', xImg, yPos, imgW, imgH);
+              yPos += imgH + 2;
+              pdf.setFontSize(8);
+              pdf.setTextColor(80, 80, 80);
+              const cap = ev.caption || ev.source_file_name || '';
+              if (cap) {
+                pdf.text(cap, pageWidth / 2, yPos, { align: 'center' });
+                yPos += 4;
+              }
+              pdf.setFontSize(11);
+              pdf.setTextColor(30, 30, 30);
+            } catch (e) {
+              console.warn('addImage IMG slug failed', e);
             }
           }
           yPos += 3;
@@ -644,46 +780,94 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         );
       }
       
+      // Markdown table
+      if (isMarkdownTable(trimmed)) {
+        const tbl = parseMarkdownTable(trimmed);
+        if (tbl) {
+          return (
+            <div key={idx} className="my-5 overflow-x-auto">
+              <table className="w-full border-collapse text-sm" style={{ border: '1px solid #1e3a5f' }}>
+                <thead>
+                  <tr style={{ background: '#1e3a5f' }}>
+                    {tbl.headers.map((h, i) => (
+                      <th key={i} className="px-3 py-2 text-left text-white font-semibold" style={{ borderRight: '1px solid #c8af37' }}>
+                        {renderInlineMarkdown(h)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {tbl.rows.map((row, ri) => (
+                    <tr key={ri} style={{ background: ri % 2 === 0 ? '#f7f9fc' : '#fff' }}>
+                      {row.map((c, ci) => (
+                        <td key={ci} className="px-3 py-2 align-top" style={{ borderTop: '1px solid #d4d8e0', borderRight: '1px solid #eef0f4', color: '#1a1a1a' }}>
+                          {renderInlineMarkdown(c)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+      }
+
       const isList = /^[-–•]\s/.test(trimmed);
       if (isList) {
-        return <p key={idx} className="mb-3 pl-6" style={{ textIndent: '0' }}>{trimmed}</p>;
+        return <p key={idx} className="mb-3 pl-6" style={{ textIndent: '0' }}>{renderInlineMarkdown(trimmed)}</p>;
       }
       
       // Short lines (e.g. "EXCELENTÍSSIMO...") should not be stretched by justify
       const isShort = trimmed.length < 120;
-      // [DOC:N] marker handling — split paragraph and insert <figure>
-      const docRegex = /\[DOC:(\d{1,3})\]/g;
-      if (docRegex.test(trimmed)) {
-        docRegex.lastIndex = 0;
-        const parts: Array<{ type: 'text' | 'doc'; value: string; n?: number }> = [];
+      // [DOC:N] and [IMG:slug] marker handling — split paragraph and insert <figure>
+      const markerRegex = /\[(DOC:(\d{1,3})|IMG:([a-z0-9_\-]+))\]/gi;
+      if (markerRegex.test(trimmed)) {
+        markerRegex.lastIndex = 0;
+        const parts: Array<{ type: 'text' | 'doc' | 'img'; value: string; n?: number; slug?: string }> = [];
         let last = 0;
         let m: RegExpExecArray | null;
-        while ((m = docRegex.exec(trimmed)) !== null) {
+        while ((m = markerRegex.exec(trimmed)) !== null) {
           if (m.index > last) parts.push({ type: 'text', value: trimmed.slice(last, m.index) });
-          parts.push({ type: 'doc', value: m[0], n: parseInt(m[1], 10) });
+          if (m[2]) {
+            parts.push({ type: 'doc', value: m[0], n: parseInt(m[2], 10) });
+          } else if (m[3]) {
+            parts.push({ type: 'img', value: m[0], slug: m[3].toLowerCase() });
+          }
           last = m.index + m[0].length;
         }
         if (last < trimmed.length) parts.push({ type: 'text', value: trimmed.slice(last) });
+        const findEvidenceBySlug = (slug: string) =>
+          evidences.find((e) => {
+            const cap = (e.caption || '').toLowerCase();
+            const src = (e.source_file_name || '').toLowerCase();
+            return cap.includes(slug.replace(/_/g, ' ')) || src.includes(slug);
+          });
         return (
           <div key={idx} className="mb-4">
             <p className={isShort ? '' : 'text-justify'} style={{ textIndent: '2cm', textAlignLast: 'left' }}>
-              {parts.map((p, i) => p.type === 'text'
-                ? <span key={i}>{p.value}</span>
-                : <span key={i} className="font-semibold" style={{ color: '#1e3a5f' }}>(Doc. {String(p.n).padStart(2, '0')})</span>)}
+              {parts.map((p, i) => {
+                if (p.type === 'text') return <span key={i}>{renderInlineMarkdown(p.value)}</span>;
+                if (p.type === 'doc') return <span key={i} className="font-semibold" style={{ color: '#1e3a5f' }}>(Doc. {String(p.n).padStart(2, '0')})</span>;
+                return null; // img markers handled below as figures only
+              })}
             </p>
-            {parts.filter(p => p.type === 'doc').map((p, i) => {
-              const ev = evidenceByNum(p.n!);
+            {parts.filter(p => p.type === 'doc' || p.type === 'img').map((p, i) => {
+              const ev = p.type === 'doc' ? evidenceByNum(p.n!) : findEvidenceBySlug(p.slug!);
               if (!ev?.signedUrl) return null;
+              const label = p.type === 'doc'
+                ? <><strong>Doc. {String(p.n).padStart(2, '0')}</strong> — {ev.caption || ev.source_file_name}</>
+                : <>{ev.caption || ev.source_file_name}</>;
               return (
                 <figure key={`fig-${i}`} className="my-4 mx-auto text-center">
                   <img
                     src={ev.signedUrl}
-                    alt={ev.caption || `Doc. ${p.n}`}
+                    alt={ev.caption || (p.type === 'doc' ? `Doc. ${p.n}` : p.slug)}
                     className="mx-auto border rounded"
                     style={{ maxWidth: '70%', maxHeight: '340px', objectFit: 'contain' }}
                   />
                   <figcaption className="text-xs mt-2" style={{ color: '#555' }}>
-                    <strong>Doc. {String(p.n).padStart(2, '0')}</strong> — {ev.caption || ev.source_file_name}
+                    {label}
                   </figcaption>
                 </figure>
               );
@@ -693,7 +877,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       }
       return (
         <p key={idx} className={`mb-4 ${isShort ? '' : 'text-justify'}`} style={{ textIndent: '2cm', textAlignLast: 'left' }}>
-          {trimmed}
+          {renderInlineMarkdown(trimmed)}
         </p>
       );
     }).filter(Boolean);
