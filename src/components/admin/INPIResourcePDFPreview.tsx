@@ -170,7 +170,17 @@ const stripClosingFromContent = (text: string, resourceType?: string): string =>
   for (const pattern of closingPatterns) {
     cleaned = cleaned.replace(pattern, '');
   }
-  cleaned = cleaned.replace(/\n\s*Termos em que,?\s*\n\s*Pede deferimento\.?\s*\n[\s\S]*$/i, '');
+  // Remove encerramento FINAL (no fim do texto): "Termos em que, ... Pede deferimento. ..." até o fim
+  cleaned = cleaned.replace(/\n+\s*Termos em que[,\.\s]*\n?\s*[Pp]ede deferimento[\s\S]*$/i, '');
+
+  // ⚠️ Remove encerramentos PREMATUROS no MEIO do documento.
+  // Quando a IA emite "Termos em que, pede deferimento / São Paulo / Procurador / (Doc. 01)..."
+  // e depois reabre com uma nova seção (ex.: "V – DA CONFORMIDADE..."), o bloco fica duplicado.
+  // Removemos do "Termos em que" / "Nestes termos" até a próxima seção romana ou heading em caixa-alta.
+  const midClosingRegex = /\n+\s*(?:Termos em que|Nestes termos)[,\.\s]*\n?\s*[Pp]ede deferimento[\s\S]*?(?=\n\s*(?:[IVX]{1,4}\s*[–—\-]\s*[A-ZÀ-Ý]|[A-ZÀ-Ý][A-ZÀ-Ý\s–—\-]{8,}\n))/gi;
+  cleaned = cleaned.replace(midClosingRegex, '\n\n');
+  // Defesa adicional: linhas "(Doc. NN) – ..." soltas antes de uma nova seção também são removidas
+  cleaned = cleaned.replace(/\n+\s*(?:São Paulo,[^\n]+\n)?\s*(?:_{5,}\s*\n)?\s*(?:Davilys Danques[^\n]*\n)?(?:CPF:[^\n]*\n)?(?:Procurador\(a\)[^\n]*\n)?(?:\(Doc\.\s*\d+\)[^\n]*\n)+(?=\s*[IVX]{1,4}\s*[–—\-]\s*[A-ZÀ-Ý])/gi, '\n\n');
   
   if (isExtrajudicial(resourceType)) {
     cleaned = cleaned.replace(/\n\s*São Paulo,\s*\d{1,2}\s*de\s*\w+\s*de\s*\d{4}[\s\S]*$/i, '');

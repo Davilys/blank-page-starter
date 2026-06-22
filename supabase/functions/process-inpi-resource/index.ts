@@ -552,6 +552,34 @@ ou, quando estritamente necessário, uma MANIFESTAÇÃO TÉCNICA LIMITADA aos po
 - EXCEÇÃO ÚNICA: se o próprio despacho do(a) examinador(a) discutir tese substantiva de direito marcário, doutrina/jurisprudência pode aparecer — sempre vinculada ao ponto exigido
 - 📏 LIMITE DE EXTENSÃO: a peça completa (Parte 1 + Parte 2) deve caber em no MÁXIMO 5 páginas A4 — seja ENXUTO e objetivo
 
+🛑 PROIBIÇÃO ABSOLUTA NESTA PARTE 1 (CAUSA DUPLICAÇÃO NO PDF):
+- NÃO escreva "Termos em que", "Nestes termos", "Pede deferimento", "São Paulo, __/__/____", linha de assinatura, "_______", "Davilys Danques", "Procurador(a) Constituído(a)" nem "CPF:" nesta parte.
+- NÃO emita lista de documentos "(Doc. 01) – …", "(Doc. 02) – …" ao final desta parte. Os marcadores [DOC:NN] no corpo são suficientes.
+- O encerramento, a data, a assinatura e a relação de documentos serão emitidos APENAS na Parte 2. Termine a Parte 1 ao fim da Seção IV, sem fechamento.
+
+🧭 PASSO 1 — CLASSIFIQUE A EXIGÊNCIA antes de redigir (mentalmente, NÃO escreva a classificação no texto):
+• TIPO A = Especificação / Classificação (ajuste de redação, enquadramento NCL, detalhamento de produtos/serviços).
+• TIPO B = Prova de atividade / titularidade (necessita documentos, cronologia, demonstração fática).
+• TIPO C = Oposição (necessita defesa completa, imagens, quadros comparativos).
+
+➡️ SE TIPO A:
+- Máximo 2 páginas A4 no documento INTEIRO (Parte 1 + Parte 2 somadas).
+- NÃO citar jurisprudência. NÃO citar doutrina. NÃO criar seções de boa-fé. NÃO criar conclusão extensa.
+- NÃO citar nome do(a) examinador(a). NÃO ampliar o escopo da atividade do requerente.
+- APENAS corrigir a especificação: apresentar a nova redação e justificá-la de forma objetiva com base no Manual de Marcas e na Classificação de Nice.
+- Nesta Parte 1 (TIPO A): produza APENAS Seção I (síntese curta, 120-200 palavras) e Seção III renomeada para "II – DO CUMPRIMENTO DA EXIGÊNCIA" (300-500 palavras com a nova especificação). PULE as Seções II e IV originais. Total Parte 1 (TIPO A): 450-700 palavras NO MÁXIMO.
+
+➡️ SE TIPO B:
+- Utilizar os documentos efetivamente anexados.
+- Demonstrar fatos com cronologia objetiva.
+- Mantenha a estrutura I–IV abaixo, mas SEM doutrina/jurisprudência.
+
+➡️ SE TIPO C:
+- Elaborar defesa completa, com quadros comparativos e referências a imagens [IMG:NN] dos documentos.
+- Mantenha a estrutura I–IV abaixo.
+
+🔒 REGRA ABSOLUTA: Nunca inventar produtos, serviços, documentos ou atividades que não estejam EXPRESSAMENTE presentes no processo ou nos documentos anexados.
+
 #tipo_recurso: ${resourceTypeLabel}
 
 ${LEGAL_KNOWLEDGE}
@@ -745,6 +773,21 @@ mantendo foco estrito na exigência formulada pelo(a) examinador(a) do INPI.
 - ✅ Fundamentação RESTRITA a: LPI (artigo aplicável), Manual de Marcas do INPI e Classificação de Nice
 - EXCEÇÃO: somente se o despacho discutir expressamente tese substantiva de direito marcário
 - 📏 LIMITE: a peça completa (Parte 1 + Parte 2) deve caber em até 5 páginas A4 — SEJA ENXUTO
+
+🧭 RECLASSIFIQUE A EXIGÊNCIA (mesma lógica da Parte 1, mentalmente):
+• TIPO A = Especificação/Classificação. • TIPO B = Prova de atividade/titularidade. • TIPO C = Oposição.
+
+➡️ SE TIPO A (caso mais comum):
+- NÃO escreva Seção V (Conformidade), nem Seção VI (Boa-fé), nem Seção VII (Conclusão extensa).
+- Produza APENAS uma seção curta "III – DOS PEDIDOS" (60-120 palavras) seguida do encerramento.
+- NÃO citar jurisprudência. NÃO citar doutrina. NÃO citar examinador. NÃO ampliar escopo.
+- Total Parte 2 (TIPO A): 150-300 palavras NO MÁXIMO. Peça inteira ≤ 2 páginas A4.
+
+➡️ SE TIPO B ou C: siga a estrutura V–VIII abaixo, sem doutrina/jurisprudência.
+
+🔒 Nunca inventar produtos, serviços, documentos ou atividades que não estejam expressamente presentes no processo ou nos documentos anexados.
+
+📌 O encerramento ("Termos em que / Pede deferimento / São Paulo, ${currentDate} / assinatura / CPF") deve aparecer UMA ÚNICA VEZ, ao FINAL desta Parte 2. Jamais no meio.
 
 #tipo_recurso: ${resourceTypeLabel}
 
@@ -1332,7 +1375,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     const pass1System = buildPass1SystemPrompt(resourceType, resourceTypeLabel, currentDate, agentName, agentStrategy);
     const pass1User = [
       { type: 'input_text', text: resourceType === 'exigencia_merito'
-        ? `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Identifique exatamente o que o(a) examinador(a) exigiu e responda a isso com precisão técnica e OBJETIVA. Se a exigência pedir detalhamento de especificação, apresente a redação corrigida adequada à classe. NÃO transforme a peça em oposição, conflito marcário, cotejo com marcas de terceiros ou defesa de colidência, salvo se isso constar expressamente no despacho. 🚫 NÃO cite doutrinadores (Denis Borges Barbosa, Gama Cerqueira, Tinoco Soares, etc.) nem jurisprudência do STJ/TRF — fundamentação restrita à LPI, Manual de Marcas do INPI e Classificação de Nice. A peça deve ser ENXUTA: entre 1.300 e 2.000 palavras nesta parte, cabendo em até 5 páginas A4 no total. NÃO chame a peça de "Recurso Administrativo"; trata-se de "Cumprimento de Exigência de Mérito".${userOrientationBlock}`
+        ? `Analise o(s) documento(s) do INPI anexado(s) e elabore APENAS o miolo (Parte 1) do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. PASSO 1 (obrigatório, mental): classifique a exigência como TIPO A (especificação/classificação), TIPO B (prova de atividade/titularidade) ou TIPO C (oposição). Se TIPO A: gere no MÁXIMO 450-700 palavras (Síntese curta + Cumprimento com nova especificação); NÃO crie seções de boa-fé, conclusão extensa, não cite jurisprudência, doutrina nem examinador, não amplie escopo. Se TIPO B/C: siga estrutura I–IV mais densa, mas sem doutrina/jurisprudência. 🛑 PROIBIDO nesta Parte 1: escrever "Termos em que", "Pede deferimento", "São Paulo, ${currentDate}", linha de assinatura, "Davilys Danques", "CPF:" ou lista "(Doc. 01) – …". Isso será emitido APENAS na Parte 2. Termine após a última seção, sem fechamento. 🔒 Nunca invente produtos, serviços, documentos ou atividades que não estejam expressamente no processo/anexos.${userOrientationBlock}`
         : `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do recurso administrativo. CADA seção deve ter a extensão MÍNIMA especificada. O texto total desta parte deve ter NO MÍNIMO 3.800 palavras. Desenvolva CADA argumento com máxima profundidade, como um escritório de PI de elite faria.` },
       ...fileResponseParts,
     ];
@@ -1340,7 +1383,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     const pass2System = buildPass2SystemPrompt(resourceType, resourceTypeLabel, currentDate, agentName, agentStrategy);
     const pass2User = [
       { type: 'input_text', text: resourceType === 'exigencia_merito'
-        ? `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Foque EXCLUSIVAMENTE no atendimento da exigência formulada pelo(a) examinador(a), sem inserir argumentos de oposição, conflito entre marcas, convivência marcária ou risco de confusão, salvo se isso constar expressamente no despacho. 🚫 NÃO cite doutrinadores nem jurisprudência do STJ/TRF — fundamentação restrita à LPI, Manual de Marcas do INPI e Classificação de Nice. O texto total desta parte deve ter entre 800 e 1.400 palavras — SEJA OBJETIVO, mantendo a peça completa em até 5 páginas A4. NÃO chame a peça de "Recurso Administrativo".${userOrientationBlock}`
+        ? `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS o fechamento (Parte 2) do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Reclassifique a exigência: TIPO A (especificação), TIPO B (prova de atividade) ou TIPO C (oposição). Se TIPO A: produza SOMENTE uma seção curta "DOS PEDIDOS" (60-120 palavras) + encerramento único ("Termos em que / Pede deferimento / São Paulo, ${currentDate} / assinatura / CPF"); total 150-300 palavras; NÃO escreva Seções V/VI/VII; NÃO cite jurisprudência, doutrina ou examinador; NÃO amplie escopo. Se TIPO B/C: siga V–VIII + encerramento, sem doutrina/jurisprudência. 🔒 Nunca invente produtos, serviços, documentos ou atividades que não estejam no processo/anexos. O encerramento aparece UMA ÚNICA VEZ, ao final.${userOrientationBlock}`
         : `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do recurso administrativo. Mantenha tom técnico, fundamentação robusta e conclusões objetivas. O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.` },
       ...fileResponseParts,
     ];
