@@ -546,6 +546,11 @@ ou, quando estritamente necessário, uma MANIFESTAÇÃO TÉCNICA LIMITADA aos po
 - Se o caso comportar defesa técnica, ela deve ser RESTRITA ao conteúdo da exigência, sem importar teses de oposição/indeferimento
 - JAMAIS inventar fatos, marcas conflitantes, jurisprudência ou fundamentos não presentes no caso
 - A argumentação deve ser PROFISSIONAL, CLARA, COERENTE e alinhada ao despacho real
+- 🚫 PROIBIDO citar doutrinadores (Denis Borges Barbosa, J. da Gama Cerqueira, Tinoco Soares, Pontes de Miranda, etc.) — exigência de mérito é peça TÉCNICA de classificação/especificação, NÃO tese acadêmica
+- 🚫 PROIBIDO citar jurisprudência do STJ, TRF-2, TRF-3 ou de qualquer tribunal — irrelevante para o cumprimento da exigência
+- ✅ Fundamentação deve se RESTRINGIR a: LPI (artigo específico aplicável), Manual de Marcas do INPI (capítulo/seção pertinente) e Classificação de Nice
+- EXCEÇÃO ÚNICA: se o próprio despacho do(a) examinador(a) discutir tese substantiva de direito marcário, doutrina/jurisprudência pode aparecer — sempre vinculada ao ponto exigido
+- 📏 LIMITE DE EXTENSÃO: a peça completa (Parte 1 + Parte 2) deve caber em no MÁXIMO 5 páginas A4 — seja ENXUTO e objetivo
 
 #tipo_recurso: ${resourceTypeLabel}
 
