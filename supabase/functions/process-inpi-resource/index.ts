@@ -546,6 +546,11 @@ ou, quando estritamente necessário, uma MANIFESTAÇÃO TÉCNICA LIMITADA aos po
 - Se o caso comportar defesa técnica, ela deve ser RESTRITA ao conteúdo da exigência, sem importar teses de oposição/indeferimento
 - JAMAIS inventar fatos, marcas conflitantes, jurisprudência ou fundamentos não presentes no caso
 - A argumentação deve ser PROFISSIONAL, CLARA, COERENTE e alinhada ao despacho real
+- 🚫 PROIBIDO citar doutrinadores (Denis Borges Barbosa, J. da Gama Cerqueira, Tinoco Soares, Pontes de Miranda, etc.) — exigência de mérito é peça TÉCNICA de classificação/especificação, NÃO tese acadêmica
+- 🚫 PROIBIDO citar jurisprudência do STJ, TRF-2, TRF-3 ou de qualquer tribunal — irrelevante para o cumprimento da exigência
+- ✅ Fundamentação deve se RESTRINGIR a: LPI (artigo específico aplicável), Manual de Marcas do INPI (capítulo/seção pertinente) e Classificação de Nice
+- EXCEÇÃO ÚNICA: se o próprio despacho do(a) examinador(a) discutir tese substantiva de direito marcário, doutrina/jurisprudência pode aparecer — sempre vinculada ao ponto exigido
+- 📏 LIMITE DE EXTENSÃO: a peça completa (Parte 1 + Parte 2) deve caber em no MÁXIMO 5 páginas A4 — seja ENXUTO e objetivo
 
 #tipo_recurso: ${resourceTypeLabel}
 
@@ -735,6 +740,11 @@ mantendo foco estrito na exigência formulada pelo(a) examinador(a) do INPI.
 - A peça deve demonstrar que a exigência foi cumprida de modo técnico, preciso e suficiente
 - Se houver necessidade de sustentar interpretação jurídica, faça isso APENAS em relação ao teor da exigência concreta
 - MANTENHA coerência com as Seções I a IV já geradas
+- 🚫 PROIBIDO citar doutrinadores (Denis Borges Barbosa, J. da Gama Cerqueira, Tinoco Soares, Pontes de Miranda, etc.) — não inserir nesta Parte 2
+- 🚫 PROIBIDO citar jurisprudência do STJ, TRF-2, TRF-3 ou de qualquer tribunal
+- ✅ Fundamentação RESTRITA a: LPI (artigo aplicável), Manual de Marcas do INPI e Classificação de Nice
+- EXCEÇÃO: somente se o despacho discutir expressamente tese substantiva de direito marcário
+- 📏 LIMITE: a peça completa (Parte 1 + Parte 2) deve caber em até 5 páginas A4 — SEJA ENXUTO
 
 #tipo_recurso: ${resourceTypeLabel}
 
@@ -1275,7 +1285,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
       const pass2System = buildPass2SystemPrompt(resourceType, resourceTypeLabel, currentDate, agentName, agentStrategy);
       const pass2User = [
         { type: 'input_text', text: `${resourceType === 'exigencia_merito'
-          ? 'Contexto: Você já gerou as Seções I a IV do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Continue com foco EXCLUSIVO no atendimento da exigência formulada pelo(a) examinador(a), sem inserir argumentos de oposição, conflito entre marcas, convivência marcária ou risco de confusão, salvo se isso constar expressamente no despacho.'
+          ? 'Contexto: Você já gerou as Seções I a IV do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Continue com foco EXCLUSIVO no atendimento da exigência formulada pelo(a) examinador(a), sem inserir argumentos de oposição, conflito entre marcas, convivência marcária ou risco de confusão, salvo se isso constar expressamente no despacho. 🚫 NÃO cite doutrinadores (Denis Borges Barbosa, Gama Cerqueira, etc.) nem jurisprudência do STJ/TRF — fundamentação restrita a LPI + Manual de Marcas + Nice. A peça completa deve caber em até 5 páginas A4.'
           : 'Contexto: Você já gerou as Seções I a IV do recurso. Abaixo está o conteúdo já gerado para referência de dados e continuidade de estilo.'}
 
 SEÇÕES I A IV JÁ GERADAS:
@@ -1322,7 +1332,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     const pass1System = buildPass1SystemPrompt(resourceType, resourceTypeLabel, currentDate, agentName, agentStrategy);
     const pass1User = [
       { type: 'input_text', text: resourceType === 'exigencia_merito'
-        ? `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Identifique exatamente o que o(a) examinador(a) exigiu e responda a isso com precisão técnica e OBJETIVA. Se a exigência pedir detalhamento de especificação, apresente a redação corrigida adequada à classe. NÃO transforme a peça em oposição, conflito marcário, cotejo com marcas de terceiros ou defesa de colidência, salvo se isso constar expressamente no despacho. A peça deve ser ENXUTA: entre 1.300 e 2.000 palavras nesta parte. NÃO chame a peça de "Recurso Administrativo"; trata-se de "Cumprimento de Exigência de Mérito".${userOrientationBlock}`
+        ? `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Identifique exatamente o que o(a) examinador(a) exigiu e responda a isso com precisão técnica e OBJETIVA. Se a exigência pedir detalhamento de especificação, apresente a redação corrigida adequada à classe. NÃO transforme a peça em oposição, conflito marcário, cotejo com marcas de terceiros ou defesa de colidência, salvo se isso constar expressamente no despacho. 🚫 NÃO cite doutrinadores (Denis Borges Barbosa, Gama Cerqueira, Tinoco Soares, etc.) nem jurisprudência do STJ/TRF — fundamentação restrita à LPI, Manual de Marcas do INPI e Classificação de Nice. A peça deve ser ENXUTA: entre 1.300 e 2.000 palavras nesta parte, cabendo em até 5 páginas A4 no total. NÃO chame a peça de "Recurso Administrativo"; trata-se de "Cumprimento de Exigência de Mérito".${userOrientationBlock}`
         : `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do recurso administrativo. CADA seção deve ter a extensão MÍNIMA especificada. O texto total desta parte deve ter NO MÍNIMO 3.800 palavras. Desenvolva CADA argumento com máxima profundidade, como um escritório de PI de elite faria.` },
       ...fileResponseParts,
     ];
@@ -1330,7 +1340,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     const pass2System = buildPass2SystemPrompt(resourceType, resourceTypeLabel, currentDate, agentName, agentStrategy);
     const pass2User = [
       { type: 'input_text', text: resourceType === 'exigencia_merito'
-        ? `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Foque EXCLUSIVAMENTE no atendimento da exigência formulada pelo(a) examinador(a), sem inserir argumentos de oposição, conflito entre marcas, convivência marcária ou risco de confusão, salvo se isso constar expressamente no despacho. O texto total desta parte deve ter entre 800 e 1.400 palavras — SEJA OBJETIVO. NÃO chame a peça de "Recurso Administrativo".${userOrientationBlock}`
+        ? `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Foque EXCLUSIVAMENTE no atendimento da exigência formulada pelo(a) examinador(a), sem inserir argumentos de oposição, conflito entre marcas, convivência marcária ou risco de confusão, salvo se isso constar expressamente no despacho. 🚫 NÃO cite doutrinadores nem jurisprudência do STJ/TRF — fundamentação restrita à LPI, Manual de Marcas do INPI e Classificação de Nice. O texto total desta parte deve ter entre 800 e 1.400 palavras — SEJA OBJETIVO, mantendo a peça completa em até 5 páginas A4. NÃO chame a peça de "Recurso Administrativo".${userOrientationBlock}`
         : `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do recurso administrativo. Mantenha tom técnico, fundamentação robusta e conclusões objetivas. O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.` },
       ...fileResponseParts,
     ];

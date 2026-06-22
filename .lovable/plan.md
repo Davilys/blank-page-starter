@@ -1,44 +1,18 @@
 ## Objetivo
 
-Adicionar um campo de **Orientações do Recurso** (textarea) na etapa de "Anexar Documentos", visível **apenas quando `resourceType === 'exigencia_merito'**`, para que o usuário escreva instruções customizadas que o Agente Mazzola usará ao elaborar o recurso.
+Instruir o agente a **NÃO** inserir doutrina (Denis Borges Barbosa, Gama Cerqueira, Tinoco Soares) nem jurisprudência do STJ/TRF em peças de **Exigência de Mérito**, salvo se a exigência tratar expressamente de direito marcário substantivo. Mudança restrita ao tipo `exigencia_merito`.
 
-## Mudanças
+## Mudança
 
-### 1. `src/pages/admin/RecursosINPI.tsx`
+### `supabase/functions/process-inpi-resource/index.ts`
 
-- Novo estado: `const [userOrientation, setUserOrientation] = useState('')`.
-- Resetar `userOrientation` ao voltar/finalizar fluxo (junto com `setMultipleFiles([])`).
-- Na etapa `upload` (linha ~2315), **logo após a Drop zone** e antes do "Agent badge", renderizar condicionalmente quando `resourceType === 'exigencia_merito'`:
-  - Card com título "Orientações para o Agente (opcional)" + descrição curta.
-  - `<Textarea>` com `value={userOrientation}`, `onChange`, `rows={6}`, placeholder explicando que pode descrever a estratégia, pontos a enfatizar, argumentos específicos, tom desejado, etc.
-  - Contador de caracteres.
-- Em `processDocument` (chamadas pass1 e pass2 do `process-inpi-resource`), incluir `userOrientation: userOrientation.trim() || undefined` no `body` — apenas relevante para `exigencia_merito`, mas mandar sempre não atrapalha; alternativamente passar apenas quando preenchido.
+Nos dois prompts de sistema do tipo exigência de mérito (`buildPass1SystemPrompt` e `buildPass2SystemPrompt`, ramo `isExigenciaMerito`), adicionar à lista de "REGRAS ABSOLUTAS PARA EXIGÊNCIA DE MÉRITO":
 
-### 2. `supabase/functions/process-inpi-resource/index.ts`
+- NÃO citar doutrinadores (Denis Borges Barbosa, Gama Cerqueira, Tinoco Soares, Pontes de Miranda, etc.) — exigência de mérito é peça técnica de classificação/especificação, não tese acadêmica.
+- NÃO citar jurisprudência do STJ, TRF-2, TRF-3 ou de qualquer tribunal — irrelevante para o cumprimento.
+- Fundamentação deve se restringir a: LPI (art. específico aplicável), Manual de Marcas do INPI (capítulo/seção pertinente) e Classificação de Nice.
+- Exceção única: se o próprio despacho do(a) examinador(a) discutir tese substantiva de direito marcário, aí sim doutrina/jurisprudência pode aparecer — sempre vinculada ao ponto exigido. RESUMIR O RECURSO DE EXAME DE MERITO NO MAXIMO A 5 PAGINAS 
 
-- Ler `userOrientation` do body.
-- Quando `resourceType === 'exigencia_merito'` e `userOrientation` estiver preenchido, injetar um bloco no prompt do usuário (tanto pass1 quanto pass2) com prioridade alta, ex.:
-  ```
-  ⚠️ ORIENTAÇÕES OBRIGATÓRIAS DO USUÁRIO (siga à risca, são a diretriz principal deste recurso):
-  <userOrientation literal>
-  ```
-- Esse bloco deve ser inserido **antes** das instruções genéricas de estratégia, com marcação de prioridade máxima, para que o agente Mazzola siga as orientações do usuário.
+Também reforçar a mesma regra no texto do `pass1User` e `pass2User` específicos do `exigencia_merito` em `index.ts` (linhas ~1313 e ~1321), em uma frase curta.
 
-## Escopo
-
-- Apenas UI da etapa upload e edge function de geração.
-- Nenhuma mudança em outros tipos de recurso (indeferimento, oposição, notificação, procurador).
-- Sem alterações de schema.  PRECISO QUE TAMBEM FACA ISSO; Pontos que eu melhoraria
-  #### 1. Não é exatamente um "Recurso Administrativo"
-  Tecnicamente trata-se de:
-  **Cumprimento de Exigência de Mérito**
-  e não de um recurso administrativo. O próprio texto reconhece isso diversas vezes.
-  Isso não costuma gerar indeferimento, mas a nomenclatura poderia ser mais precisa.
-  ---
-  #### 2. Ficou excessivamente longo
-  Para uma exigência classificatória simples, 10 páginas é bastante.
-  O INPI normalmente resolveria isso com:
-  - nova especificação;
-  - justificativa de 1 a 2 páginas.
-  Você entregou praticamente uma tese jurídica.
-  Não prejudica, mas parte do texto é dispensável.
+Nenhuma outra mudança: indeferimento, oposição, notificações e procuradores continuam com doutrina/jurisprudência completas.
