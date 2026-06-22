@@ -573,7 +573,7 @@ export default function RecursosINPI() {
       );
 
       const { data: pass1Data, error: pass1Error } = await supabase.functions.invoke('process-inpi-resource', {
-        body: { files: filesBase64, resourceType, agentStrategy: agent.promptExtra, agentName: agent.name, generationPass: 'pass1' }
+        body: { files: filesBase64, resourceType, agentStrategy: agent.promptExtra, agentName: agent.name, generationPass: 'pass1', userOrientation: userOrientation.trim() || undefined }
       });
 
       if (pass1Error) throw pass1Error;
@@ -615,6 +615,7 @@ export default function RecursosINPI() {
           generationPass: 'pass2',
           pass1Content: pass1Data.pass1_content || partialContent,
           extractedData: partialExtracted,
+          userOrientation: userOrientation.trim() || undefined,
         }
       });
 
