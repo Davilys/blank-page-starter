@@ -136,13 +136,12 @@ INSTRUÇÕES FINAIS:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-5',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        max_tokens: 16000,
-        temperature: 0.25,
+        max_completion_tokens: 16000,
       }),
     });
 
