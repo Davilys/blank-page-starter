@@ -455,6 +455,49 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         if (!trimmedParagraph) continue;
         if (/^(Av\.\s*Brigadeiro|Tel:\s*\(11\))/.test(trimmedParagraph)) continue;
 
+        // ── Markdown table → simple grid in jsPDF ──
+        if (isMarkdownTable(trimmedParagraph)) {
+          const tbl = parseMarkdownTable(trimmedParagraph);
+          if (tbl) {
+            const cols = Math.max(tbl.headers.length, 1);
+            const colW = contentWidth / cols;
+            const rowH = 7;
+            const headerH = 8;
+            // Header
+            if (yPos + headerH > bottomLimit) { pdf.addPage(); yPos = margin; }
+            pdf.setFillColor(30, 58, 95);
+            pdf.rect(margin, yPos, contentWidth, headerH, 'F');
+            pdf.setTextColor(255, 255, 255);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setFontSize(9);
+            tbl.headers.forEach((h, i) => {
+              const txt = h.replace(/\*\*/g, '').replace(/\*/g, '');
+              pdf.text(txt, margin + i * colW + 2, yPos + 5.5);
+            });
+            yPos += headerH;
+            // Rows
+            pdf.setTextColor(30, 30, 30);
+            pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(9);
+            tbl.rows.forEach((row, ri) => {
+              if (yPos + rowH > bottomLimit) { pdf.addPage(); yPos = margin; }
+              if (ri % 2 === 0) {
+                pdf.setFillColor(247, 249, 252);
+                pdf.rect(margin, yPos, contentWidth, rowH, 'F');
+              }
+              row.forEach((c, ci) => {
+                const txt = (c || '').replace(/\*\*/g, '').replace(/\*/g, '');
+                const lines = pdf.splitTextToSize(txt, colW - 4);
+                pdf.text(lines[0] || '', margin + ci * colW + 2, yPos + 5);
+              });
+              yPos += rowH;
+            });
+            yPos += 4;
+            pdf.setFontSize(11);
+            continue;
+          }
+        }
+
         // Handle metadata block: split into individual lines rendered compactly
         const metadataLines = trimmedParagraph.split('\n').filter(l => l.trim());
         const hasMetadata = metadataLines.some(l => isMetadataLine(l));
@@ -507,11 +550,18 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           const lineWidth = isList ? contentWidth - 5 : contentWidth;
 
           const docNums: number[] = [];
-          const renderText = trimmedParagraph.replace(/\[DOC:(\d{1,3})\]/g, (_full: string, n: string) => {
+          const imgSlugs: string[] = [];
+          let renderText = trimmedParagraph.replace(/\[DOC:(\d{1,3})\]/g, (_full: string, n: string) => {
             const num = parseInt(n, 10);
             docNums.push(num);
             return `(Doc. ${String(num).padStart(2, '0')})`;
           });
+          renderText = renderText.replace(/\[IMG:([a-z0-9_\-]+)\]/gi, (_full, slug) => {
+            imgSlugs.push(String(slug).toLowerCase());
+            return '';
+          });
+          // Strip markdown bold/italic markers for jsPDF (rendered as plain text)
+          renderText = renderText.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*\n]+)\*/g, '$1');
           const lines = pdf.splitTextToSize(renderText, lineWidth);
           
           for (const line of lines) {
@@ -547,6 +597,39 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
               pdf.setTextColor(30, 30, 30);
             } catch (e) {
               console.warn('addImage inline failed', e);
+            }
+          }
+          // Render [IMG:slug] markers as inline figures matched by caption/filename
+          for (const slug of imgSlugs) {
+            const ev = evidences.find((e) => {
+              const cap = (e.caption || '').toLowerCase();
+              const src = (e.source_file_name || '').toLowerCase();
+              return cap.includes(slug.replace(/_/g, ' ')) || src.includes(slug);
+            });
+            if (!ev?.dataUrl) continue;
+            const maxImgW = contentWidth * 0.55;
+            const maxImgH = 65;
+            const ratio = ev.width && ev.height ? ev.width / ev.height : 0.75;
+            let imgW = maxImgW;
+            let imgH = imgW / ratio;
+            if (imgH > maxImgH) { imgH = maxImgH; imgW = imgH * ratio; }
+            if (yPos + imgH + 10 > bottomLimit) { pdf.addPage(); yPos = margin; }
+            yPos += 3;
+            const xImg = (pageWidth - imgW) / 2;
+            try {
+              pdf.addImage(ev.dataUrl, 'PNG', xImg, yPos, imgW, imgH);
+              yPos += imgH + 2;
+              pdf.setFontSize(8);
+              pdf.setTextColor(80, 80, 80);
+              const cap = ev.caption || ev.source_file_name || '';
+              if (cap) {
+                pdf.text(cap, pageWidth / 2, yPos, { align: 'center' });
+                yPos += 4;
+              }
+              pdf.setFontSize(11);
+              pdf.setTextColor(30, 30, 30);
+            } catch (e) {
+              console.warn('addImage IMG slug failed', e);
             }
           }
           yPos += 3;
