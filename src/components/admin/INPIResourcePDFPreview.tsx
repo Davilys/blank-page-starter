@@ -298,6 +298,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   const isExtrajudicialDoc = isExtrajudicial(resourceType);
   const isProcuradorPetition = resourceType === 'troca_procurador' || resourceType === 'nomeacao_procurador';
   const isOposicao = resourceType === 'oposicao';
+  const isExigenciaMerito = resourceType === 'exigencia_merito';
   const cleanedContent = stripOpeningMarkers(softCleanMarkdown(liveContent));
   const bodyContent = stripClosingFromContent(cleanedContent, resourceType);
 
@@ -315,6 +316,8 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         : 'Petição de Nomeação de Procurador'
     : isOposicao
       ? 'Manifestação à Oposição'
+    : isExigenciaMerito
+      ? 'Cumprimento de Exigência de Mérito'
       : 'Recurso Administrativo';
   const documentTitleUpper = documentTitle.toUpperCase();
   const pdfFileName = isNotif
@@ -325,6 +328,8 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       ? `${resourceType === 'troca_procurador' ? 'Peticao_Troca_Procurador' : 'Peticao_Nomeacao_Procurador'}_${resource.brand_name?.replace(/\s+/g, '_') || 'INPI'}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
     : isOposicao
       ? `Manifestacao_Oposicao_${resource.brand_name?.replace(/\s+/g, '_') || 'INPI'}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
+    : isExigenciaMerito
+      ? `Cumprimento_Exigencia_Merito_${resource.brand_name?.replace(/\s+/g, '_') || 'INPI'}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
       : `Recurso_${resource.brand_name?.replace(/\s+/g, '_') || 'INPI'}_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
 
   const handlePrint = () => {
