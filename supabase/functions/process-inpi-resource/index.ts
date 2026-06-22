@@ -740,6 +740,11 @@ mantendo foco estrito na exigência formulada pelo(a) examinador(a) do INPI.
 - A peça deve demonstrar que a exigência foi cumprida de modo técnico, preciso e suficiente
 - Se houver necessidade de sustentar interpretação jurídica, faça isso APENAS em relação ao teor da exigência concreta
 - MANTENHA coerência com as Seções I a IV já geradas
+- 🚫 PROIBIDO citar doutrinadores (Denis Borges Barbosa, J. da Gama Cerqueira, Tinoco Soares, Pontes de Miranda, etc.) — não inserir nesta Parte 2
+- 🚫 PROIBIDO citar jurisprudência do STJ, TRF-2, TRF-3 ou de qualquer tribunal
+- ✅ Fundamentação RESTRITA a: LPI (artigo aplicável), Manual de Marcas do INPI e Classificação de Nice
+- EXCEÇÃO: somente se o despacho discutir expressamente tese substantiva de direito marcário
+- 📏 LIMITE: a peça completa (Parte 1 + Parte 2) deve caber em até 5 páginas A4 — SEJA ENXUTO
 
 #tipo_recurso: ${resourceTypeLabel}
 
