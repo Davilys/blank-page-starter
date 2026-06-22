@@ -363,6 +363,53 @@ Se houver QUALQUER dúvida → NÃO CITAR → substituir por fundamentação leg
 `;
 
 // ═══════════════════════════════════════════════════════════
+// FORMATAÇÃO VISUAL — instrução compartilhada entre os dois passes
+// Permite negrito, itálico, tabelas e marcadores de imagem inline.
+// ═══════════════════════════════════════════════════════════
+const FORMATTING_INSTRUCTIONS = `
+#formatacao_visual_obrigatoria
+
+⚠️ PRODUZA O TEXTO COM FORMATAÇÃO MARKDOWN LEVE PARA APRIMORAR A LEGIBILIDADE NO PDF FINAL:
+
+1. NEGRITO — use **dois asteriscos** para destacar:
+   - Conclusões parciais de cada seção (ex.: **Conclusão parcial:** …)
+   - Nomes de marcas em cotejo (ex.: a marca **CLIENTE** versus a marca **OPOSITORA**)
+   - Termos jurídicos-chave (ex.: **princípio da especialidade**, **impressão de conjunto**, **marca fraca**)
+   - Números de processo e dispositivos legais quando citados pela primeira vez
+
+2. ITÁLICO — use *um asterisco* para:
+   - Transcrições literais de artigos de lei (ex.: *"Art. 124. Não são registráveis como marca: ..."*)
+   - Expressões em latim (ex.: *Abstandslehre*, *ab initio*, *prima facie*)
+   - Citações doutrinárias diretas
+
+3. TABELAS — use sintaxe markdown padrão SEMPRE que houver comparação ponto a ponto:
+   | Elemento | Marca Cliente | Marca Opositora |
+   | :--- | :--- | :--- |
+   | Sílabas | … | … |
+   | Tonicidade | … | … |
+   | Significado | … | … |
+   | Classe NCL | … | … |
+
+   Use tabela obrigatoriamente na Seção IV (cotejo de marcas) e na Seção V (análise de mercado/segmento). Tabela limpa, no máximo 6 linhas por tabela.
+
+4. MARCADORES DE IMAGEM INLINE — quando o sistema tiver fornecido evidências/imagens (marca do cliente extraída do espelho INPI, prints da oposição, fotos de produto, página de decisão), INSIRA marcadores literais no parágrafo argumentativo correspondente:
+   - [IMG:marca_cliente] — vinheta da marca conforme depósito INPI (use na Seção I — Síntese dos Fatos)
+   - [IMG:marca_opositora] — vinheta/representação da marca da oposição ou da marca anterior citada no indeferimento (use na Seção IV — Cotejo)
+   - [DOC:01], [DOC:02], [DOC:03] — para prints de site/redes sociais, fotos de produto, documentos escaneados, decisão do INPI. Use exatamente como [DOC:NN] (dois dígitos, entre colchetes).
+
+   REGRAS dos marcadores:
+   - Os marcadores serão SUBSTITUÍDOS pela imagem real na geração do PDF — NÃO descreva a imagem, apenas insira o marcador no fim da frase pertinente.
+   - Cite o número do Doc no texto também: "… conforme se vê do print em anexo (**Doc. 03**) [DOC:03]."
+   - Não invente marcadores cujas evidências não tenham sido fornecidas.
+
+5. SEÇÕES — títulos em CAIXA-ALTA, sem markdown de cabeçalho (#), em linha própria. Ex.: "III – FUNDAMENTAÇÃO JURÍDICA APROFUNDADA".
+
+6. PARÁGRAFOS — denso, justificado, juridicamente sólido. Não use bullets em excesso; prefira parágrafos coesos. Listas só nos PEDIDOS finais (a, b, c, d…).
+
+⚠️ O texto continua sendo uma peça jurídica formal — formatação markdown deve ser PARCIMONIOSA e ESTRATÉGICA, nunca decorativa. Use negrito ~3-5x por seção. Use itálico apenas onde tecnicamente correto. Tabela ao menos uma em IV e uma em V.
+`;
+
+// ═══════════════════════════════════════════════════════════
 // NOTIFICAÇÃO EXTRAJUDICIAL PROMPT (unchanged from original logic)
 // ═══════════════════════════════════════════════════════════
 function buildNotificacaoPrompt(
