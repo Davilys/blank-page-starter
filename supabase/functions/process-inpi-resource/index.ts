@@ -867,7 +867,7 @@ Davilys Danques de Oliveira Cunha
 Procurador(a) Constituído(a)
 CPF: 393.239.118-79
 
-⚠️ RESPONDA APENAS com o texto jurídico das Seções V a VIII + encerramento. SEM JSON. SEM explicações. SEM markdown. Apenas o texto jurídico profissional.
+⚠️ RESPONDA APENAS com o texto jurídico das Seções V a VIII + encerramento. SEM JSON. SEM explicações. Apenas o documento jurídico, COM formatação markdown leve conforme #formatacao_visual_obrigatoria (negrito, itálico, tabelas e marcadores [IMG:] / [DOC:NN]).
 ⚠️ O texto desta parte deve ter NO MÍNIMO 3.400 palavras.`;
 }
 
