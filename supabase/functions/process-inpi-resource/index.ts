@@ -774,6 +774,21 @@ mantendo foco estrito na exigência formulada pelo(a) examinador(a) do INPI.
 - EXCEÇÃO: somente se o despacho discutir expressamente tese substantiva de direito marcário
 - 📏 LIMITE: a peça completa (Parte 1 + Parte 2) deve caber em até 5 páginas A4 — SEJA ENXUTO
 
+🧭 RECLASSIFIQUE A EXIGÊNCIA (mesma lógica da Parte 1, mentalmente):
+• TIPO A = Especificação/Classificação. • TIPO B = Prova de atividade/titularidade. • TIPO C = Oposição.
+
+➡️ SE TIPO A (caso mais comum):
+- NÃO escreva Seção V (Conformidade), nem Seção VI (Boa-fé), nem Seção VII (Conclusão extensa).
+- Produza APENAS uma seção curta "III – DOS PEDIDOS" (60-120 palavras) seguida do encerramento.
+- NÃO citar jurisprudência. NÃO citar doutrina. NÃO citar examinador. NÃO ampliar escopo.
+- Total Parte 2 (TIPO A): 150-300 palavras NO MÁXIMO. Peça inteira ≤ 2 páginas A4.
+
+➡️ SE TIPO B ou C: siga a estrutura V–VIII abaixo, sem doutrina/jurisprudência.
+
+🔒 Nunca inventar produtos, serviços, documentos ou atividades que não estejam expressamente presentes no processo ou nos documentos anexados.
+
+📌 O encerramento ("Termos em que / Pede deferimento / São Paulo, ${currentDate} / assinatura / CPF") deve aparecer UMA ÚNICA VEZ, ao FINAL desta Parte 2. Jamais no meio.
+
 #tipo_recurso: ${resourceTypeLabel}
 
 ${LEGAL_KNOWLEDGE}
