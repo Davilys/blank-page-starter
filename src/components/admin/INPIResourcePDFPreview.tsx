@@ -70,6 +70,59 @@ const cleanMarkdown = (text: string): string => {
     .trim();
 };
 
+// Soft clean: preserves **bold**, *italic*, tables (| ... |), and [IMG:]/[DOC:] markers.
+// Strips only headings (#), inline code (`), and box-drawing chars.
+const softCleanMarkdown = (text: string): string => {
+  return text
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/[\u2500-\u257F\u2580-\u259F\u2550-\u256C]/g, '')
+    .trim();
+};
+
+// Parse a string with **bold** and *italic* markers into React inline nodes.
+const renderInlineMarkdown = (text: string): React.ReactNode[] => {
+  const nodes: React.ReactNode[] = [];
+  // Combined regex: **bold** | *italic*
+  const regex = /(\*\*([^*]+)\*\*|\*([^*\n]+)\*)/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let key = 0;
+  while ((m = regex.exec(text)) !== null) {
+    if (m.index > last) nodes.push(<span key={`t${key++}`}>{text.slice(last, m.index)}</span>);
+    if (m[2] !== undefined) {
+      nodes.push(<strong key={`b${key++}`}>{m[2]}</strong>);
+    } else if (m[3] !== undefined) {
+      nodes.push(<em key={`i${key++}`}>{m[3]}</em>);
+    }
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) nodes.push(<span key={`t${key++}`}>{text.slice(last)}</span>);
+  return nodes;
+};
+
+// Detect markdown table block (paragraph composed of table rows)
+const isMarkdownTable = (paragraph: string): boolean => {
+  const lines = paragraph.split('\n').map((l) => l.trim()).filter(Boolean);
+  if (lines.length < 2) return false;
+  const rowLike = lines.filter((l) => /^\|.+\|$/.test(l));
+  return rowLike.length >= 2;
+};
+
+const parseMarkdownTable = (paragraph: string): { headers: string[]; rows: string[][] } | null => {
+  const lines = paragraph.split('\n').map((l) => l.trim()).filter((l) => /^\|.+\|$/.test(l));
+  if (lines.length < 2) return null;
+  const splitRow = (l: string) =>
+    l.replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+  const headers = splitRow(lines[0]);
+  // lines[1] is separator like |:---|:---|
+  const dataLines = lines.slice(1).filter((l) => !/^\|?\s*:?-{2,}/.test(l.split('|').filter(Boolean)[0] || ''));
+  // Filter out separator rows
+  const isSep = (l: string) => splitRow(l).every((c) => /^:?-{2,}:?$/.test(c));
+  const rows = lines.slice(1).filter((l) => !isSep(l)).map(splitRow);
+  return { headers, rows };
+};
+
 const stripOpeningMarkers = (text: string): string => {
   let cleaned = text;
   // Remove structural markers
