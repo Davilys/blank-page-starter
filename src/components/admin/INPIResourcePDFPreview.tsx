@@ -916,11 +916,37 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   return (
     <div className="space-y-4">
       <div className="flex gap-3 justify-end print:hidden">
-        <Button variant="outline" onClick={handlePrint} className="gap-2 rounded-xl">
-          <Printer className="h-4 w-4" />
-          Imprimir
-        </Button>
-        <Button onClick={handleDownloadPDF} disabled={isGeneratingPDF} className="gap-2 rounded-xl shadow-lg shadow-primary/15">
+        {isEditing ? (
+          <>
+            <Button
+              variant="outline"
+              onClick={() => { setEditDraft(liveContent); setIsEditing(false); }}
+              disabled={isSavingEdit}
+              className="gap-2 rounded-xl"
+            >
+              <X className="h-4 w-4" />
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={isSavingEdit} className="gap-2 rounded-xl">
+              {isSavingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Salvar alterações
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="outline" onClick={handlePrint} className="gap-2 rounded-xl">
+              <Printer className="h-4 w-4" />
+              Imprimir
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => { setEditDraft(liveContent); setIsEditing(true); }}
+              className="gap-2 rounded-xl"
+            >
+              <Pencil className="h-4 w-4" />
+              Editar PDF
+            </Button>
+            <Button onClick={handleDownloadPDF} disabled={isGeneratingPDF} className="gap-2 rounded-xl shadow-lg shadow-primary/15">
           {isGeneratingPDF ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -932,8 +958,24 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
               Download PDF
             </>
           )}
-        </Button>
+            </Button>
+          </>
+        )}
       </div>
+
+      {isEditing && (
+        <div className="rounded-xl border bg-card p-4 print:hidden">
+          <p className="text-sm text-muted-foreground mb-2">
+            Edite o conteúdo abaixo para fazer correções. Marcadores como <code>[IMG:1]</code>, <code>[DOC:1]</code>, <strong>**negrito**</strong> e tabelas em markdown são preservados.
+          </p>
+          <Textarea
+            value={editDraft}
+            onChange={(e) => setEditDraft(e.target.value)}
+            className="min-h-[500px] font-mono text-sm leading-relaxed"
+            spellCheck
+          />
+        </div>
+      )}
 
       <div 
         ref={printRef}
