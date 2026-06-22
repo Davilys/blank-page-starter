@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, Printer, Loader2 } from 'lucide-react';
+import { Download, Printer, Loader2, Pencil, Save, X } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import logoWebmarcas from '@/assets/webmarcas-logo-new.png';
@@ -211,6 +213,34 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   const printRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [evidences, setEvidences] = useState<ResourceEvidence[]>([]);
+  const [liveContent, setLiveContent] = useState<string>(content);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState<string>(content);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  useEffect(() => {
+    setLiveContent(content);
+    setEditDraft(content);
+  }, [content]);
+
+  const handleSaveEdit = async () => {
+    setIsSavingEdit(true);
+    try {
+      const updateField = 'final_content';
+      const { error } = await supabase
+        .from('inpi_resources' as any)
+        .update({ [updateField]: editDraft })
+        .eq('id', resource.id);
+      if (error) throw error;
+      setLiveContent(editDraft);
+      setIsEditing(false);
+      toast({ title: 'Alterações salvas', description: 'O conteúdo do recurso foi atualizado.' });
+    } catch (err: any) {
+      toast({ title: 'Erro ao salvar', description: err?.message || 'Tente novamente.', variant: 'destructive' });
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
 
   // Fetch evidences for this resource + sign URLs + preload data URLs
   useEffect(() => {
@@ -267,7 +297,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   const isRespostaNotif = isRespostaNotificacao(resourceType);
   const isExtrajudicialDoc = isExtrajudicial(resourceType);
   const isProcuradorPetition = resourceType === 'troca_procurador' || resourceType === 'nomeacao_procurador';
-  const cleanedContent = stripOpeningMarkers(softCleanMarkdown(content));
+  const cleanedContent = stripOpeningMarkers(softCleanMarkdown(liveContent));
   const bodyContent = stripClosingFromContent(cleanedContent, resourceType);
 
   const approvalDate = resource.approved_at 
@@ -886,11 +916,37 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   return (
     <div className="space-y-4">
       <div className="flex gap-3 justify-end print:hidden">
-        <Button variant="outline" onClick={handlePrint} className="gap-2 rounded-xl">
-          <Printer className="h-4 w-4" />
-          Imprimir
-        </Button>
-        <Button onClick={handleDownloadPDF} disabled={isGeneratingPDF} className="gap-2 rounded-xl shadow-lg shadow-primary/15">
+        {isEditing ? (
+          <>
+            <Button
+              variant="outline"
+              onClick={() => { setEditDraft(liveContent); setIsEditing(false); }}
+              disabled={isSavingEdit}
+              className="gap-2 rounded-xl"
+            >
+              <X className="h-4 w-4" />
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={isSavingEdit} className="gap-2 rounded-xl">
+              {isSavingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Salvar alterações
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="outline" onClick={handlePrint} className="gap-2 rounded-xl">
+              <Printer className="h-4 w-4" />
+              Imprimir
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => { setEditDraft(liveContent); setIsEditing(true); }}
+              className="gap-2 rounded-xl"
+            >
+              <Pencil className="h-4 w-4" />
+              Editar PDF
+            </Button>
+            <Button onClick={handleDownloadPDF} disabled={isGeneratingPDF} className="gap-2 rounded-xl shadow-lg shadow-primary/15">
           {isGeneratingPDF ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -902,8 +958,24 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
               Download PDF
             </>
           )}
-        </Button>
+            </Button>
+          </>
+        )}
       </div>
+
+      {isEditing && (
+        <div className="rounded-xl border bg-card p-4 print:hidden">
+          <p className="text-sm text-muted-foreground mb-2">
+            Edite o conteúdo abaixo para fazer correções. Marcadores como <code>[IMG:1]</code>, <code>[DOC:1]</code>, <strong>**negrito**</strong> e tabelas em markdown são preservados.
+          </p>
+          <Textarea
+            value={editDraft}
+            onChange={(e) => setEditDraft(e.target.value)}
+            className="min-h-[500px] font-mono text-sm leading-relaxed"
+            spellCheck
+          />
+        </div>
+      )}
 
       <div 
         ref={printRef}
