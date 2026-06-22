@@ -697,46 +697,94 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         );
       }
       
+      // Markdown table
+      if (isMarkdownTable(trimmed)) {
+        const tbl = parseMarkdownTable(trimmed);
+        if (tbl) {
+          return (
+            <div key={idx} className="my-5 overflow-x-auto">
+              <table className="w-full border-collapse text-sm" style={{ border: '1px solid #1e3a5f' }}>
+                <thead>
+                  <tr style={{ background: '#1e3a5f' }}>
+                    {tbl.headers.map((h, i) => (
+                      <th key={i} className="px-3 py-2 text-left text-white font-semibold" style={{ borderRight: '1px solid #c8af37' }}>
+                        {renderInlineMarkdown(h)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {tbl.rows.map((row, ri) => (
+                    <tr key={ri} style={{ background: ri % 2 === 0 ? '#f7f9fc' : '#fff' }}>
+                      {row.map((c, ci) => (
+                        <td key={ci} className="px-3 py-2 align-top" style={{ borderTop: '1px solid #d4d8e0', borderRight: '1px solid #eef0f4', color: '#1a1a1a' }}>
+                          {renderInlineMarkdown(c)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+      }
+
       const isList = /^[-–•]\s/.test(trimmed);
       if (isList) {
-        return <p key={idx} className="mb-3 pl-6" style={{ textIndent: '0' }}>{trimmed}</p>;
+        return <p key={idx} className="mb-3 pl-6" style={{ textIndent: '0' }}>{renderInlineMarkdown(trimmed)}</p>;
       }
       
       // Short lines (e.g. "EXCELENTÍSSIMO...") should not be stretched by justify
       const isShort = trimmed.length < 120;
-      // [DOC:N] marker handling — split paragraph and insert <figure>
-      const docRegex = /\[DOC:(\d{1,3})\]/g;
-      if (docRegex.test(trimmed)) {
-        docRegex.lastIndex = 0;
-        const parts: Array<{ type: 'text' | 'doc'; value: string; n?: number }> = [];
+      // [DOC:N] and [IMG:slug] marker handling — split paragraph and insert <figure>
+      const markerRegex = /\[(DOC:(\d{1,3})|IMG:([a-z0-9_\-]+))\]/gi;
+      if (markerRegex.test(trimmed)) {
+        markerRegex.lastIndex = 0;
+        const parts: Array<{ type: 'text' | 'doc' | 'img'; value: string; n?: number; slug?: string }> = [];
         let last = 0;
         let m: RegExpExecArray | null;
-        while ((m = docRegex.exec(trimmed)) !== null) {
+        while ((m = markerRegex.exec(trimmed)) !== null) {
           if (m.index > last) parts.push({ type: 'text', value: trimmed.slice(last, m.index) });
-          parts.push({ type: 'doc', value: m[0], n: parseInt(m[1], 10) });
+          if (m[2]) {
+            parts.push({ type: 'doc', value: m[0], n: parseInt(m[2], 10) });
+          } else if (m[3]) {
+            parts.push({ type: 'img', value: m[0], slug: m[3].toLowerCase() });
+          }
           last = m.index + m[0].length;
         }
         if (last < trimmed.length) parts.push({ type: 'text', value: trimmed.slice(last) });
+        const findEvidenceBySlug = (slug: string) =>
+          evidences.find((e) => {
+            const cap = (e.caption || '').toLowerCase();
+            const src = (e.source_file_name || '').toLowerCase();
+            return cap.includes(slug.replace(/_/g, ' ')) || src.includes(slug);
+          });
         return (
           <div key={idx} className="mb-4">
             <p className={isShort ? '' : 'text-justify'} style={{ textIndent: '2cm', textAlignLast: 'left' }}>
-              {parts.map((p, i) => p.type === 'text'
-                ? <span key={i}>{p.value}</span>
-                : <span key={i} className="font-semibold" style={{ color: '#1e3a5f' }}>(Doc. {String(p.n).padStart(2, '0')})</span>)}
+              {parts.map((p, i) => {
+                if (p.type === 'text') return <span key={i}>{renderInlineMarkdown(p.value)}</span>;
+                if (p.type === 'doc') return <span key={i} className="font-semibold" style={{ color: '#1e3a5f' }}>(Doc. {String(p.n).padStart(2, '0')})</span>;
+                return null; // img markers handled below as figures only
+              })}
             </p>
-            {parts.filter(p => p.type === 'doc').map((p, i) => {
-              const ev = evidenceByNum(p.n!);
+            {parts.filter(p => p.type === 'doc' || p.type === 'img').map((p, i) => {
+              const ev = p.type === 'doc' ? evidenceByNum(p.n!) : findEvidenceBySlug(p.slug!);
               if (!ev?.signedUrl) return null;
+              const label = p.type === 'doc'
+                ? <><strong>Doc. {String(p.n).padStart(2, '0')}</strong> — {ev.caption || ev.source_file_name}</>
+                : <>{ev.caption || ev.source_file_name}</>;
               return (
                 <figure key={`fig-${i}`} className="my-4 mx-auto text-center">
                   <img
                     src={ev.signedUrl}
-                    alt={ev.caption || `Doc. ${p.n}`}
+                    alt={ev.caption || (p.type === 'doc' ? `Doc. ${p.n}` : p.slug)}
                     className="mx-auto border rounded"
                     style={{ maxWidth: '70%', maxHeight: '340px', objectFit: 'contain' }}
                   />
                   <figcaption className="text-xs mt-2" style={{ color: '#555' }}>
-                    <strong>Doc. {String(p.n).padStart(2, '0')}</strong> — {ev.caption || ev.source_file_name}
+                    {label}
                   </figcaption>
                 </figure>
               );
@@ -746,7 +794,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       }
       return (
         <p key={idx} className={`mb-4 ${isShort ? '' : 'text-justify'}`} style={{ textIndent: '2cm', textAlignLast: 'left' }}>
-          {trimmed}
+          {renderInlineMarkdown(trimmed)}
         </p>
       );
     }).filter(Boolean);
