@@ -560,7 +560,7 @@ ${getAgentIdentity(agentName, agentStrategy)}
 COMECE O DOCUMENTO COM:
 
 ═══════════════════════════════════════════════════════════
-RECURSO ADMINISTRATIVO – ${resourceTypeLabel}
+${resourceTypeLabel}
 MARCA: [NOME DA MARCA EXTRAÍDO DO PDF]
 ═══════════════════════════════════════════════════════════
 
