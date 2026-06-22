@@ -578,7 +578,7 @@ Procurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79
 ═══════════════════════════════════════════════════════════
 
 I – SÍNTESE DA EXIGÊNCIA FORMULADA E DO HISTÓRICO PROCESSUAL
-(MÍNIMO 700 palavras)
+(300 a 500 palavras — seja objetivo)
 - Narrar cronologicamente o histórico do pedido
 - Transcrever e explicar, com fidelidade, a exigência formulada pelo INPI
 - Identificar o ponto técnico exato a ser cumprido (ex.: especificação genérica, necessidade de detalhamento, adequação da classe, correção formal)
@@ -586,14 +586,14 @@ I – SÍNTESE DA EXIGÊNCIA FORMULADA E DO HISTÓRICO PROCESSUAL
 - Descrever a marca, o titular, a classe e o objeto do pedido com precisão
 
 II – DA TEMPESTIVIDADE, CABIMENTO E REGULARIDADE DA PRESENTE MANIFESTAÇÃO
-(MÍNIMO 300 palavras)
+(150 a 250 palavras)
 - Demonstrar a tempestividade do cumprimento/manifestação
 - Confirmar a legitimidade do requerente e do procurador constituído
 - Fundamentar o cabimento à luz da LPI, do Manual de Marcas e das regras procedimentais do INPI
 - Mencionar recolhimento de GRU apenas se compatível com o ato descrito no caso
 
 III – DO EFETIVO CUMPRIMENTO DA EXIGÊNCIA DE MÉRITO
-(MÍNIMO 1.200 palavras — SEÇÃO MAIS IMPORTANTE)
+(500 a 800 palavras — SEÇÃO MAIS IMPORTANTE, mas direta e técnica)
 - Responder PONTO A PONTO ao que o(a) examinador(a) solicitou
 - Se a exigência envolver especificação genérica, APRESENTAR a redação corrigida e detalhada da especificação
 - Se houver exemplos no despacho, utilizá-los como referência técnica, sem copiar cegamente quando o documento exigir adaptação ao caso concreto
@@ -603,7 +603,7 @@ III – DO EFETIVO CUMPRIMENTO DA EXIGÊNCIA DE MÉRITO
 - NÃO discutir oposição, colidência com terceiros ou risco de confusão, salvo se isso estiver literalmente no despacho
 
 IV – DA ADEQUAÇÃO TÉCNICA DA ESPECIFICAÇÃO, CLASSIFICAÇÃO E DELIMITAÇÃO DO ESCOPO
-(MÍNIMO 900 palavras)
+(300 a 500 palavras)
 - Demonstrar tecnicamente a correção do enquadramento na classe NCL pertinente
 - Explicar como a especificação retificada elimina genericidade, ambiguidade ou excesso
 - Relacionar a redação proposta com a atividade do requerente e com os parâmetros do INPI
@@ -612,7 +612,7 @@ IV – DA ADEQUAÇÃO TÉCNICA DA ESPECIFICAÇÃO, CLASSIFICAÇÃO E DELIMITAÇ�
 
 ⚠️ RESPONDA APENAS com o texto jurídico completo das Seções I a IV. SEM JSON. SEM explicações. Apenas o documento jurídico, COM formatação markdown leve conforme #formatacao_visual_obrigatoria (negrito, itálico, tabelas e marcadores [IMG:] / [DOC:NN]).
 ⚠️ Para EXIGÊNCIA DE MÉRITO, mantenha foco exclusivo no CUMPRIMENTO/ESCLARECIMENTO da exigência real do despacho.
-⚠️ O texto desta parte deve ter NO MÍNIMO 3.200 palavras.`;
+⚠️ O texto desta parte deve ter entre 1.300 e 2.000 palavras. EVITE prolixidade: cumprimento de exigência é peça objetiva, não tese acadêmica. NÃO chame a peça de "Recurso Administrativo" no corpo do texto — use "Cumprimento de Exigência de Mérito" ou "Manifestação".`;
   }
 
   return `#instruction
