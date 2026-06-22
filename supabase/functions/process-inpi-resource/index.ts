@@ -529,6 +529,8 @@ ou, quando estritamente necessário, uma MANIFESTAÇÃO TÉCNICA LIMITADA aos po
 
 ${LEGAL_KNOWLEDGE}
 
+${FORMATTING_INSTRUCTIONS}
+
 ${getAgentIdentity(agentName, agentStrategy)}
 
 #estrutura_obrigatoria_parte_1
@@ -586,7 +588,7 @@ IV – DA ADEQUAÇÃO TÉCNICA DA ESPECIFICAÇÃO, CLASSIFICAÇÃO E DELIMITAÇ�
 - Quando aplicável, apresentar a especificação final de forma clara, pronta para acolhimento administrativo
 - Encerrar a seção com conclusão objetiva de que a exigência foi devidamente cumprida
 
-⚠️ RESPONDA APENAS com o texto jurídico completo das Seções I a IV. SEM JSON. SEM explicações. SEM markdown. Apenas o texto jurídico profissional.
+⚠️ RESPONDA APENAS com o texto jurídico completo das Seções I a IV. SEM JSON. SEM explicações. Apenas o documento jurídico, COM formatação markdown leve conforme #formatacao_visual_obrigatoria (negrito, itálico, tabelas e marcadores [IMG:] / [DOC:NN]).
 ⚠️ Para EXIGÊNCIA DE MÉRITO, mantenha foco exclusivo no CUMPRIMENTO/ESCLARECIMENTO da exigência real do despacho.
 ⚠️ O texto desta parte deve ter NO MÍNIMO 3.200 palavras.`;
   }
@@ -608,6 +610,8 @@ de ALTÍSSIMO NÍVEL JURÍDICO, no padrão dos melhores escritórios de PI do Br
 #tipo_recurso: ${resourceTypeLabel}
 
 ${LEGAL_KNOWLEDGE}
+
+${FORMATTING_INSTRUCTIONS}
 
 ${getAgentIdentity(agentName, agentStrategy)}
 
