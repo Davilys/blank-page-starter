@@ -571,17 +571,18 @@ export default function RecursosINPI() {
         }))
       );
 
-      const { data, error } = await supabase.functions.invoke('process-inpi-resource', {
-        body: { files: filesBase64, resourceType, agentStrategy: agent.promptExtra, agentName: agent.name }
+      const { data: pass1Data, error: pass1Error } = await supabase.functions.invoke('process-inpi-resource', {
+        body: { files: filesBase64, resourceType, agentStrategy: agent.promptExtra, agentName: agent.name, generationPass: 'pass1' }
       });
 
-      if (error) throw error;
-      if (!data.success) throw new Error(data.error || 'Erro ao processar documento');
+      if (pass1Error) throw pass1Error;
+      if (!pass1Data?.success) throw new Error(pass1Data?.error || 'Erro ao processar documento');
 
-      const safeExtracted = sanitizeExtractedData(data.extracted_data);
-      const safeContent = toSafeString(data.resource_content);
-      setExtractedData(safeExtracted);
-      setDraftContent(safeContent);
+      const partialExtracted = sanitizeExtractedData(pass1Data.extracted_data);
+      const partialContent = toSafeString(pass1Data.resource_content);
+      setExtractedData(partialExtracted);
+      setDraftContent(partialContent);
+      setProcessingProgress(55);
 
       const { data: { user } } = await supabase.auth.getUser();
 
@@ -590,6 +591,46 @@ export default function RecursosINPI() {
         .insert({
           user_id: user?.id,
           resource_type: resourceType,
+          process_number: partialExtracted.process_number || null,
+          brand_name: partialExtracted.brand_name || null,
+          ncl_class: partialExtracted.ncl_class || null,
+          holder: partialExtracted.holder || null,
+          examiner_or_opponent: partialExtracted.examiner_or_opponent || null,
+          legal_basis: partialExtracted.legal_basis || null,
+          draft_content: partialContent,
+          status: 'draft'
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+      setCurrentResourceId(insertedResource.id);
+
+      const { data: pass2Data, error: pass2Error } = await supabase.functions.invoke('process-inpi-resource', {
+        body: {
+          resourceType,
+          agentStrategy: agent.promptExtra,
+          agentName: agent.name,
+          generationPass: 'pass2',
+          pass1Content: pass1Data.pass1_content || partialContent,
+          extractedData: partialExtracted,
+        }
+      });
+
+      if (pass2Error || !pass2Data?.success) {
+        toast.warning('A primeira parte foi salva como rascunho, mas a finalização falhou. Abra o rascunho e tente ajustar novamente.');
+        setStep('review');
+        return;
+      }
+
+      const safeExtracted = sanitizeExtractedData(pass2Data.extracted_data || partialExtracted);
+      const safeContent = toSafeString(pass2Data.resource_content);
+      setExtractedData(safeExtracted);
+      setDraftContent(safeContent);
+
+      const { error: updateError } = await supabase
+        .from('inpi_resources')
+        .update({
           process_number: safeExtracted.process_number || null,
           brand_name: safeExtracted.brand_name || null,
           ncl_class: safeExtracted.ncl_class || null,
@@ -599,11 +640,9 @@ export default function RecursosINPI() {
           draft_content: safeContent,
           status: 'pending_review'
         })
-        .select()
-        .single();
+        .eq('id', insertedResource.id);
 
-      if (insertError) throw insertError;
-      setCurrentResourceId(insertedResource.id);
+      if (updateError) throw updateError;
       setProcessingProgress(100);
       setTimeout(() => setStep('review'), 500);
       toast.success(`Recurso gerado com sucesso pela estratégia ${agent.name}!`);

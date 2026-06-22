@@ -66,52 +66,66 @@ async function callOpenAI(
   systemPrompt: string,
   userParts: any[],
   maxTokens: number = 16000,
-  temperature?: number
+  temperature?: number,
+  timeoutMs: number = 120000
 ): Promise<{ content: string; error?: string; status?: number }> {
   const inputMessages = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userParts },
   ];
 
-  const response = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-5-mini',
-      input: inputMessages,
-      max_output_tokens: maxTokens,
-      // reasoning "minimal" + verbosity "high" = resposta começa quase imediatamente
-      // e mantém texto longo e detalhado. Sem isso, o modelo gasta 60-120s só em
-      // reasoning tokens internos antes de escrever, estourando o limite de 150s.
-      reasoning: { effort: 'minimal' },
-      text: { verbosity: 'high' },
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('OpenAI API error:', response.status, errorText.substring(0, 500));
-    return { content: '', error: errorText, status: response.status };
-  }
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-5-mini',
+        input: inputMessages,
+        max_output_tokens: maxTokens,
+        // reasoning "minimal" + verbosity "high" = resposta começa quase imediatamente
+        // e mantém texto longo e detalhado. Sem isso, o modelo gasta 60-120s só em
+        // reasoning tokens internos antes de escrever, estourando o limite de 150s.
+        reasoning: { effort: 'minimal' },
+        text: { verbosity: 'high' },
+      }),
+    });
 
-  const data = await response.json();
-  let content = '';
-  if (data.output && Array.isArray(data.output)) {
-    for (const item of data.output) {
-      if (item.type === 'message' && item.content) {
-        for (const part of item.content) {
-          if (part.type === 'output_text') {
-            content += part.text;
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenAI API error:', response.status, errorText.substring(0, 500));
+      return { content: '', error: errorText, status: response.status };
+    }
+
+    const data = await response.json();
+    let content = '';
+    if (data.output && Array.isArray(data.output)) {
+      for (const item of data.output) {
+        if (item.type === 'message' && item.content) {
+          for (const part of item.content) {
+            if (part.type === 'output_text') {
+              content += part.text;
+            }
           }
         }
       }
     }
-  }
 
-  return { content };
+    return { content };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Erro desconhecido na IA';
+    const isTimeout = error instanceof Error && error.name === 'AbortError';
+    console.error('OpenAI request failed:', isTimeout ? 'timeout' : message);
+    return { content: '', error: isTimeout ? 'Tempo limite da IA atingido' : message, status: isTimeout ? 408 : 500 };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1211,7 +1225,8 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
     // STANDARD INPI RESOURCE FLOW — TWO-PASS GENERATION
     // (indeferimento, exigencia_merito, oposicao)
     // ═════════════════════════════════════════════════════
-    const { fileBase64, fileType, files: multiFiles } = body;
+    const { fileBase64, fileType, files: multiFiles, generationPass, pass1Content: providedPass1Content, extractedData: providedExtractedData } = body;
+    const requestedPass = generationPass || body.pass;
     const resourceTypeLabel = RESOURCE_TYPE_LABELS[resourceType] || 'RECURSO ADMINISTRATIVO';
 
     // Build file parts for all calls
@@ -1230,7 +1245,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
       } else {
         fileParts.push({ type: 'image_url', image_url: { url: `data:${fileType};base64,${fileBase64}` } });
       }
-    } else {
+    } else if (requestedPass !== 'pass2') {
       return new Response(JSON.stringify({ error: 'Nenhum arquivo fornecido' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -1238,6 +1253,48 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
 
     console.log('=== TWO-PASS GENERATION START ===');
     console.log('Resource type:', resourceType, '| Agent:', agentName || 'default', '| Files:', fileResponseParts.length);
+
+    if (requestedPass === 'pass2') {
+      const basePass1Content = cleanAIContent(toSafeStr(providedPass1Content));
+      if (basePass1Content.length < 1000) {
+        return new Response(JSON.stringify({ error: 'Parte 1 não informada ou incompleta' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const extractedData = providedExtractedData || {};
+      const pass2System = buildPass2SystemPrompt(resourceType, resourceTypeLabel, currentDate, agentName, agentStrategy);
+      const pass2User = [
+        { type: 'input_text', text: `${resourceType === 'exigencia_merito'
+          ? 'Contexto: Você já gerou as Seções I a IV do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Continue com foco EXCLUSIVO no atendimento da exigência formulada pelo(a) examinador(a), sem inserir argumentos de oposição, conflito entre marcas, convivência marcária ou risco de confusão, salvo se isso constar expressamente no despacho.'
+          : 'Contexto: Você já gerou as Seções I a IV do recurso. Abaixo está o conteúdo já gerado para referência de dados e continuidade de estilo.'}
+
+SEÇÕES I A IV JÁ GERADAS:
+---
+${basePass1Content.substring(0, 6000)}
+---
+
+Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo e nível de profundidade. ${resourceType === 'exigencia_merito' ? 'O texto total desta parte deve ter NO MÍNIMO 2.500 palavras.' : 'O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.'}` },
+      ];
+
+      console.log('PASS 2 only: Generating Sections V-VIII...');
+      const pass2Result = await callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25);
+      if (pass2Result.error) {
+        return new Response(JSON.stringify({ error: `Erro na geração (Parte 2): ${pass2Result.status}` }), { status: pass2Result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const pass2Content = cleanAIContent(pass2Result.content);
+      const rawFullContent = `${basePass1Content}\n\n${pass2Content}`;
+      const enriched = enrichExtractedData(providedExtractedData || {}, rawFullContent);
+      const fullContent = enforceMandatoryOpening(rawFullContent, resourceTypeLabel, enriched);
+
+      return new Response(JSON.stringify({
+        success: true,
+        generation_pass: 'pass2',
+        extracted_data: sanitizeExtracted(enriched),
+        resource_content: fullContent,
+        resource_type: resourceType,
+        resource_type_label: resourceTypeLabel
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     // ─────────────────────────────────────────────────────
     // PASS 0: Quick data extraction (parallel-ready)
@@ -1248,7 +1305,8 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
     ];
 
     // ─────────────────────────────────────────────────────
-    // PASS 1: Generate Sections I to IV
+    // PASS 1 + PASS 2: generate in parallel to stay below
+    // Supabase's 150s request idle timeout.
     // ─────────────────────────────────────────────────────
     const pass1System = buildPass1SystemPrompt(resourceType, resourceTypeLabel, currentDate, agentName, agentStrategy);
     const pass1User = [
@@ -1258,12 +1316,23 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
       ...fileResponseParts,
     ];
 
-    console.log('PASS 1: Generating Sections I-IV...');
+    const pass2System = buildPass2SystemPrompt(resourceType, resourceTypeLabel, currentDate, agentName, agentStrategy);
+    const pass2User = [
+      { type: 'input_text', text: resourceType === 'exigencia_merito'
+        ? `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Foque EXCLUSIVAMENTE no atendimento da exigência formulada pelo(a) examinador(a), sem inserir argumentos de oposição, conflito entre marcas, convivência marcária ou risco de confusão, salvo se isso constar expressamente no despacho. O texto total desta parte deve ter NO MÍNIMO 2.500 palavras.`
+        : `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do recurso administrativo. Mantenha tom técnico, fundamentação robusta e conclusões objetivas. O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.` },
+      ...fileResponseParts,
+    ];
+
+    console.log('PASS 1 and PASS 2: Generating all sections in parallel...');
     
-    // Run extraction and pass 1 in parallel
-    const [extractionResult, pass1Result] = await Promise.all([
+    // Run extraction and both content passes in parallel. Sequential AI calls were
+    // exceeding Supabase's 150s idle timeout before the function could respond.
+    const shouldRunPass2Now = requestedPass !== 'pass1';
+    const [extractionResult, pass1Result, pass2Result] = await Promise.all([
       callOpenAI(OPENAI_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, 1000, 0.1),
       callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 9000, 0.25),
+      shouldRunPass2Now ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25) : Promise.resolve({ content: '' }),
     ]);
 
     // Parse extracted data
@@ -1291,28 +1360,20 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
       return new Response(JSON.stringify({ error: 'Parte 1 do recurso ficou incompleta. Tente novamente.' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // ─────────────────────────────────────────────────────
-    // PASS 2: Generate Sections V to VIII + closing
-    // ─────────────────────────────────────────────────────
-    const pass2System = buildPass2SystemPrompt(resourceType, resourceTypeLabel, currentDate, agentName, agentStrategy);
-    const pass2User = [
-      { type: 'input_text', text: `${resourceType === 'exigencia_merito'
-        ? 'Contexto: Você já gerou as Seções I a IV do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Continue com foco EXCLUSIVO no atendimento da exigência formulada pelo(a) examinador(a), sem inserir argumentos de oposição, conflito entre marcas, convivência marcária ou risco de confusão, salvo se isso constar expressamente no despacho.'
-        : 'Contexto: Você já gerou as Seções I a IV do recurso. Abaixo está o conteúdo já gerado para referência de dados e continuidade de estilo.'}
-
-${resourceType === 'exigencia_merito' ? 'Abaixo está o conteúdo já gerado para referência de dados e continuidade de estilo.' : ''}
-
-SEÇÕES I A IV JÁ GERADAS:
----
-${pass1Content.substring(0, 4000)}
----
-
-Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo e nível de profundidade. ${resourceType === 'exigencia_merito' ? 'O texto total desta parte deve ter NO MÍNIMO 2.500 palavras.' : 'O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.'} Use os dados do caso (marca: ${extractedData.brand_name}, processo: ${extractedData.process_number}, classe: ${extractedData.ncl_class}, titular: ${extractedData.holder}) conforme a Parte 1.` },
-      ...fileResponseParts,
-    ];
-
-    console.log('PASS 2: Generating Sections V-VIII...');
-    const pass2Result = await callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25);
+    if (requestedPass === 'pass1') {
+      const enriched = enrichExtractedData(extractedData, pass1Content);
+      const partialContent = enforceMandatoryOpening(pass1Content, resourceTypeLabel, enriched);
+      return new Response(JSON.stringify({
+        success: true,
+        generation_pass: 'pass1',
+        extracted_data: sanitizeExtracted(enriched),
+        pass1_content: pass1Content,
+        resource_content: partialContent,
+        resource_type: resourceType,
+        resource_type_label: resourceTypeLabel,
+        partial: true
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     if (pass2Result.error) {
       console.error('PASS 2 failed:', pass2Result.status, pass2Result.error?.substring(0, 300));
