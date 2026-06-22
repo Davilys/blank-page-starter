@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Download, Printer, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -267,7 +267,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   const isRespostaNotif = isRespostaNotificacao(resourceType);
   const isExtrajudicialDoc = isExtrajudicial(resourceType);
   const isProcuradorPetition = resourceType === 'troca_procurador' || resourceType === 'nomeacao_procurador';
-  const cleanedContent = stripOpeningMarkers(cleanMarkdown(content));
+  const cleanedContent = stripOpeningMarkers(softCleanMarkdown(content));
   const bodyContent = stripClosingFromContent(cleanedContent, resourceType);
 
   const approvalDate = resource.approved_at 
