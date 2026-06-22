@@ -1,21 +1,44 @@
-## Problema
+## Objetivo
 
-Para recursos do tipo **oposição**, o documento gerado (preview + PDF + impressão) mostra o título genérico **"RECURSO ADMINISTRATIVO"**, o que é tecnicamente impreciso — em oposição apresenta-se uma **manifestação**, não um recurso.
+Adicionar um campo de **Orientações do Recurso** (textarea) na etapa de "Anexar Documentos", visível **apenas quando `resourceType === 'exigencia_merito'**`, para que o usuário escreva instruções customizadas que o Agente Mazzola usará ao elaborar o recurso.
 
-O `RESOURCE_TYPE_LABELS` em `INPIResourcePDFPreview.tsx` já tem `oposicao: 'MANIFESTAÇÃO À OPOSIÇÃO'`, mas o badge e o título não usam esse mapa quando o tipo é oposição — caem no fallback "RECURSO ADMINISTRATIVO".
+## Mudanças
 
-## Correção
+### 1. `src/pages/admin/RecursosINPI.tsx`
 
-Em `src/components/admin/INPIResourcePDFPreview.tsx`, ajustar 3 pontos para tratar `resourceType === 'oposicao'`:
+- Novo estado: `const [userOrientation, setUserOrientation] = useState('')`.
+- Resetar `userOrientation` ao voltar/finalizar fluxo (junto com `setMultipleFiles([])`).
+- Na etapa `upload` (linha ~2315), **logo após a Drop zone** e antes do "Agent badge", renderizar condicionalmente quando `resourceType === 'exigencia_merito'`:
+  - Card com título "Orientações para o Agente (opcional)" + descrição curta.
+  - `<Textarea>` com `value={userOrientation}`, `onChange`, `rows={6}`, placeholder explicando que pode descrever a estratégia, pontos a enfatizar, argumentos específicos, tom desejado, etc.
+  - Contador de caracteres.
+- Em `processDocument` (chamadas pass1 e pass2 do `process-inpi-resource`), incluir `userOrientation: userOrientation.trim() || undefined` no `body` — apenas relevante para `exigencia_merito`, mas mandar sempre não atrapalha; alternativamente passar apenas quando preenchido.
 
-1. **`documentTitle`** (linha ~307): adicionar ramo `isOposicao ? 'Manifestação à Oposição'`.
-2. **Badge do PDF** (linha ~419/425): substituir o fallback `'RECURSO ADMINISTRATIVO'` para usar `documentTitleUpper` (ou ramo explícito `'MANIFESTAÇÃO À OPOSIÇÃO'` quando oposição).
-3. **Badge da pré-visualização** (linha ~1027/1028): mesma troca do fallback.
+### 2. `supabase/functions/process-inpi-resource/index.ts`
 
-Também ajustar o nome do arquivo PDF para `Manifestacao_Oposicao_<marca>_<data>.pdf` quando for oposição.
-
-Os demais tipos (indeferimento, exigência de mérito, etc.) continuam com **"RECURSO ADMINISTRATIVO"**, que é o termo tecnicamente correto para esses.
+- Ler `userOrientation` do body.
+- Quando `resourceType === 'exigencia_merito'` e `userOrientation` estiver preenchido, injetar um bloco no prompt do usuário (tanto pass1 quanto pass2) com prioridade alta, ex.:
+  ```
+  ⚠️ ORIENTAÇÕES OBRIGATÓRIAS DO USUÁRIO (siga à risca, são a diretriz principal deste recurso):
+  <userOrientation literal>
+  ```
+- Esse bloco deve ser inserido **antes** das instruções genéricas de estratégia, com marcação de prioridade máxima, para que o agente Mazzola siga as orientações do usuário.
 
 ## Escopo
 
-Mudança apenas de apresentação/UI em um único arquivo. Não afeta o conteúdo gerado pela IA nem o banco de dados.
+- Apenas UI da etapa upload e edge function de geração.
+- Nenhuma mudança em outros tipos de recurso (indeferimento, oposição, notificação, procurador).
+- Sem alterações de schema.  PRECISO QUE TAMBEM FACA ISSO; Pontos que eu melhoraria
+  #### 1. Não é exatamente um "Recurso Administrativo"
+  Tecnicamente trata-se de:
+  **Cumprimento de Exigência de Mérito**
+  e não de um recurso administrativo. O próprio texto reconhece isso diversas vezes.
+  Isso não costuma gerar indeferimento, mas a nomenclatura poderia ser mais precisa.
+  ---
+  #### 2. Ficou excessivamente longo
+  Para uma exigência classificatória simples, 10 páginas é bastante.
+  O INPI normalmente resolveria isso com:
+  - nova especificação;
+  - justificativa de 1 a 2 páginas.
+  Você entregou praticamente uma tese jurídica.
+  Não prejudica, mas parte do texto é dispensável.
