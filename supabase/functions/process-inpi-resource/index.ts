@@ -1283,7 +1283,7 @@ SEÇÕES I A IV JÁ GERADAS:
 ${basePass1Content.substring(0, 6000)}
 ---
 
-Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo e nível de profundidade. ${resourceType === 'exigencia_merito' ? 'O texto total desta parte deve ter NO MÍNIMO 2.500 palavras.' : 'O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.'}` },
+Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo e nível de profundidade. ${resourceType === 'exigencia_merito' ? 'O texto total desta parte deve ter entre 800 e 1.400 palavras — SEJA OBJETIVO.' : 'O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.'}${userOrientationBlock}` },
       ];
 
       console.log('PASS 2 only: Generating Sections V-VIII...');
@@ -1322,7 +1322,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     const pass1System = buildPass1SystemPrompt(resourceType, resourceTypeLabel, currentDate, agentName, agentStrategy);
     const pass1User = [
       { type: 'input_text', text: resourceType === 'exigencia_merito'
-        ? `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Identifique exatamente o que o(a) examinador(a) exigiu e responda a isso com precisão técnica. Se a exigência pedir detalhamento de especificação, apresente a redação corrigida adequada à classe. NÃO transforme a peça em oposição, conflito marcário, cotejo com marcas de terceiros ou defesa de colidência, salvo se isso constar expressamente no despacho. O texto desta parte deve ter NO MÍNIMO 3.200 palavras.`
+        ? `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Identifique exatamente o que o(a) examinador(a) exigiu e responda a isso com precisão técnica e OBJETIVA. Se a exigência pedir detalhamento de especificação, apresente a redação corrigida adequada à classe. NÃO transforme a peça em oposição, conflito marcário, cotejo com marcas de terceiros ou defesa de colidência, salvo se isso constar expressamente no despacho. A peça deve ser ENXUTA: entre 1.300 e 2.000 palavras nesta parte. NÃO chame a peça de "Recurso Administrativo"; trata-se de "Cumprimento de Exigência de Mérito".${userOrientationBlock}`
         : `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do recurso administrativo. CADA seção deve ter a extensão MÍNIMA especificada. O texto total desta parte deve ter NO MÍNIMO 3.800 palavras. Desenvolva CADA argumento com máxima profundidade, como um escritório de PI de elite faria.` },
       ...fileResponseParts,
     ];
@@ -1330,7 +1330,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     const pass2System = buildPass2SystemPrompt(resourceType, resourceTypeLabel, currentDate, agentName, agentStrategy);
     const pass2User = [
       { type: 'input_text', text: resourceType === 'exigencia_merito'
-        ? `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Foque EXCLUSIVAMENTE no atendimento da exigência formulada pelo(a) examinador(a), sem inserir argumentos de oposição, conflito entre marcas, convivência marcária ou risco de confusão, salvo se isso constar expressamente no despacho. O texto total desta parte deve ter NO MÍNIMO 2.500 palavras.`
+        ? `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Foque EXCLUSIVAMENTE no atendimento da exigência formulada pelo(a) examinador(a), sem inserir argumentos de oposição, conflito entre marcas, convivência marcária ou risco de confusão, salvo se isso constar expressamente no despacho. O texto total desta parte deve ter entre 800 e 1.400 palavras — SEJA OBJETIVO. NÃO chame a peça de "Recurso Administrativo".${userOrientationBlock}`
         : `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do recurso administrativo. Mantenha tom técnico, fundamentação robusta e conclusões objetivas. O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.` },
       ...fileResponseParts,
     ];
