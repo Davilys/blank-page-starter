@@ -80,7 +80,10 @@ async function callOpenAI(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-5',
+      // gpt-5-mini: mantém raciocínio jurídico superior ao gpt-4o,
+      // mas ~3-5x mais rápido — necessário para caber no limite de 150s
+      // do Edge Function quando rodamos PASS 1 + PASS 2.
+      model: 'gpt-5-mini',
       input: inputMessages,
       max_output_tokens: maxTokens,
       // gpt-5 only accepts default temperature (1). Omit user-supplied temperature.
