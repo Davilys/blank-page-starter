@@ -297,6 +297,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   const isRespostaNotif = isRespostaNotificacao(resourceType);
   const isExtrajudicialDoc = isExtrajudicial(resourceType);
   const isProcuradorPetition = resourceType === 'troca_procurador' || resourceType === 'nomeacao_procurador';
+  const isOposicao = resourceType === 'oposicao';
   const cleanedContent = stripOpeningMarkers(softCleanMarkdown(liveContent));
   const bodyContent = stripClosingFromContent(cleanedContent, resourceType);
 
@@ -312,6 +313,8 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       ? resourceType === 'troca_procurador'
         ? 'Petição de Troca de Procurador'
         : 'Petição de Nomeação de Procurador'
+    : isOposicao
+      ? 'Manifestação à Oposição'
       : 'Recurso Administrativo';
   const documentTitleUpper = documentTitle.toUpperCase();
   const pdfFileName = isNotif
@@ -320,6 +323,8 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       ? `Resposta_Notificacao_Extrajudicial_${format(new Date(), 'yyyy-MM-dd')}.pdf`
     : isProcuradorPetition
       ? `${resourceType === 'troca_procurador' ? 'Peticao_Troca_Procurador' : 'Peticao_Nomeacao_Procurador'}_${resource.brand_name?.replace(/\s+/g, '_') || 'INPI'}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
+    : isOposicao
+      ? `Manifestacao_Oposicao_${resource.brand_name?.replace(/\s+/g, '_') || 'INPI'}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
       : `Recurso_${resource.brand_name?.replace(/\s+/g, '_') || 'INPI'}_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
 
   const handlePrint = () => {
@@ -422,6 +427,8 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           ? 'RESPOSTA À NOTIFICAÇÃO EXTRAJUDICIAL'
         : isProcuradorPetition
           ? documentTitleUpper
+        : isOposicao
+          ? 'MANIFESTAÇÃO À OPOSIÇÃO'
           : 'RECURSO ADMINISTRATIVO';
 
       // Draw navy badge
@@ -1025,6 +1032,8 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
                       ? 'RESPOSTA À NOTIFICAÇÃO EXTRAJUDICIAL'
                   : isProcuradorPetition
                     ? documentTitleUpper
+                  : isOposicao
+                    ? 'MANIFESTAÇÃO À OPOSIÇÃO'
                     : 'RECURSO ADMINISTRATIVO'}
               </p>
             </div>
