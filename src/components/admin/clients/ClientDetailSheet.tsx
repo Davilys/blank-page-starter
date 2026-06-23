@@ -1238,10 +1238,10 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
     { id: 'nova_fatura', label: 'Nova Fatura', icon: Receipt, cls: 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300 hover:bg-teal-200 dark:hover:bg-teal-900/60' },
     {
       id: 'cliente_especial',
-      label: (client as any).is_special_client ? 'Cliente Especial ✓' : 'Cliente Especial',
+      label: (client as any).is_special_client ? '⭐ Cliente Especial ✓' : 'Cliente Especial',
       icon: Star,
       cls: (client as any).is_special_client
-        ? 'bg-amber-400 text-amber-950 hover:bg-amber-500 border border-amber-500 shadow-sm font-bold'
+        ? 'bg-yellow-300 text-yellow-950 hover:bg-yellow-400 border-2 border-yellow-500 ring-2 ring-yellow-300/70 ring-offset-2 ring-offset-transparent shadow-lg shadow-yellow-500/40 font-bold'
         : 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 border border-amber-200 dark:border-amber-800',
     },
     ...(isMasterAdmin && client?.email && client.email !== MASTER_ADMIN_EMAIL ? [
@@ -1437,7 +1437,9 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                   <Zap className="h-3 w-3" /> Ações Rápidas
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {QUICK_ACTIONS.map(action => (
+                  {QUICK_ACTIONS.map(action => {
+                    const isSpecialActive = action.id === 'cliente_especial' && (client as any).is_special_client;
+                    return (
                     <motion.button
                       key={action.id}
                       whileHover={{ scale: 1.05 }}
@@ -1445,10 +1447,11 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                       className={cn('px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors', action.cls)}
                       onClick={() => handleQuickAction(action.id)}
                     >
-                      <action.icon className="h-3.5 w-3.5" />
+                      <action.icon className={cn('h-3.5 w-3.5', isSpecialActive && 'fill-yellow-600 text-yellow-700')} />
                       {action.label}
                     </motion.button>
-                  ))}
+                    );
+                  })}
                   {extraActions}
                 </div>
               </div>
