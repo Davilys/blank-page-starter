@@ -353,7 +353,6 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         address: '', neighborhood: '', city: '', state: '', zip_code: '',
         priority: client.priority || 'medium', origin: client.origin || 'site',
         brand_name: client.brand_name || '', business_area: client.business_area || '', assigned_to: client.assigned_to || '',
-        is_special_client: !!(client as any).is_special_client,
       });
       const matchedOption = SERVICE_PRICING_OPTIONS.find(opt => opt.value === client.contract_value);
       if (matchedOption) setSelectedPricing(matchedOption.id);
