@@ -14,7 +14,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -331,7 +330,6 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
     full_name: '', email: '', phone: '', cpf: '', cnpj: '', company_name: '',
     address: '', neighborhood: '', city: '', state: '', zip_code: '',
     priority: 'medium', origin: 'site', brand_name: '', business_area: '', assigned_to: '',
-    is_special_client: false,
   });
   const [newProcess, setNewProcess] = useState({ brand_name: '', process_number: '', pipeline_stage: 'protocolado', business_area: '' });
   const { stages: juridicoStages } = useJuridicoStages();
@@ -354,7 +352,6 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         address: '', neighborhood: '', city: '', state: '', zip_code: '',
         priority: client.priority || 'medium', origin: client.origin || 'site',
         brand_name: client.brand_name || '', business_area: client.business_area || '', assigned_to: client.assigned_to || '',
-        is_special_client: !!(client as any).is_special_client,
       });
       const matchedOption = SERVICE_PRICING_OPTIONS.find(opt => opt.value === client.contract_value);
       if (matchedOption) setSelectedPricing(matchedOption.id);
@@ -756,7 +753,6 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         state: editFormData.state, zip_code: editFormData.zip_code,
         priority: editFormData.priority, origin: editFormData.origin,
         assigned_to: editFormData.assigned_to || null,
-        is_special_client: editFormData.is_special_client,
       }).eq('id', client.id);
       if (profileError) throw profileError;
       if (client.process_id && (editFormData.brand_name || editFormData.business_area)) {
@@ -1018,6 +1014,27 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         break;
       case 'nova_fatura': setShowNewInvoiceDialog(true); break;
       case 'reset_senha': setShowResetPasswordDialog(true); break;
+      case 'cliente_especial': {
+        if (!client) break;
+        const current = !!(client as any).is_special_client;
+        const next = !current;
+        const { error } = await supabase
+          .from('profiles')
+          .update({ is_special_client: next } as any)
+          .eq('id', client.id);
+        if (error) {
+          toast.error(`Erro ao atualizar Cliente Especial: ${error.message}`);
+        } else {
+          toast.success(
+            next
+              ? 'Cliente marcado como Especial — movimentações INPI sem cobrança de honorários'
+              : 'Cliente Especial removido — voltará a receber cobranças normais'
+          );
+          await fetchClientData();
+          onUpdate();
+        }
+        break;
+      }
     }
   };
 
@@ -1219,6 +1236,14 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
     { id: 'excluir', label: 'Excluir', icon: Trash2, cls: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200' },
     { id: 'processo', label: 'Detalhes do Processo', icon: FileText, cls: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/60' },
     { id: 'nova_fatura', label: 'Nova Fatura', icon: Receipt, cls: 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300 hover:bg-teal-200 dark:hover:bg-teal-900/60' },
+    {
+      id: 'cliente_especial',
+      label: (client as any).is_special_client ? 'Cliente Especial ✓' : 'Cliente Especial',
+      icon: Star,
+      cls: (client as any).is_special_client
+        ? 'bg-amber-400 text-amber-950 hover:bg-amber-500 border border-amber-500 shadow-sm font-bold'
+        : 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 border border-amber-200 dark:border-amber-800',
+    },
     ...(isMasterAdmin && client?.email && client.email !== MASTER_ADMIN_EMAIL ? [
       { id: 'reset_senha', label: 'Resetar Senha', icon: KeyRound, cls: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60' },
     ] : []),
@@ -3581,23 +3606,6 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                     <SelectTrigger><SelectValue placeholder="Não atribuído" /></SelectTrigger>
                     <SelectContent className="max-h-60"><SelectItem value="none">Nenhum</SelectItem>{adminUsersList.map(a => <SelectItem key={a.id} value={a.id}>{a.full_name || a.email}</SelectItem>)}</SelectContent>
                   </Select>
-                </div>
-                <div className="col-span-2">
-                  <div className="flex items-start justify-between gap-3 rounded-xl border-2 border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 px-4 py-3">
-                    <div className="flex-1 min-w-0">
-                      <Label className="flex items-center gap-1.5 text-sm font-semibold text-amber-900 dark:text-amber-200">
-                        <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
-                        Cliente Especial
-                      </Label>
-                      <p className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-1">
-                        Quando ativo, as movimentações no INPI enviam apenas a notificação ao cliente, <strong>sem cobrança de honorários</strong>.
-                      </p>
-                    </div>
-                    <Switch
-                      checked={editFormData.is_special_client}
-                      onCheckedChange={(v) => setEditFormData({ ...editFormData, is_special_client: !!v })}
-                    />
-                  </div>
                 </div>
               </div>
             </ScrollArea>
