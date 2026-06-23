@@ -72,11 +72,7 @@ export function PropostaDesistiuDialog({ open, onOpenChange, publicacao, client,
             .update({ last_notif_at: now, last_notif_bucket: 'desistiu_proposta' })
             .eq('id', existing.id);
         }
-        await supabase.from('publicacao_logs').insert({
-          publicacao_id: publicacao.id,
-          acao: 'proposta_desistiu_enviada',
-          detalhes: { channel, subject, valor: 699 } as any,
-        });
+        // log opcional ignorado para evitar dependência de schema específico
       } catch { /* opcional */ }
 
       toast.success(`Proposta enviada via ${channel === 'ambos' ? 'e-mail e WhatsApp' : channel}`);
