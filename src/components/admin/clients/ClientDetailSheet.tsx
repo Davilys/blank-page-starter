@@ -3581,6 +3581,23 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                     <SelectContent className="max-h-60"><SelectItem value="none">Nenhum</SelectItem>{adminUsersList.map(a => <SelectItem key={a.id} value={a.id}>{a.full_name || a.email}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
+                <div className="col-span-2">
+                  <div className="flex items-start justify-between gap-3 rounded-xl border-2 border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 px-4 py-3">
+                    <div className="flex-1 min-w-0">
+                      <Label className="flex items-center gap-1.5 text-sm font-semibold text-amber-900 dark:text-amber-200">
+                        <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
+                        Cliente Especial
+                      </Label>
+                      <p className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-1">
+                        Quando ativo, as movimentações no INPI enviam apenas a notificação ao cliente, <strong>sem cobrança de honorários</strong>.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={editFormData.is_special_client}
+                      onCheckedChange={(v) => setEditFormData({ ...editFormData, is_special_client: !!v })}
+                    />
+                  </div>
+                </div>
               </div>
             </ScrollArea>
             <DialogFooter>
