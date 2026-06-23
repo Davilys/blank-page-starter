@@ -178,7 +178,7 @@ function calcDeadlineFromDispatch(dispatchText: string | null, publicationDate: 
 }
 
 // Regras INPI por status (usadas quando dispatch_text está ausente)
-function calcDeadlineFromStatus(status: PubStatus | string | undefined): { days: number | null; desc: string } | null {
+export function calcDeadlineFromStatus(status: PubStatus | string | undefined): { days: number | null; desc: string } | null {
   switch (status) {
     case '003':
     case 'oposicao':
