@@ -1267,7 +1267,13 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                     {isOpen && (
                       <TableRow key={h.id + "-detail"} className="bg-muted/30">
                         <TableCell colSpan={8} className="py-3">
-                          <ParcelasPanel parcelas={parcelas} totalVencido={sum.totalVencido} max={5} />
+                          <ParcelasPanel
+                            parcelas={parcelas}
+                            totalVencido={sum.totalVencido}
+                            max={5}
+                            clienteNome={h.cliente_nome}
+                            clienteCpfCnpj={h.cliente_cpf_cnpj}
+                          />
                         </TableCell>
                       </TableRow>
                     )}
@@ -1380,7 +1386,13 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                     {isOpen && (
                       <TableRow key={h.id + "-detail"} className="bg-muted/30">
                         <TableCell colSpan={9} className="py-3">
-                          <ParcelasPanel parcelas={parcelas} totalVencido={sum.totalVencido} max={max} />
+                          <ParcelasPanel
+                            parcelas={parcelas}
+                            totalVencido={sum.totalVencido}
+                            max={max}
+                            clienteNome={h.cliente_nome}
+                            clienteCpfCnpj={h.cliente_cpf_cnpj}
+                          />
                         </TableCell>
                       </TableRow>
                     )}
