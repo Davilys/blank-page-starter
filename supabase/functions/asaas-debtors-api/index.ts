@@ -410,6 +410,13 @@ Deno.serve(async (req) => {
       }
 
       await cleanupBucket(admin, "d30", 31, 59);
+      if (negotiatedSet.size > 0) {
+        const ids = Array.from(negotiatedSet);
+        for (let i = 0; i < ids.length; i += 500) {
+          const chunk = ids.slice(i, i + 500);
+          await admin.from("cobrancas_vencidas").delete().in("asaas_payment_id", chunk);
+        }
+      }
       return json({ success: true, total_overdue: total, kept_under_30d: kept, skipped_finalized, skipped_in_history });
     }
 
