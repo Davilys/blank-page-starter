@@ -1014,6 +1014,27 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         break;
       case 'nova_fatura': setShowNewInvoiceDialog(true); break;
       case 'reset_senha': setShowResetPasswordDialog(true); break;
+      case 'cliente_especial': {
+        if (!client) break;
+        const current = !!(client as any).is_special_client;
+        const next = !current;
+        const { error } = await supabase
+          .from('profiles')
+          .update({ is_special_client: next } as any)
+          .eq('id', client.id);
+        if (error) {
+          toast.error(`Erro ao atualizar Cliente Especial: ${error.message}`);
+        } else {
+          toast.success(
+            next
+              ? 'Cliente marcado como Especial — movimentações INPI sem cobrança de honorários'
+              : 'Cliente Especial removido — voltará a receber cobranças normais'
+          );
+          await fetchClientData();
+          onUpdate();
+        }
+        break;
+      }
     }
   };
 
