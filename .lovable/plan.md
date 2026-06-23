@@ -1,49 +1,60 @@
 ## Objetivo
 
-Na aba **Prazos** → bucket **"Desistiu"**, substituir o botão "Notificar" por **"Enviar Proposta R$ 699"**. Ao clicar, dispara em um único clique:
-- **E-mail** com o texto formal completo (Equipe Jurídica WebMarcas, R$ 1.621 → R$ 699 PIX/cartão)
-- **WhatsApp** com a mensagem curta da oferta especial
+No Financeiro, parcelas geradas por uma negociação (Devedores +30) ou renegociação (Devedores +60) estão reaparecendo como "novos vencidos" assim que vencem (em Vencidos até 30, depois +30, depois +60). Isso é errado: uma vez que o débito foi negociado, suas parcelas pertencem **apenas** ao Histórico daquela negociação — nunca devem voltar a aparecer nas listas de cobrança. Além disso, o Histórico precisa mostrar o detalhe parcela a parcela (pagas, a vencer, vencidas).
 
-Mensagens diferentes por canal; `[NOME]` substituído pelo nome do cliente.
+## O que muda
 
-## Escopo
+### 1. Filtro global de "parcelas já negociadas" (backend)
 
-### 1. Novo template (`src/components/admin/publicacao/cobrancaTemplates.ts`)
-Adicionar `PROPOSTA_DESISTIU_TEMPLATE` exportado:
-- `subject(marca)` → `"Proposta especial para continuidade do registro — <marca>"`
-- `email(nome, marca)` → HTML formatado com o texto formal completo fornecido pelo usuário (parágrafos, bullets PIX/cartão, assinatura Equipe Jurídica WebMarcas, telefone, site)
-- `whatsapp(nome)` → texto curto com 🚨 e oferta R$ 699
+Criar um helper único no edge function `asaas-debtors-api` que retorna o conjunto de `asaas_payment_id` que já pertencem a alguma negociação — unindo:
 
-### 2. Botão exclusivo do bucket Desistiu (`src/components/admin/publicacao/PublicacaoPrazos.tsx`)
-- Quando `status_cumprimento === 'desistiu'` (ou bucket ativo = "desistiu"), a célula de ações exibe **"Enviar Proposta R$ 699"** (botão destaque) no lugar do "Notificar" atual.
-- Ao clicar, abre um `Dialog` de confirmação com:
-  - Dados do cliente (nome, e-mail, WhatsApp) lidos do `profile` vinculado
-  - Preview do assunto + corpo do e-mail
-  - Preview da mensagem do WhatsApp
-  - Botão **"Enviar agora (E-mail + WhatsApp)"** e **Cancelar**
-- Handler `enviarPropostaDesistiu(pub)` chama a edge function já existente `send-multichannel-notification` com:
-  - `channels: ['email','whatsapp']`
-  - `recipient: { nome, email, phone, user_id }`
-  - `custom_subject`, `custom_html`, `custom_message`
-  - `event_type: 'desistiu_proposta_699'`
-- Toast de sucesso/erro. Após envio, registra `last_notif_at` + `last_notif_bucket = 'desistiu_proposta'` em `publicacao_cobranca_schedule` (se existir registro para a publicação) apenas como histórico — sem alterar cronograma 15/30/50.
+- `parcelas_devedor.asaas_payment_id` (vindo de `negociacoes_devedor`)
+- `parcelas_renegociadas.asaas_payment_id` (vindo de `renegociacoes`)
 
-### 3. Comportamento
-- Demais buckets (No Prazo / 30 Dias / Última Semana / Vencidos / Cumpridos) seguem com o botão **Notificar** original — nada muda.
-- Apenas em **Desistiu** a ação vira a Proposta R$ 699.
+Aplicar esse filtro em:
+
+- `sync-overdue` (bucket d60) — ignora o pagamento e não insere em `cobrancas_vencidas`.
+- `sync-overdue-30` (bucket d30) — idem.
+- `list-debtors-grouped` e `list-debtors-30-grouped` — remove qualquer linha residual cujo `asaas_payment_id` já esteja em uma negociação.
+- Como segurança extra: marcar tais linhas como `status='negociada'` em `cobrancas_vencidas` durante o sync, para nunca mais voltarem.
+
+### 2. Vencidos até 30 dias (lista do Financeiro)
+
+`src/components/admin/financeiro/vencidos/Vencidos30DiasTab.tsx` lê direto da tabela `invoices`. Antes de renderizar, buscar todos os `asaas_payment_id` em `parcelas_devedor` + `parcelas_renegociadas` e filtrar as faturas cujo `asaas_invoice_id` esteja nesse conjunto — assim parcelas de negociação que vencem entre 1 e 30 dias somem desta aba.
+
+### 3. Histórico (Devedores +30 e +60) — detalhar parcelas
+
+Hoje o histórico mostra só totais. Vou:
+
+- Tornar cada linha do histórico **expansível** (chevron) para abrir um painel com a lista de parcelas (`parcelas_devedor` ou `parcelas_renegociadas` — já são carregadas via join).
+- Em cada parcela, mostrar: nº, vencimento, valor, link do boleto, e um badge calculado:
+  - **Paga** — quando `status` ∈ {paid, confirmed, received}.
+  - **A vencer** — quando não paga e `data_vencimento >= hoje`.
+  - **Vencida** — quando não paga e `data_vencimento < hoje`.
+- No cabeçalho da linha do histórico, adicionar contadores resumidos: `X pagas · Y a vencer · Z vencidas` e o subtotal vencido em R$.
+
+### 4. Organização do Financeiro
+
+Para deixar coerente com a nova regra:
+
+- Em `FinanceiroVencidos.tsx`, renomear as abas e descrições:
+  - "Vencidos até 30 dias" → faturas avulsas (sem negociação) com 1–30 dias de atraso.
+  - "Devedores +30 dias" → débitos 31–59 dias **ainda não negociados** + histórico de negociações 3x.
+  - "Devedores +60 dias" → débitos 60+ dias **ainda não renegociados** + histórico de renegociações 5x.
+- Em cada aba, adicionar uma legenda curta abaixo do toggle Lista/Histórico explicando que "parcelas já negociadas só aparecem no Histórico".
+- Na página `Financeiro.tsx`, o card "Vencidos 30d" passa a refletir o mesmo filtro (descontando parcelas negociadas) para o número não divergir da aba.
+
+## Arquivos afetados
+
+- `supabase/functions/asaas-debtors-api/index.ts` — novo helper `getNegotiatedPaymentIds`, aplicado em sync + list.
+- `src/components/admin/financeiro/vencidos/Vencidos30DiasTab.tsx` — filtro de exclusão por `asaas_invoice_id`.
+- `src/pages/admin/Devedores.tsx` — linhas de histórico expansíveis com detalhe de parcelas; contadores; estado de expansão por id.
+- `src/pages/admin/FinanceiroVencidos.tsx` — textos das abas e legenda explicativa.
+- `src/pages/admin/Financeiro.tsx` — ajuste do cálculo `overdue30d` para descontar parcelas negociadas.
 
 ## Detalhes técnicos
 
-**Arquivos afetados:**
-- `src/components/admin/publicacao/cobrancaTemplates.ts` — adicionar template.
-- `src/components/admin/publicacao/PublicacaoPrazos.tsx` — render condicional + dialog + handler.
-
-**Sem mudanças de schema. Sem nova edge function** — reutiliza `send-multichannel-notification`.
-
-**Substituições:**
-- `[NOME]` → `profile.full_name || 'Cliente'`
-- marca → `pub.brand_name_rpi`
-
-## Fora de escopo
-- Não altera fluxo dos 3 lembretes (15/30/50) nem auto-assignment de responsável.
-- Não cria automação/cron — disparo é manual por clique do admin.
+- Sem migration: as tabelas `parcelas_devedor` e `parcelas_renegociadas` já existem e têm `asaas_payment_id`.
+- O helper roda em batches de até 1000 ids para respeitar o limite do PostgREST.
+- Status de parcela vem de `parcelas_devedor.status` / `parcelas_renegociadas.status` (já gravado pelo webhook do Asaas); a categorização "a vencer / vencida" é puramente derivada no cliente.
+- A marcação `status='negociada'` em `cobrancas_vencidas` é idempotente e usa update em massa apenas quando há ids novos detectados no sweep.
