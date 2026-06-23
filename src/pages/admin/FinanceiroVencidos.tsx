@@ -89,16 +89,25 @@ export default function FinanceiroVencidos() {
         <Suspense fallback={<div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
           <TabsContent value="ate30" className="mt-0 space-y-3">
             <ViewToggle value={viewAte30} onChange={setViewAte30} />
+            <p className="text-xs text-muted-foreground">
+              Faturas avulsas vencidas em até 30 dias. Parcelas já negociadas ou renegociadas aparecem apenas no Histórico.
+            </p>
             <Vencidos30DiasTab view={viewAte30} />
           </TabsContent>
 
           <TabsContent value="mais30" className="mt-0 space-y-3">
             <ViewToggle value={view30} onChange={setView30} />
+            <p className="text-xs text-muted-foreground">
+              Devedores com 31 a 59 dias de atraso ainda sem negociação. Parcelas geradas por acordo ficam apenas no Histórico.
+            </p>
             <Devedores embedded forceTab={view30 === "lista" ? "devedor" : "historico-devedor"} />
           </TabsContent>
 
           <TabsContent value="mais60" className="mt-0 space-y-3">
             <ViewToggle value={view60} onChange={setView60} />
+            <p className="text-xs text-muted-foreground">
+              Devedores com 60+ dias de atraso ainda sem renegociação. Parcelas de acordos anteriores ficam apenas no Histórico.
+            </p>
             <Devedores embedded forceTab={view60 === "lista" ? "lista" : "historico"} />
           </TabsContent>
         </Suspense>

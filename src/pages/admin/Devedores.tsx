@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, lazy, Suspense } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense, Fragment } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, RefreshCw, Loader2, Zap, AlertTriangle, Users, DollarSign, TrendingUp, Search, Mail, MessageCircle, Trash2 } from "lucide-react";
+import { ArrowLeft, RefreshCw, Loader2, Zap, AlertTriangle, Users, DollarSign, TrendingUp, Search, Mail, MessageCircle, Trash2, ChevronDown, ChevronRight, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ClientWithProcess } from "@/components/admin/clients/ClientKanbanBoard";
@@ -71,6 +71,79 @@ const fmtDate = (s: string) => {
   return `${d}/${m}/${y}`;
 };
 
+const PAID_STATUSES = new Set(["paid", "confirmed", "received", "RECEIVED", "CONFIRMED"]);
+function parcelaState(p: any): "paga" | "vencida" | "a_vencer" {
+  const s = (p?.status || "").toString();
+  if (PAID_STATUSES.has(s)) return "paga";
+  if (!p?.data_vencimento) return "a_vencer";
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const due = new Date(p.data_vencimento + "T00:00:00");
+  return due < today ? "vencida" : "a_vencer";
+}
+function summarizeParcelas(parcelas: any[]) {
+  let pagas = 0, vencidas = 0, aVencer = 0, totalVencido = 0;
+  for (const p of parcelas || []) {
+    const st = parcelaState(p);
+    if (st === "paga") pagas++;
+    else if (st === "vencida") { vencidas++; totalVencido += Number(p.valor) || 0; }
+    else aVencer++;
+  }
+  return { pagas, vencidas, aVencer, totalVencido };
+}
+
+function ParcelasPanel({ parcelas, totalVencido, max }: { parcelas: any[]; totalVencido: number; max: number }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>Parcelas do acordo ({parcelas.length}/{max})</span>
+        {totalVencido > 0 && (
+          <span className="text-red-600 font-medium">Vencido em aberto: {fmtBRL(totalVencido)}</span>
+        )}
+      </div>
+      <div className="rounded border border-border/60 overflow-hidden">
+        <table className="w-full text-xs">
+          <thead className="bg-muted/50">
+            <tr>
+              <th className="text-left px-2 py-1">#</th>
+              <th className="text-left px-2 py-1">Vencimento</th>
+              <th className="text-right px-2 py-1">Valor</th>
+              <th className="text-left px-2 py-1">Status</th>
+              <th className="text-right px-2 py-1">Boleto</th>
+            </tr>
+          </thead>
+          <tbody>
+            {parcelas.map((p: any) => {
+              const st = parcelaState(p);
+              const cfg =
+                st === "paga" ? { label: "Paga", cls: "text-emerald-600 border-emerald-500/40", Icon: CheckCircle2 } :
+                st === "vencida" ? { label: "Vencida", cls: "text-red-600 border-red-500/40", Icon: AlertCircle } :
+                { label: "A vencer", cls: "text-amber-600 border-amber-500/40", Icon: Clock };
+              const link = p.invoice_url || p.link_boleto || "";
+              return (
+                <tr key={p.id} className="border-t border-border/40">
+                  <td className="px-2 py-1">{p.numero_parcela}</td>
+                  <td className="px-2 py-1">{p.data_vencimento ? fmtDate(p.data_vencimento) : "—"}</td>
+                  <td className="px-2 py-1 text-right">{fmtBRL(Number(p.valor) || 0)}</td>
+                  <td className="px-2 py-1">
+                    <Badge variant="outline" className={cfg.cls}>
+                      <cfg.Icon className="h-3 w-3 mr-1" />{cfg.label}
+                    </Badge>
+                  </td>
+                  <td className="px-2 py-1 text-right">
+                    {link ? (
+                      <a href={link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Abrir</a>
+                    ) : <span className="text-muted-foreground">—</span>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 async function callApi(action: string, body?: any) {
   const { data: sess } = await supabase.auth.getSession();
   const token = sess.session?.access_token;
@@ -122,6 +195,14 @@ export default function Devedores({ embedded = false, forceTab }: DevedoresProps
   const [pageSize60, setPageSize60] = useState<PageSize>(10);
   const [page30, setPage30] = useState(1);
   const [pageSize30, setPageSize30] = useState<PageSize>(10);
+  const [expandedHist, setExpandedHist] = useState<Set<string>>(new Set());
+  const toggleHistRow = (id: string) => {
+    setExpandedHist((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
   const devedoresIds = useMemo(
     () => [...debtors, ...debtors30].map(d => d.asaas_customer_id).filter(Boolean),
     [debtors, debtors30],
@@ -927,6 +1008,7 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10"></TableHead>
                     <TableHead>Data</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead className="text-right">Original</TableHead>
@@ -938,9 +1020,14 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                 </TableHeader>
                 <TableBody>
                   {filteredHistory.length === 0 && (
-                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhuma renegociação ainda.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Nenhuma renegociação ainda.</TableCell></TableRow>
                   )}
-                  {filteredHistory.map((h) => (
+                  {filteredHistory.map((h) => {
+                    const parcelas = (h.parcelas_renegociadas || []).slice().sort((a: any, b: any) => (a.numero_parcela || 0) - (b.numero_parcela || 0));
+                    const sum = summarizeParcelas(parcelas);
+                    const isOpen = expandedHist.has(h.id);
+                    return (
+                    <Fragment key={h.id}>
                     <TableRow
                       key={h.id}
                       onClick={() => openClientFile({
@@ -959,6 +1046,9 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                       } as Debtor)}
                       className="cursor-pointer"
                     >
+                      <TableCell onClick={(e) => { e.stopPropagation(); toggleHistRow(h.id); }} className="cursor-pointer">
+                        {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      </TableCell>
                       <TableCell className="text-sm">{new Date(h.created_at).toLocaleDateString("pt-BR")}</TableCell>
                       <TableCell>
                         <span className="inline-flex items-center gap-2 hover:text-primary hover:underline transition-colors">
@@ -992,7 +1082,14 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                       <TableCell className="text-right text-amber-600">{fmtBRL(h.valor_acrescimo)}</TableCell>
                       <TableCell className="text-right font-semibold">{fmtBRL(h.valor_renegociado)}</TableCell>
                       <TableCell className="text-center">
-                        <Badge variant="outline">{h.parcelas_renegociadas?.length || 0}/5</Badge>
+                        <div className="flex flex-col items-center gap-0.5">
+                          <Badge variant="outline">{parcelas.length}/5</Badge>
+                          <div className="text-[10px] text-muted-foreground flex gap-1">
+                            <span className="text-emerald-600">{sum.pagas}p</span>·
+                            <span className="text-amber-600">{sum.aVencer}a</span>·
+                            <span className="text-red-600">{sum.vencidas}v</span>
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         {h.asaas_customer_id ? (
@@ -1006,7 +1103,15 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                         )}
                       </TableCell>
                     </TableRow>
-                  ))}
+                    {isOpen && (
+                      <TableRow key={h.id + "-detail"} className="bg-muted/30">
+                        <TableCell colSpan={8} className="py-3">
+                          <ParcelasPanel parcelas={parcelas} totalVencido={sum.totalVencido} max={5} />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    </Fragment>
+                  );})}
                 </TableBody>
               </Table>
             </CardContent>
@@ -1019,6 +1124,7 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10"></TableHead>
                     <TableHead>Data</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Tipo</TableHead>
@@ -1031,9 +1137,15 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                 </TableHeader>
                 <TableBody>
                   {filteredHistory30.length === 0 && (
-                    <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Nenhuma negociação ainda.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Nenhuma negociação ainda.</TableCell></TableRow>
                   )}
-                  {filteredHistory30.map((h) => (
+                  {filteredHistory30.map((h) => {
+                    const parcelas = (h.parcelas_devedor || []).slice().sort((a: any, b: any) => (a.numero_parcela || 0) - (b.numero_parcela || 0));
+                    const sum = summarizeParcelas(parcelas);
+                    const isOpen = expandedHist.has(h.id);
+                    const max = h.tipo === 'negociar' ? 3 : 1;
+                    return (
+                    <Fragment key={h.id}>
                     <TableRow
                       key={h.id}
                       onClick={() => openClientFile({
@@ -1052,6 +1164,9 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                       } as Debtor)}
                       className="cursor-pointer"
                     >
+                      <TableCell onClick={(e) => { e.stopPropagation(); toggleHistRow(h.id); }} className="cursor-pointer">
+                        {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      </TableCell>
                       <TableCell className="text-sm">{new Date(h.created_at).toLocaleDateString("pt-BR")}</TableCell>
                       <TableCell>
                         <span className="inline-flex items-center gap-2 hover:text-primary hover:underline transition-colors">
@@ -1079,7 +1194,16 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                       <TableCell className="text-right">{fmtBRL(h.valor_original_total)}</TableCell>
                       <TableCell className="text-right text-amber-600">{fmtBRL(h.valor_acrescimo)}</TableCell>
                       <TableCell className="text-right font-semibold">{fmtBRL(h.valor_total)}</TableCell>
-                      <TableCell className="text-center"><Badge variant="outline">{h.parcelas_devedor?.length || 0}</Badge></TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <Badge variant="outline">{parcelas.length}/{max}</Badge>
+                          <div className="text-[10px] text-muted-foreground flex gap-1">
+                            <span className="text-emerald-600">{sum.pagas}p</span>·
+                            <span className="text-amber-600">{sum.aVencer}a</span>·
+                            <span className="text-red-600">{sum.vencidas}v</span>
+                          </div>
+                        </div>
+                      </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         {h.asaas_customer_id ? (
                           <ResponsavelChip
@@ -1092,7 +1216,15 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                         )}
                       </TableCell>
                     </TableRow>
-                  ))}
+                    {isOpen && (
+                      <TableRow key={h.id + "-detail"} className="bg-muted/30">
+                        <TableCell colSpan={9} className="py-3">
+                          <ParcelasPanel parcelas={parcelas} totalVencido={sum.totalVencido} max={max} />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    </Fragment>
+                  );})}
                 </TableBody>
               </Table>
             </CardContent>

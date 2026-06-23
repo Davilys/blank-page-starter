@@ -159,6 +159,30 @@ export default function AdminFinanceiro() {
   const [syncing, setSyncing] = useState(false);
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
   const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [negotiatedInvoiceIds, setNegotiatedInvoiceIds] = useState<Set<string>>(new Set());
+
+  // IDs (invoices.id) de faturas que vieram de parcela de negociação/renegociação.
+  // Essas faturas não devem entrar no card "Vencidos 30d" — pertencem ao Histórico.
+  useEffect(() => {
+    (async () => {
+      try {
+        const [{ data: pd }, { data: pr }] = await Promise.all([
+          supabase.from('parcelas_devedor').select('asaas_payment_id').not('asaas_payment_id', 'is', null),
+          supabase.from('parcelas_renegociadas').select('asaas_payment_id').not('asaas_payment_id', 'is', null),
+        ]);
+        const payIds = [
+          ...((pd || []).map((r: any) => r.asaas_payment_id).filter(Boolean)),
+          ...((pr || []).map((r: any) => r.asaas_payment_id).filter(Boolean)),
+        ];
+        if (payIds.length === 0) { setNegotiatedInvoiceIds(new Set()); return; }
+        const { data: invs } = await supabase
+          .from('invoices')
+          .select('id')
+          .in('asaas_invoice_id', payIds);
+        setNegotiatedInvoiceIds(new Set((invs || []).map((r: any) => r.id)));
+      } catch (e) { console.warn('negotiated set load failed', e); }
+    })();
+  }, []);
 
   const handleSyncAsaas = async () => {
     setSyncing(true);
@@ -391,6 +415,7 @@ export default function AdminFinanceiro() {
     for (const i of invoices) {
       const ns = normalizeStatus(i.status);
       if (ns === 'paid' || ns === 'cancelled') continue;
+      if (negotiatedInvoiceIds.has(i.id)) continue;
       const due = new Date((i.due_date || '').length === 10 ? i.due_date + 'T00:00:00' : i.due_date);
       if (due >= since && due <= today && (ns === 'overdue' || due < today)) {
         value += Number(i.amount || 0);
@@ -398,7 +423,7 @@ export default function AdminFinanceiro() {
       }
     }
     return { value, count };
-  }, [invoices]);
+  }, [invoices, negotiatedInvoiceIds]);
 
   const clientProcesses = processes.filter(p => p.user_id === formData.user_id);
   const getInstallmentValue = () => {

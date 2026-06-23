@@ -112,6 +112,47 @@ async function getPaymentsWithHistory(admin: any, asaasPaymentIds: string[]): Pr
   return result;
 }
 
+/**
+ * Retorna o conjunto de asaas_payment_id que JÁ pertencem a alguma negociação
+ * (parcelas_devedor – bucket 30/3x) ou renegociação (parcelas_renegociadas –
+ * bucket 60/5x). Esses pagamentos não devem voltar a aparecer em nenhuma lista
+ * de vencidos: foram gerados pelo próprio CRM como parcelas de acordo e
+ * pertencem exclusivamente ao Histórico.
+ */
+async function getNegotiatedPaymentIds(admin: any): Promise<Set<string>> {
+  const result = new Set<string>();
+  try {
+    let from = 0;
+    const step = 1000;
+    while (true) {
+      const { data, error } = await admin
+        .from("parcelas_devedor")
+        .select("asaas_payment_id")
+        .not("asaas_payment_id", "is", null)
+        .range(from, from + step - 1);
+      if (error) break;
+      for (const r of data || []) if (r.asaas_payment_id) result.add(r.asaas_payment_id);
+      if (!data || data.length < step) break;
+      from += step;
+    }
+    from = 0;
+    while (true) {
+      const { data, error } = await admin
+        .from("parcelas_renegociadas")
+        .select("asaas_payment_id")
+        .not("asaas_payment_id", "is", null)
+        .range(from, from + step - 1);
+      if (error) break;
+      for (const r of data || []) if (r.asaas_payment_id) result.add(r.asaas_payment_id);
+      if (!data || data.length < step) break;
+      from += step;
+    }
+  } catch (e) {
+    console.warn("getNegotiatedPaymentIds failed", e);
+  }
+  return result;
+}
+
 async function _cleanupBucketImpl(admin: any, bucket: "d30" | "d60", minDays: number, maxDays?: number) {
   const { data: rows } = await admin
     .from("cobrancas_vencidas")
@@ -194,6 +235,7 @@ Deno.serve(async (req) => {
       let skipped_in_history = 0;
       const customerCache = new Map<string, any>();
       const minOverdueDays = 60;
+      const negotiatedSet = await getNegotiatedPaymentIds(admin);
 
       while (true) {
         const page = await asaas(`/payments?status=OVERDUE&limit=${limit}&offset=${offset}`);
@@ -221,6 +263,12 @@ Deno.serve(async (req) => {
           if (!due) continue;
           const dias = daysBetween(due);
           if (dias <= minOverdueDays) continue;
+
+          if (negotiatedSet.has(p.id)) {
+            // parcela criada por negociação/renegociação — pertence ao Histórico
+            skipped_finalized++;
+            continue;
+          }
 
           const prevStatus = existingMap.get(p.id);
           if (prevStatus && prevStatus !== "pendente_renegociacao") {
@@ -269,6 +317,14 @@ Deno.serve(async (req) => {
       // Cleanup: linhas d60 que NÃO foram tocadas neste sweep podem ter sido
       // reagendadas/quitadas no Asaas. Re-checa cada uma e remove se já não estiver vencida >60d.
       await cleanupBucket(admin, "d60", 60);
+      // Limpa linhas residuais cujo asaas_payment_id virou parcela de negociação
+      if (negotiatedSet.size > 0) {
+        const ids = Array.from(negotiatedSet);
+        for (let i = 0; i < ids.length; i += 500) {
+          const chunk = ids.slice(i, i + 500);
+          await admin.from("cobrancas_vencidas").delete().in("asaas_payment_id", chunk);
+        }
+      }
       return json({ success: true, total_overdue: total, kept_over_60d: kept, skipped_finalized, skipped_in_history });
     }
 
@@ -281,6 +337,7 @@ Deno.serve(async (req) => {
       let skipped_finalized = 0;
       let skipped_in_history = 0;
       const customerCache = new Map<string, any>();
+      const negotiatedSet = await getNegotiatedPaymentIds(admin);
 
       while (true) {
         const page = await asaas(`/payments?status=OVERDUE&limit=${limit}&offset=${offset}`);
@@ -306,6 +363,11 @@ Deno.serve(async (req) => {
           const dias = daysBetween(due);
           // Bucket d30 = entre 31 e 59 dias de atraso (0–30 fica em Financeiro/Vencido, ≥60 vai para d60)
           if (dias < 31 || dias > 59) continue;
+
+          if (negotiatedSet.has(p.id)) {
+            skipped_finalized++;
+            continue;
+          }
 
           const prevStatus = existingMap.get(p.id);
           if (prevStatus && prevStatus !== "pendente_renegociacao") {
@@ -348,6 +410,13 @@ Deno.serve(async (req) => {
       }
 
       await cleanupBucket(admin, "d30", 31, 59);
+      if (negotiatedSet.size > 0) {
+        const ids = Array.from(negotiatedSet);
+        for (let i = 0; i < ids.length; i += 500) {
+          const chunk = ids.slice(i, i + 500);
+          await admin.from("cobrancas_vencidas").delete().in("asaas_payment_id", chunk);
+        }
+      }
       return json({ success: true, total_overdue: total, kept_under_30d: kept, skipped_finalized, skipped_in_history });
     }
 
@@ -418,8 +487,10 @@ Deno.serve(async (req) => {
         .order("cliente_nome", { ascending: true });
       if (error) throw error;
 
+      const negotiatedSet = await getNegotiatedPaymentIds(admin);
       const groups = new Map<string, any>();
       for (const row of data || []) {
+        if (row.asaas_payment_id && negotiatedSet.has(row.asaas_payment_id)) continue;
         const key = (row.cliente_cpf_cnpj || row.asaas_customer_id || row.cliente_nome || "sem-id") as string;
         if (!groups.has(key)) {
           groups.set(key, {
@@ -469,8 +540,10 @@ Deno.serve(async (req) => {
         .order("cliente_nome", { ascending: true });
       if (error) throw error;
 
+      const negotiatedSet = await getNegotiatedPaymentIds(admin);
       const groups = new Map<string, any>();
       for (const row of data || []) {
+        if (row.asaas_payment_id && negotiatedSet.has(row.asaas_payment_id)) continue;
         const key = (row.cliente_cpf_cnpj || row.asaas_customer_id || row.cliente_nome || "sem-id") as string;
         if (!groups.has(key)) {
           groups.set(key, {

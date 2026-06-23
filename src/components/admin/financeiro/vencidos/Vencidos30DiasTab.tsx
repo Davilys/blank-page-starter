@@ -28,6 +28,7 @@ interface OverdueInvoice {
   status: string | null;
   invoice_url: string | null;
   user_id: string | null;
+  asaas_invoice_id?: string | null;
   profiles?: { full_name: string | null; email: string; phone: string | null } | null;
 }
 
@@ -54,6 +55,7 @@ interface Vencidos30DiasTabProps {
 export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabProps = {}) {
   const [invoices, setInvoices] = useState<OverdueInvoice[]>([]);
   const [history, setHistory] = useState<CobrancaHist[]>([]);
+  const [negotiatedPaymentIds, setNegotiatedPaymentIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [period, setPeriod] = useState<Period>("30d");
@@ -84,11 +86,24 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
   const load = async () => {
     setLoading(true);
     try {
+      // Carrega asaas_payment_id de parcelas geradas por negociação/renegociação
+      // para excluí-las desta lista — pertencem apenas ao Histórico de Devedores.
+      const negSet = new Set<string>();
+      try {
+        const [{ data: pd }, { data: pr }] = await Promise.all([
+          supabase.from("parcelas_devedor").select("asaas_payment_id").not("asaas_payment_id", "is", null),
+          supabase.from("parcelas_renegociadas").select("asaas_payment_id").not("asaas_payment_id", "is", null),
+        ]);
+        for (const r of pd || []) if ((r as any).asaas_payment_id) negSet.add((r as any).asaas_payment_id);
+        for (const r of pr || []) if ((r as any).asaas_payment_id) negSet.add((r as any).asaas_payment_id);
+      } catch (e) { console.warn("negotiated payments fetch failed", e); }
+      setNegotiatedPaymentIds(negSet);
+
       const since = subDays(new Date(), 30).toISOString().split("T")[0];
       const today = new Date().toISOString().split("T")[0];
       const { data, error } = await supabase
         .from("invoices")
-        .select("id, description, amount, due_date, status, invoice_url, user_id, profiles:user_id(full_name,email,phone)")
+        .select("id, description, amount, due_date, status, invoice_url, user_id, asaas_invoice_id, profiles:user_id(full_name,email,phone)")
         .gte("due_date", since)
         .lte("due_date", today)
         .order("due_date", { ascending: false })
@@ -102,6 +117,8 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
         if (s === "cancelled" || s === "CANCELLED") return false;
         if (!i.due_date) return false;
         if (daysAgo(i.due_date) <= 0) return false; // vence hoje ou no futuro → não vencido
+        // parcela criada por negociação/renegociação → não aparece em Vencidos
+        if (i.asaas_invoice_id && negSet.has(i.asaas_invoice_id)) return false;
         return s === "pending" || s === "overdue" || s === "OVERDUE";
       });
       setInvoices(overdue as any);
@@ -200,7 +217,7 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
       const name = (i.profiles?.full_name || i.profiles?.email || "").toLowerCase();
       return name.includes(q) || (i.description || "").toLowerCase().includes(q);
     });
-  }, [invoices, period, search, history]);
+  }, [invoices, period, search, history, negotiatedPaymentIds]);
 
   const total = filtered.reduce((s, i) => s + Number(i.amount || 0), 0);
   useEffect(() => { setPage(1); }, [search, period, pageSize, filtered.length]);
