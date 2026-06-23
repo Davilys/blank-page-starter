@@ -701,6 +701,9 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                               <DropdownMenuItem onClick={() => handleSetStatus(pub, 'aguardando_pagamento')} className="text-amber-700 dark:text-amber-400">
                                 <Wallet className="w-4 h-4 mr-2" /> Aguardando Pagamento
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleSetStatus(pub, 'nao_respondeu')} className="text-orange-700 dark:text-orange-400">
+                                <PhoneOff className="w-4 h-4 mr-2" /> Não Respondeu
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleSetStatus(pub, 'desistiu')} className="text-zinc-700 dark:text-zinc-300">
                                 <Ban className="w-4 h-4 mr-2" /> Desistiu
                               </DropdownMenuItem>
