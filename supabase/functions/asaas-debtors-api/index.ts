@@ -337,6 +337,7 @@ Deno.serve(async (req) => {
       let skipped_finalized = 0;
       let skipped_in_history = 0;
       const customerCache = new Map<string, any>();
+      const negotiatedSet = await getNegotiatedPaymentIds(admin);
 
       while (true) {
         const page = await asaas(`/payments?status=OVERDUE&limit=${limit}&offset=${offset}`);
@@ -362,6 +363,11 @@ Deno.serve(async (req) => {
           const dias = daysBetween(due);
           // Bucket d30 = entre 31 e 59 dias de atraso (0–30 fica em Financeiro/Vencido, ≥60 vai para d60)
           if (dias < 31 || dias > 59) continue;
+
+          if (negotiatedSet.has(p.id)) {
+            skipped_finalized++;
+            continue;
+          }
 
           const prevStatus = existingMap.get(p.id);
           if (prevStatus && prevStatus !== "pendente_renegociacao") {
