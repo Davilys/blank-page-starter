@@ -738,6 +738,14 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
         marca={(notifyPub?.process_id && processMap.get(notifyPub.process_id)?.brand_name) || notifyPub?.brand_name_rpi || 'sua marca'}
       />
 
+      <PropostaDesistiuDialog
+        open={!!propostaPub}
+        onOpenChange={(o) => { if (!o) setPropostaPub(null); }}
+        publicacao={propostaPub}
+        client={propostaPub?.client_id ? clientMap.get(propostaPub.client_id) : null}
+        marca={(propostaPub?.process_id && processMap.get(propostaPub.process_id)?.brand_name) || propostaPub?.brand_name_rpi || 'sua marca'}
+      />
+
       <VincularClienteDialog
         open={!!linkDialogPub}
         onOpenChange={(o) => { if (!o) setLinkDialogPub(null); }}
