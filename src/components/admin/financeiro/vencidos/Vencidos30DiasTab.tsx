@@ -28,6 +28,7 @@ interface OverdueInvoice {
   status: string | null;
   invoice_url: string | null;
   user_id: string | null;
+  asaas_invoice_id?: string | null;
   profiles?: { full_name: string | null; email: string; phone: string | null } | null;
 }
 
@@ -102,7 +103,7 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
       const today = new Date().toISOString().split("T")[0];
       const { data, error } = await supabase
         .from("invoices")
-        .select("id, description, amount, due_date, status, invoice_url, user_id, profiles:user_id(full_name,email,phone)")
+        .select("id, description, amount, due_date, status, invoice_url, user_id, asaas_invoice_id, profiles:user_id(full_name,email,phone)")
         .gte("due_date", since)
         .lte("due_date", today)
         .order("due_date", { ascending: false })
