@@ -17,6 +17,8 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { STATUS_CONFIG } from './types';
 import { NotificarClienteDialog } from './NotificarClienteDialog';
+import { PropostaDesistiuDialog } from './PropostaDesistiuDialog';
+import { Sparkles } from 'lucide-react';
 import { VincularClienteDialog } from './VincularClienteDialog';
 import { EditarMarcaDialog } from './EditarMarcaDialog';
 import { ResponsavelChip } from '@/components/admin/shared/ResponsavelChip';
