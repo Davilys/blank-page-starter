@@ -44,3 +44,28 @@ export const VENCIDO_FORMAL_TEMPLATE: CobrancaTemplate = {
   whatsapp: (nome) => `Olá, ${safe(nome)}.\n\nInformamos que o prazo concedido pelo INPI para cumprimento da exigência referente ao seu processo foi encerrado.\n\nDurante os 60 dias legais, realizamos diversas tentativas de contato por WhatsApp, telefone e e-mail, incluindo notificações formais, porém não obtivemos retorno dentro do prazo estabelecido.\n\nDessa forma, o processo poderá ser arquivado pelo INPI por falta de manifestação do titular, não sendo esta uma responsabilidade da WebMarcas, uma vez que todas as comunicações foram realizadas e registradas.\n\nCaso deseje mais informações, estamos à disposição para apresentar o histórico completo dos contatos realizados.\n\nEsta mensagem possui caráter formal de notificação.\n\nAtenciosamente,\nWebMarcas – Registro de Marcas e Patentes\n📞 (11) 91112-0225\n📧 ola@webmarcas.net`,
   email: (nome, marca) => `<p>Olá, <strong>${safe(nome)}</strong>.</p><p>Informamos que o <strong>prazo concedido pelo INPI</strong> para cumprimento da exigência referente ao seu processo da marca <strong>${marca || 'sua marca'}</strong> foi <strong>encerrado</strong>.</p><p>Durante os <strong>60 dias legais</strong>, realizamos diversas tentativas de contato por WhatsApp, telefone e e-mail, incluindo notificações formais, porém não obtivemos retorno dentro do prazo estabelecido.</p><p>Dessa forma, o processo poderá ser arquivado pelo INPI por falta de manifestação do titular, <strong>não sendo esta uma responsabilidade da WebMarcas</strong>, uma vez que todas as comunicações foram realizadas e registradas.</p><p>Caso deseje mais informações, estamos à disposição para apresentar o histórico completo dos contatos realizados.</p><p><em>Esta mensagem possui caráter formal de notificação.</em></p><p>Atenciosamente,<br/><strong>WebMarcas – Registro de Marcas e Patentes</strong><br/>📞 (11) 91112-0225<br/>📧 ola@webmarcas.net</p>`,
 };
+
+export const PROPOSTA_DESISTIU_TEMPLATE: CobrancaTemplate = {
+  id: 4,
+  label: 'Proposta Especial — R$ 699,00 (Desistiu)',
+  dueDays: 0,
+  subject: (marca) => `Proposta especial para continuidade do registro — ${marca || 'sua marca'}`,
+  whatsapp: (nome) => `🚨 Conseguimos uma condição especial para evitar a perda do seu processo de marca.\n\nOlá, ${safe(nome)}. Tudo bem?\n\nA etapa atual do seu processo possui valor de R$ 1.621,00, porém conseguimos liberar uma condição excepcional de apenas R$ 699,00, à vista no PIX ou parcelado no cartão.\n\nEssa etapa refere-se a uma publicação oficial do INPI com prazo legal para cumprimento. Conforme informado durante a contratação e previsto em contrato, publicações e exigências podem gerar custos específicos ao longo do processo.\n\nNosso objetivo é evitar a perda do prazo e concluir o registro da sua marca.\n\nPosso lhe enviar as condições para aproveitarmos esse valor especial?`,
+  email: (nome, _marca) => `<p>Prezado(a) <strong>${safe(nome)}</strong>,</p>
+<p>Esperamos que esteja bem.</p>
+<p>Entramos em contato para informar que seu processo de registro de marca recebeu uma publicação oficial do <strong>Instituto Nacional da Propriedade Industrial (INPI)</strong>, a qual exige manifestação dentro do prazo legal estabelecido pelo órgão.</p>
+<p>Até o presente momento, não identificamos sua autorização para continuidade desta etapa.</p>
+<p>Gostaríamos de reforçar, com total transparência, que durante a contratação foi informado por nossa equipe, tanto por mensagens quanto por áudios e por meio do contrato firmado, que o valor promocional pago no protocolo inicial refere-se <strong>exclusivamente à fase de depósito</strong> do pedido de registro.</p>
+<p>Também foi informado que eventuais publicações, exigências, oposições ou demais atos processuais emitidos pelo INPI durante a tramitação do processo poderiam demandar atuação técnica complementar e, consequentemente, gerar custos específicos para cada fase.</p>
+<p>Importante destacar que tais publicações <strong>não são criadas pela WebMarcas</strong>, mas sim pelo próprio INPI, sendo etapas previstas na legislação e aplicáveis a todos os processos de registro de marca.</p>
+<p>O valor desta etapa é de <strong>R$ 1.621,00</strong>, correspondente à elaboração técnica, análise jurídica, protocolo e acompanhamento da manifestação necessária para cumprimento da publicação.</p>
+<p>Entretanto, considerando o histórico do relacionamento e nosso interesse em concluir o registro da sua marca com sucesso, disponibilizamos uma <strong>condição comercial excepcional</strong>:</p>
+<ul>
+  <li><strong>R$ 699,00</strong> à vista via PIX; ou</li>
+  <li>Parcelamento no cartão de crédito em quantas parcelas desejar, acrescido apenas dos encargos da operadora.</li>
+</ul>
+<p>Nosso principal objetivo é <strong>evitar a perda do prazo legal</strong> e permitir que o processo siga normalmente até sua conclusão.</p>
+<p>Caso tenha interesse em aproveitar esta condição especial, pedimos que responda este e-mail ou entre em contato com nossa equipe o mais breve possível.</p>
+<p>Permanecemos à disposição para quaisquer esclarecimentos.</p>
+<p>Atenciosamente,<br/><strong>Equipe Jurídica</strong><br/><strong>WebMarcas</strong><br/>📞 (11) 91112-0225<br/>🌐 www.webmarcas.net</p>`,
+};

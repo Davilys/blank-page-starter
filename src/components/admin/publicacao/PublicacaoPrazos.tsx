@@ -17,6 +17,8 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { STATUS_CONFIG } from './types';
 import { NotificarClienteDialog } from './NotificarClienteDialog';
+import { PropostaDesistiuDialog } from './PropostaDesistiuDialog';
+import { Sparkles } from 'lucide-react';
 import { VincularClienteDialog } from './VincularClienteDialog';
 import { EditarMarcaDialog } from './EditarMarcaDialog';
 import { ResponsavelChip } from '@/components/admin/shared/ResponsavelChip';
@@ -100,6 +102,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
   const [search, setSearch] = useState('');
   const queryClient = useQueryClient();
   const [notifyPub, setNotifyPub] = useState<any | null>(null);
+  const [propostaPub, setPropostaPub] = useState<any | null>(null);
   const [schedules, setSchedules] = useState<Record<string, any>>({});
   const [linkDialogPub, setLinkDialogPub] = useState<any | null>(null);
   const [editMarcaPub, setEditMarcaPub] = useState<any | null>(null);
@@ -634,19 +637,35 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 px-2 text-xs gap-1 border-primary/40 text-primary hover:bg-primary/10"
-                            onClick={() => {
-                              setNotifyPub(pub);
-                              atribuirResponsavel('publicacao', pub.id, { acao: 'cobrou', somenteSeVazio: true }).catch(() => {});
-                            }}
-                            disabled={!pub.client_id}
-                            title={pub.client_id ? 'Enviar notificação' : 'Vincule um cliente primeiro'}
-                          >
-                            <Bell className="w-3.5 h-3.5" /> Notificar
-                          </Button>
+                          {(pub._bucket === 'desistiu' || pub.cumprimento_status === 'desistiu') ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-xs gap-1 border-amber-500/60 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
+                              onClick={() => {
+                                setPropostaPub(pub);
+                                atribuirResponsavel('publicacao', pub.id, { acao: 'cobrou', somenteSeVazio: true }).catch(() => {});
+                              }}
+                              disabled={!pub.client_id}
+                              title={pub.client_id ? 'Enviar proposta especial R$ 699' : 'Vincule um cliente primeiro'}
+                            >
+                              <Sparkles className="w-3.5 h-3.5" /> Proposta R$ 699
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-xs gap-1 border-primary/40 text-primary hover:bg-primary/10"
+                              onClick={() => {
+                                setNotifyPub(pub);
+                                atribuirResponsavel('publicacao', pub.id, { acao: 'cobrou', somenteSeVazio: true }).catch(() => {});
+                              }}
+                              disabled={!pub.client_id}
+                              title={pub.client_id ? 'Enviar notificação' : 'Vincule um cliente primeiro'}
+                            >
+                              <Bell className="w-3.5 h-3.5" /> Notificar
+                            </Button>
+                          )}
                           {onOpenDetail && (
                             <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => onOpenDetail(pub.id)} title="Ver detalhe">
                               <Eye className="w-3.5 h-3.5" />
@@ -717,6 +736,14 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
         publicacao={notifyPub}
         client={notifyPub?.client_id ? clientMap.get(notifyPub.client_id) : null}
         marca={(notifyPub?.process_id && processMap.get(notifyPub.process_id)?.brand_name) || notifyPub?.brand_name_rpi || 'sua marca'}
+      />
+
+      <PropostaDesistiuDialog
+        open={!!propostaPub}
+        onOpenChange={(o) => { if (!o) setPropostaPub(null); }}
+        publicacao={propostaPub}
+        client={propostaPub?.client_id ? clientMap.get(propostaPub.client_id) : null}
+        marca={(propostaPub?.process_id && processMap.get(propostaPub.process_id)?.brand_name) || propostaPub?.brand_name_rpi || 'sua marca'}
       />
 
       <VincularClienteDialog
