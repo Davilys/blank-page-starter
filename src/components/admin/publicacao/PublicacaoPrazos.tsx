@@ -397,6 +397,16 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                           <div className="text-xs text-muted-foreground">{proc?.process_number || pub.process_number_rpi || ''}</div>
                         </button>
                         {(() => {
+                          const info = getPubIndex(pub);
+                          if (!info) return null;
+                          return (
+                            <Badge variant="secondary" className="ml-1 text-[10px] bg-primary/10 text-primary border-primary/20">
+                              Publicação {info.idx}/{info.total}
+                              {pub.rpi_number ? ` · RPI ${pub.rpi_number}` : ''}
+                            </Badge>
+                          );
+                        })()}
+                        {(() => {
                           const hasName = !!(proc?.brand_name || pub.brand_name_rpi);
                           return hasName ? (
                             <button
@@ -431,10 +441,53 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                             {pub.cumprimento_at ? format(parseISO(pub.cumprimento_at), 'dd/MM/yyyy', { locale: ptBR }) : '—'}
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1.5">
-                            {days !== null && days < 0 ? <AlertTriangle className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
-                            {days === null ? '—' : days < 0 ? `${Math.abs(days)}d atrasado` : `${days}d restantes`}
-                          </div>
+                          <Popover
+                            open={editPrazoPubId === pub.id}
+                            onOpenChange={(o) => { if (o) openEditPrazo(pub); else setEditPrazoPubId(null); }}
+                          >
+                            <PopoverTrigger asChild>
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-1.5 hover:underline group"
+                                title="Clique para editar a data da publicação"
+                              >
+                                {days !== null && days < 0 ? <AlertTriangle className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
+                                {days === null ? '—' : days < 0 ? `${Math.abs(days)}d atrasado` : `${days}d restantes`}
+                                <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60 transition" />
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-72 p-3 space-y-3" align="start">
+                              <div className="space-y-1.5">
+                                <Label className="text-xs">Data da publicação (RPI)</Label>
+                                <Input
+                                  type="date"
+                                  value={editRpiDate}
+                                  onChange={(e) => handleRpiDateChange(e.target.value, pub)}
+                                  className="h-8 text-sm"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label className="text-xs">Prazo final</Label>
+                                <Input
+                                  type="date"
+                                  value={editDeadline}
+                                  onChange={(e) => setEditDeadline(e.target.value)}
+                                  className="h-8 text-sm"
+                                />
+                                <p className="text-[10px] text-muted-foreground">
+                                  Recalculado automaticamente conforme o status ({pub.status}).
+                                </p>
+                              </div>
+                              <div className="flex justify-end gap-2 pt-1">
+                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditPrazoPubId(null)}>
+                                  Cancelar
+                                </Button>
+                                <Button size="sm" className="h-7 text-xs" onClick={() => savePrazo(pub)} disabled={savingPrazo}>
+                                  {savingPrazo ? 'Salvando...' : 'Salvar'}
+                                </Button>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         )}
                       </TableCell>
                       <TableCell>
