@@ -1238,10 +1238,10 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
     { id: 'nova_fatura', label: 'Nova Fatura', icon: Receipt, cls: 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300 hover:bg-teal-200 dark:hover:bg-teal-900/60' },
     {
       id: 'cliente_especial',
-      label: (client as any).is_special_client ? 'Cliente Especial ✓' : 'Cliente Especial',
+      label: (client as any).is_special_client ? '⭐ Cliente Especial ✓' : 'Cliente Especial',
       icon: Star,
       cls: (client as any).is_special_client
-        ? 'bg-amber-400 text-amber-950 hover:bg-amber-500 border border-amber-500 shadow-sm font-bold'
+        ? 'bg-yellow-300 text-yellow-950 hover:bg-yellow-400 border-2 border-yellow-500 ring-2 ring-yellow-300/70 ring-offset-2 ring-offset-transparent shadow-lg shadow-yellow-500/40 font-bold'
         : 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 border border-amber-200 dark:border-amber-800',
     },
     ...(isMasterAdmin && client?.email && client.email !== MASTER_ADMIN_EMAIL ? [
