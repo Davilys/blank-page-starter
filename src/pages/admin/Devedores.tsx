@@ -19,6 +19,7 @@ import { PaginationBar, type PageSize } from "@/components/admin/financeiro/Pagi
 import { EditableAmountCell } from "@/components/admin/financeiro/EditableAmountCell";
 import { ResponsavelChip } from "@/components/admin/shared/ResponsavelChip";
 import { useResponsaveis, atribuirResponsavel } from "@/hooks/useResponsaveis";
+import { CobrarParcelaAcordoDialog } from "@/components/admin/financeiro/CobrarParcelaAcordoDialog";
 
 const ClientDetailSheet = lazy(() =>
   import("@/components/admin/clients/ClientDetailSheet").then((m) => ({ default: m.ClientDetailSheet }))
@@ -155,81 +156,7 @@ function ParcelasPanel({
   clienteNome?: string | null;
   clienteCpfCnpj?: string | null;
 }) {
-  const [cobrandoId, setCobrandoId] = useState<string | null>(null);
-
-  const handleCobrarParcela = async (p: any) => {
-    setCobrandoId(p.id);
-    try {
-      const link = p.invoice_url || p.link_boleto || "";
-      if (!link) {
-        toast.error("Parcela sem link de boleto.");
-        return;
-      }
-      let email = "";
-      let phone = "";
-      if (clienteCpfCnpj) {
-        const { data: prof } = await supabase
-          .from("profiles")
-          .select("email, phone")
-          .or(`cpf.eq.${clienteCpfCnpj},cpf_cnpj.eq.${clienteCpfCnpj}`)
-          .maybeSingle();
-        email = prof?.email || "";
-        phone = prof?.phone || "";
-      }
-      if (!email && !phone) {
-        toast.error("Cliente sem e-mail e telefone cadastrados.");
-        return;
-      }
-
-      const nome = clienteNome || "Cliente";
-      const valor = fmtBRL(Number(p.valor) || 0);
-      const { emailMsg, emailHtml, whatsappMsg } = buildCobrarAcordoMessages(nome, valor, link);
-      const subject = "Parcela do acordo em aberto — WebMarcas";
-
-      const tasks: Promise<any>[] = [];
-      if (email) {
-        tasks.push(
-          supabase.functions.invoke("send-multichannel-notification", {
-            body: {
-              event_type: "parcela_acordo_vencida",
-              channels: ["email"],
-              recipient: { nome, email },
-              custom_message: emailMsg,
-              custom_html: emailHtml,
-              custom_subject: subject,
-              data: { link, valor },
-            },
-          })
-        );
-      }
-      if (phone) {
-        tasks.push(
-          supabase.functions.invoke("send-multichannel-notification", {
-            body: {
-              event_type: "parcela_acordo_vencida",
-              channels: ["whatsapp"],
-              recipient: { nome, phone },
-              custom_message: whatsappMsg,
-              data: { link, valor },
-            },
-          })
-        );
-      }
-
-      const results = await Promise.all(tasks);
-      const failed = results.filter((r: any) => r?.error).length;
-      if (failed > 0) {
-        toast.warning(`Cobrança enviada com ${failed} falha(s).`);
-      } else {
-        const canais = [email && "e-mail", phone && "WhatsApp"].filter(Boolean).join(" + ");
-        toast.success(`Cobrança enviada por ${canais}.`);
-      }
-    } catch (e: any) {
-      toast.error(`Falha ao cobrar: ${e.message}`);
-    } finally {
-      setCobrandoId(null);
-    }
-  };
+  const [cobrarParcela, setCobrarParcela] = useState<any | null>(null);
 
   return (
     <div className="space-y-2">
@@ -280,15 +207,11 @@ function ParcelasPanel({
                         size="sm"
                         variant="outline"
                         className="h-6 px-2 gap-1"
-                        onClick={() => handleCobrarParcela(p)}
-                        disabled={cobrandoId === p.id || !link}
-                        title={link ? "Enviar cobrança por e-mail e WhatsApp" : "Sem link de boleto"}
+                        onClick={() => setCobrarParcela(p)}
+                        disabled={!link}
+                        title={link ? "Abrir cobrança (e-mail / WhatsApp)" : "Sem link de boleto"}
                       >
-                        {cobrandoId === p.id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <Send className="h-3 w-3" />
-                        )}
+                        <Send className="h-3 w-3" />
                         <span>Cobrar</span>
                       </Button>
                     ) : (
@@ -301,6 +224,13 @@ function ParcelasPanel({
           </tbody>
         </table>
       </div>
+      <CobrarParcelaAcordoDialog
+        open={!!cobrarParcela}
+        onOpenChange={(v) => { if (!v) setCobrarParcela(null); }}
+        parcela={cobrarParcela}
+        clienteNome={clienteNome}
+        clienteCpfCnpj={clienteCpfCnpj}
+      />
     </div>
   );
 }
