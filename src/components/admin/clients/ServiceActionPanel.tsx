@@ -23,6 +23,7 @@ interface ServiceActionPanelProps {
     brand_name?: string | null;
     process_number?: string | null;
     process_id?: string | null;
+    is_special_client?: boolean | null;
   };
   stage: {
     id: string;
@@ -92,6 +93,48 @@ Para dar continuidade ao processo, solicitamos o pagamento da taxa de serviço n
 Para que eu possa explicar os detalhes da publicação e orientá-lo(a) sobre os próximos passos, preciso agendar uma breve reunião.
 
 Por gentileza, qual o melhor dia e horário para conversarmos?
+
+Fico no aguardo.`;
+}
+
+function generateEmailTemplateSemCobranca(client: ServiceActionPanelProps['client'], stage: ServiceActionPanelProps['stage']): string {
+  const nome = client.full_name || 'Cliente';
+  const marca = client.brand_name || 'sua marca';
+  const protocolo = client.process_number ? ` (Protocolo: ${client.process_number})` : '';
+  return `Prezado ${nome},
+
+Venho informar que o INPI publicou uma movimentação (${stage.label}) referente ao processo da marca "${marca}"${protocolo}.
+
+Toda e qualquer publicação possui prazo de 60 (sessenta) dias corridos para o cumprimento, contados a partir da data de publicação na Revista da Propriedade Industrial (RPI).
+
+Como cliente especial WebMarcas, o cumprimento desta etapa será conduzido pelo nosso jurídico sem cobrança adicional de honorários. Eventuais taxas oficiais (GRU) do INPI, quando aplicáveis, permanecem de responsabilidade do titular conforme contrato.
+
+Caso queira falar com o jurídico, informe o melhor dia e horário, pois precisamos resolver isso o quanto antes.
+
+Estamos à disposição para esclarecer qualquer dúvida.
+
+Atenciosamente,
+
+Equipe WebMarcas
+www.webmarcas.net
+WhatsApp: (11) 91112-0225`;
+}
+
+function generateWhatsAppTemplateSemCobranca(client: ServiceActionPanelProps['client'], stage: ServiceActionPanelProps['stage']): string {
+  const nome = client.full_name || 'Cliente';
+  const marca = client.brand_name || 'sua marca';
+  const primeiroNome = nome.split(' ')[0];
+  const numero = client.process_number?.trim();
+  const trechoNumero = numero ? `, sob o número ${numero}` : '';
+  return `Olá, ${primeiroNome}, tudo bem?
+
+Atualização importante sobre o seu processo no INPI: foi publicada uma movimentação (${stage.label}) referente à marca ${marca}${trechoNumero}.
+
+O prazo do INPI é de 60 (sessenta) dias corridos a partir da publicação na RPI.
+
+Como você é cliente especial WebMarcas, nosso jurídico vai cuidar do cumprimento desta etapa sem cobrança adicional de honorários.
+
+Qual o melhor dia e horário para uma breve conversa de alinhamento?
 
 Fico no aguardo.`;
 }
@@ -190,20 +233,25 @@ Equipe WebMarcas`;
 export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySent }: ServiceActionPanelProps) {
   const isArquivado = stage.id === 'arquivado';
   const isDistrato = stage.id === 'distrato';
-  const isNotificationOnly = isArquivado || isDistrato;
+  const isSpecialClient = !!client.is_special_client;
+  const isNotificationOnly = isArquivado || isDistrato || isSpecialClient;
   const [message, setMessage] = useState(() =>
     isDistrato
       ? generateDistratoEmail(client)
       : isArquivado
         ? generateArquivadoEmail(client)
-        : generateEmailTemplate(client, stage, SALARIO_MINIMO_2026)
+        : isSpecialClient
+          ? generateEmailTemplateSemCobranca(client, stage)
+          : generateEmailTemplate(client, stage, SALARIO_MINIMO_2026)
   );
   const [whatsappMessage, setWhatsappMessage] = useState(() =>
     isDistrato
       ? generateDistratoWhatsApp(client)
       : isArquivado
         ? generateArquivadoWhatsApp(client)
-        : generateWhatsAppTemplate(client, stage, SALARIO_MINIMO_2026)
+        : isSpecialClient
+          ? generateWhatsAppTemplateSemCobranca(client, stage)
+          : generateWhatsAppTemplate(client, stage, SALARIO_MINIMO_2026)
   );
   const [sendEmail, setSendEmail] = useState(true);
   const [sendWhatsApp, setSendWhatsApp] = useState(true);
@@ -371,7 +419,13 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
       await supabase.functions.invoke('send-multichannel-notification', {
         body: {
           user_id: client.id,
-          event_type: isDistrato ? 'distrato_enviado' : isArquivado ? 'arquivamento' : 'cobranca_gerada',
+          event_type: isDistrato
+            ? 'distrato_enviado'
+            : isArquivado
+              ? 'arquivamento'
+              : isSpecialClient
+                ? 'notificacao_sem_cobranca'
+                : 'cobranca_gerada',
           channels: notifChannels,
           custom_message: finalWhatsappMessage,
           data: {
@@ -393,7 +447,9 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
               ? 'Notificação Extrajudicial – Distrato Contratual e Encerramento de Responsabilidade'
               : isArquivado
                 ? `Arquivamento do processo – ${client.brand_name || 'Marca'} – WebMarcas`
-                : `Exigência INPI – ${stage.label} – ${client.brand_name || 'Marca'}`,
+                : isSpecialClient
+                  ? `Movimentação INPI – ${stage.label} – ${client.brand_name || 'Marca'} (Cliente Especial)`
+                  : `Exigência INPI – ${stage.label} – ${client.brand_name || 'Marca'}`,
             body: finalEmailMessage,
             attachments,
           },
@@ -408,12 +464,16 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
           ? 'notificacao_distrato'
           : isArquivado
             ? 'notificacao_arquivamento'
-            : 'notificacao_cobranca',
+            : isSpecialClient
+              ? 'notificacao_isenta'
+              : 'notificacao_cobranca',
         description: isDistrato
           ? `Notificação extrajudicial de distrato enviada: ${stage.label}`
           : isArquivado
             ? `Notificação de arquivamento enviada: ${stage.label}`
-            : `Notificação + cobrança enviada: ${stage.label} - R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+            : isSpecialClient
+              ? `Notificação enviada (Cliente Especial – sem cobrança): ${stage.label}`
+              : `Notificação + cobrança enviada: ${stage.label} - R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
         metadata: ({
           stage_id: stage.id,
           stage_label: stage.label,
@@ -421,7 +481,9 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
             ? { contract_id: distratoContractId, signature_url: distratoSignatureUrl }
             : isArquivado
               ? {}
-              : {
+              : isSpecialClient
+                ? { special_client: true }
+                : {
                   valor,
                   payment_type: paymentType,
                   payment_method: paymentType === 'avista' ? 'pix' : paymentMethod,
@@ -437,7 +499,9 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
           ? 'Notificação de distrato enviada com sucesso!'
           : isArquivado
             ? 'Notificação de arquivamento enviada com sucesso!'
-            : 'Notificação e cobrança enviadas com sucesso!'
+            : isSpecialClient
+              ? 'Notificação enviada com sucesso (Cliente Especial — sem cobrança)!'
+              : 'Notificação e cobrança enviadas com sucesso!'
       );
       onUpdate();
       onClose();
@@ -465,7 +529,15 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
             </div>
             <div>
               <p className="text-sm font-semibold">Painel de Ação – {stage.label}</p>
-              <p className="text-xs text-muted-foreground">{isDistrato ? 'Notificação Extrajudicial – Distrato' : isArquivado ? 'Notificação ao cliente' : 'Notificação + Cobrança'}</p>
+              <p className="text-xs text-muted-foreground">
+                {isDistrato
+                  ? 'Notificação Extrajudicial – Distrato'
+                  : isArquivado
+                    ? 'Notificação ao cliente'
+                    : isSpecialClient
+                      ? 'Notificação (Cliente Especial – sem cobrança)'
+                      : 'Notificação + Cobrança'}
+              </p>
             </div>
           </div>
           <button className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center" onClick={onClose}>
@@ -479,6 +551,16 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
             <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
             <AlertDescription className="text-yellow-700 dark:text-yellow-300 text-xs">
               Esta notificação já foi enviada em <strong>{new Date(alreadySent.sent_at).toLocaleDateString('pt-BR')}</strong>. Deseja enviar novamente?
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Special client banner */}
+        {isSpecialClient && !isArquivado && !isDistrato && (
+          <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700">
+            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <AlertDescription className="text-amber-800 dark:text-amber-200 text-xs">
+              <strong>Cliente Especial</strong> — apenas a notificação será enviada. <strong>Nenhuma fatura ou cobrança de honorários</strong> será gerada para esta movimentação.
             </AlertDescription>
           </Alert>
         )}
@@ -646,6 +728,8 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
             <><Send className="h-4 w-4 mr-2" /> {alreadySent ? 'Reenviar Notificação + Distrato' : 'Enviar Notificação + Distrato sem multa'}</>
           ) : isArquivado ? (
             <><Send className="h-4 w-4 mr-2" /> {alreadySent ? 'Reenviar Notificação' : 'Enviar Notificação'}</>
+          ) : isSpecialClient ? (
+            <><Send className="h-4 w-4 mr-2" /> {alreadySent ? 'Reenviar Notificação (sem cobrança)' : 'Enviar Notificação (sem cobrança)'}</>
           ) : alreadySent ? (
             <><Send className="h-4 w-4 mr-2" /> Reenviar Notificação + Cobrança</>
           ) : (

@@ -1,32 +1,45 @@
 ## Objetivo
 
-Substituir o envio direto do botão "Cobrar" (parcelas vencidas de acordo no Histórico de Devedores) por um **diálogo de pré-visualização editável**, no mesmo padrão do "Notificar Cliente" da Publicação.
+Criar a etiqueta **"CLIENTE ESPECIAL"** na ficha do cliente. Quando marcada, qualquer movimentação no card de **Serviços → Painel de Ação (Notificação + Cobrança)** envia somente a notificação ao cliente, **sem gerar fatura/cobrança de honorários**.
 
-## Comportamento do novo diálogo
+## Comportamento
 
-Ao clicar em **Cobrar** na linha da parcela vencida, abre `CobrarParcelaAcordoDialog` com:
+1. **Etiqueta na ficha** (cabeçalho vermelho, ao lado do nome do cliente na parte de cima do ficheiro uma vez selecionado essa etiqueta o cliente passa ser especial :
+  - Novo chip **"⭐ Cliente Especial"** (dourado), visível apenas quando ativo.
+  - Toggle "Cliente Especial (sem cobrança de honorários)" no diálogo **Editar Cliente** (e também no menu/ações da ficha) — somente admins.
+2. **Painel de Ação – Serviços** (`ServiceActionPanel`):
+  - Ao abrir, se `profile.is_special_client === true`:
+    - Banner amarelo no topo do painel: *"Cliente Especial — notificação enviada sem cobrança de honorários."*
+    - Esconde toda a seção de **Cobrança** (valor, vencimento, parcelamento, método).
+    - Templates de email/WhatsApp passam a usar versão "somente notificação" (remove os parágrafos sobre taxa de serviço, valor e link de boleto; mantém apenas a explicação da publicação e instruções de continuidade do processo).
+    - Trata o envio como `isNotificationOnly = true` (pula `create-admin-invoice`, não gera link de boleto, registra `event_type: 'notificacao_sem_cobranca'` e `cobranca_historico.tipo_acao = 'notificacao_isenta'`).
+  - Quando NÃO especial: comportamento atual permanece igual (notificação + cobrança).
+3. **Histórico/Financeiro**: como nenhuma fatura é criada, o cliente especial não aparece em Devedores/Vencidos para essas movimentações. Fica registro em `cobranca_historico` apenas como notificação isenta (para auditoria).
 
-- **Cabeçalho**: "Cobrar parcela do acordo — [NOME DO CLIENTE]" + subtítulo com nº da parcela / vencimento / valor.
-- **Card de contato**: nome, email, WhatsApp e badge de status (igual ao modelo da Publicação).
-- **Canais de envio** (checkboxes): ☑ Email ☑ WhatsApp — pelo menos um obrigatório. Desabilita o canal se o contato correspondente estiver vazio.
-- **Abas Email / WhatsApp** com:
-  - Campo **Assunto** (apenas aba Email), editável, pré-preenchido.
-  - **Textarea grande** com a mensagem pré-preenchida (template já existente em `buildCobrarAcordoMessages`), totalmente editável. Email mantém formato texto/HTML simples; WhatsApp em texto puro.
-  - Rodapé indicando placeholders já substituídos ([NOME], [VALOR], [LINK_BOLETO]).
-- **Rodapé**: botão **Cancelar** + botão **Enviar** (label dinâmico: "Enviar por Email", "Enviar por WhatsApp", ou "Enviar pelos dois"). Mostra `Loader2` durante envio e toast de sucesso/erro.
+## Mudanças técnicas
 
-## Envio
+**Banco (migration)**
 
-- Mesma função `send-multichannel-notification` já usada, com `event_type: 'parcela_acordo_vencida'`.
-- Faz 1 chamada por canal selecionado, passando `custom_subject`, `custom_html`/`custom_message` editados.
-- Registra em `cobranca_historico` com `status: 'enviada'` e os canais efetivamente usados.
+```sql
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS is_special_client boolean NOT NULL DEFAULT false;
+```
+
+(sem novas policies — coluna herda as RLS existentes de profiles)
+
+**Frontend**
+
+- `src/pages/admin/Clientes.tsx` — incluir `is_special_client` no SELECT e no tipo do card; renderizar chip dourado no cabeçalho da ficha quando `true`.
+- Diálogo de edição do cliente (provavelmente `EditarClienteDialog` ou equivalente em `src/components/admin/clients/`) — adicionar `<Switch>` "Cliente Especial — isento de honorários nas movimentações INPI" + UPDATE em profiles. Restrito a admins.
+- `src/components/admin/clients/ServiceActionPanel.tsx`:
+  - Receber/buscar `is_special_client` do cliente.
+  - Novo `isSpecialClient` → forçar `isNotificationOnly = true` e ocultar bloco de cobrança.
+  - Criar `generateEmailTemplateSemCobranca()` e `generateWhatsAppTemplateSemCobranca()` (versões enxutas, sem cláusula 10.3, sem valor, sem link de boleto).
+  - Ajustar `event_type` / `cobranca_historico` conforme acima.
+
+Sem mudanças em edge functions.
 
 ## Arquivos
 
-- **Novo**: `src/components/admin/financeiro/CobrarParcelaAcordoDialog.tsx` — componente do diálogo (props: `open`, `onOpenChange`, `parcela`, `clienteNome`, `clienteEmail`, `clienteWhatsapp`, `clienteCpfCnpj`, `onSent`).
-- **Editar**: `src/pages/admin/Devedores.tsx` — em `ParcelasPanel`:
-  - Remover `handleCobrarParcela` direto; o botão **Cobrar** passa a apenas abrir o diálogo com a parcela selecionada (`useState` local `cobrandoParcela`).
-  - Buscar email/whatsapp do cliente uma vez (via `profiles` por `cpfCnpj`) ao abrir o diálogo.
-  - Reaproveitar `buildCobrarAcordoMessages` movendo-o para dentro do novo dialog (ou exportando) para gerar os defaults.
-
-Sem mudanças de schema, sem nova edge function.
+- **Migration**: `add_is_special_client_to_profiles`
+- **Editar**: `src/pages/admin/Clientes.tsx`, `src/components/admin/clients/ServiceActionPanel.tsx`, diálogo de edição de cliente (a identificar na implementação)

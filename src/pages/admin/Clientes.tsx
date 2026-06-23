@@ -220,7 +220,7 @@ export default function AdminClientes() {
       const [profiles, processes, contracts] = await Promise.all([
         fetchAllRows<any>(
           'profiles',
-          'id, full_name, email, phone, cpf_cnpj, company_name, priority, origin, contract_value, created_at, last_contact, client_funnel_type, created_by, assigned_to',
+          'id, full_name, email, phone, cpf_cnpj, company_name, priority, origin, contract_value, created_at, last_contact, client_funnel_type, created_by, assigned_to, is_special_client',
           (q) => q.order('created_at', { ascending: false })
         ),
         fetchAllRows<any>('brand_processes', 'id, user_id, brand_name, business_area, pipeline_stage, status, process_number'),
@@ -290,6 +290,7 @@ export default function AdminClientes() {
             assigned_to: (profile as any).assigned_to || null,
             created_by_name: createdByName,
             assigned_to_name: assignedToName,
+            is_special_client: !!(profile as any).is_special_client,
           });
         } else {
           // Create one card per brand/process
@@ -325,6 +326,7 @@ export default function AdminClientes() {
               created_by_name: createdByName,
               assigned_to_name: assignedToName,
               brands: brands,
+              is_special_client: !!(profile as any).is_special_client,
             });
           }
         }
