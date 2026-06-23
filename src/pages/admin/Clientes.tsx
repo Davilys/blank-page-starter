@@ -290,6 +290,7 @@ export default function AdminClientes() {
             assigned_to: (profile as any).assigned_to || null,
             created_by_name: createdByName,
             assigned_to_name: assignedToName,
+            is_special_client: !!(profile as any).is_special_client,
           });
         } else {
           // Create one card per brand/process
@@ -325,6 +326,7 @@ export default function AdminClientes() {
               created_by_name: createdByName,
               assigned_to_name: assignedToName,
               brands: brands,
+              is_special_client: !!(profile as any).is_special_client,
             });
           }
         }
