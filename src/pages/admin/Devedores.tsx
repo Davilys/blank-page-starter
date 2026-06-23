@@ -91,6 +91,59 @@ function summarizeParcelas(parcelas: any[]) {
   return { pagas, vencidas, aVencer, totalVencido };
 }
 
+function ParcelasPanel({ parcelas, totalVencido, max }: { parcelas: any[]; totalVencido: number; max: number }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>Parcelas do acordo ({parcelas.length}/{max})</span>
+        {totalVencido > 0 && (
+          <span className="text-red-600 font-medium">Vencido em aberto: {fmtBRL(totalVencido)}</span>
+        )}
+      </div>
+      <div className="rounded border border-border/60 overflow-hidden">
+        <table className="w-full text-xs">
+          <thead className="bg-muted/50">
+            <tr>
+              <th className="text-left px-2 py-1">#</th>
+              <th className="text-left px-2 py-1">Vencimento</th>
+              <th className="text-right px-2 py-1">Valor</th>
+              <th className="text-left px-2 py-1">Status</th>
+              <th className="text-right px-2 py-1">Boleto</th>
+            </tr>
+          </thead>
+          <tbody>
+            {parcelas.map((p: any) => {
+              const st = parcelaState(p);
+              const cfg =
+                st === "paga" ? { label: "Paga", cls: "text-emerald-600 border-emerald-500/40", Icon: CheckCircle2 } :
+                st === "vencida" ? { label: "Vencida", cls: "text-red-600 border-red-500/40", Icon: AlertCircle } :
+                { label: "A vencer", cls: "text-amber-600 border-amber-500/40", Icon: Clock };
+              const link = p.invoice_url || p.link_boleto || "";
+              return (
+                <tr key={p.id} className="border-t border-border/40">
+                  <td className="px-2 py-1">{p.numero_parcela}</td>
+                  <td className="px-2 py-1">{p.data_vencimento ? fmtDate(p.data_vencimento) : "—"}</td>
+                  <td className="px-2 py-1 text-right">{fmtBRL(Number(p.valor) || 0)}</td>
+                  <td className="px-2 py-1">
+                    <Badge variant="outline" className={cfg.cls}>
+                      <cfg.Icon className="h-3 w-3 mr-1" />{cfg.label}
+                    </Badge>
+                  </td>
+                  <td className="px-2 py-1 text-right">
+                    {link ? (
+                      <a href={link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Abrir</a>
+                    ) : <span className="text-muted-foreground">—</span>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 async function callApi(action: string, body?: any) {
   const { data: sess } = await supabase.auth.getSession();
   const token = sess.session?.access_token;
