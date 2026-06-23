@@ -1124,6 +1124,7 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10"></TableHead>
                     <TableHead>Data</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Tipo</TableHead>
@@ -1136,9 +1137,15 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                 </TableHeader>
                 <TableBody>
                   {filteredHistory30.length === 0 && (
-                    <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Nenhuma negociação ainda.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Nenhuma negociação ainda.</TableCell></TableRow>
                   )}
-                  {filteredHistory30.map((h) => (
+                  {filteredHistory30.map((h) => {
+                    const parcelas = (h.parcelas_devedor || []).slice().sort((a: any, b: any) => (a.numero_parcela || 0) - (b.numero_parcela || 0));
+                    const sum = summarizeParcelas(parcelas);
+                    const isOpen = expandedHist.has(h.id);
+                    const max = h.tipo === 'negociar' ? 3 : 1;
+                    return (
+                    <>
                     <TableRow
                       key={h.id}
                       onClick={() => openClientFile({
@@ -1157,6 +1164,9 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                       } as Debtor)}
                       className="cursor-pointer"
                     >
+                      <TableCell onClick={(e) => { e.stopPropagation(); toggleHistRow(h.id); }} className="cursor-pointer">
+                        {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      </TableCell>
                       <TableCell className="text-sm">{new Date(h.created_at).toLocaleDateString("pt-BR")}</TableCell>
                       <TableCell>
                         <span className="inline-flex items-center gap-2 hover:text-primary hover:underline transition-colors">
@@ -1184,7 +1194,16 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                       <TableCell className="text-right">{fmtBRL(h.valor_original_total)}</TableCell>
                       <TableCell className="text-right text-amber-600">{fmtBRL(h.valor_acrescimo)}</TableCell>
                       <TableCell className="text-right font-semibold">{fmtBRL(h.valor_total)}</TableCell>
-                      <TableCell className="text-center"><Badge variant="outline">{h.parcelas_devedor?.length || 0}</Badge></TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <Badge variant="outline">{parcelas.length}/{max}</Badge>
+                          <div className="text-[10px] text-muted-foreground flex gap-1">
+                            <span className="text-emerald-600">{sum.pagas}p</span>·
+                            <span className="text-amber-600">{sum.aVencer}a</span>·
+                            <span className="text-red-600">{sum.vencidas}v</span>
+                          </div>
+                        </div>
+                      </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         {h.asaas_customer_id ? (
                           <ResponsavelChip
@@ -1197,7 +1216,15 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                         )}
                       </TableCell>
                     </TableRow>
-                  ))}
+                    {isOpen && (
+                      <TableRow key={h.id + "-detail"} className="bg-muted/30">
+                        <TableCell colSpan={9} className="py-3">
+                          <ParcelasPanel parcelas={parcelas} totalVencido={sum.totalVencido} max={max} />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    </>
+                  );})}
                 </TableBody>
               </Table>
             </CardContent>
