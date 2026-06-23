@@ -12,6 +12,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CheckCircle2, Clock, AlertTriangle, Archive, Search, Eye, Bell, ChevronDown, CalendarCheck, Wallet, UserPlus, X, Ban, Pencil } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { STATUS_CONFIG } from './types';
 import { NotificarClienteDialog } from './NotificarClienteDialog';
@@ -19,6 +21,7 @@ import { VincularClienteDialog } from './VincularClienteDialog';
 import { EditarMarcaDialog } from './EditarMarcaDialog';
 import { ResponsavelChip } from '@/components/admin/shared/ResponsavelChip';
 import { useResponsaveis, atribuirResponsavel } from '@/hooks/useResponsaveis';
+import { calcDeadlineFromStatus } from '@/components/admin/PublicacaoTab';
 
 type Bucket = 'no_prazo' | '30dias' | 'ultima_semana' | 'vencidos' | 'cumpridos' | 'desistiu';
 
@@ -89,6 +92,10 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
   const [schedules, setSchedules] = useState<Record<string, any>>({});
   const [linkDialogPub, setLinkDialogPub] = useState<any | null>(null);
   const [editMarcaPub, setEditMarcaPub] = useState<any | null>(null);
+  const [editPrazoPubId, setEditPrazoPubId] = useState<string | null>(null);
+  const [editRpiDate, setEditRpiDate] = useState<string>('');
+  const [editDeadline, setEditDeadline] = useState<string>('');
+  const [savingPrazo, setSavingPrazo] = useState(false);
   const pubIds = useMemo(() => publicacoes.map(p => p.id), [publicacoes]);
   const responsaveisMap = useResponsaveis('publicacao', pubIds);
 
@@ -222,6 +229,73 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
     toast.success('Publicação arquivada');
     queryClient.invalidateQueries({ queryKey: ['publicacoes-marcas'] });
     queryClient.invalidateQueries({ queryKey: ['brand-processes-pub'] });
+  };
+
+  // Conta publicações por processo para mostrar "Publicação N/M"
+  const pubCountByProcess = useMemo(() => {
+    const map = new Map<string, any[]>();
+    for (const p of publicacoes) {
+      const key = p.process_id || `rpi:${p.process_number_rpi || p.id}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(p);
+    }
+    // ordenar por data_publicacao_rpi asc
+    for (const arr of map.values()) {
+      arr.sort((a, b) => {
+        const da = a.data_publicacao_rpi ? new Date(a.data_publicacao_rpi).getTime() : 0;
+        const db = b.data_publicacao_rpi ? new Date(b.data_publicacao_rpi).getTime() : 0;
+        return da - db;
+      });
+    }
+    return map;
+  }, [publicacoes]);
+
+  const getPubIndex = (pub: any): { idx: number; total: number } | null => {
+    const key = pub.process_id || `rpi:${pub.process_number_rpi || pub.id}`;
+    const arr = pubCountByProcess.get(key);
+    if (!arr || arr.length < 2) return null;
+    const idx = arr.findIndex(p => p.id === pub.id);
+    return { idx: idx + 1, total: arr.length };
+  };
+
+  const openEditPrazo = (pub: any) => {
+    setEditPrazoPubId(pub.id);
+    setEditRpiDate(pub.data_publicacao_rpi || '');
+    setEditDeadline(pub._deadline || pub.proximo_prazo_critico || '');
+  };
+
+  const handleRpiDateChange = (newDate: string, pub: any) => {
+    setEditRpiDate(newDate);
+    if (newDate) {
+      const rule = calcDeadlineFromStatus(pub.status);
+      if (rule && rule.days !== null) {
+        const d = addDays(parseISO(newDate), rule.days);
+        setEditDeadline(format(d, 'yyyy-MM-dd'));
+      }
+    }
+  };
+
+  const savePrazo = async (pub: any) => {
+    if (!editRpiDate) { toast.error('Informe a data da publicação'); return; }
+    setSavingPrazo(true);
+    const finalDeadline = editDeadline || (() => {
+      const rule = calcDeadlineFromStatus(pub.status);
+      return rule?.days ? format(addDays(parseISO(editRpiDate), rule.days), 'yyyy-MM-dd') : null;
+    })();
+    const { error } = await supabase
+      .from('publicacoes_marcas')
+      .update({
+        data_publicacao_rpi: editRpiDate,
+        proximo_prazo_critico: finalDeadline,
+        descricao_prazo: calcDeadlineFromStatus(pub.status)?.desc || pub.descricao_prazo,
+        updated_at: new Date().toISOString(),
+      } as any)
+      .eq('id', pub.id);
+    setSavingPrazo(false);
+    if (error) { toast.error('Erro ao salvar prazo'); return; }
+    toast.success('Prazo atualizado');
+    setEditPrazoPubId(null);
+    queryClient.invalidateQueries({ queryKey: ['publicacoes-marcas'] });
   };
 
   return (
