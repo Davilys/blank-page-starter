@@ -1437,7 +1437,9 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                   <Zap className="h-3 w-3" /> Ações Rápidas
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {QUICK_ACTIONS.map(action => (
+                  {QUICK_ACTIONS.map(action => {
+                    const isSpecialActive = action.id === 'cliente_especial' && (client as any).is_special_client;
+                    return (
                     <motion.button
                       key={action.id}
                       whileHover={{ scale: 1.05 }}
@@ -1445,10 +1447,11 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                       className={cn('px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors', action.cls)}
                       onClick={() => handleQuickAction(action.id)}
                     >
-                      <action.icon className="h-3.5 w-3.5" />
+                      <action.icon className={cn('h-3.5 w-3.5', isSpecialActive && 'fill-yellow-600 text-yellow-700')} />
                       {action.label}
                     </motion.button>
-                  ))}
+                    );
+                  })}
                   {extraActions}
                 </div>
               </div>
