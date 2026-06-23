@@ -728,6 +728,8 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
             <><Send className="h-4 w-4 mr-2" /> {alreadySent ? 'Reenviar Notificação + Distrato' : 'Enviar Notificação + Distrato sem multa'}</>
           ) : isArquivado ? (
             <><Send className="h-4 w-4 mr-2" /> {alreadySent ? 'Reenviar Notificação' : 'Enviar Notificação'}</>
+          ) : isSpecialClient ? (
+            <><Send className="h-4 w-4 mr-2" /> {alreadySent ? 'Reenviar Notificação (sem cobrança)' : 'Enviar Notificação (sem cobrança)'}</>
           ) : alreadySent ? (
             <><Send className="h-4 w-4 mr-2" /> Reenviar Notificação + Cobrança</>
           ) : (
