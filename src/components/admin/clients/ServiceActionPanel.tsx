@@ -233,20 +233,25 @@ Equipe WebMarcas`;
 export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySent }: ServiceActionPanelProps) {
   const isArquivado = stage.id === 'arquivado';
   const isDistrato = stage.id === 'distrato';
-  const isNotificationOnly = isArquivado || isDistrato;
+  const isSpecialClient = !!client.is_special_client;
+  const isNotificationOnly = isArquivado || isDistrato || isSpecialClient;
   const [message, setMessage] = useState(() =>
     isDistrato
       ? generateDistratoEmail(client)
       : isArquivado
         ? generateArquivadoEmail(client)
-        : generateEmailTemplate(client, stage, SALARIO_MINIMO_2026)
+        : isSpecialClient
+          ? generateEmailTemplateSemCobranca(client, stage)
+          : generateEmailTemplate(client, stage, SALARIO_MINIMO_2026)
   );
   const [whatsappMessage, setWhatsappMessage] = useState(() =>
     isDistrato
       ? generateDistratoWhatsApp(client)
       : isArquivado
         ? generateArquivadoWhatsApp(client)
-        : generateWhatsAppTemplate(client, stage, SALARIO_MINIMO_2026)
+        : isSpecialClient
+          ? generateWhatsAppTemplateSemCobranca(client, stage)
+          : generateWhatsAppTemplate(client, stage, SALARIO_MINIMO_2026)
   );
   const [sendEmail, setSendEmail] = useState(true);
   const [sendWhatsApp, setSendWhatsApp] = useState(true);
