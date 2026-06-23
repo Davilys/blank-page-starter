@@ -97,6 +97,48 @@ Por gentileza, qual o melhor dia e horário para conversarmos?
 Fico no aguardo.`;
 }
 
+function generateEmailTemplateSemCobranca(client: ServiceActionPanelProps['client'], stage: ServiceActionPanelProps['stage']): string {
+  const nome = client.full_name || 'Cliente';
+  const marca = client.brand_name || 'sua marca';
+  const protocolo = client.process_number ? ` (Protocolo: ${client.process_number})` : '';
+  return `Prezado ${nome},
+
+Venho informar que o INPI publicou uma movimentação (${stage.label}) referente ao processo da marca "${marca}"${protocolo}.
+
+Toda e qualquer publicação possui prazo de 60 (sessenta) dias corridos para o cumprimento, contados a partir da data de publicação na Revista da Propriedade Industrial (RPI).
+
+Como cliente especial WebMarcas, o cumprimento desta etapa será conduzido pelo nosso jurídico sem cobrança adicional de honorários. Eventuais taxas oficiais (GRU) do INPI, quando aplicáveis, permanecem de responsabilidade do titular conforme contrato.
+
+Caso queira falar com o jurídico, informe o melhor dia e horário, pois precisamos resolver isso o quanto antes.
+
+Estamos à disposição para esclarecer qualquer dúvida.
+
+Atenciosamente,
+
+Equipe WebMarcas
+www.webmarcas.net
+WhatsApp: (11) 91112-0225`;
+}
+
+function generateWhatsAppTemplateSemCobranca(client: ServiceActionPanelProps['client'], stage: ServiceActionPanelProps['stage']): string {
+  const nome = client.full_name || 'Cliente';
+  const marca = client.brand_name || 'sua marca';
+  const primeiroNome = nome.split(' ')[0];
+  const numero = client.process_number?.trim();
+  const trechoNumero = numero ? `, sob o número ${numero}` : '';
+  return `Olá, ${primeiroNome}, tudo bem?
+
+Atualização importante sobre o seu processo no INPI: foi publicada uma movimentação (${stage.label}) referente à marca ${marca}${trechoNumero}.
+
+O prazo do INPI é de 60 (sessenta) dias corridos a partir da publicação na RPI.
+
+Como você é cliente especial WebMarcas, nosso jurídico vai cuidar do cumprimento desta etapa sem cobrança adicional de honorários.
+
+Qual o melhor dia e horário para uma breve conversa de alinhamento?
+
+Fico no aguardo.`;
+}
+
 function generateArquivadoEmail(client: ServiceActionPanelProps['client']): string {
   const nome = client.full_name || 'Cliente';
   const marca = client.brand_name?.trim() || '[NOME DA MARCA]';
