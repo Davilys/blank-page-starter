@@ -235,6 +235,7 @@ Deno.serve(async (req) => {
       let skipped_in_history = 0;
       const customerCache = new Map<string, any>();
       const minOverdueDays = 60;
+      const negotiatedSet = await getNegotiatedPaymentIds(admin);
 
       while (true) {
         const page = await asaas(`/payments?status=OVERDUE&limit=${limit}&offset=${offset}`);
@@ -262,6 +263,12 @@ Deno.serve(async (req) => {
           if (!due) continue;
           const dias = daysBetween(due);
           if (dias <= minOverdueDays) continue;
+
+          if (negotiatedSet.has(p.id)) {
+            // parcela criada por negociação/renegociação — pertence ao Histórico
+            skipped_finalized++;
+            continue;
+          }
 
           const prevStatus = existingMap.get(p.id);
           if (prevStatus && prevStatus !== "pendente_renegociacao") {
@@ -310,6 +317,14 @@ Deno.serve(async (req) => {
       // Cleanup: linhas d60 que NÃO foram tocadas neste sweep podem ter sido
       // reagendadas/quitadas no Asaas. Re-checa cada uma e remove se já não estiver vencida >60d.
       await cleanupBucket(admin, "d60", 60);
+      // Limpa linhas residuais cujo asaas_payment_id virou parcela de negociação
+      if (negotiatedSet.size > 0) {
+        const ids = Array.from(negotiatedSet);
+        for (let i = 0; i < ids.length; i += 500) {
+          const chunk = ids.slice(i, i + 500);
+          await admin.from("cobrancas_vencidas").delete().in("asaas_payment_id", chunk);
+        }
+      }
       return json({ success: true, total_overdue: total, kept_over_60d: kept, skipped_finalized, skipped_in_history });
     }
 
