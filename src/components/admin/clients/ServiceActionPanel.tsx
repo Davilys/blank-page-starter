@@ -529,7 +529,15 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
             </div>
             <div>
               <p className="text-sm font-semibold">Painel de Ação – {stage.label}</p>
-              <p className="text-xs text-muted-foreground">{isDistrato ? 'Notificação Extrajudicial – Distrato' : isArquivado ? 'Notificação ao cliente' : 'Notificação + Cobrança'}</p>
+              <p className="text-xs text-muted-foreground">
+                {isDistrato
+                  ? 'Notificação Extrajudicial – Distrato'
+                  : isArquivado
+                    ? 'Notificação ao cliente'
+                    : isSpecialClient
+                      ? 'Notificação (Cliente Especial – sem cobrança)'
+                      : 'Notificação + Cobrança'}
+              </p>
             </div>
           </div>
           <button className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center" onClick={onClose}>
@@ -543,6 +551,16 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
             <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
             <AlertDescription className="text-yellow-700 dark:text-yellow-300 text-xs">
               Esta notificação já foi enviada em <strong>{new Date(alreadySent.sent_at).toLocaleDateString('pt-BR')}</strong>. Deseja enviar novamente?
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Special client banner */}
+        {isSpecialClient && !isArquivado && !isDistrato && (
+          <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700">
+            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <AlertDescription className="text-amber-800 dark:text-amber-200 text-xs">
+              <strong>Cliente Especial</strong> — apenas a notificação será enviada. <strong>Nenhuma fatura ou cobrança de honorários</strong> será gerada para esta movimentação.
             </AlertDescription>
           </Alert>
         )}
