@@ -1282,6 +1282,12 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                         {client.brand_name}
                       </span>
                     )}
+                    {(client as any).is_special_client && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400/90 text-amber-950 text-xs font-bold shadow-sm border border-amber-300">
+                        <Star className="h-3 w-3 fill-current" />
+                        Cliente Especial
+                      </span>
+                    )}
                     {/* Publication status badge in header */}
                     {processPublicacoes.length > 0 && (() => {
                       const latestPub = processPublicacoes[0];
