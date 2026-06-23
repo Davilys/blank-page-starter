@@ -19,6 +19,7 @@ import { PaginationBar, type PageSize } from "@/components/admin/financeiro/Pagi
 import { EditableAmountCell } from "@/components/admin/financeiro/EditableAmountCell";
 import { ResponsavelChip } from "@/components/admin/shared/ResponsavelChip";
 import { useResponsaveis, atribuirResponsavel } from "@/hooks/useResponsaveis";
+import { CobrarParcelaAcordoDialog } from "@/components/admin/financeiro/CobrarParcelaAcordoDialog";
 
 const ClientDetailSheet = lazy(() =>
   import("@/components/admin/clients/ClientDetailSheet").then((m) => ({ default: m.ClientDetailSheet }))
