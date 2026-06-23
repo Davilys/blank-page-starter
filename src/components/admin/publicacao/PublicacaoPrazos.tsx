@@ -20,8 +20,19 @@ import { NotificarClienteDialog } from './NotificarClienteDialog';
 import { VincularClienteDialog } from './VincularClienteDialog';
 import { EditarMarcaDialog } from './EditarMarcaDialog';
 import { ResponsavelChip } from '@/components/admin/shared/ResponsavelChip';
-import { useResponsaveis, atribuirResponsavel } from '@/hooks/useResponsaveis';
+import { useResponsaveis, atribuirResponsavel, useAdminList } from '@/hooks/useResponsaveis';
 import { calcDeadlineFromStatus } from '@/components/admin/PublicacaoTab';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Check, User } from 'lucide-react';
+
+// Admin UUIDs para atribuição automática por bucket de prazo
+const AUTO_OWNERS = {
+  no_prazo: { id: 'ad9db755-9d8f-4b2c-806b-c9c7245b79bc', nome: 'caroline martins dos santos' },
+  '30dias': { id: 'e01073ec-5424-4aab-bfb0-bd8b40396349', nome: 'João Pedro' },
+  ultima_semana: { id: '1569b08c-e266-47d0-a384-4b7f29c64dc1', nome: 'Camila Ferreira' },
+} as const;
+
+const STATUS_BLOQUEIA_REATRIBUICAO = new Set(['cumprido', 'aguardando_pagamento']);
 
 type Bucket = 'no_prazo' | '30dias' | 'ultima_semana' | 'vencidos' | 'cumpridos' | 'desistiu';
 
@@ -98,6 +109,9 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
   const [savingPrazo, setSavingPrazo] = useState(false);
   const pubIds = useMemo(() => publicacoes.map(p => p.id), [publicacoes]);
   const responsaveisMap = useResponsaveis('publicacao', pubIds);
+  const { admins } = useAdminList();
+  const [filtroResp, setFiltroResp] = useState<string>('all'); // 'all' | userId | 'none'
+  const [respPopoverOpen, setRespPopoverOpen] = useState(false);
 
   useEffect(() => {
     const ids = publicacoes.map(p => p.id);
@@ -112,6 +126,45 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
         setSchedules(map);
       });
   }, [publicacoes]);
+
+  // Atribuição automática por bucket de prazo (Caroline 60d → João 30d → Camila 7d)
+  useEffect(() => {
+    if (publicacoes.length === 0) return;
+    // Aguarda o mapa de responsáveis carregar pelo menos uma vez
+    const tarefas: Array<{ pubId: string; ownerId: string; ownerNome: string }> = [];
+    for (const p of publicacoes) {
+      if (p.status === 'certificado' || p.status === 'arquivado') continue;
+      if (p.cumprimento_ok) continue;
+      if (STATUS_BLOQUEIA_REATRIBUICAO.has(p.cumprimento_status)) continue;
+
+      const deadline = computeDeadline(p);
+      if (!deadline) continue;
+      const days = differenceInDays(parseISO(deadline), new Date());
+      const bucket = bucketOf(days);
+      if (bucket !== 'no_prazo' && bucket !== '30dias' && bucket !== 'ultima_semana') continue;
+
+      const expected = AUTO_OWNERS[bucket];
+      const atual = responsaveisMap[p.id]?.user_id || null;
+      if (atual === expected.id) continue;
+      tarefas.push({ pubId: p.id, ownerId: expected.id, ownerNome: expected.nome });
+    }
+    if (tarefas.length === 0) return;
+    // Dispara em background (sem await para não travar render). Limita 25 por ciclo.
+    (async () => {
+      for (const t of tarefas.slice(0, 25)) {
+        try {
+          await atribuirResponsavel('publicacao', t.pubId, {
+            userId: t.ownerId,
+            userNome: t.ownerNome,
+            acao: 'atribuiu',
+          });
+        } catch (e) {
+          console.warn('[auto-assign] falhou', t.pubId, e);
+        }
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publicacoes, responsaveisMap]);
 
   // Filter eligible publications for deadline buckets (not certified/archived/cumprido)
   const eligible = useMemo(() => {
@@ -165,6 +218,15 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
       eligible.filter(p => p._bucket === active);
     return source
       .filter(p => {
+        // Filtro de responsável
+        if (filtroResp !== 'all') {
+          const respId = responsaveisMap[p.id]?.user_id || null;
+          if (filtroResp === 'none') {
+            if (respId) return false;
+          } else if (respId !== filtroResp) {
+            return false;
+          }
+        }
         if (!term) return true;
         const proc = p.process_id ? processMap.get(p.process_id) : null;
         const client = p.client_id ? clientMap.get(p.client_id) : null;
@@ -175,7 +237,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
         );
       })
       .sort((a, b) => (a._days ?? 9999) - (b._days ?? 9999));
-  }, [eligible, cumpridosList, desistiuList, active, search, processMap, clientMap]);
+  }, [eligible, cumpridosList, desistiuList, active, search, processMap, clientMap, filtroResp, responsaveisMap]);
 
   const handleSetStatus = async (pub: any, status: AndamentoStatus) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -319,10 +381,58 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
         ))}
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar marca, processo ou cliente..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8 h-9 text-sm" />
+      {/* Search + Filtro Responsável */}
+      <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+        <div className="relative max-w-sm flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar marca, processo ou cliente..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8 h-9 text-sm" />
+        </div>
+        <Popover open={respPopoverOpen} onOpenChange={setRespPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-9 gap-2 justify-start min-w-[200px]">
+              <User className="h-3.5 w-3.5" />
+              {filtroResp === 'all'
+                ? 'Todos os responsáveis'
+                : filtroResp === 'none'
+                ? 'Sem responsável'
+                : (admins.find(a => a.user_id === filtroResp)?.full_name?.split(' ')[0] || 'Responsável')}
+              <ChevronDown className="h-3 w-3 ml-auto opacity-60" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-0" align="start">
+            <Command>
+              <CommandInput placeholder="Buscar responsável..." />
+              <CommandList>
+                <CommandEmpty>Nenhum admin encontrado</CommandEmpty>
+                <CommandGroup>
+                  <CommandItem value="todos" onSelect={() => { setFiltroResp('all'); setRespPopoverOpen(false); }}>
+                    <User className="h-3.5 w-3.5 mr-2" /> Todos
+                    {filtroResp === 'all' && <Check className="h-3 w-3 ml-auto text-emerald-500" />}
+                  </CommandItem>
+                  <CommandItem value="sem-responsavel" onSelect={() => { setFiltroResp('none'); setRespPopoverOpen(false); }}>
+                    <UserPlus className="h-3.5 w-3.5 mr-2" /> Sem responsável
+                    {filtroResp === 'none' && <Check className="h-3 w-3 ml-auto text-emerald-500" />}
+                  </CommandItem>
+                </CommandGroup>
+                <CommandGroup heading="Admins">
+                  {admins.map(a => (
+                    <CommandItem
+                      key={a.user_id}
+                      value={a.full_name + ' ' + (a.email || '')}
+                      onSelect={() => { setFiltroResp(a.user_id); setRespPopoverOpen(false); }}
+                    >
+                      <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-blue-500 text-white text-[10px] font-semibold mr-2">
+                        {(a.full_name || '?').trim().split(/\s+/).map(s => s[0]).slice(0, 2).join('').toUpperCase()}
+                      </span>
+                      <span className="truncate">{a.full_name}</span>
+                      {filtroResp === a.user_id && <Check className="h-3 w-3 ml-auto text-emerald-500" />}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       </div>
 
       <Card>
