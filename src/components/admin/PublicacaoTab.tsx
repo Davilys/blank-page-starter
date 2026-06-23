@@ -177,6 +177,29 @@ function calcDeadlineFromDispatch(dispatchText: string | null, publicationDate: 
   return { days: 30, desc: 'Prazo padrão - 30 dias' };
 }
 
+// Regras INPI por status (usadas quando dispatch_text está ausente)
+function calcDeadlineFromStatus(status: PubStatus | string | undefined): { days: number | null; desc: string } | null {
+  switch (status) {
+    case '003':
+    case 'oposicao':
+      return { days: 60, desc: 'Prazo para oposição' };
+    case 'exigencia_merito':
+      return { days: 60, desc: 'Cumprimento de exigência de mérito' };
+    case 'indeferimento':
+      return { days: 60, desc: 'Prazo para recurso (indeferimento)' };
+    case 'deferimento':
+      return { days: 60, desc: 'Pagamento de taxas (deferimento)' };
+    case 'renovacao':
+      return { days: 60, desc: 'Prazo para protocolar renovação' };
+    case 'arquivado':
+    case 'distrato':
+    case 'certificado':
+      return null;
+    default:
+      return { days: 60, desc: 'Prazo padrão INPI - 60 dias' };
+  }
+}
+
 function calcAutoFields(pub: Partial<Publicacao>, dispatchText?: string | null): Partial<Publicacao> {
   const out = { ...pub };
   if (out.data_publicacao_rpi) {
@@ -202,10 +225,13 @@ function calcAutoFields(pub: Partial<Publicacao>, dispatchText?: string | null):
     }
   }
 
-  // Fallback: if still no proximo_prazo_critico but has publication date, use 30 days
+  // Fallback baseado no status (regra INPI). NÃO usa mais 30 dias como padrão.
   if (!out.proximo_prazo_critico && out.data_publicacao_rpi) {
-    out.proximo_prazo_critico = format(addDays(parseISO(out.data_publicacao_rpi), 30), 'yyyy-MM-dd');
-    if (!out.descricao_prazo) out.descricao_prazo = 'Prazo padrão - 30 dias';
+    const byStatus = calcDeadlineFromStatus(out.status);
+    if (byStatus && byStatus.days !== null) {
+      out.proximo_prazo_critico = format(addDays(parseISO(out.data_publicacao_rpi), byStatus.days), 'yyyy-MM-dd');
+      if (!out.descricao_prazo) out.descricao_prazo = byStatus.desc;
+    }
   }
 
   const futureDates = [out.prazo_oposicao, out.data_renovacao, out.proximo_prazo_critico]
