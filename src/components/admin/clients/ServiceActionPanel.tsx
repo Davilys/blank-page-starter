@@ -23,6 +23,7 @@ interface ServiceActionPanelProps {
     brand_name?: string | null;
     process_number?: string | null;
     process_id?: string | null;
+    is_special_client?: boolean | null;
   };
   stage: {
     id: string;
