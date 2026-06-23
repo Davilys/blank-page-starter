@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, RefreshCw, Loader2, Zap, AlertTriangle, Users, DollarSign, TrendingUp, Search, Mail, MessageCircle, Trash2 } from "lucide-react";
+import { ArrowLeft, RefreshCw, Loader2, Zap, AlertTriangle, Users, DollarSign, TrendingUp, Search, Mail, MessageCircle, Trash2, ChevronDown, ChevronRight, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ClientWithProcess } from "@/components/admin/clients/ClientKanbanBoard";
@@ -122,6 +122,14 @@ export default function Devedores({ embedded = false, forceTab }: DevedoresProps
   const [pageSize60, setPageSize60] = useState<PageSize>(10);
   const [page30, setPage30] = useState(1);
   const [pageSize30, setPageSize30] = useState<PageSize>(10);
+  const [expandedHist, setExpandedHist] = useState<Set<string>>(new Set());
+  const toggleHistRow = (id: string) => {
+    setExpandedHist((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
   const devedoresIds = useMemo(
     () => [...debtors, ...debtors30].map(d => d.asaas_customer_id).filter(Boolean),
     [debtors, debtors30],
