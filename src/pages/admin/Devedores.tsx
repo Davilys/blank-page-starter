@@ -71,6 +71,26 @@ const fmtDate = (s: string) => {
   return `${d}/${m}/${y}`;
 };
 
+const PAID_STATUSES = new Set(["paid", "confirmed", "received", "RECEIVED", "CONFIRMED"]);
+function parcelaState(p: any): "paga" | "vencida" | "a_vencer" {
+  const s = (p?.status || "").toString();
+  if (PAID_STATUSES.has(s)) return "paga";
+  if (!p?.data_vencimento) return "a_vencer";
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const due = new Date(p.data_vencimento + "T00:00:00");
+  return due < today ? "vencida" : "a_vencer";
+}
+function summarizeParcelas(parcelas: any[]) {
+  let pagas = 0, vencidas = 0, aVencer = 0, totalVencido = 0;
+  for (const p of parcelas || []) {
+    const st = parcelaState(p);
+    if (st === "paga") pagas++;
+    else if (st === "vencida") { vencidas++; totalVencido += Number(p.valor) || 0; }
+    else aVencer++;
+  }
+  return { pagas, vencidas, aVencer, totalVencido };
+}
+
 async function callApi(action: string, body?: any) {
   const { data: sess } = await supabase.auth.getSession();
   const token = sess.session?.access_token;
