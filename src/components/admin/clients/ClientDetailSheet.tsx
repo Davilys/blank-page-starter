@@ -331,7 +331,6 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
     full_name: '', email: '', phone: '', cpf: '', cnpj: '', company_name: '',
     address: '', neighborhood: '', city: '', state: '', zip_code: '',
     priority: 'medium', origin: 'site', brand_name: '', business_area: '', assigned_to: '',
-    is_special_client: false,
   });
   const [newProcess, setNewProcess] = useState({ brand_name: '', process_number: '', pipeline_stage: 'protocolado', business_area: '' });
   const { stages: juridicoStages } = useJuridicoStages();
