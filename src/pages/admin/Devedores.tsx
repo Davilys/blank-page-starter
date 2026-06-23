@@ -1027,7 +1027,7 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                     const sum = summarizeParcelas(parcelas);
                     const isOpen = expandedHist.has(h.id);
                     return (
-                    <>
+                    <Fragment key={h.id}>
                     <TableRow
                       key={h.id}
                       onClick={() => openClientFile({
@@ -1110,7 +1110,7 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                         </TableCell>
                       </TableRow>
                     )}
-                    </>
+                    </Fragment>
                   );})}
                 </TableBody>
               </Table>
@@ -1145,7 +1145,7 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                     const isOpen = expandedHist.has(h.id);
                     const max = h.tipo === 'negociar' ? 3 : 1;
                     return (
-                    <>
+                    <Fragment key={h.id}>
                     <TableRow
                       key={h.id}
                       onClick={() => openClientFile({
@@ -1223,7 +1223,7 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                         </TableCell>
                       </TableRow>
                     )}
-                    </>
+                    </Fragment>
                   );})}
                 </TableBody>
               </Table>
