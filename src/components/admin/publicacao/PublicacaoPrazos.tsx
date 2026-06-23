@@ -637,19 +637,35 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 px-2 text-xs gap-1 border-primary/40 text-primary hover:bg-primary/10"
-                            onClick={() => {
-                              setNotifyPub(pub);
-                              atribuirResponsavel('publicacao', pub.id, { acao: 'cobrou', somenteSeVazio: true }).catch(() => {});
-                            }}
-                            disabled={!pub.client_id}
-                            title={pub.client_id ? 'Enviar notificação' : 'Vincule um cliente primeiro'}
-                          >
-                            <Bell className="w-3.5 h-3.5" /> Notificar
-                          </Button>
+                          {(pub._bucket === 'desistiu' || pub.cumprimento_status === 'desistiu') ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-xs gap-1 border-amber-500/60 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
+                              onClick={() => {
+                                setPropostaPub(pub);
+                                atribuirResponsavel('publicacao', pub.id, { acao: 'cobrou', somenteSeVazio: true }).catch(() => {});
+                              }}
+                              disabled={!pub.client_id}
+                              title={pub.client_id ? 'Enviar proposta especial R$ 699' : 'Vincule um cliente primeiro'}
+                            >
+                              <Sparkles className="w-3.5 h-3.5" /> Proposta R$ 699
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-xs gap-1 border-primary/40 text-primary hover:bg-primary/10"
+                              onClick={() => {
+                                setNotifyPub(pub);
+                                atribuirResponsavel('publicacao', pub.id, { acao: 'cobrou', somenteSeVazio: true }).catch(() => {});
+                              }}
+                              disabled={!pub.client_id}
+                              title={pub.client_id ? 'Enviar notificação' : 'Vincule um cliente primeiro'}
+                            >
+                              <Bell className="w-3.5 h-3.5" /> Notificar
+                            </Button>
+                          )}
                           {onOpenDetail && (
                             <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => onOpenDetail(pub.id)} title="Ver detalhe">
                               <Eye className="w-3.5 h-3.5" />
