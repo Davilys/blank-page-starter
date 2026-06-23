@@ -1,47 +1,49 @@
 ## Objetivo
 
-Na aba **Prazos** (Publicações), adicionar:
-1. Filtro por **Responsável** (dropdown com busca por nome) que mostra apenas clientes/prazos vinculados a esse admin.
-2. **Atribuição automática de responsável** conforme o estágio do prazo:
-   - Novo (60 dias / "No Prazo") → **Caroline**
-   - 30 dias para vencer → **João Pedro**
-   - Última semana (≤7 dias) → **Camila Ferreira**
-   - Só re-atribui se o status NÃO for `cumprido` nem `aguardando_pagamento` (nesses casos mantém o responsável atual).
+Na aba **Prazos** → bucket **"Desistiu"**, substituir o botão "Notificar" por **"Enviar Proposta R$ 699"**. Ao clicar, dispara em um único clique:
+- **E-mail** com o texto formal completo (Equipe Jurídica WebMarcas, R$ 1.621 → R$ 699 PIX/cartão)
+- **WhatsApp** com a mensagem curta da oferta especial
 
-## Mudanças
+Mensagens diferentes por canal; `[NOME]` substituído pelo nome do cliente.
 
-### 1. UI — `src/components/admin/publicacao/PublicacaoPrazos.tsx`
-- Adicionar um **dropdown "Responsável"** ao lado do campo de busca existente, com:
-  - Opção "Todos"
-  - Lista de admins (via `useAdminList`)
-  - Input de busca interno (Command)
-- Aplicar filtro no array de publicações antes de renderizar: mostrar só linhas em que `responsavel.user_id === filtroSelecionado`.
-- Contadores das chips (No Prazo, 30 Dias, Última Semana, Vencidos, etc.) recalculados respeitando o filtro de responsável (assim o admin vê só "seus" números).
+## Escopo
 
-### 2. Atribuição automática — novo hook/efeito em `PublicacaoPrazos.tsx`
-- Constantes com os UUIDs dos 3 admins-alvo:
-  - Caroline: `ad9db755-9d8f-4b2c-806b-c9c7245b79bc`
-  - João: `e01073ec-5424-4aab-bfb0-bd8b40396349`
-  - Camila: `1569b08c-e266-47d0-a384-4b7f29c64dc1`
-- Função `bucketOf(pub)` retorna `60d | 30d | 7d` a partir de `proximo_prazo_critico - hoje`.
-- Função `expectedOwner(bucket)` retorna o UUID do admin esperado.
-- Ao carregar publicações, percorrer cada item e:
-  - Se `status_cumprimento ∈ {cumprido, aguardando_pagamento}` → não mexer.
-  - Se responsável atual ≠ esperado → chamar `atribuirResponsavel('publicacao', pub.id, { userId: expected, userNome, acao: 'atribuiu' })`.
-- Para evitar reatribuir em loop, manter um `Set` de IDs já processados nesta sessão e só re-rodar quando `bucket` mudar.
+### 1. Novo template (`src/components/admin/publicacao/cobrancaTemplates.ts`)
+Adicionar `PROPOSTA_DESISTIU_TEMPLATE` exportado:
+- `subject(marca)` → `"Proposta especial para continuidade do registro — <marca>"`
+- `email(nome, marca)` → HTML formatado com o texto formal completo fornecido pelo usuário (parágrafos, bullets PIX/cartão, assinatura Equipe Jurídica WebMarcas, telefone, site)
+- `whatsapp(nome)` → texto curto com 🚨 e oferta R$ 699
 
-### 3. Atribuição na criação (Revista INPI) — `supabase/functions/process-rpi/index.ts`
-- Quando uma RPI cria/atualiza um `publicacoes_marcas` novo com prazo de 60 dias, fazer `upsert` em `responsavel_atribuicao` com Caroline como responsável padrão (somente se ainda não houver responsável).
-- Garante que mesmo antes do admin abrir a tela, a publicação já nasce vinculada à Caroline.
+### 2. Botão exclusivo do bucket Desistiu (`src/components/admin/publicacao/PublicacaoPrazos.tsx`)
+- Quando `status_cumprimento === 'desistiu'` (ou bucket ativo = "desistiu"), a célula de ações exibe **"Enviar Proposta R$ 699"** (botão destaque) no lugar do "Notificar" atual.
+- Ao clicar, abre um `Dialog` de confirmação com:
+  - Dados do cliente (nome, e-mail, WhatsApp) lidos do `profile` vinculado
+  - Preview do assunto + corpo do e-mail
+  - Preview da mensagem do WhatsApp
+  - Botão **"Enviar agora (E-mail + WhatsApp)"** e **Cancelar**
+- Handler `enviarPropostaDesistiu(pub)` chama a edge function já existente `send-multichannel-notification` com:
+  - `channels: ['email','whatsapp']`
+  - `recipient: { nome, email, phone, user_id }`
+  - `custom_subject`, `custom_html`, `custom_message`
+  - `event_type: 'desistiu_proposta_699'`
+- Toast de sucesso/erro. Após envio, registra `last_notif_at` + `last_notif_bucket = 'desistiu_proposta'` em `publicacao_cobranca_schedule` (se existir registro para a publicação) apenas como histórico — sem alterar cronograma 15/30/50.
 
-### Detalhes técnicos
-- Buckets seguem a mesma regra já usada nas chips de contagem (`No Prazo`, `30 Dias para Vencer`, `Última Semana`).
-- O fallback "Última Semana" cobre dias restantes entre 1 e 7 (inclusive).
-- Reaproveita `atribuirResponsavel` / `removerResponsavel` de `useResponsaveis.ts` — sem nova tabela.
-- Sem migration de schema; apenas dados em `responsavel_atribuicao`.
-- Filtro por responsável é client-side (já temos todas as publicações em memória na aba Prazos).
+### 3. Comportamento
+- Demais buckets (No Prazo / 30 Dias / Última Semana / Vencidos / Cumpridos) seguem com o botão **Notificar** original — nada muda.
+- Apenas em **Desistiu** a ação vira a Proposta R$ 699.
+
+## Detalhes técnicos
+
+**Arquivos afetados:**
+- `src/components/admin/publicacao/cobrancaTemplates.ts` — adicionar template.
+- `src/components/admin/publicacao/PublicacaoPrazos.tsx` — render condicional + dialog + handler.
+
+**Sem mudanças de schema. Sem nova edge function** — reutiliza `send-multichannel-notification`.
+
+**Substituições:**
+- `[NOME]` → `profile.full_name || 'Cliente'`
+- marca → `pub.brand_name_rpi`
 
 ## Fora de escopo
-- Não altera lógica de status (`cumprido` / `aguardando_pagamento` continuam manuais).
-- Não muda cálculo de prazos (já corrigido na rodada anterior).
-- Não cria notificações novas para os admins atribuídos.
+- Não altera fluxo dos 3 lembretes (15/30/50) nem auto-assignment de responsável.
+- Não cria automação/cron — disparo é manual por clique do admin.
