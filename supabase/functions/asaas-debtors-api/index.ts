@@ -487,8 +487,10 @@ Deno.serve(async (req) => {
         .order("cliente_nome", { ascending: true });
       if (error) throw error;
 
+      const negotiatedSet = await getNegotiatedPaymentIds(admin);
       const groups = new Map<string, any>();
       for (const row of data || []) {
+        if (row.asaas_payment_id && negotiatedSet.has(row.asaas_payment_id)) continue;
         const key = (row.cliente_cpf_cnpj || row.asaas_customer_id || row.cliente_nome || "sem-id") as string;
         if (!groups.has(key)) {
           groups.set(key, {
@@ -538,8 +540,10 @@ Deno.serve(async (req) => {
         .order("cliente_nome", { ascending: true });
       if (error) throw error;
 
+      const negotiatedSet = await getNegotiatedPaymentIds(admin);
       const groups = new Map<string, any>();
       for (const row of data || []) {
+        if (row.asaas_payment_id && negotiatedSet.has(row.asaas_payment_id)) continue;
         const key = (row.cliente_cpf_cnpj || row.asaas_customer_id || row.cliente_nome || "sem-id") as string;
         if (!groups.has(key)) {
           groups.set(key, {
