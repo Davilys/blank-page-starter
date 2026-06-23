@@ -2525,6 +2525,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                                     return targetBrand ? targetBrand.process_number : (clientBrands.length > 0 ? clientBrands[0].process_number : client.process_number);
                                   })(),
                                   process_id: selectedServiceBrandId || (clientBrands.length > 0 ? clientBrands[0].id : client.process_id),
+                                  is_special_client: !!(client as any).is_special_client,
                                 }}
                                 stage={actionStage}
                                 onClose={() => setExpandedStageAction(null)}
