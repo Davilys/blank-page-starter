@@ -102,6 +102,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
   const [search, setSearch] = useState('');
   const queryClient = useQueryClient();
   const [notifyPub, setNotifyPub] = useState<any | null>(null);
+  const [propostaPub, setPropostaPub] = useState<any | null>(null);
   const [schedules, setSchedules] = useState<Record<string, any>>({});
   const [linkDialogPub, setLinkDialogPub] = useState<any | null>(null);
   const [editMarcaPub, setEditMarcaPub] = useState<any | null>(null);
