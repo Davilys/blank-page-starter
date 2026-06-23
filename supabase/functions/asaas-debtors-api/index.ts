@@ -112,6 +112,47 @@ async function getPaymentsWithHistory(admin: any, asaasPaymentIds: string[]): Pr
   return result;
 }
 
+/**
+ * Retorna o conjunto de asaas_payment_id que JÁ pertencem a alguma negociação
+ * (parcelas_devedor – bucket 30/3x) ou renegociação (parcelas_renegociadas –
+ * bucket 60/5x). Esses pagamentos não devem voltar a aparecer em nenhuma lista
+ * de vencidos: foram gerados pelo próprio CRM como parcelas de acordo e
+ * pertencem exclusivamente ao Histórico.
+ */
+async function getNegotiatedPaymentIds(admin: any): Promise<Set<string>> {
+  const result = new Set<string>();
+  try {
+    let from = 0;
+    const step = 1000;
+    while (true) {
+      const { data, error } = await admin
+        .from("parcelas_devedor")
+        .select("asaas_payment_id")
+        .not("asaas_payment_id", "is", null)
+        .range(from, from + step - 1);
+      if (error) break;
+      for (const r of data || []) if (r.asaas_payment_id) result.add(r.asaas_payment_id);
+      if (!data || data.length < step) break;
+      from += step;
+    }
+    from = 0;
+    while (true) {
+      const { data, error } = await admin
+        .from("parcelas_renegociadas")
+        .select("asaas_payment_id")
+        .not("asaas_payment_id", "is", null)
+        .range(from, from + step - 1);
+      if (error) break;
+      for (const r of data || []) if (r.asaas_payment_id) result.add(r.asaas_payment_id);
+      if (!data || data.length < step) break;
+      from += step;
+    }
+  } catch (e) {
+    console.warn("getNegotiatedPaymentIds failed", e);
+  }
+  return result;
+}
+
 async function _cleanupBucketImpl(admin: any, bucket: "d30" | "d60", minDays: number, maxDays?: number) {
   const { data: rows } = await admin
     .from("cobrancas_vencidas")
