@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle2, Clock, AlertTriangle, Archive, Search, Eye, Bell, ChevronDown, CalendarCheck, Wallet, UserPlus, X, Ban, Pencil } from 'lucide-react';
+import { CheckCircle2, Clock, AlertTriangle, Archive, Search, Eye, Bell, ChevronDown, CalendarCheck, Wallet, UserPlus, X, Ban, Pencil, PhoneOff } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
@@ -72,7 +72,7 @@ const BUCKETS: { id: Bucket; label: string; color: string; ring: string }[] = [
   { id: 'desistiu', label: 'Desistiu', color: 'text-zinc-700 dark:text-zinc-300 bg-zinc-200 dark:bg-zinc-800/60', ring: 'ring-zinc-500' },
 ];
 
-type AndamentoStatus = 'cumprido' | 'contato_agendado' | 'aguardando_pagamento' | 'desistiu' | null;
+type AndamentoStatus = 'cumprido' | 'contato_agendado' | 'aguardando_pagamento' | 'nao_respondeu' | 'desistiu' | null;
 
 const ANDAMENTO_CFG: Record<Exclude<AndamentoStatus, null>, { label: string; trigger: string; icon: any }> = {
   cumprido: {
@@ -89,6 +89,11 @@ const ANDAMENTO_CFG: Record<Exclude<AndamentoStatus, null>, { label: string; tri
     label: 'Aguardando Pagamento',
     trigger: 'border-amber-500/50 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50',
     icon: Wallet,
+  },
+  nao_respondeu: {
+    label: 'Não Respondeu',
+    trigger: 'border-orange-500/50 bg-orange-50 text-orange-700 hover:bg-orange-100 dark:bg-orange-900/30 dark:text-orange-300 dark:hover:bg-orange-900/50',
+    icon: PhoneOff,
   },
   desistiu: {
     label: 'Desistiu',
