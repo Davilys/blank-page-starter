@@ -754,7 +754,6 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         state: editFormData.state, zip_code: editFormData.zip_code,
         priority: editFormData.priority, origin: editFormData.origin,
         assigned_to: editFormData.assigned_to || null,
-        is_special_client: editFormData.is_special_client,
       }).eq('id', client.id);
       if (profileError) throw profileError;
       if (client.process_id && (editFormData.brand_name || editFormData.business_area)) {
