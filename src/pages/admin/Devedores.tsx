@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, RefreshCw, Loader2, Zap, AlertTriangle, Users, DollarSign, TrendingUp, Search, Mail, MessageCircle, Trash2, ChevronDown, ChevronRight, CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { ArrowLeft, RefreshCw, Loader2, Zap, AlertTriangle, Users, DollarSign, TrendingUp, Search, Mail, MessageCircle, Trash2, ChevronDown, ChevronRight, CheckCircle2, Clock, AlertCircle, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ClientWithProcess } from "@/components/admin/clients/ClientKanbanBoard";
@@ -91,7 +91,146 @@ function summarizeParcelas(parcelas: any[]) {
   return { pagas, vencidas, aVencer, totalVencido };
 }
 
-function ParcelasPanel({ parcelas, totalVencido, max }: { parcelas: any[]; totalVencido: number; max: number }) {
+function buildCobrarAcordoMessages(nome: string, valor: string, link: string) {
+  const linkLine = link ? link : "(link indisponível)";
+  const linkHtml = link
+    ? `<a href="${link}" target="_blank" rel="noopener">${link}</a>`
+    : "(link indisponível)";
+
+  const emailMsg =
+`Prezado(a) ${nome},
+
+Identificamos que uma das parcelas do acordo firmado para regularização do seu débito encontra-se pendente de pagamento.
+
+Lembramos que esta condição foi concedida de forma excepcional para facilitar a regularização dos valores em aberto e manter as condições negociadas entre as partes.
+
+Solicitamos, por gentileza, a verificação da parcela pendente para evitar o cancelamento dos benefícios concedidos na renegociação e eventual retorno do débito às condições originais.
+
+Segue o boleto vencido — valor ${valor}: ${linkLine}
+
+Caso o pagamento já tenha sido realizado, pedimos desconsiderar este aviso.
+
+Permanecemos à disposição para qualquer esclarecimento.
+
+Atenciosamente,
+Financeiro WebMarcas
+(11) 91112-0225`;
+
+  const emailHtml = `
+<p>Prezado(a) <strong>${nome}</strong>,</p>
+<p>Identificamos que uma das parcelas do acordo firmado para regularização do seu débito encontra-se pendente de pagamento.</p>
+<p>Lembramos que esta condição foi concedida de forma excepcional para facilitar a regularização dos valores em aberto e manter as condições negociadas entre as partes.</p>
+<p>Solicitamos, por gentileza, a verificação da parcela pendente para evitar o cancelamento dos benefícios concedidos na renegociação e eventual retorno do débito às condições originais.</p>
+<p>Segue o boleto vencido — valor <strong>${valor}</strong>: ${linkHtml}</p>
+<p>Caso o pagamento já tenha sido realizado, pedimos desconsiderar este aviso.</p>
+<p>Permanecemos à disposição para qualquer esclarecimento.</p>
+<p>Atenciosamente,<br/>Financeiro WebMarcas<br/>(11) 91112-0225</p>`;
+
+  const whatsappMsg =
+`Olá, ${nome}. Tudo bem?
+
+Verificamos que a parcela do acordo realizado anteriormente encontra-se em aberto.
+
+Como essa condição foi criada especialmente para regularização do seu débito, pedimos a gentileza de verificar o pagamento para evitar o cancelamento dos benefícios concedidos na negociação.
+
+Segue o boleto vencido — valor ${valor}: ${linkLine}
+
+Caso já tenha efetuado o pagamento, por favor desconsidere esta mensagem.
+
+Estamos à disposição.`;
+
+  return { emailMsg, emailHtml, whatsappMsg };
+}
+
+function ParcelasPanel({
+  parcelas,
+  totalVencido,
+  max,
+  clienteNome,
+  clienteCpfCnpj,
+}: {
+  parcelas: any[];
+  totalVencido: number;
+  max: number;
+  clienteNome?: string | null;
+  clienteCpfCnpj?: string | null;
+}) {
+  const [cobrandoId, setCobrandoId] = useState<string | null>(null);
+
+  const handleCobrarParcela = async (p: any) => {
+    setCobrandoId(p.id);
+    try {
+      const link = p.invoice_url || p.link_boleto || "";
+      if (!link) {
+        toast.error("Parcela sem link de boleto.");
+        return;
+      }
+      let email = "";
+      let phone = "";
+      if (clienteCpfCnpj) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("email, phone")
+          .or(`cpf.eq.${clienteCpfCnpj},cpf_cnpj.eq.${clienteCpfCnpj}`)
+          .maybeSingle();
+        email = prof?.email || "";
+        phone = prof?.phone || "";
+      }
+      if (!email && !phone) {
+        toast.error("Cliente sem e-mail e telefone cadastrados.");
+        return;
+      }
+
+      const nome = clienteNome || "Cliente";
+      const valor = fmtBRL(Number(p.valor) || 0);
+      const { emailMsg, emailHtml, whatsappMsg } = buildCobrarAcordoMessages(nome, valor, link);
+      const subject = "Parcela do acordo em aberto — WebMarcas";
+
+      const tasks: Promise<any>[] = [];
+      if (email) {
+        tasks.push(
+          supabase.functions.invoke("send-multichannel-notification", {
+            body: {
+              event_type: "parcela_acordo_vencida",
+              channels: ["email"],
+              recipient: { nome, email },
+              custom_message: emailMsg,
+              custom_html: emailHtml,
+              custom_subject: subject,
+              data: { link, valor },
+            },
+          })
+        );
+      }
+      if (phone) {
+        tasks.push(
+          supabase.functions.invoke("send-multichannel-notification", {
+            body: {
+              event_type: "parcela_acordo_vencida",
+              channels: ["whatsapp"],
+              recipient: { nome, phone },
+              custom_message: whatsappMsg,
+              data: { link, valor },
+            },
+          })
+        );
+      }
+
+      const results = await Promise.all(tasks);
+      const failed = results.filter((r: any) => r?.error).length;
+      if (failed > 0) {
+        toast.warning(`Cobrança enviada com ${failed} falha(s).`);
+      } else {
+        const canais = [email && "e-mail", phone && "WhatsApp"].filter(Boolean).join(" + ");
+        toast.success(`Cobrança enviada por ${canais}.`);
+      }
+    } catch (e: any) {
+      toast.error(`Falha ao cobrar: ${e.message}`);
+    } finally {
+      setCobrandoId(null);
+    }
+  };
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -109,6 +248,7 @@ function ParcelasPanel({ parcelas, totalVencido, max }: { parcelas: any[]; total
               <th className="text-right px-2 py-1">Valor</th>
               <th className="text-left px-2 py-1">Status</th>
               <th className="text-right px-2 py-1">Boleto</th>
+              <th className="text-right px-2 py-1">Ação</th>
             </tr>
           </thead>
           <tbody>
@@ -133,6 +273,27 @@ function ParcelasPanel({ parcelas, totalVencido, max }: { parcelas: any[]; total
                     {link ? (
                       <a href={link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Abrir</a>
                     ) : <span className="text-muted-foreground">—</span>}
+                  </td>
+                  <td className="px-2 py-1 text-right">
+                    {st === "vencida" ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 px-2 gap-1"
+                        onClick={() => handleCobrarParcela(p)}
+                        disabled={cobrandoId === p.id || !link}
+                        title={link ? "Enviar cobrança por e-mail e WhatsApp" : "Sem link de boleto"}
+                      >
+                        {cobrandoId === p.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Send className="h-3 w-3" />
+                        )}
+                        <span>Cobrar</span>
+                      </Button>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </td>
                 </tr>
               );
@@ -1106,7 +1267,13 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                     {isOpen && (
                       <TableRow key={h.id + "-detail"} className="bg-muted/30">
                         <TableCell colSpan={8} className="py-3">
-                          <ParcelasPanel parcelas={parcelas} totalVencido={sum.totalVencido} max={5} />
+                          <ParcelasPanel
+                            parcelas={parcelas}
+                            totalVencido={sum.totalVencido}
+                            max={5}
+                            clienteNome={h.cliente_nome}
+                            clienteCpfCnpj={h.cliente_cpf_cnpj}
+                          />
                         </TableCell>
                       </TableRow>
                     )}
@@ -1219,7 +1386,13 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                     {isOpen && (
                       <TableRow key={h.id + "-detail"} className="bg-muted/30">
                         <TableCell colSpan={9} className="py-3">
-                          <ParcelasPanel parcelas={parcelas} totalVencido={sum.totalVencido} max={max} />
+                          <ParcelasPanel
+                            parcelas={parcelas}
+                            totalVencido={sum.totalVencido}
+                            max={max}
+                            clienteNome={h.cliente_nome}
+                            clienteCpfCnpj={h.cliente_cpf_cnpj}
+                          />
                         </TableCell>
                       </TableRow>
                     )}
