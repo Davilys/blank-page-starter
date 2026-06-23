@@ -419,7 +419,13 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
       await supabase.functions.invoke('send-multichannel-notification', {
         body: {
           user_id: client.id,
-          event_type: isDistrato ? 'distrato_enviado' : isArquivado ? 'arquivamento' : 'cobranca_gerada',
+          event_type: isDistrato
+            ? 'distrato_enviado'
+            : isArquivado
+              ? 'arquivamento'
+              : isSpecialClient
+                ? 'notificacao_sem_cobranca'
+                : 'cobranca_gerada',
           channels: notifChannels,
           custom_message: finalWhatsappMessage,
           data: {
@@ -441,7 +447,9 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
               ? 'Notificação Extrajudicial – Distrato Contratual e Encerramento de Responsabilidade'
               : isArquivado
                 ? `Arquivamento do processo – ${client.brand_name || 'Marca'} – WebMarcas`
-                : `Exigência INPI – ${stage.label} – ${client.brand_name || 'Marca'}`,
+                : isSpecialClient
+                  ? `Movimentação INPI – ${stage.label} – ${client.brand_name || 'Marca'} (Cliente Especial)`
+                  : `Exigência INPI – ${stage.label} – ${client.brand_name || 'Marca'}`,
             body: finalEmailMessage,
             attachments,
           },
@@ -456,12 +464,16 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
           ? 'notificacao_distrato'
           : isArquivado
             ? 'notificacao_arquivamento'
-            : 'notificacao_cobranca',
+            : isSpecialClient
+              ? 'notificacao_isenta'
+              : 'notificacao_cobranca',
         description: isDistrato
           ? `Notificação extrajudicial de distrato enviada: ${stage.label}`
           : isArquivado
             ? `Notificação de arquivamento enviada: ${stage.label}`
-            : `Notificação + cobrança enviada: ${stage.label} - R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+            : isSpecialClient
+              ? `Notificação enviada (Cliente Especial – sem cobrança): ${stage.label}`
+              : `Notificação + cobrança enviada: ${stage.label} - R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
         metadata: ({
           stage_id: stage.id,
           stage_label: stage.label,
@@ -469,7 +481,9 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
             ? { contract_id: distratoContractId, signature_url: distratoSignatureUrl }
             : isArquivado
               ? {}
-              : {
+              : isSpecialClient
+                ? { special_client: true }
+                : {
                   valor,
                   payment_type: paymentType,
                   payment_method: paymentType === 'avista' ? 'pix' : paymentMethod,
@@ -485,7 +499,9 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
           ? 'Notificação de distrato enviada com sucesso!'
           : isArquivado
             ? 'Notificação de arquivamento enviada com sucesso!'
-            : 'Notificação e cobrança enviadas com sucesso!'
+            : isSpecialClient
+              ? 'Notificação enviada com sucesso (Cliente Especial — sem cobrança)!'
+              : 'Notificação e cobrança enviadas com sucesso!'
       );
       onUpdate();
       onClose();
