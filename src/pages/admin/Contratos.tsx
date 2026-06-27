@@ -59,6 +59,7 @@ interface Contract {
   asaas_payment_id?: string | null;
   template_id?: string | null;
   signatory_name?: string | null;
+  document_type?: string | null;
   contract_type?: { name: string } | null;
   contract_template?: { name: string } | null;
   profile?: { full_name: string | null; phone: string | null } | null;
