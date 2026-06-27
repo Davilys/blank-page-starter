@@ -10,7 +10,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   Search, Plus, RefreshCw, FileSignature, MoreHorizontal, 
   Eye, Trash2, Download, Send, Filter, CheckCircle, XCircle, Loader2, Timer, Edit,
-  TrendingUp, DollarSign, FileText, PenTool, RotateCcw, Archive, Upload, Link2
+  TrendingUp, DollarSign, FileText, PenTool, RotateCcw, Archive, Upload, Link2,
+  BadgeCheck, Wallet
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, isToday, isThisWeek, isThisMonth } from 'date-fns';
@@ -181,6 +182,9 @@ export default function AdminContratos() {
   const [zipProgress, setZipProgress] = useState<{ current: number; total: number; label: string } | null>(null);
   const [zipImporting, setZipImporting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [paidAsaasIds, setPaidAsaasIds] = useState<Set<string>>(new Set());
+  const [paidUserIds, setPaidUserIds] = useState<Set<string>>(new Set());
+  const [syncingAsaas, setSyncingAsaas] = useState(false);
   const PAGE_SIZE = 50;
 
   const handleExpirePromotions = async () => {
@@ -322,6 +326,9 @@ export default function AdminContratos() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session && mounted) {
         fetchContracts();
+        fetchPaidInvoices();
+        // Trigger background Asaas sync once per mount so paid metrics open fresh
+        backgroundSyncAsaas();
       }
     });
 
@@ -339,6 +346,63 @@ export default function AdminContratos() {
       realtimeSub.unsubscribe();
     };
   }, []);
+
+  // Fetch the set of invoices that are actually paid (received/confirmed)
+  const fetchPaidInvoices = async () => {
+    try {
+      const PAGE = 1000;
+      const aSet = new Set<string>();
+      const uSet = new Set<string>();
+      let from = 0;
+      for (let i = 0; i < 50; i++) {
+        const { data, error } = await supabase
+          .from('invoices')
+          .select('asaas_invoice_id, user_id, status')
+          .in('status', ['received', 'confirmed', 'paid'])
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        const batch = data || [];
+        for (const inv of batch) {
+          if (inv.asaas_invoice_id) aSet.add(inv.asaas_invoice_id);
+          if (inv.user_id) uSet.add(inv.user_id);
+        }
+        if (batch.length < PAGE) break;
+        from += PAGE;
+      }
+      setPaidAsaasIds(aSet);
+      setPaidUserIds(uSet);
+    } catch (err) {
+      console.error('Error fetching paid invoices:', err);
+    }
+  };
+
+  const backgroundSyncAsaas = async () => {
+    try {
+      await supabase.functions.invoke('sync-asaas-invoices');
+      // After background sync, refresh paid set silently
+      fetchPaidInvoices();
+    } catch (err) {
+      // Silent — background task
+      console.warn('Background Asaas sync failed:', err);
+    }
+  };
+
+  const handleSyncAsaas = async () => {
+    setSyncingAsaas(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-asaas-invoices');
+      if (error) throw error;
+      await fetchPaidInvoices();
+      const synced = (data as any)?.synced ?? 0;
+      const total = (data as any)?.total ?? 0;
+      toast.success(`Sincronização concluída: ${synced} de ${total} faturas atualizadas`);
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Erro ao sincronizar com Asaas: ' + (err?.message || 'falha desconhecida'));
+    } finally {
+      setSyncingAsaas(false);
+    }
+  };
 
   const fetchContracts = async (retryCount = 0) => {
     setLoading(true);
@@ -561,6 +625,13 @@ export default function AdminContratos() {
     }
   };
 
+  const isContractPaid = (c: Contract): boolean => {
+    if (c.signature_status !== 'signed') return false;
+    if (c.asaas_payment_id && paidAsaasIds.has(c.asaas_payment_id)) return true;
+    if (c.user_id && paidUserIds.has(c.user_id)) return true;
+    return false;
+  };
+
   const filteredContracts = contracts.filter(contract => {
     const clientName = contract.profile?.full_name || '';
     const matchesSearch = 
@@ -571,7 +642,8 @@ export default function AdminContratos() {
     const matchesSignature = 
       signatureFilter === 'all' ||
       (signatureFilter === 'signed' && contract.signature_status === 'signed') ||
-      (signatureFilter === 'not_signed' && contract.signature_status !== 'signed');
+      (signatureFilter === 'not_signed' && contract.signature_status !== 'signed') ||
+      (signatureFilter === 'paid' && isContractPaid(contract));
 
     const matchesTab = getContractTabMatch(contract, activeTab);
 
@@ -625,6 +697,10 @@ export default function AdminContratos() {
   const pendingCount = filteredContracts.filter(c => c.signature_status !== 'signed').length;
   const signedPct = filteredContracts.length > 0 ? (signedCount / filteredContracts.length) * 100 : 0;
   const pendingPct = filteredContracts.length > 0 ? (pendingCount / filteredContracts.length) * 100 : 0;
+  const paidContracts = filteredContracts.filter(isContractPaid);
+  const paidCount = paidContracts.length;
+  const paidValue = paidContracts.reduce((sum, c) => sum + (c.contract_value || 0), 0);
+  const paidPct = signedCount > 0 ? (paidCount / signedCount) * 100 : 0;
 
   return (
     <>
@@ -804,6 +880,20 @@ export default function AdminContratos() {
                 )}
                 Expirar Promoções
               </Button>
+              <Button
+                variant="outline"
+                onClick={handleSyncAsaas}
+                disabled={syncingAsaas}
+                className="rounded-xl text-emerald-600 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                title="Sincroniza status de pagamento das faturas com o Asaas"
+              >
+                {syncingAsaas ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                Sincronizar Pagos
+              </Button>
               <Button onClick={() => setCreateOpen(true)} className="rounded-xl bg-gradient-to-r from-primary to-primary/80 shadow-lg hover:shadow-xl transition-shadow">
                 <Plus className="h-4 w-4 mr-2" />
                 Novo Contrato
@@ -833,7 +923,7 @@ export default function AdminContratos() {
         )}
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           <StatCard
             icon={FileText}
             label="Total"
@@ -864,6 +954,16 @@ export default function AdminContratos() {
             ring={pendingPct}
           />
           <StatCard
+            icon={BadgeCheck}
+            label="Pagos"
+            value={paidCount}
+            subtitle={signedCount > 0 ? `de ${signedCount} assinados` : 'aguardando pagamento'}
+            color="hsl(160, 84%, 39%)"
+            gradient="bg-gradient-to-br from-teal-500 to-emerald-600"
+            delay={0.35}
+            ring={paidPct}
+          />
+          <StatCard
             icon={canViewFinancialValues ? DollarSign : EyeOff}
             label="Valor Total"
             value={canViewFinancialValues
@@ -874,6 +974,18 @@ export default function AdminContratos() {
             color="hsl(210, 100%, 40%)"
             gradient="bg-gradient-to-br from-blue-500 to-indigo-600"
             delay={0.4}
+          />
+          <StatCard
+            icon={canViewFinancialValues ? Wallet : EyeOff}
+            label="Valor Pago"
+            value={canViewFinancialValues
+              ? `R$ ${paidValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+              : '—— ——'
+            }
+            subtitle={canViewFinancialValues ? 'recebidos via Asaas' : 'restrito ao admin master'}
+            color="hsl(160, 84%, 39%)"
+            gradient="bg-gradient-to-br from-emerald-500 to-green-600"
+            delay={0.45}
           />
         </div>
 
@@ -902,6 +1014,7 @@ export default function AdminContratos() {
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="signed">Assinados</SelectItem>
               <SelectItem value="not_signed">Não assinados</SelectItem>
+            <SelectItem value="paid">Pagos</SelectItem>
             </SelectContent>
           </Select>
           <DatePeriodFilter
