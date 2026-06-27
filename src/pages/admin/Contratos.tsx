@@ -604,22 +604,27 @@ export default function AdminContratos() {
     const typeName = (contract.contract_type?.name || '').toLowerCase();
     const subject = (contract.subject || '').toLowerCase();
     const combined = `${templateName} ${typeName} ${subject}`;
+    const docType = (contract.document_type || 'contract').toLowerCase();
+    const isContractDoc = docType === 'contract';
 
     switch (tab) {
       case 'padrao':
-        return (combined.includes('padrão') || combined.includes('padrao')) && 
+        return isContractDoc &&
+               (combined.includes('padrão') || combined.includes('padrao')) &&
                combined.includes('registro de marca') &&
-               !combined.includes('premium') && !combined.includes('corporativ') && !combined.includes('procura');
+               !combined.includes('premium') && !combined.includes('corporativ');
       case 'premium':
-        return combined.includes('premium');
+        return isContractDoc && combined.includes('premium');
       case 'corporativo':
-        return combined.includes('corporativ');
+        return isContractDoc && combined.includes('corporativ');
       case 'procuracao':
-        return combined.includes('procura');
+        return docType === 'procuracao' || combined.includes('procura');
       case 'distrato_sem':
-        return combined.includes('distrato') && combined.includes('sem');
+        return docType === 'distrato_sem_multa' ||
+               (combined.includes('distrato') && combined.includes('sem'));
       case 'distrato_com':
-        return combined.includes('distrato') && combined.includes('com') && !combined.includes('sem');
+        return docType === 'distrato_multa' ||
+               (combined.includes('distrato') && combined.includes('com') && !combined.includes('sem'));
       default:
         return true;
     }
