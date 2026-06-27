@@ -1106,7 +1106,7 @@ export default function AdminContratos() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-16">
+                  <TableCell colSpan={11} className="text-center py-16">
                     <div className="flex flex-col items-center gap-3">
                       <motion.div
                         animate={{ rotate: 360 }}
@@ -1120,7 +1120,7 @@ export default function AdminContratos() {
                 </TableRow>
               ) : filteredContracts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-16">
+                  <TableCell colSpan={11} className="text-center py-16">
                     <div className="flex flex-col items-center gap-3">
                       <div className="p-4 rounded-full bg-muted/50">
                         <FileText className="h-8 w-8 text-muted-foreground/50" />
