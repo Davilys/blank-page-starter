@@ -1,34 +1,49 @@
 ## Objetivo
-Adicionar uma nova coluna **PAGAMENTO** ao lado de **STATUS** na tabela de Contratos (aba "Contratos"), com badge verde "Pago" / vermelho "Não Pago", podendo ser marcada manualmente pelo admin (ex.: pagamento em dinheiro) ou sincronizada automaticamente via Asaas.
 
-## Como funciona
-- **Verde "Pago"** quando:
-  - O contrato tem fatura Asaas confirmada/recebida (lógica `isContractPaid` já existente — sincronização automática), OU
-  - O admin marcou manualmente como pago (novo campo `manually_paid` na tabela `contracts`).
-- **Vermelho "Não Pago"** quando nenhum dos dois.
-- Clicar no badge "Não Pago" abre confirmação para marcar manualmente como pago. Clicar em "Pago manual" permite reverter (apenas se não veio do Asaas). Se Asaas confirmar depois, prevalece automático (sem perder o manual).
+Adicionar, no card do cliente (aba Clientes / Kanban), uma etiqueta destacada ao lado do badge **MEDIUM** indicando se o cliente possui débitos em aberto:
 
-## Mudanças
+- 🟢 **EM DIA** — verde, quando não há faturas vencidas/pendentes em atraso.
+- 🔴 **DEVEDOR** — vermelho, quando há fatura(s) com `status = overdue` (ou `pending` com `due_date` no passado) na tabela `invoices`, que já é sincronizada com o Asaas pela função `sync-asaas-invoices`.
 
-### 1. Banco (migration)
-- Adicionar à tabela `contracts`:
-  - `manually_paid boolean DEFAULT false`
-  - `manually_paid_at timestamptz`
-  - `manually_paid_by uuid` (admin que marcou)
+## Onde alterar
 
-### 2. `src/pages/admin/Contratos.tsx`
-- Header: nova coluna **"Pagamento"** logo após "Status".
-- Helper `isContractPaid` atualizado: retorna `true` também quando `contract.manually_paid === true`.
-- Novo helper `getPaymentSource(contract)` → `'asaas' | 'manual' | 'none'` para exibir tooltip (ex.: "Confirmado via Asaas" ou "Marcado manualmente").
-- Nova célula `<TableCell>` com badge:
-  - Verde "Pago" (com ícone ✓) — clicável só se fonte for manual (permite desfazer via AlertDialog).
-  - Vermelho "Não Pago" — clicável, abre AlertDialog de confirmação "Confirmar pagamento manual?".
-- Função `togglePaidManual(contract)`: faz `UPDATE contracts SET manually_paid = ..., manually_paid_at = now(), manually_paid_by = auth.uid()` e dá refresh.
-- Métrica "Pagos" do dashboard usa o mesmo `isContractPaid` atualizado, então passa a contar pagos manuais também (já alinhado com o pedido).
+Apenas `src/components/admin/clients/ClientKanbanBoard.tsx` (frontend / apresentação). Nenhuma mudança de banco — vamos reusar a tabela `invoices` já sincronizada com Asaas.
 
-### 3. Sem mudanças em edge functions
-A sincronização Asaas já existente (`sync-asaas-invoices` + `fetchPaidInvoices`) continua sendo a fonte verde automática. O campo manual é apenas um override aditivo.
+## Implementação
 
-## Arquivos
-- `supabase/migrations/<nova>.sql` (via tool de migration)
-- `src/pages/admin/Contratos.tsx`
+1. **Buscar débitos por cliente (1 query agregada)**
+   - Em um `useEffect` no `ClientKanbanBoard`, consultar:
+     ```ts
+     supabase.from('invoices')
+       .select('user_id, status, due_date')
+       .in('status', ['overdue', 'pending'])
+     ```
+   - Construir um `Set<string>` `debtorUserIds` contendo os `user_id` que possuem:
+     - alguma linha com `status = 'overdue'`, **ou**
+     - linha com `status = 'pending'` e `due_date < hoje`.
+   - Guardar em `useState` e revalidar quando `onRefresh` rodar ou a cada ~5 min.
+
+2. **Sincronização automática com Asaas**
+   - Disparar `supabase.functions.invoke('sync-asaas-invoices')` em background uma vez ao montar o board (igual ao padrão já usado na aba Contratos), para garantir que o status local reflita o Asaas antes de calcular a etiqueta.
+
+3. **Renderizar a etiqueta no card**
+   - No bloco *Badges Row* (linhas ~597-615), logo após o `<Badge>` do `priorityConfig` (MEDIUM), inserir um novo badge condicional:
+     - `client.user_id && debtorUserIds.has(client.user_id)` → `<Badge>` vermelho sólido com texto **"DEVEDOR"** e ícone `AlertCircle`.
+     - Caso contrário (cliente sem débitos em aberto) → `<Badge>` verde sólido com texto **"EM DIA"** e ícone `CheckCircle2`.
+   - Estilo seguindo a mesma altura/escala do badge MEDIUM (`text-[10px] px-1.5 py-0`), com cores via classes Tailwind já usadas no projeto:
+     - DEVEDOR: `bg-red-500 text-white ring-1 ring-red-400`
+     - EM DIA: `bg-emerald-500 text-white ring-1 ring-emerald-400`
+   - Tooltip ao passar o mouse: "Cliente possui fatura(s) vencida(s) no Asaas" ou "Sem débitos em aberto".
+
+4. **Casos de borda**
+   - Cliente sem `user_id` (lead não convertido) → não exibir nenhum dos dois badges (evita falso "EM DIA").
+   - Enquanto a query inicial está carregando, não renderizar o badge (evita flash incorreto).
+
+## Resultado visual
+
+```text
+[ MEDIUM ] [ DEVEDOR ] [ import ]      ← vermelho destacado
+[ MEDIUM ] [ EM DIA  ] [ site   ]      ← verde destacado
+```
+
+Apenas alteração de UI no card do Kanban de Clientes; nenhuma regra de negócio nem schema alterado.
