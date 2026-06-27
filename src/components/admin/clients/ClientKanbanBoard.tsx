@@ -11,7 +11,8 @@ import {
   Eye, MessageCircle, Mail, Phone, Building2, DollarSign, 
   ChevronDown, ChevronRight, GripVertical, Star, Calendar,
   MoreHorizontal, Trash2, UserPlus, UserCheck, CheckCircle, XCircle,
-  ArrowRight, Sparkles, Clock, Hash, Shield, Crown, Infinity as InfinityIcon
+  ArrowRight, Sparkles, Clock, Hash, Shield, Crown, Infinity as InfinityIcon,
+  AlertCircle, CheckCircle2
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -119,6 +120,31 @@ export function ClientKanbanBoard({ clients, onClientClick, onRefresh, filters, 
   const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
   const [dynamicStages, setDynamicStages] = useState<typeof PIPELINE_STAGES | null>(null);
   const MAX_VISIBLE = 20;
+  const [debtorUserIds, setDebtorUserIds] = useState<Set<string> | null>(null);
+
+  // Sync Asaas + load open debts to flag EM DIA / DEVEDOR
+  useEffect(() => {
+    let cancelled = false;
+    const loadDebtors = async () => {
+      const { data } = await supabaseClient
+        .from('invoices')
+        .select('user_id, status, due_date')
+        .in('status', ['overdue', 'pending']);
+      if (cancelled || !data) return;
+      const today = new Date().toISOString().slice(0, 10);
+      const ids = new Set<string>();
+      for (const inv of data as Array<{ user_id: string | null; status: string; due_date: string | null }>) {
+        if (!inv.user_id) continue;
+        if (inv.status === 'overdue') ids.add(inv.user_id);
+        else if (inv.status === 'pending' && inv.due_date && inv.due_date < today) ids.add(inv.user_id);
+      }
+      setDebtorUserIds(ids);
+    };
+    // Background sync with Asaas, then refresh
+    supabaseClient.functions.invoke('sync-asaas-invoices').finally(() => loadDebtors());
+    loadDebtors();
+    return () => { cancelled = true; };
+  }, []);
 
   // Load dynamic stages from system_settings
   useEffect(() => {
@@ -599,6 +625,29 @@ export function ClientKanbanBoard({ clients, onClientClick, onRefresh, filters, 
                                     <Badge className={cn("text-[10px] px-1.5 py-0", priorityConfig.color)}>
                                       {priorityConfig.label}
                                     </Badge>
+                                    {client.id && debtorUserIds !== null && (
+                                      debtorUserIds.has(client.id) ? (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Badge className="text-[10px] px-1.5 py-0 gap-0.5 bg-red-500 hover:bg-red-500 text-white ring-1 ring-red-400 shadow-sm">
+                                              <AlertCircle className="h-2.5 w-2.5" />
+                                              DEVEDOR
+                                            </Badge>
+                                          </TooltipTrigger>
+                                          <TooltipContent>Cliente possui fatura(s) vencida(s) no Asaas</TooltipContent>
+                                        </Tooltip>
+                                      ) : (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Badge className="text-[10px] px-1.5 py-0 gap-0.5 bg-emerald-500 hover:bg-emerald-500 text-white ring-1 ring-emerald-400 shadow-sm">
+                                              <CheckCircle2 className="h-2.5 w-2.5" />
+                                              EM DIA
+                                            </Badge>
+                                          </TooltipTrigger>
+                                          <TooltipContent>Sem débitos em aberto</TooltipContent>
+                                        </Tooltip>
+                                      )
+                                    )}
                                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                                       {client.origin === 'whatsapp' ? 'what...' : client.origin || 'site'}
                                     </Badge>
