@@ -10,7 +10,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   Search, Plus, RefreshCw, FileSignature, MoreHorizontal, 
   Eye, Trash2, Download, Send, Filter, CheckCircle, XCircle, Loader2, Timer, Edit,
-  TrendingUp, DollarSign, FileText, PenTool, RotateCcw, Archive, Upload, Link2
+  TrendingUp, DollarSign, FileText, PenTool, RotateCcw, Archive, Upload, Link2,
+  BadgeCheck, Wallet
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, isToday, isThisWeek, isThisMonth } from 'date-fns';
