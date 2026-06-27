@@ -1236,6 +1236,49 @@ export default function AdminContratos() {
                         </div>
                       </TableCell>
                       <TableCell>
+                        {(() => {
+                          const paid = isContractPaid(contract);
+                          const source = getPaymentSource(contract);
+                          if (paid) {
+                            const tip = source === 'asaas'
+                              ? 'Confirmado via Asaas'
+                              : 'Marcado manualmente como pago — clique para reverter';
+                            return (
+                              <Badge
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (source === 'manual') {
+                                    if (confirm('Remover marcação de pagamento manual?')) {
+                                      togglePaidManual(contract, false);
+                                    }
+                                  }
+                                }}
+                                title={tip}
+                                className={`bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-medium gap-1.5 ${source === 'manual' ? 'cursor-pointer hover:bg-emerald-500/25' : ''}`}
+                              >
+                                <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                                Pago{source === 'manual' ? ' (manual)' : ''}
+                              </Badge>
+                            );
+                          }
+                          return (
+                            <Badge
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm('Confirmar pagamento manual deste contrato? (use para pagamentos em dinheiro)')) {
+                                  togglePaidManual(contract, true);
+                                }
+                              }}
+                              title="Clique para marcar como pago manualmente"
+                              className="bg-destructive/10 text-destructive border-destructive/20 font-medium gap-1.5 cursor-pointer hover:bg-destructive/20"
+                            >
+                              <span className="h-2 w-2 rounded-full bg-destructive/60"></span>
+                              Não Pago
+                            </Badge>
+                          );
+                        })()}
+                      </TableCell>
+                      <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="rounded-xl h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
