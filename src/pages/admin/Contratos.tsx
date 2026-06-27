@@ -60,6 +60,8 @@ interface Contract {
   template_id?: string | null;
   signatory_name?: string | null;
   document_type?: string | null;
+  manually_paid?: boolean | null;
+  manually_paid_at?: string | null;
   contract_type?: { name: string } | null;
   contract_template?: { name: string } | null;
   profile?: { full_name: string | null; phone: string | null } | null;
