@@ -1004,6 +1004,9 @@ export type Database = {
           id: string
           ip_address: string | null
           lead_id: string | null
+          manually_paid: boolean
+          manually_paid_at: string | null
+          manually_paid_by: string | null
           ots_file_url: string | null
           payment_method: string | null
           penalty_value: number | null
@@ -1050,6 +1053,9 @@ export type Database = {
           id?: string
           ip_address?: string | null
           lead_id?: string | null
+          manually_paid?: boolean
+          manually_paid_at?: string | null
+          manually_paid_by?: string | null
           ots_file_url?: string | null
           payment_method?: string | null
           penalty_value?: number | null
@@ -1096,6 +1102,9 @@ export type Database = {
           id?: string
           ip_address?: string | null
           lead_id?: string | null
+          manually_paid?: boolean
+          manually_paid_at?: string | null
+          manually_paid_by?: string | null
           ots_file_url?: string | null
           payment_method?: string | null
           penalty_value?: number | null

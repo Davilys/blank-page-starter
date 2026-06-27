@@ -60,6 +60,8 @@ interface Contract {
   template_id?: string | null;
   signatory_name?: string | null;
   document_type?: string | null;
+  manually_paid?: boolean | null;
+  manually_paid_at?: string | null;
   contract_type?: { name: string } | null;
   contract_template?: { name: string } | null;
   profile?: { full_name: string | null; phone: string | null } | null;
@@ -633,9 +635,39 @@ export default function AdminContratos() {
 
   const isContractPaid = (c: Contract): boolean => {
     if (c.signature_status !== 'signed') return false;
+    if (c.manually_paid) return true;
     if (c.asaas_payment_id && paidAsaasIds.has(c.asaas_payment_id)) return true;
     if (c.user_id && paidUserIds.has(c.user_id)) return true;
     return false;
+  };
+
+  const getPaymentSource = (c: Contract): 'asaas' | 'manual' | 'none' => {
+    const fromAsaas =
+      (c.asaas_payment_id && paidAsaasIds.has(c.asaas_payment_id)) ||
+      (c.user_id && paidUserIds.has(c.user_id));
+    if (fromAsaas) return 'asaas';
+    if (c.manually_paid) return 'manual';
+    return 'none';
+  };
+
+  const togglePaidManual = async (contract: Contract, makePaid: boolean) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('contracts')
+        .update({
+          manually_paid: makePaid,
+          manually_paid_at: makePaid ? new Date().toISOString() : null,
+          manually_paid_by: makePaid ? user?.id ?? null : null,
+        })
+        .eq('id', contract.id);
+      if (error) throw error;
+      toast.success(makePaid ? 'Marcado como pago' : 'Pagamento manual removido');
+      refreshContracts();
+    } catch (e: any) {
+      console.error('togglePaidManual error', e);
+      toast.error(e.message || 'Erro ao atualizar pagamento');
+    }
   };
 
   const filteredContracts = contracts.filter(contract => {
@@ -1067,13 +1099,14 @@ export default function AdminContratos() {
                 <TableHead className="font-semibold text-xs uppercase tracking-wider">Expira</TableHead>
                 <TableHead className="font-semibold text-xs uppercase tracking-wider">Telefone</TableHead>
                 <TableHead className="font-semibold text-xs uppercase tracking-wider">Status</TableHead>
+                <TableHead className="font-semibold text-xs uppercase tracking-wider">Pagamento</TableHead>
                 <TableHead className="w-[60px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-16">
+                  <TableCell colSpan={11} className="text-center py-16">
                     <div className="flex flex-col items-center gap-3">
                       <motion.div
                         animate={{ rotate: 360 }}
@@ -1087,7 +1120,7 @@ export default function AdminContratos() {
                 </TableRow>
               ) : filteredContracts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-16">
+                  <TableCell colSpan={11} className="text-center py-16">
                     <div className="flex flex-col items-center gap-3">
                       <div className="p-4 rounded-full bg-muted/50">
                         <FileText className="h-8 w-8 text-muted-foreground/50" />
@@ -1201,6 +1234,49 @@ export default function AdminContratos() {
                             <Link2 className="h-3 w-3" /> {contract.user_id ? 'Revincular' : 'Vincular cliente'}
                           </Button>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const paid = isContractPaid(contract);
+                          const source = getPaymentSource(contract);
+                          if (paid) {
+                            const tip = source === 'asaas'
+                              ? 'Confirmado via Asaas'
+                              : 'Marcado manualmente como pago — clique para reverter';
+                            return (
+                              <Badge
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (source === 'manual') {
+                                    if (confirm('Remover marcação de pagamento manual?')) {
+                                      togglePaidManual(contract, false);
+                                    }
+                                  }
+                                }}
+                                title={tip}
+                                className={`bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-medium gap-1.5 ${source === 'manual' ? 'cursor-pointer hover:bg-emerald-500/25' : ''}`}
+                              >
+                                <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                                Pago{source === 'manual' ? ' (manual)' : ''}
+                              </Badge>
+                            );
+                          }
+                          return (
+                            <Badge
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm('Confirmar pagamento manual deste contrato? (use para pagamentos em dinheiro)')) {
+                                  togglePaidManual(contract, true);
+                                }
+                              }}
+                              title="Clique para marcar como pago manualmente"
+                              className="bg-destructive/10 text-destructive border-destructive/20 font-medium gap-1.5 cursor-pointer hover:bg-destructive/20"
+                            >
+                              <span className="h-2 w-2 rounded-full bg-destructive/60"></span>
+                              Não Pago
+                            </Badge>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
