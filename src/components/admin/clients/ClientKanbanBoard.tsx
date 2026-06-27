@@ -625,6 +625,29 @@ export function ClientKanbanBoard({ clients, onClientClick, onRefresh, filters, 
                                     <Badge className={cn("text-[10px] px-1.5 py-0", priorityConfig.color)}>
                                       {priorityConfig.label}
                                     </Badge>
+                                    {client.user_id && debtorUserIds !== null && (
+                                      debtorUserIds.has(client.user_id) ? (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Badge className="text-[10px] px-1.5 py-0 gap-0.5 bg-red-500 hover:bg-red-500 text-white ring-1 ring-red-400 shadow-sm">
+                                              <AlertCircle className="h-2.5 w-2.5" />
+                                              DEVEDOR
+                                            </Badge>
+                                          </TooltipTrigger>
+                                          <TooltipContent>Cliente possui fatura(s) vencida(s) no Asaas</TooltipContent>
+                                        </Tooltip>
+                                      ) : (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Badge className="text-[10px] px-1.5 py-0 gap-0.5 bg-emerald-500 hover:bg-emerald-500 text-white ring-1 ring-emerald-400 shadow-sm">
+                                              <CheckCircle2 className="h-2.5 w-2.5" />
+                                              EM DIA
+                                            </Badge>
+                                          </TooltipTrigger>
+                                          <TooltipContent>Sem débitos em aberto</TooltipContent>
+                                        </Tooltip>
+                                      )
+                                    )}
                                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                                       {client.origin === 'whatsapp' ? 'what...' : client.origin || 'site'}
                                     </Badge>
