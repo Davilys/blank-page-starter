@@ -182,6 +182,9 @@ export default function AdminContratos() {
   const [zipProgress, setZipProgress] = useState<{ current: number; total: number; label: string } | null>(null);
   const [zipImporting, setZipImporting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [paidAsaasIds, setPaidAsaasIds] = useState<Set<string>>(new Set());
+  const [paidUserIds, setPaidUserIds] = useState<Set<string>>(new Set());
+  const [syncingAsaas, setSyncingAsaas] = useState(false);
   const PAGE_SIZE = 50;
 
   const handleExpirePromotions = async () => {
@@ -323,6 +326,9 @@ export default function AdminContratos() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session && mounted) {
         fetchContracts();
+        fetchPaidInvoices();
+        // Trigger background Asaas sync once per mount so paid metrics open fresh
+        backgroundSyncAsaas();
       }
     });
 
@@ -340,6 +346,63 @@ export default function AdminContratos() {
       realtimeSub.unsubscribe();
     };
   }, []);
+
+  // Fetch the set of invoices that are actually paid (received/confirmed)
+  const fetchPaidInvoices = async () => {
+    try {
+      const PAGE = 1000;
+      const aSet = new Set<string>();
+      const uSet = new Set<string>();
+      let from = 0;
+      for (let i = 0; i < 50; i++) {
+        const { data, error } = await supabase
+          .from('invoices')
+          .select('asaas_invoice_id, user_id, status')
+          .in('status', ['received', 'confirmed', 'paid'])
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        const batch = data || [];
+        for (const inv of batch) {
+          if (inv.asaas_invoice_id) aSet.add(inv.asaas_invoice_id);
+          if (inv.user_id) uSet.add(inv.user_id);
+        }
+        if (batch.length < PAGE) break;
+        from += PAGE;
+      }
+      setPaidAsaasIds(aSet);
+      setPaidUserIds(uSet);
+    } catch (err) {
+      console.error('Error fetching paid invoices:', err);
+    }
+  };
+
+  const backgroundSyncAsaas = async () => {
+    try {
+      await supabase.functions.invoke('sync-asaas-invoices');
+      // After background sync, refresh paid set silently
+      fetchPaidInvoices();
+    } catch (err) {
+      // Silent — background task
+      console.warn('Background Asaas sync failed:', err);
+    }
+  };
+
+  const handleSyncAsaas = async () => {
+    setSyncingAsaas(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-asaas-invoices');
+      if (error) throw error;
+      await fetchPaidInvoices();
+      const synced = (data as any)?.synced ?? 0;
+      const total = (data as any)?.total ?? 0;
+      toast.success(`Sincronização concluída: ${synced} de ${total} faturas atualizadas`);
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Erro ao sincronizar com Asaas: ' + (err?.message || 'falha desconhecida'));
+    } finally {
+      setSyncingAsaas(false);
+    }
+  };
 
   const fetchContracts = async (retryCount = 0) => {
     setLoading(true);
