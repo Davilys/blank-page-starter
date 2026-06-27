@@ -625,8 +625,8 @@ export function ClientKanbanBoard({ clients, onClientClick, onRefresh, filters, 
                                     <Badge className={cn("text-[10px] px-1.5 py-0", priorityConfig.color)}>
                                       {priorityConfig.label}
                                     </Badge>
-                                    {client.user_id && debtorUserIds !== null && (
-                                      debtorUserIds.has(client.user_id) ? (
+                                    {client.id && debtorUserIds !== null && (
+                                      debtorUserIds.has(client.id) ? (
                                         <Tooltip>
                                           <TooltipTrigger asChild>
                                             <Badge className="text-[10px] px-1.5 py-0 gap-0.5 bg-red-500 hover:bg-red-500 text-white ring-1 ring-red-400 shadow-sm">
