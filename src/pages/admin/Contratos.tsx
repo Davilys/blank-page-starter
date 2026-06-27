@@ -1099,6 +1099,7 @@ export default function AdminContratos() {
                 <TableHead className="font-semibold text-xs uppercase tracking-wider">Expira</TableHead>
                 <TableHead className="font-semibold text-xs uppercase tracking-wider">Telefone</TableHead>
                 <TableHead className="font-semibold text-xs uppercase tracking-wider">Status</TableHead>
+                <TableHead className="font-semibold text-xs uppercase tracking-wider">Pagamento</TableHead>
                 <TableHead className="w-[60px]"></TableHead>
               </TableRow>
             </TableHeader>
