@@ -635,9 +635,39 @@ export default function AdminContratos() {
 
   const isContractPaid = (c: Contract): boolean => {
     if (c.signature_status !== 'signed') return false;
+    if (c.manually_paid) return true;
     if (c.asaas_payment_id && paidAsaasIds.has(c.asaas_payment_id)) return true;
     if (c.user_id && paidUserIds.has(c.user_id)) return true;
     return false;
+  };
+
+  const getPaymentSource = (c: Contract): 'asaas' | 'manual' | 'none' => {
+    const fromAsaas =
+      (c.asaas_payment_id && paidAsaasIds.has(c.asaas_payment_id)) ||
+      (c.user_id && paidUserIds.has(c.user_id));
+    if (fromAsaas) return 'asaas';
+    if (c.manually_paid) return 'manual';
+    return 'none';
+  };
+
+  const togglePaidManual = async (contract: Contract, makePaid: boolean) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('contracts')
+        .update({
+          manually_paid: makePaid,
+          manually_paid_at: makePaid ? new Date().toISOString() : null,
+          manually_paid_by: makePaid ? user?.id ?? null : null,
+        })
+        .eq('id', contract.id);
+      if (error) throw error;
+      toast.success(makePaid ? 'Marcado como pago' : 'Pagamento manual removido');
+      refreshContracts();
+    } catch (e: any) {
+      console.error('togglePaidManual error', e);
+      toast.error(e.message || 'Erro ao atualizar pagamento');
+    }
   };
 
   const filteredContracts = contracts.filter(contract => {
