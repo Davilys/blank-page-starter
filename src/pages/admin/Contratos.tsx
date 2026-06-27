@@ -923,7 +923,7 @@ export default function AdminContratos() {
         )}
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           <StatCard
             icon={FileText}
             label="Total"
@@ -954,6 +954,16 @@ export default function AdminContratos() {
             ring={pendingPct}
           />
           <StatCard
+            icon={BadgeCheck}
+            label="Pagos"
+            value={paidCount}
+            subtitle={signedCount > 0 ? `de ${signedCount} assinados` : 'aguardando pagamento'}
+            color="hsl(160, 84%, 39%)"
+            gradient="bg-gradient-to-br from-teal-500 to-emerald-600"
+            delay={0.35}
+            ring={paidPct}
+          />
+          <StatCard
             icon={canViewFinancialValues ? DollarSign : EyeOff}
             label="Valor Total"
             value={canViewFinancialValues
@@ -964,6 +974,18 @@ export default function AdminContratos() {
             color="hsl(210, 100%, 40%)"
             gradient="bg-gradient-to-br from-blue-500 to-indigo-600"
             delay={0.4}
+          />
+          <StatCard
+            icon={canViewFinancialValues ? Wallet : EyeOff}
+            label="Valor Pago"
+            value={canViewFinancialValues
+              ? `R$ ${paidValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+              : '—— ——'
+            }
+            subtitle={canViewFinancialValues ? 'recebidos via Asaas' : 'restrito ao admin master'}
+            color="hsl(160, 84%, 39%)"
+            gradient="bg-gradient-to-br from-emerald-500 to-green-600"
+            delay={0.45}
           />
         </div>
 
@@ -992,6 +1014,7 @@ export default function AdminContratos() {
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="signed">Assinados</SelectItem>
               <SelectItem value="not_signed">Não assinados</SelectItem>
+            <SelectItem value="paid">Pagos</SelectItem>
             </SelectContent>
           </Select>
           <DatePeriodFilter
