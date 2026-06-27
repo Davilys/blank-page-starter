@@ -880,6 +880,20 @@ export default function AdminContratos() {
                 )}
                 Expirar Promoções
               </Button>
+              <Button
+                variant="outline"
+                onClick={handleSyncAsaas}
+                disabled={syncingAsaas}
+                className="rounded-xl text-emerald-600 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                title="Sincroniza status de pagamento das faturas com o Asaas"
+              >
+                {syncingAsaas ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                Sincronizar Pagos
+              </Button>
               <Button onClick={() => setCreateOpen(true)} className="rounded-xl bg-gradient-to-r from-primary to-primary/80 shadow-lg hover:shadow-xl transition-shadow">
                 <Plus className="h-4 w-4 mr-2" />
                 Novo Contrato
