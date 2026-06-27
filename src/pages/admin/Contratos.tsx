@@ -625,6 +625,13 @@ export default function AdminContratos() {
     }
   };
 
+  const isContractPaid = (c: Contract): boolean => {
+    if (c.signature_status !== 'signed') return false;
+    if (c.asaas_payment_id && paidAsaasIds.has(c.asaas_payment_id)) return true;
+    if (c.user_id && paidUserIds.has(c.user_id)) return true;
+    return false;
+  };
+
   const filteredContracts = contracts.filter(contract => {
     const clientName = contract.profile?.full_name || '';
     const matchesSearch = 
@@ -635,7 +642,8 @@ export default function AdminContratos() {
     const matchesSignature = 
       signatureFilter === 'all' ||
       (signatureFilter === 'signed' && contract.signature_status === 'signed') ||
-      (signatureFilter === 'not_signed' && contract.signature_status !== 'signed');
+      (signatureFilter === 'not_signed' && contract.signature_status !== 'signed') ||
+      (signatureFilter === 'paid' && isContractPaid(contract));
 
     const matchesTab = getContractTabMatch(contract, activeTab);
 
@@ -689,6 +697,10 @@ export default function AdminContratos() {
   const pendingCount = filteredContracts.filter(c => c.signature_status !== 'signed').length;
   const signedPct = filteredContracts.length > 0 ? (signedCount / filteredContracts.length) * 100 : 0;
   const pendingPct = filteredContracts.length > 0 ? (pendingCount / filteredContracts.length) * 100 : 0;
+  const paidContracts = filteredContracts.filter(isContractPaid);
+  const paidCount = paidContracts.length;
+  const paidValue = paidContracts.reduce((sum, c) => sum + (c.contract_value || 0), 0);
+  const paidPct = signedCount > 0 ? (paidCount / signedCount) * 100 : 0;
 
   return (
     <>
