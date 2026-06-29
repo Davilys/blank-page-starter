@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle2, Clock, AlertTriangle, Archive, Search, Eye, Bell, ChevronDown, CalendarCheck, Wallet, UserPlus, X, Ban, Pencil, PhoneOff } from 'lucide-react';
+import { CheckCircle2, Clock, AlertTriangle, Archive, Search, Eye, Bell, ChevronDown, CalendarCheck, Wallet, UserPlus, X, Ban, Pencil, PhoneOff, FileSignature } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
@@ -34,7 +34,7 @@ const AUTO_OWNERS = {
   ultima_semana: { id: '1569b08c-e266-47d0-a384-4b7f29c64dc1', nome: 'Camila Ferreira' },
 } as const;
 
-const STATUS_BLOQUEIA_REATRIBUICAO = new Set(['cumprido', 'aguardando_pagamento']);
+const STATUS_BLOQUEIA_REATRIBUICAO = new Set(['cumprido', 'aguardando_pagamento', 'desistiu', 'assinou_distrato']);
 
 type Bucket = 'no_prazo' | '30dias' | 'ultima_semana' | 'vencidos' | 'cumpridos' | 'desistiu';
 
@@ -72,7 +72,7 @@ const BUCKETS: { id: Bucket; label: string; color: string; ring: string }[] = [
   { id: 'desistiu', label: 'Desistiu', color: 'text-zinc-700 dark:text-zinc-300 bg-zinc-200 dark:bg-zinc-800/60', ring: 'ring-zinc-500' },
 ];
 
-type AndamentoStatus = 'cumprido' | 'contato_agendado' | 'aguardando_pagamento' | 'nao_respondeu' | 'desistiu' | null;
+type AndamentoStatus = 'cumprido' | 'contato_agendado' | 'aguardando_pagamento' | 'nao_respondeu' | 'desistiu' | 'assinou_distrato' | null;
 
 const ANDAMENTO_CFG: Record<Exclude<AndamentoStatus, null>, { label: string; trigger: string; icon: any }> = {
   cumprido: {
@@ -99,6 +99,11 @@ const ANDAMENTO_CFG: Record<Exclude<AndamentoStatus, null>, { label: string; tri
     label: 'Desistiu',
     trigger: 'border-zinc-500/50 bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800/60 dark:text-zinc-300 dark:hover:bg-zinc-800',
     icon: Ban,
+  },
+  assinou_distrato: {
+    label: 'Assinou Distrato',
+    trigger: 'border-violet-500/50 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:bg-violet-900/30 dark:text-violet-300 dark:hover:bg-violet-900/50',
+    icon: FileSignature,
   },
 };
 
@@ -203,7 +208,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
 
   const desistiuList = useMemo(() => {
     return publicacoes
-      .filter(p => p.cumprimento_status === 'desistiu')
+      .filter(p => p.cumprimento_status === 'desistiu' || p.cumprimento_status === 'assinou_distrato')
       .map(p => {
         const deadline = computeDeadline(p);
         return { ...p, _deadline: deadline, _days: null as number | null, _bucket: 'desistiu' as Bucket };
@@ -707,6 +712,11 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                               <DropdownMenuItem onClick={() => handleSetStatus(pub, 'desistiu')} className="text-zinc-700 dark:text-zinc-300">
                                 <Ban className="w-4 h-4 mr-2" /> Desistiu
                               </DropdownMenuItem>
+                              {active === 'desistiu' && (
+                                <DropdownMenuItem onClick={() => handleSetStatus(pub, 'assinou_distrato')} className="text-violet-700 dark:text-violet-400">
+                                  <FileSignature className="w-4 h-4 mr-2" /> Assinou Distrato
+                                </DropdownMenuItem>
+                              )}
                               {andamento && (
                                 <>
                                   <DropdownMenuSeparator />
