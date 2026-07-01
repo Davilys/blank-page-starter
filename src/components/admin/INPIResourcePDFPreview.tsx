@@ -744,7 +744,6 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
             .print-target { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none !important; border-radius: 0 !important; }
             .print\\:hidden { display: none !important; }
           }
-          body.printing-inpi-doc > *:not(.print-target-holder) { display: none !important; }
         `}</style>
 
         {/* Header */}
