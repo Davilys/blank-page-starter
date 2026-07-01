@@ -344,38 +344,12 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       : `Recurso_${resource.brand_name?.replace(/\s+/g, '_') || 'INPI'}_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
 
   const handlePrint = () => {
-    const printContent = printRef.current;
-    if (!printContent) return;
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('Por favor, permita pop-ups para imprimir o documento.');
-      return;
-    }
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${documentTitle} - ${resource.brand_name || 'WebMarcas'}</title>
-          <style>
-            @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;500;600;700&display=swap');
-            @page { margin: 2.5cm; size: A4; }
-            body { font-family: 'Crimson Pro', Georgia, serif; font-size: 12pt; line-height: 1.8; color: #1a1a1a; }
-            .letterhead { margin-bottom: 40px; border-top: 8px solid #1e3a5f; padding-top: 20px; }
-            .logo-container img { width: 80px; height: 80px; }
-            .content { text-align: justify; margin-top: 30px; }
-            .content h2 { font-weight: 600; color: #1e3a5f; font-size: 13pt; margin-top: 20px; margin-bottom: 10px; }
-            .content p { margin-bottom: 14px; text-indent: 2cm; }
-            .signature { margin-top: 60px; text-align: center; }
-            .signature-name { font-weight: 600; color: #1e3a5f; }
-          </style>
-        </head>
-        <body>${printContent.innerHTML}</body>
-      </html>
-    `);
-    printWindow.document.close();
-    setTimeout(() => printWindow.print(), 500);
+    // Same window print — reuses the preview DOM & its @media print styles,
+    // guaranteeing that "impressão" is visually identical to "preview".
+    document.body.classList.add('printing-inpi-doc');
+    window.print();
+    // remove flag after print dialog closes
+    setTimeout(() => document.body.classList.remove('printing-inpi-doc'), 1000);
   };
 
   const handleDownloadPDF = async () => {
