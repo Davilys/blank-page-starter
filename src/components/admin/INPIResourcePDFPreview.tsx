@@ -474,7 +474,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       const hasMetadata = metaLines.some(l => isMetadataLine(l));
       if (hasMetadata && metaLines.length > 1) {
         return (
-          <div key={idx} className="mb-4 text-sm" style={{ color: '#444', lineHeight: '1.6' }}>
+          <div key={idx} data-pdf-section className="legal-meta mb-4 text-sm" style={{ color: '#444', lineHeight: '1.6' }}>
             {metaLines.map((ml, mi) => (
               <p key={mi} className="mb-0.5" style={{ textIndent: '0' }}>{ml.trim()}</p>
             ))}
@@ -484,7 +484,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
 
       if (isHeadingLine(trimmed)) {
         return (
-          <h2 key={idx} className="text-base font-semibold mt-6 mb-3 pb-1" style={{ color: '#1e3a5f', borderBottom: '2px solid #c8af37' }}>
+          <h2 key={idx} data-pdf-section className="legal-heading text-base font-semibold mt-6 mb-3 pb-1" style={{ color: '#1e3a5f', borderBottom: '2px solid #c8af37' }}>
             {trimmed}
           </h2>
         );
@@ -495,8 +495,8 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         const tbl = parseMarkdownTable(trimmed);
         if (tbl) {
           return (
-            <div key={idx} className="my-5 overflow-x-auto">
-              <table className="w-full border-collapse text-sm" style={{ border: '1px solid #1e3a5f' }}>
+            <div key={idx} data-pdf-section className="legal-table-wrap my-5">
+              <table className="legal-table w-full text-sm" style={{ border: '1px solid #1e3a5f', tableLayout: 'auto', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#1e3a5f' }}>
                     {tbl.headers.map((h, i) => (
@@ -525,7 +525,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
 
       const isList = /^[-–•]\s/.test(trimmed);
       if (isList) {
-        return <p key={idx} className="mb-3 pl-6" style={{ textIndent: '0' }}>{renderInlineMarkdown(trimmed)}</p>;
+        return <p key={idx} data-pdf-section className="legal-list mb-3 pl-6" style={{ textIndent: '0' }}>{renderInlineMarkdown(trimmed)}</p>;
       }
       
       // Short lines (e.g. "EXCELENTÍSSIMO...") should not be stretched by justify
@@ -554,8 +554,8 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
             return cap.includes(slug.replace(/_/g, ' ')) || src.includes(slug);
           });
         return (
-          <div key={idx} className="mb-4">
-            <p className={isShort ? '' : 'text-justify'} style={{ textIndent: '2cm', textAlignLast: 'left' }}>
+          <div key={idx} data-pdf-section className="mb-4">
+            <p className={`legal-p ${isShort ? 'legal-p-short' : ''}`}>
               {parts.map((p, i) => {
                 if (p.type === 'text') return <span key={i}>{renderInlineMarkdown(p.value)}</span>;
                 if (p.type === 'doc') return <span key={i} className="font-semibold" style={{ color: '#1e3a5f' }}>(Doc. {String(p.n).padStart(2, '0')})</span>;
@@ -586,7 +586,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         );
       }
       return (
-        <p key={idx} className={`mb-4 ${isShort ? '' : 'text-justify'}`} style={{ textIndent: '2cm', textAlignLast: 'left' }}>
+        <p key={idx} data-pdf-section className={`legal-p ${isShort ? 'legal-p-short' : ''}`}>
           {renderInlineMarkdown(trimmed)}
         </p>
       );
