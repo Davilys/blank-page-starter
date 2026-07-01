@@ -8,6 +8,7 @@ import { ptBR } from 'date-fns/locale';
 import logoWebmarcas from '@/assets/webmarcas-logo-new.png';
 import signatureImage from '@/assets/davilys-signature.png';
 import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ResourceEvidence {
@@ -343,466 +344,121 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       : `Recurso_${resource.brand_name?.replace(/\s+/g, '_') || 'INPI'}_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
 
   const handlePrint = () => {
-    const printContent = printRef.current;
-    if (!printContent) return;
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('Por favor, permita pop-ups para imprimir o documento.');
-      return;
-    }
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${documentTitle} - ${resource.brand_name || 'WebMarcas'}</title>
-          <style>
-            @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;500;600;700&display=swap');
-            @page { margin: 2.5cm; size: A4; }
-            body { font-family: 'Crimson Pro', Georgia, serif; font-size: 12pt; line-height: 1.8; color: #1a1a1a; }
-            .letterhead { margin-bottom: 40px; border-top: 8px solid #1e3a5f; padding-top: 20px; }
-            .logo-container img { width: 80px; height: 80px; }
-            .content { text-align: justify; margin-top: 30px; }
-            .content h2 { font-weight: 600; color: #1e3a5f; font-size: 13pt; margin-top: 20px; margin-bottom: 10px; }
-            .content p { margin-bottom: 14px; text-indent: 2cm; }
-            .signature { margin-top: 60px; text-align: center; }
-            .signature-name { font-weight: 600; color: #1e3a5f; }
-          </style>
-        </head>
-        <body>${printContent.innerHTML}</body>
-      </html>
-    `);
-    printWindow.document.close();
-    setTimeout(() => printWindow.print(), 500);
+    // Same window print — reuses the preview DOM & its @media print styles,
+    // guaranteeing that "impressão" is visually identical to "preview".
+    document.body.classList.add('printing-inpi-doc');
+    window.print();
+    // remove flag after print dialog closes
+    setTimeout(() => document.body.classList.remove('printing-inpi-doc'), 1000);
   };
 
   const handleDownloadPDF = async () => {
     setIsGeneratingPDF(true);
-    
+
     try {
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 25;
-      const contentWidth = pageWidth - (margin * 2);
-      let yPos = margin;
+      const root = printRef.current;
+      if (!root) throw new Error('Preview não disponível.');
 
-      let logoBase64: string | null = null;
-      let signBase64: string | null = null;
-      try { logoBase64 = await imageToBase64(logoWebmarcas); } catch { /* skip */ }
-      try { signBase64 = await imageToBase64(signatureImage); } catch { /* skip */ }
+      // A4 dimensions (mm) and safe printable area (leaves room for header/footer strip)
+      const A4_W = 210;
+      const A4_H = 297;
+      const MARGIN_X = 15;
+      const MARGIN_TOP = 18;
+      const MARGIN_BOTTOM = 18;
+      const CONTENT_W = A4_W - MARGIN_X * 2;
+      const CONTENT_H = A4_H - MARGIN_TOP - MARGIN_BOTTOM;
+      const GAP = 2.5;
 
-      // ── Header Bar ──
-      pdf.setFillColor(30, 58, 95);
-      pdf.rect(0, 0, pageWidth, 6, 'F');
-      pdf.setFillColor(200, 175, 55);
-      pdf.rect(0, 6, pageWidth, 2, 'F');
-      yPos = 18;
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-      // ── Letterhead ──
-      if (logoBase64) {
-        pdf.addImage(logoBase64, 'PNG', margin, yPos - 2, 16, 16);
-      }
-      const textX = logoBase64 ? margin + 19 : margin;
-      pdf.setFontSize(16);
-      pdf.setTextColor(30, 58, 95);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('WEBMARCAS INTELLIGENCE PI', textX, yPos + 5);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text('Propriedade Intelectual e Registro de Marcas', textX, yPos + 10);
+      const sections = Array.from(
+        root.querySelectorAll<HTMLElement>('[data-pdf-section]'),
+      );
+      if (sections.length === 0) throw new Error('Nenhuma seção marcada para PDF.');
 
-      // Right-aligned contact info - positioned below header line to avoid overlap
-      yPos += 16;
-      pdf.setFontSize(8);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(30, 58, 95);
-      pdf.text('CNPJ: 39.528.012/0001-29', pageWidth - margin, yPos, { align: 'right' });
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(150, 150, 150);
-      pdf.text('Av. Brigadeiro Luiz Antônio, 2696 — Centro — São Paulo/SP', pageWidth - margin, yPos + 4, { align: 'right' });
-      pdf.text('Tel: (11) 9 1112-0225  |  juridico@webmarcas.net', pageWidth - margin, yPos + 8, { align: 'right' });
+      let currentY = MARGIN_TOP;
 
-      // ── Double Separator ──
-      yPos += 12;
-      pdf.setDrawColor(30, 58, 95);
-      pdf.setLineWidth(0.8);
-      pdf.line(margin, yPos, pageWidth - margin, yPos);
-      pdf.setDrawColor(200, 175, 55);
-      pdf.setLineWidth(0.3);
-      pdf.line(margin, yPos + 1.5, pageWidth - margin, yPos + 1.5);
-      yPos += 8;
+      for (const section of sections) {
+        // Force layout & make sure webfonts/images are ready before snapshot
+        const canvas = await html2canvas(section, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: '#ffffff',
+          logging: false,
+          windowWidth: root.scrollWidth,
+        });
 
-      // ── Document Title Badge (centered) ──
-      const badgeTitle = isNotif
-        ? 'NOTIFICAÇÃO EXTRAJUDICIAL'
-        : isRespostaNotif
-          ? 'RESPOSTA À NOTIFICAÇÃO EXTRAJUDICIAL'
-        : isProcuradorPetition
-          ? documentTitleUpper
-        : isOposicao
-          ? 'MANIFESTAÇÃO À OPOSIÇÃO'
-        : isExigenciaMerito
-          ? 'CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO'
-          : 'RECURSO ADMINISTRATIVO';
+        const pxWidth = canvas.width;
+        const pxHeight = canvas.height;
+        // Fit to content width in mm
+        const heightMM = (pxHeight * CONTENT_W) / pxWidth;
 
-      // Draw navy badge
-      pdf.setFontSize(11);
-      pdf.setFont('helvetica', 'bold');
-      const badgeTextWidth = pdf.getTextWidth(badgeTitle);
-      const badgePadX = 12;
-      const badgeW = badgeTextWidth + badgePadX * 2;
-      const badgeH = 9;
-      const badgeX = (pageWidth - badgeW) / 2;
-      pdf.setFillColor(30, 58, 95);
-      pdf.roundedRect(badgeX, yPos - 1, badgeW, badgeH, 1.5, 1.5, 'F');
-      pdf.setTextColor(255, 255, 255);
-      pdf.text(badgeTitle, pageWidth / 2, yPos + 5, { align: 'center' });
-      yPos += badgeH + 5;
-
-      // Marca line centered
-      if (resource.brand_name) {
-        pdf.setFontSize(12);
-        pdf.setTextColor(30, 58, 95);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(`Marca: ${resource.brand_name}`, pageWidth / 2, yPos, { align: 'center' });
-        yPos += 6;
-      }
-
-      // Process number centered
-      if (resource.process_number) {
-        pdf.setFontSize(10);
-        pdf.setTextColor(80, 80, 80);
-        pdf.setFont('helvetica', 'normal');
-        pdf.text(`Processo INPI nº ${resource.process_number}`, pageWidth / 2, yPos, { align: 'center' });
-        yPos += 6;
-      }
-      yPos += 4;
-
-      // ── Content Body ──
-      pdf.setFont('helvetica', 'normal');
-      const paragraphs = bodyContent.split('\n\n').filter(p => p.trim());
-      
-      const addFooter = (pageNum: number, totalPages: number) => {
-        const footerY = pageHeight - 12;
-        pdf.setDrawColor(30, 58, 95);
-        pdf.setLineWidth(0.5);
-        pdf.line(margin, footerY - 8, pageWidth - margin, footerY - 8);
-        pdf.setDrawColor(200, 175, 55);
-        pdf.setLineWidth(0.3);
-        pdf.line(margin, footerY - 6.5, pageWidth - margin, footerY - 6.5);
-        pdf.setFontSize(7.5);
-        pdf.setTextColor(100, 100, 100);
-        pdf.text('Av. Brigadeiro Luiz Antônio, 2696, Centro — São Paulo/SP — CEP 01402-000', pageWidth / 2, footerY - 2, { align: 'center' });
-        pdf.text('Tel: (11) 9 1112-0225  |  juridico@webmarcas.net  |  www.webmarcas.net', pageWidth / 2, footerY + 2, { align: 'center' });
-        pdf.setFontSize(8);
-        pdf.setTextColor(130, 130, 130);
-        pdf.text(`${pageNum}/${totalPages}`, pageWidth - margin, footerY - 2, { align: 'right' });
-      };
-
-      const bottomLimit = pageHeight - 30;
-
-      for (const paragraph of paragraphs) {
-        const trimmedParagraph = paragraph.trim();
-        if (!trimmedParagraph) continue;
-        if (/^(Av\.\s*Brigadeiro|Tel:\s*\(11\))/.test(trimmedParagraph)) continue;
-
-        // ── Markdown table → simple grid in jsPDF ──
-        if (isMarkdownTable(trimmedParagraph)) {
-          const tbl = parseMarkdownTable(trimmedParagraph);
-          if (tbl) {
-            const cols = Math.max(tbl.headers.length, 1);
-            const colW = contentWidth / cols;
-            const rowH = 7;
-            const headerH = 8;
-            // Header
-            if (yPos + headerH > bottomLimit) { pdf.addPage(); yPos = margin; }
-            pdf.setFillColor(30, 58, 95);
-            pdf.rect(margin, yPos, contentWidth, headerH, 'F');
-            pdf.setTextColor(255, 255, 255);
-            pdf.setFont('helvetica', 'bold');
-            pdf.setFontSize(9);
-            tbl.headers.forEach((h, i) => {
-              const txt = h.replace(/\*\*/g, '').replace(/\*/g, '');
-              pdf.text(txt, margin + i * colW + 2, yPos + 5.5);
-            });
-            yPos += headerH;
-            // Rows
-            pdf.setTextColor(30, 30, 30);
-            pdf.setFont('helvetica', 'normal');
-            pdf.setFontSize(9);
-            tbl.rows.forEach((row, ri) => {
-              if (yPos + rowH > bottomLimit) { pdf.addPage(); yPos = margin; }
-              if (ri % 2 === 0) {
-                pdf.setFillColor(247, 249, 252);
-                pdf.rect(margin, yPos, contentWidth, rowH, 'F');
-              }
-              row.forEach((c, ci) => {
-                const txt = (c || '').replace(/\*\*/g, '').replace(/\*/g, '');
-                const lines = pdf.splitTextToSize(txt, colW - 4);
-                pdf.text(lines[0] || '', margin + ci * colW + 2, yPos + 5);
-              });
-              yPos += rowH;
-            });
-            yPos += 4;
-            pdf.setFontSize(11);
-            continue;
+        // If section is taller than a full page, slice it vertically across pages
+        if (heightMM > CONTENT_H) {
+          const pxPerMM = pxWidth / CONTENT_W;
+          const sliceHeightPx = Math.floor(CONTENT_H * pxPerMM);
+          let offsetPx = 0;
+          while (offsetPx < pxHeight) {
+            const remainingPx = Math.min(sliceHeightPx, pxHeight - offsetPx);
+            const sliceCanvas = document.createElement('canvas');
+            sliceCanvas.width = pxWidth;
+            sliceCanvas.height = remainingPx;
+            const ctx = sliceCanvas.getContext('2d');
+            if (ctx) {
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(0, 0, pxWidth, remainingPx);
+              ctx.drawImage(canvas, 0, offsetPx, pxWidth, remainingPx, 0, 0, pxWidth, remainingPx);
+            }
+            const sliceHeightMM = (remainingPx * CONTENT_W) / pxWidth;
+            if (offsetPx > 0 || currentY + sliceHeightMM > MARGIN_TOP + CONTENT_H) {
+              pdf.addPage();
+              currentY = MARGIN_TOP;
+            }
+            pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.92), 'JPEG', MARGIN_X, currentY, CONTENT_W, sliceHeightMM);
+            currentY += sliceHeightMM + GAP;
+            offsetPx += remainingPx;
           }
-        }
-
-        // Handle metadata block: split into individual lines rendered compactly
-        const metadataLines = trimmedParagraph.split('\n').filter(l => l.trim());
-        const hasMetadata = metadataLines.some(l => isMetadataLine(l));
-        
-        if (hasMetadata && metadataLines.length > 1) {
-          pdf.setFontSize(10);
-          pdf.setFont('helvetica', 'normal');
-          pdf.setTextColor(60, 60, 60);
-          for (const mLine of metadataLines) {
-            const ml = mLine.trim();
-            if (!ml) continue;
-            if (yPos > bottomLimit) { pdf.addPage(); yPos = margin; }
-            pdf.text(ml, margin, yPos);
-            yPos += 5.5;
-          }
-          yPos += 4;
           continue;
         }
 
-        const heading = isHeadingLine(trimmedParagraph);
-        
-        if (heading) {
-          if (yPos > margin + 10) yPos += 4;
-          pdf.setFontSize(12);
-          pdf.setFont('helvetica', 'bold');
-          pdf.setTextColor(30, 58, 95);
-          
-          const headingLines = pdf.splitTextToSize(trimmedParagraph, contentWidth);
-          for (const line of headingLines) {
-            if (yPos > bottomLimit) { pdf.addPage(); yPos = margin; }
-            pdf.text(line, margin, yPos);
-            yPos += 7;
-          }
-          
-          if (trimmedParagraph.length < 80) {
-            pdf.setDrawColor(200, 175, 55);
-            pdf.setLineWidth(0.3);
-            pdf.line(margin, yPos - 2, margin + 40, yPos - 2);
-          }
-          
-          pdf.setFont('helvetica', 'normal');
-          yPos += 3;
-        } else {
-          pdf.setFontSize(11);
-          pdf.setTextColor(30, 30, 30);
-          pdf.setFont('helvetica', 'normal');
-
-          const isList = /^[-–•]\s/.test(trimmedParagraph);
-          const indent = isList ? margin + 5 : margin;
-          const lineWidth = isList ? contentWidth - 5 : contentWidth;
-
-          const docNums: number[] = [];
-          const imgSlugs: string[] = [];
-          let renderText = trimmedParagraph.replace(/\[DOC:(\d{1,3})\]/g, (_full: string, n: string) => {
-            const num = parseInt(n, 10);
-            docNums.push(num);
-            return `(Doc. ${String(num).padStart(2, '0')})`;
-          });
-          renderText = renderText.replace(/\[IMG:([a-z0-9_\-]+)\]/gi, (_full, slug) => {
-            imgSlugs.push(String(slug).toLowerCase());
-            return '';
-          });
-          // Strip markdown bold/italic markers for jsPDF (rendered as plain text)
-          renderText = renderText.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*\n]+)\*/g, '$1');
-          const lines = pdf.splitTextToSize(renderText, lineWidth);
-          
-          for (const line of lines) {
-            if (yPos > bottomLimit) { pdf.addPage(); yPos = margin; }
-            pdf.text(line, indent, yPos);
-            yPos += 6;
-          }
-          for (const n of docNums) {
-            const ev = evidenceByNum(n);
-            if (!ev?.dataUrl) continue;
-            const maxImgW = contentWidth * 0.7;
-            const maxImgH = 75;
-            const ratio = ev.width && ev.height ? ev.width / ev.height : 0.75;
-            let imgW = maxImgW;
-            let imgH = imgW / ratio;
-            if (imgH > maxImgH) { imgH = maxImgH; imgW = imgH * ratio; }
-            if (yPos + imgH + 12 > bottomLimit) { pdf.addPage(); yPos = margin; }
-            yPos += 3;
-            const xImg = (pageWidth - imgW) / 2;
-            try {
-              pdf.addImage(ev.dataUrl, 'PNG', xImg, yPos, imgW, imgH);
-              yPos += imgH + 2;
-              pdf.setFontSize(8);
-              pdf.setTextColor(80, 80, 80);
-              const cap = `Doc. ${String(n).padStart(2, '0')} — ${ev.caption || ev.source_file_name || ''}`;
-              const capLines = pdf.splitTextToSize(cap, contentWidth);
-              for (const cl of capLines) {
-                if (yPos > bottomLimit) { pdf.addPage(); yPos = margin; }
-                pdf.text(cl, pageWidth / 2, yPos, { align: 'center' });
-                yPos += 4;
-              }
-              pdf.setFontSize(11);
-              pdf.setTextColor(30, 30, 30);
-            } catch (e) {
-              console.warn('addImage inline failed', e);
-            }
-          }
-          // Render [IMG:slug] markers as inline figures matched by caption/filename
-          for (const slug of imgSlugs) {
-            const ev = evidences.find((e) => {
-              const cap = (e.caption || '').toLowerCase();
-              const src = (e.source_file_name || '').toLowerCase();
-              return cap.includes(slug.replace(/_/g, ' ')) || src.includes(slug);
-            });
-            if (!ev?.dataUrl) continue;
-            const maxImgW = contentWidth * 0.55;
-            const maxImgH = 65;
-            const ratio = ev.width && ev.height ? ev.width / ev.height : 0.75;
-            let imgW = maxImgW;
-            let imgH = imgW / ratio;
-            if (imgH > maxImgH) { imgH = maxImgH; imgW = imgH * ratio; }
-            if (yPos + imgH + 10 > bottomLimit) { pdf.addPage(); yPos = margin; }
-            yPos += 3;
-            const xImg = (pageWidth - imgW) / 2;
-            try {
-              pdf.addImage(ev.dataUrl, 'PNG', xImg, yPos, imgW, imgH);
-              yPos += imgH + 2;
-              pdf.setFontSize(8);
-              pdf.setTextColor(80, 80, 80);
-              const cap = ev.caption || ev.source_file_name || '';
-              if (cap) {
-                pdf.text(cap, pageWidth / 2, yPos, { align: 'center' });
-                yPos += 4;
-              }
-              pdf.setFontSize(11);
-              pdf.setTextColor(30, 30, 30);
-            } catch (e) {
-              console.warn('addImage IMG slug failed', e);
-            }
-          }
-          yPos += 3;
-        }
-      }
-
-      // ── Closing / Signature Block ──
-      if (yPos > pageHeight - 90) { pdf.addPage(); yPos = margin; }
-      
-      yPos += 10;
-      pdf.setFontSize(11);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(60, 60, 60);
-
-      if (!isExtrajudicialDoc) {
-        // Standard INPI resource closing
-        pdf.text('Termos em que,', pageWidth / 2, yPos, { align: 'center' });
-        yPos += 8;
-        pdf.text('Pede deferimento.', pageWidth / 2, yPos, { align: 'center' });
-        yPos += 12;
-      }
-
-      pdf.text(`São Paulo, ${approvalDate}`, pageWidth / 2, yPos, { align: 'center' });
-      yPos += 16;
-
-      // Signature image
-      if (signBase64) {
-        const sigW = 40;
-        const sigH = 16;
-        pdf.addImage(signBase64, 'PNG', (pageWidth - sigW) / 2, yPos, sigW, sigH);
-        yPos += sigH + 2;
-      }
-
-      // Signature line
-      pdf.setDrawColor(30, 58, 95);
-      pdf.setLineWidth(0.5);
-      pdf.line(pageWidth / 2 - 35, yPos, pageWidth / 2 + 35, yPos);
-      
-      yPos += 6;
-      pdf.setFontSize(11);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(30, 58, 95);
-      pdf.text('Davilys Danques de Oliveira Cunha', pageWidth / 2, yPos, { align: 'center' });
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(10);
-      pdf.setTextColor(80, 80, 80);
-      pdf.text('Procurador', pageWidth / 2, yPos + 6, { align: 'center' });
-
-      if (!isExtrajudicialDoc && !isProcuradorPetition) {
-        // Only show CPF for standard INPI appeal resources
-        pdf.text('CPF 393.239.118-79', pageWidth / 2, yPos + 12, { align: 'center' });
-      }
-
-      // ── ANEXOS DOCUMENTAIS ──
-      if (annexEvidences.length > 0) {
-        pdf.addPage();
-        yPos = margin;
-        pdf.setFillColor(30, 58, 95);
-        pdf.rect(margin, yPos, contentWidth, 10, 'F');
-        pdf.setTextColor(255, 255, 255);
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(12);
-        pdf.text('ANEXOS DOCUMENTAIS', pageWidth / 2, yPos + 7, { align: 'center' });
-        yPos += 18;
-        pdf.setTextColor(30, 30, 30);
-        pdf.setFont('helvetica', 'normal');
-
-        for (const ev of annexEvidences) {
-          if (!ev.dataUrl) continue;
-          // One page per doc
+        const remaining = MARGIN_TOP + CONTENT_H - currentY;
+        if (heightMM > remaining && currentY > MARGIN_TOP) {
           pdf.addPage();
-          yPos = margin;
-          pdf.setFontSize(11);
-          pdf.setFont('helvetica', 'bold');
-          pdf.setTextColor(30, 58, 95);
-          const title = `Doc. ${String(ev.docNumber).padStart(2, '0')} — ${ev.caption || ev.source_file_name || ''}`;
-          const titleLines = pdf.splitTextToSize(title, contentWidth);
-          for (const tl of titleLines) {
-            pdf.text(tl, pageWidth / 2, yPos, { align: 'center' });
-            yPos += 6;
-          }
-          yPos += 4;
-          pdf.setFont('helvetica', 'normal');
-
-          const availableH = pageHeight - yPos - margin - 20;
-          const availableW = contentWidth;
-          const ratio = ev.width && ev.height ? ev.width / ev.height : 0.75;
-          let imgW = availableW;
-          let imgH = imgW / ratio;
-          if (imgH > availableH) { imgH = availableH; imgW = imgH * ratio; }
-          const xImg = (pageWidth - imgW) / 2;
-          try {
-            pdf.addImage(ev.dataUrl, 'PNG', xImg, yPos, imgW, imgH);
-          } catch (e) {
-            console.warn('addImage annex failed', e);
-          }
-          yPos += imgH + 4;
-          if (ev.source_file_name) {
-            pdf.setFontSize(8);
-            pdf.setTextColor(120, 120, 120);
-            pdf.text(
-              `Origem: ${ev.source_file_name}${ev.page_number ? ` — pág. ${ev.page_number}` : ''}`,
-              pageWidth / 2, yPos, { align: 'center' },
-            );
-          }
+          currentY = MARGIN_TOP;
         }
+
+        pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', MARGIN_X, currentY, CONTENT_W, heightMM);
+        currentY += heightMM + GAP;
       }
 
-      // ── Footers on all pages ──
+      // Footer with pagination on every page
       const totalPages = pdf.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         pdf.setPage(i);
-        addFooter(i, totalPages);
+        pdf.setDrawColor(30, 58, 95);
+        pdf.setLineWidth(0.4);
+        pdf.line(MARGIN_X, A4_H - MARGIN_BOTTOM + 4, A4_W - MARGIN_X, A4_H - MARGIN_BOTTOM + 4);
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(110, 110, 110);
+        pdf.text(
+          'Av. Brigadeiro Luiz Antônio, 2696, Centro — São Paulo/SP  |  (11) 9 1112-0225  |  juridico@webmarcas.net',
+          A4_W / 2,
+          A4_H - MARGIN_BOTTOM + 9,
+          { align: 'center' },
+        );
+        pdf.setTextColor(130, 130, 130);
+        pdf.text(`${i} / ${totalPages}`, A4_W - MARGIN_X, A4_H - MARGIN_BOTTOM + 9, { align: 'right' });
       }
 
       pdf.save(pdfFileName);
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Erro ao gerar PDF. Tente novamente.');
+      toast({
+        title: 'Erro ao gerar PDF',
+        description: (error as Error)?.message || 'Tente novamente.',
+        variant: 'destructive',
+      });
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -818,7 +474,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       const hasMetadata = metaLines.some(l => isMetadataLine(l));
       if (hasMetadata && metaLines.length > 1) {
         return (
-          <div key={idx} className="mb-4 text-sm" style={{ color: '#444', lineHeight: '1.6' }}>
+          <div key={idx} data-pdf-section className="legal-meta mb-4 text-sm" style={{ color: '#444', lineHeight: '1.6' }}>
             {metaLines.map((ml, mi) => (
               <p key={mi} className="mb-0.5" style={{ textIndent: '0' }}>{ml.trim()}</p>
             ))}
@@ -828,7 +484,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
 
       if (isHeadingLine(trimmed)) {
         return (
-          <h2 key={idx} className="text-base font-semibold mt-6 mb-3 pb-1" style={{ color: '#1e3a5f', borderBottom: '2px solid #c8af37' }}>
+          <h2 key={idx} data-pdf-section className="legal-heading text-base font-semibold mt-6 mb-3 pb-1" style={{ color: '#1e3a5f', borderBottom: '2px solid #c8af37' }}>
             {trimmed}
           </h2>
         );
@@ -839,8 +495,8 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         const tbl = parseMarkdownTable(trimmed);
         if (tbl) {
           return (
-            <div key={idx} className="my-5 overflow-x-auto">
-              <table className="w-full border-collapse text-sm" style={{ border: '1px solid #1e3a5f' }}>
+            <div key={idx} data-pdf-section className="legal-table-wrap my-5">
+              <table className="legal-table w-full text-sm" style={{ border: '1px solid #1e3a5f', tableLayout: 'auto', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#1e3a5f' }}>
                     {tbl.headers.map((h, i) => (
@@ -869,7 +525,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
 
       const isList = /^[-–•]\s/.test(trimmed);
       if (isList) {
-        return <p key={idx} className="mb-3 pl-6" style={{ textIndent: '0' }}>{renderInlineMarkdown(trimmed)}</p>;
+        return <p key={idx} data-pdf-section className="legal-list mb-3 pl-6" style={{ textIndent: '0' }}>{renderInlineMarkdown(trimmed)}</p>;
       }
       
       // Short lines (e.g. "EXCELENTÍSSIMO...") should not be stretched by justify
@@ -898,8 +554,8 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
             return cap.includes(slug.replace(/_/g, ' ')) || src.includes(slug);
           });
         return (
-          <div key={idx} className="mb-4">
-            <p className={isShort ? '' : 'text-justify'} style={{ textIndent: '2cm', textAlignLast: 'left' }}>
+          <div key={idx} data-pdf-section className="mb-4">
+            <p className={`legal-p ${isShort ? 'legal-p-short' : ''}`}>
               {parts.map((p, i) => {
                 if (p.type === 'text') return <span key={i}>{renderInlineMarkdown(p.value)}</span>;
                 if (p.type === 'doc') return <span key={i} className="font-semibold" style={{ color: '#1e3a5f' }}>(Doc. {String(p.n).padStart(2, '0')})</span>;
@@ -930,7 +586,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         );
       }
       return (
-        <p key={idx} className={`mb-4 ${isShort ? '' : 'text-justify'}`} style={{ textIndent: '2cm', textAlignLast: 'left' }}>
+        <p key={idx} data-pdf-section className={`legal-p ${isShort ? 'legal-p-short' : ''}`}>
           {renderInlineMarkdown(trimmed)}
         </p>
       );
@@ -1003,16 +659,66 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
 
       <div 
         ref={printRef}
-        className="bg-white text-gray-900 shadow-2xl mx-auto overflow-hidden rounded-lg"
-        style={{ width: '210mm', minHeight: '297mm', fontFamily: "Georgia, serif", fontSize: '12pt', lineHeight: '1.8' }}
+        className="legal-body bg-white text-gray-900 shadow-2xl mx-auto overflow-hidden rounded-lg print-target"
+        style={{ width: '210mm', minHeight: '297mm', fontFamily: "Georgia, 'Times New Roman', serif", fontSize: '11.5pt', lineHeight: '1.7' }}
       >
+        <style>{`
+          .legal-body { color: #1a1a1a; }
+          .legal-body .legal-p {
+            text-align: justify;
+            text-justify: inter-word;
+            hyphens: auto;
+            -webkit-hyphens: auto;
+            -ms-hyphens: auto;
+            overflow-wrap: break-word;
+            word-break: normal;
+            text-indent: 1.25cm;
+            margin: 0 0 0.55em 0;
+            orphans: 3;
+            widows: 3;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          .legal-body .legal-p-short {
+            text-align: left;
+            text-indent: 0;
+          }
+          .legal-body .legal-list {
+            text-align: left;
+            hyphens: auto;
+            overflow-wrap: break-word;
+          }
+          .legal-body .legal-heading {
+            page-break-after: avoid;
+            break-after: avoid;
+          }
+          .legal-body .legal-table-wrap { page-break-inside: avoid; break-inside: avoid; }
+          .legal-body .legal-table { width: 100%; border-collapse: collapse; }
+          .legal-body .legal-table th,
+          .legal-body .legal-table td {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            vertical-align: top;
+          }
+          @media print {
+            @page { size: A4; margin: 18mm 15mm 20mm 15mm; }
+            body > *:not(.printing-inpi-doc-wrapper) { visibility: hidden; }
+            .print-target, .print-target * { visibility: visible; }
+            .print-target { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none !important; border-radius: 0 !important; }
+            .print\\:hidden { display: none !important; }
+          }
+          body.printing-inpi-doc > *:not(.print-target-holder) { display: none !important; }
+        `}</style>
+
         {/* Header */}
-        <div className="w-full" style={{ height: '8px', background: 'linear-gradient(90deg, #1e3a5f 0%, #2a5080 50%, #1e3a5f 100%)' }} />
-        <div className="w-full" style={{ height: '3px', background: 'linear-gradient(90deg, #c8af37, #d4c050, #c8af37)' }} />
+        <div data-pdf-section>
+          <div className="w-full" style={{ height: '8px', background: 'linear-gradient(90deg, #1e3a5f 0%, #2a5080 50%, #1e3a5f 100%)' }} />
+          <div className="w-full" style={{ height: '3px', background: 'linear-gradient(90deg, #c8af37, #d4c050, #c8af37)' }} />
+        </div>
 
         <div className="px-16 py-10">
           {/* Letterhead */}
-          <div className="flex items-start justify-between mb-6">
+          <div data-pdf-section className="flex items-start justify-between mb-6">
             <div className="flex items-center gap-5">
               <img 
                 src={logoWebmarcas} 
@@ -1034,13 +740,13 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           </div>
 
           {/* Double separator */}
-          <div className="w-full mb-8">
+          <div data-pdf-section className="w-full mb-8">
             <div style={{ height: '2px', background: 'linear-gradient(90deg, #1e3a5f, #2a5080, #1e3a5f)' }} />
             <div style={{ height: '1px', marginTop: '2px', background: 'linear-gradient(90deg, transparent, #c8af37, transparent)' }} />
           </div>
 
           {/* Document title badge (centered) */}
-          <div className="mb-6 text-center">
+          <div data-pdf-section className="mb-6 text-center">
             <div className="inline-block px-8 py-2 rounded" style={{ background: '#1e3a5f' }}>
               <p className="text-white font-bold tracking-wide text-sm uppercase">
                 {isNotif
@@ -1069,12 +775,12 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           </div>
 
           {/* Content */}
-          <div className="text-justify" style={{ color: '#1a1a1a' }}>
+          <div style={{ color: '#1a1a1a' }}>
             {renderContent()}
           </div>
 
           {/* Signature */}
-          <div className="mt-16 text-center">
+          <div data-pdf-section className="mt-16 text-center">
             {!isExtrajudicialDoc && (
               <>
                 <p className="mb-4" style={{ color: '#374151' }}>Termos em que,</p>
@@ -1101,7 +807,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           </div>
 
           {/* Footer */}
-          <div className="mt-16 pt-3" style={{ borderTop: '2px solid #1e3a5f' }}>
+          <div data-pdf-section className="mt-16 pt-3" style={{ borderTop: '2px solid #1e3a5f' }}>
             <div className="mb-2" style={{ height: '1px', background: 'linear-gradient(90deg, transparent, #c8af37, transparent)' }} />
             <div className="flex justify-center gap-6 text-xs flex-wrap" style={{ color: '#888' }}>
               <span>📍 Av. Brigadeiro Luiz Antônio, 2696, Centro — São Paulo/SP</span>
@@ -1114,7 +820,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           {/* ANEXOS DOCUMENTAIS */}
           {annexEvidences.length > 0 && (
             <div className="mt-16">
-              <div className="text-center mb-6">
+              <div data-pdf-section className="text-center mb-6">
                 <div className="inline-block px-8 py-2 rounded" style={{ background: '#1e3a5f' }}>
                   <p className="text-white font-bold tracking-wide text-sm uppercase">
                     Anexos Documentais
@@ -1123,7 +829,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
               </div>
               <div className="space-y-10">
                 {annexEvidences.map((ev) => (
-                  <div key={ev.id} className="text-center break-inside-avoid page-break-before-always">
+                  <div key={ev.id} data-pdf-section className="text-center break-inside-avoid page-break-before-always">
                     <p className="text-sm font-semibold mb-2" style={{ color: '#1e3a5f' }}>
                       Doc. {String(ev.docNumber).padStart(2, '0')} — {ev.caption || ev.source_file_name}
                     </p>
