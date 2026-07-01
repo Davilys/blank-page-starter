@@ -376,25 +376,61 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
 
       const pageHeightCssPx = root.scrollWidth * (A4_H / A4_W);
       const totalSlices = Math.max(1, Math.ceil(root.scrollHeight / pageHeightCssPx));
+      const FAST_SINGLE_RENDER_LIMIT = 18;
 
-      for (let pageIndex = 0; pageIndex < totalSlices; pageIndex++) {
-        setPdfProgress(`Renderizando página ${pageIndex + 1}/${totalSlices}...`);
-        if (pageIndex > 0) pdf.addPage();
-
-        const pageCanvas = await html2canvas(root, {
+      if (totalSlices <= FAST_SINGLE_RENDER_LIMIT) {
+        setPdfProgress('Renderizando documento...');
+        const fullCanvas = await html2canvas(root, {
           scale: PDF_SCALE,
           useCORS: true,
           allowTaint: false,
           backgroundColor: '#ffffff',
           logging: false,
           windowWidth: root.scrollWidth,
-          windowHeight: pageHeightCssPx,
-          width: root.scrollWidth,
-          height: pageHeightCssPx,
-          y: pageIndex * pageHeightCssPx,
+          windowHeight: root.scrollHeight,
         });
 
-        pdf.addImage(pageCanvas.toDataURL('image/jpeg', JPEG_QUALITY), 'JPEG', 0, 0, A4_W, A4_H);
+        const pageHeightPx = Math.floor(fullCanvas.width * (A4_H / A4_W));
+
+        setPdfProgress('Montando PDF...');
+        for (let pageIndex = 0; pageIndex < totalSlices; pageIndex++) {
+          if (pageIndex > 0) pdf.addPage();
+
+          const offsetPx = pageIndex * pageHeightPx;
+          const sliceHeightPx = Math.min(pageHeightPx, fullCanvas.height - offsetPx);
+          const sliceCanvas = document.createElement('canvas');
+          sliceCanvas.width = fullCanvas.width;
+          sliceCanvas.height = pageHeightPx;
+          const ctx = sliceCanvas.getContext('2d');
+
+          if (ctx) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+            ctx.drawImage(fullCanvas, 0, offsetPx, fullCanvas.width, sliceHeightPx, 0, 0, fullCanvas.width, sliceHeightPx);
+          }
+
+          pdf.addImage(sliceCanvas.toDataURL('image/jpeg', JPEG_QUALITY), 'JPEG', 0, 0, A4_W, A4_H);
+        }
+      } else {
+        for (let pageIndex = 0; pageIndex < totalSlices; pageIndex++) {
+          setPdfProgress(`Renderizando página ${pageIndex + 1}/${totalSlices}...`);
+          if (pageIndex > 0) pdf.addPage();
+
+          const pageCanvas = await html2canvas(root, {
+            scale: PDF_SCALE,
+            useCORS: true,
+            allowTaint: false,
+            backgroundColor: '#ffffff',
+            logging: false,
+            windowWidth: root.scrollWidth,
+            windowHeight: pageHeightCssPx,
+            width: root.scrollWidth,
+            height: pageHeightCssPx,
+            y: pageIndex * pageHeightCssPx,
+          });
+
+          pdf.addImage(pageCanvas.toDataURL('image/jpeg', JPEG_QUALITY), 'JPEG', 0, 0, A4_W, A4_H);
+        }
       }
 
       setPdfProgress('Montando PDF...');
