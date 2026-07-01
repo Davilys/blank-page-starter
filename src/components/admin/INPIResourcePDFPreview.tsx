@@ -371,66 +371,41 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
 
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-      const sections = Array.from(
-        root.querySelectorAll<HTMLElement>('[data-pdf-section]'),
-      );
-      if (sections.length === 0) throw new Error('Nenhuma seção marcada para PDF.');
+      // Single-shot render of the whole preview, then slice into A4 pages.
+      const canvas = await html2canvas(root, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        logging: false,
+        windowWidth: root.scrollWidth,
+      });
 
-      let currentY = MARGIN_TOP;
+      const pxWidth = canvas.width;
+      const pxHeight = canvas.height;
+      const pxPerMM = pxWidth / CONTENT_W;
+      const pageHeightPx = Math.floor(CONTENT_H * pxPerMM);
 
-      for (const section of sections) {
-        // Force layout & make sure webfonts/images are ready before snapshot
-        const canvas = await html2canvas(section, {
-          scale: 2,
-          useCORS: true,
-          allowTaint: false,
-          backgroundColor: '#ffffff',
-          logging: false,
-          windowWidth: root.scrollWidth,
-        });
-
-        const pxWidth = canvas.width;
-        const pxHeight = canvas.height;
-        // Fit to content width in mm
-        const heightMM = (pxHeight * CONTENT_W) / pxWidth;
-
-        // If section is taller than a full page, slice it vertically across pages
-        if (heightMM > CONTENT_H) {
-          const pxPerMM = pxWidth / CONTENT_W;
-          const sliceHeightPx = Math.floor(CONTENT_H * pxPerMM);
-          let offsetPx = 0;
-          while (offsetPx < pxHeight) {
-            const remainingPx = Math.min(sliceHeightPx, pxHeight - offsetPx);
-            const sliceCanvas = document.createElement('canvas');
-            sliceCanvas.width = pxWidth;
-            sliceCanvas.height = remainingPx;
-            const ctx = sliceCanvas.getContext('2d');
-            if (ctx) {
-              ctx.fillStyle = '#ffffff';
-              ctx.fillRect(0, 0, pxWidth, remainingPx);
-              ctx.drawImage(canvas, 0, offsetPx, pxWidth, remainingPx, 0, 0, pxWidth, remainingPx);
-            }
-            const sliceHeightMM = (remainingPx * CONTENT_W) / pxWidth;
-            if (offsetPx > 0 || currentY + sliceHeightMM > MARGIN_TOP + CONTENT_H) {
-              pdf.addPage();
-              currentY = MARGIN_TOP;
-            }
-            pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.92), 'JPEG', MARGIN_X, currentY, CONTENT_W, sliceHeightMM);
-            currentY += sliceHeightMM + GAP;
-            offsetPx += remainingPx;
-          }
-          continue;
+      let offsetPx = 0;
+      let pageIndex = 0;
+      while (offsetPx < pxHeight) {
+        const remainingPx = Math.min(pageHeightPx, pxHeight - offsetPx);
+        const sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = pxWidth;
+        sliceCanvas.height = remainingPx;
+        const ctx = sliceCanvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, pxWidth, remainingPx);
+          ctx.drawImage(canvas, 0, offsetPx, pxWidth, remainingPx, 0, 0, pxWidth, remainingPx);
         }
-
-        const remaining = MARGIN_TOP + CONTENT_H - currentY;
-        if (heightMM > remaining && currentY > MARGIN_TOP) {
-          pdf.addPage();
-          currentY = MARGIN_TOP;
-        }
-
-        pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', MARGIN_X, currentY, CONTENT_W, heightMM);
-        currentY += heightMM + GAP;
+        const sliceHeightMM = (remainingPx * CONTENT_W) / pxWidth;
+        if (pageIndex > 0) pdf.addPage();
+        pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.92), 'JPEG', MARGIN_X, MARGIN_TOP, CONTENT_W, sliceHeightMM);
+        offsetPx += remainingPx;
+        pageIndex += 1;
       }
+      void GAP;
 
       // Footer with pagination on every page
       const totalPages = pdf.getNumberOfPages();
