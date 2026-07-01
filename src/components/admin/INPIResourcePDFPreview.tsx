@@ -336,22 +336,39 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
     setTimeout(() => document.body.classList.remove('printing-inpi-doc'), 1000);
   };
 
-  const waitForDocumentAssets = async (root: HTMLElement) => {
+  const handleFastPDF = async () => {
+    const root = printRef.current;
+    if (!root) {
+      toast({ title: 'Preview não disponível', description: 'Aguarde o documento carregar e tente novamente.', variant: 'destructive' });
+      return;
+    }
+
+    setPdfProgress('Abrindo PDF rápido...');
+    await waitForDocumentAssets(root, 2500);
+    setPdfProgress('');
+    handlePrint();
+  };
+
+  const waitForDocumentAssets = async (root: HTMLElement, timeoutMs = 6000) => {
+    const timeout = new Promise<void>((resolve) => window.setTimeout(resolve, timeoutMs));
     if ('fonts' in document) {
-      await document.fonts.ready.catch(() => undefined);
+      await Promise.race([document.fonts.ready.catch(() => undefined), timeout]);
     }
 
     const images = Array.from(root.querySelectorAll('img'));
-    await Promise.all(
-      images.map((img) => {
-        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
-        return new Promise<void>((resolve) => {
-          const done = () => resolve();
-          img.addEventListener('load', done, { once: true });
-          img.addEventListener('error', done, { once: true });
-        });
-      }),
-    );
+    await Promise.race([
+      Promise.all(
+        images.map((img) => {
+          if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+          return new Promise<void>((resolve) => {
+            const done = () => resolve();
+            img.addEventListener('load', done, { once: true });
+            img.addEventListener('error', done, { once: true });
+          });
+        }),
+      ).then(() => undefined),
+      timeout,
+    ]);
   };
 
   const handleDownloadPDF = async () => {
@@ -376,13 +393,18 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       const CONTENT_BOTTOM = FOOTER_LINE_Y - 7;
       const CONTENT_H = CONTENT_BOTTOM - MARGIN_TOP;
       const GAP = 2.2;
-      const PDF_SCALE = 1.35;
-      const JPEG_QUALITY = 0.84;
+      const rawSections = Array.from(root.querySelectorAll<HTMLElement>('[data-pdf-section]'));
+      const sections = rawSections.filter((section) => {
+        const box = section.getBoundingClientRect();
+        return box.width > 1 && box.height > 1 && window.getComputedStyle(section).display !== 'none';
+      });
+      if (sections.length === 0) throw new Error('Nenhuma seção marcada para PDF.');
+
+      const hasManyBlocks = sections.length > 80;
+      const PDF_SCALE = hasManyBlocks ? 1.05 : 1.2;
+      const JPEG_QUALITY = hasManyBlocks ? 0.76 : 0.8;
 
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-      const sections = Array.from(root.querySelectorAll<HTMLElement>('[data-pdf-section]'));
-      if (sections.length === 0) throw new Error('Nenhuma seção marcada para PDF.');
 
       let currentY = MARGIN_TOP;
 
@@ -628,7 +650,20 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
               <Pencil className="h-4 w-4" />
               Editar PDF
             </Button>
-            <Button onClick={handleDownloadPDF} disabled={isGeneratingPDF} className="gap-2 rounded-xl shadow-lg shadow-primary/15">
+            <Button onClick={handleFastPDF} disabled={isGeneratingPDF || Boolean(pdfProgress)} className="gap-2 rounded-xl shadow-lg shadow-primary/15">
+              {pdfProgress === 'Abrindo PDF rápido...' ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Abrindo...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4" />
+                  Baixar PDF rápido
+                </>
+              )}
+            </Button>
+            <Button variant="outline" onClick={handleDownloadPDF} disabled={isGeneratingPDF || Boolean(pdfProgress)} className="gap-2 rounded-xl">
           {isGeneratingPDF ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -637,7 +672,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           ) : (
             <>
               <Download className="h-4 w-4" />
-              Download PDF
+              Gerar PDF completo
             </>
           )}
             </Button>
@@ -709,7 +744,6 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
             .print-target { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none !important; border-radius: 0 !important; }
             .print\\:hidden { display: none !important; }
           }
-          body.printing-inpi-doc > *:not(.print-target-holder) { display: none !important; }
         `}</style>
 
         {/* Header */}
