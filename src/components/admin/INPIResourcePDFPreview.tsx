@@ -364,73 +364,71 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
 
       await waitForDocumentAssets(root);
 
-      // A4 dimensions (mm). The preview already contains safe inner margins;
-      // exporting it as a full-page canvas keeps layout fidelity with far fewer captures.
+      // A4 dimensions (mm) with a protected footer area. Content must never
+      // be drawn below CONTENT_BOTTOM, otherwise the footer crosses the text.
       const A4_W = 210;
       const A4_H = 297;
-      const FOOTER_Y = 286;
-      const PDF_SCALE = 1.4;
-      const JPEG_QUALITY = 0.86;
+      const MARGIN_X = 15;
+      const MARGIN_TOP = 16;
+      const CONTENT_W = A4_W - MARGIN_X * 2;
+      const FOOTER_LINE_Y = 278;
+      const FOOTER_TEXT_Y = 284;
+      const CONTENT_BOTTOM = FOOTER_LINE_Y - 7;
+      const CONTENT_H = CONTENT_BOTTOM - MARGIN_TOP;
+      const GAP = 2.2;
+      const PDF_SCALE = 1.35;
+      const JPEG_QUALITY = 0.84;
 
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-      const pageHeightCssPx = root.scrollWidth * (A4_H / A4_W);
-      const totalSlices = Math.max(1, Math.ceil(root.scrollHeight / pageHeightCssPx));
-      const FAST_SINGLE_RENDER_LIMIT = 18;
+      const sections = Array.from(root.querySelectorAll<HTMLElement>('[data-pdf-section]'));
+      if (sections.length === 0) throw new Error('Nenhuma seção marcada para PDF.');
 
-      if (totalSlices <= FAST_SINGLE_RENDER_LIMIT) {
-        setPdfProgress('Renderizando documento...');
-        const fullCanvas = await html2canvas(root, {
+      let currentY = MARGIN_TOP;
+
+      const addNewPage = () => {
+        pdf.addPage();
+        currentY = MARGIN_TOP;
+      };
+
+      for (let index = 0; index < sections.length; index++) {
+        const section = sections[index];
+        setPdfProgress(`Renderizando bloco ${index + 1}/${sections.length}...`);
+
+        const canvas = await html2canvas(section, {
           scale: PDF_SCALE,
           useCORS: true,
           allowTaint: false,
           backgroundColor: '#ffffff',
           logging: false,
           windowWidth: root.scrollWidth,
-          windowHeight: root.scrollHeight,
         });
 
-        const pageHeightPx = Math.floor(fullCanvas.width * (A4_H / A4_W));
+        if (!canvas.width || !canvas.height) continue;
 
-        setPdfProgress('Montando PDF...');
-        for (let pageIndex = 0; pageIndex < totalSlices; pageIndex++) {
-          if (pageIndex > 0) pdf.addPage();
+        const originalHeightMM = (canvas.height * CONTENT_W) / canvas.width;
+        const sectionStartsNewPage = section.classList.contains('page-break-before-always') && currentY > MARGIN_TOP;
+        if (sectionStartsNewPage) addNewPage();
 
-          const offsetPx = pageIndex * pageHeightPx;
-          const sliceHeightPx = Math.min(pageHeightPx, fullCanvas.height - offsetPx);
-          const sliceCanvas = document.createElement('canvas');
-          sliceCanvas.width = fullCanvas.width;
-          sliceCanvas.height = pageHeightPx;
-          const ctx = sliceCanvas.getContext('2d');
-
-          if (ctx) {
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
-            ctx.drawImage(fullCanvas, 0, offsetPx, fullCanvas.width, sliceHeightPx, 0, 0, fullCanvas.width, sliceHeightPx);
+        // Normal sections are moved whole to the next page if they don't fit.
+        // This prevents the footer from crossing text and prevents mid-line cuts.
+        if (originalHeightMM <= CONTENT_H) {
+          if (currentY + originalHeightMM > CONTENT_BOTTOM && currentY > MARGIN_TOP) {
+            addNewPage();
           }
-
-          pdf.addImage(sliceCanvas.toDataURL('image/jpeg', JPEG_QUALITY), 'JPEG', 0, 0, A4_W, A4_H);
+          pdf.addImage(canvas.toDataURL('image/jpeg', JPEG_QUALITY), 'JPEG', MARGIN_X, currentY, CONTENT_W, originalHeightMM);
+          currentY += originalHeightMM + GAP;
+          continue;
         }
-      } else {
-        for (let pageIndex = 0; pageIndex < totalSlices; pageIndex++) {
-          setPdfProgress(`Renderizando página ${pageIndex + 1}/${totalSlices}...`);
-          if (pageIndex > 0) pdf.addPage();
 
-          const pageCanvas = await html2canvas(root, {
-            scale: PDF_SCALE,
-            useCORS: true,
-            allowTaint: false,
-            backgroundColor: '#ffffff',
-            logging: false,
-            windowWidth: root.scrollWidth,
-            windowHeight: pageHeightCssPx,
-            width: root.scrollWidth,
-            height: pageHeightCssPx,
-            y: pageIndex * pageHeightCssPx,
-          });
-
-          pdf.addImage(pageCanvas.toDataURL('image/jpeg', JPEG_QUALITY), 'JPEG', 0, 0, A4_W, A4_H);
-        }
+        // Oversized evidence/table block: fit it inside one protected content area.
+        // This is safer than slicing through a paragraph and still keeps footer clear.
+        if (currentY > MARGIN_TOP) addNewPage();
+        const fittedWidthMM = Math.min(CONTENT_W, (canvas.width * CONTENT_H) / canvas.height);
+        const fittedHeightMM = Math.min(CONTENT_H, (canvas.height * fittedWidthMM) / canvas.width);
+        const fittedX = MARGIN_X + (CONTENT_W - fittedWidthMM) / 2;
+        pdf.addImage(canvas.toDataURL('image/jpeg', JPEG_QUALITY), 'JPEG', fittedX, currentY, fittedWidthMM, fittedHeightMM);
+        currentY += fittedHeightMM + GAP;
       }
 
       setPdfProgress('Montando PDF...');
@@ -440,17 +438,17 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         pdf.setPage(i);
         pdf.setDrawColor(30, 58, 95);
         pdf.setLineWidth(0.4);
-        pdf.line(15, FOOTER_Y, A4_W - 15, FOOTER_Y);
+        pdf.line(MARGIN_X, FOOTER_LINE_Y, A4_W - MARGIN_X, FOOTER_LINE_Y);
         pdf.setFontSize(7.5);
         pdf.setTextColor(110, 110, 110);
         pdf.text(
           'Av. Brigadeiro Luiz Antônio, 2696, Centro — São Paulo/SP  |  (11) 9 1112-0225  |  juridico@webmarcas.net',
           A4_W / 2,
-          FOOTER_Y + 5,
+          FOOTER_TEXT_Y,
           { align: 'center' },
         );
         pdf.setTextColor(130, 130, 130);
-        pdf.text(`${i} / ${totalPages}`, A4_W - 15, FOOTER_Y + 5, { align: 'right' });
+        pdf.text(`${i} / ${totalPages}`, A4_W - MARGIN_X, FOOTER_TEXT_Y, { align: 'right' });
       }
 
       setPdfProgress('Baixando arquivo...');
