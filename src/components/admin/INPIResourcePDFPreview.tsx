@@ -650,7 +650,20 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
               <Pencil className="h-4 w-4" />
               Editar PDF
             </Button>
-            <Button onClick={handleDownloadPDF} disabled={isGeneratingPDF} className="gap-2 rounded-xl shadow-lg shadow-primary/15">
+            <Button onClick={handleFastPDF} disabled={isGeneratingPDF || Boolean(pdfProgress)} className="gap-2 rounded-xl shadow-lg shadow-primary/15">
+              {pdfProgress === 'Abrindo PDF rápido...' ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Abrindo...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4" />
+                  Baixar PDF rápido
+                </>
+              )}
+            </Button>
+            <Button variant="outline" onClick={handleDownloadPDF} disabled={isGeneratingPDF || Boolean(pdfProgress)} className="gap-2 rounded-xl">
           {isGeneratingPDF ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -659,7 +672,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           ) : (
             <>
               <Download className="h-4 w-4" />
-              Download PDF
+              Gerar PDF completo
             </>
           )}
             </Button>
