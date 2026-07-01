@@ -336,22 +336,39 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
     setTimeout(() => document.body.classList.remove('printing-inpi-doc'), 1000);
   };
 
-  const waitForDocumentAssets = async (root: HTMLElement) => {
+  const handleFastPDF = async () => {
+    const root = printRef.current;
+    if (!root) {
+      toast({ title: 'Preview não disponível', description: 'Aguarde o documento carregar e tente novamente.', variant: 'destructive' });
+      return;
+    }
+
+    setPdfProgress('Abrindo PDF rápido...');
+    await waitForDocumentAssets(root, 2500);
+    setPdfProgress('');
+    handlePrint();
+  };
+
+  const waitForDocumentAssets = async (root: HTMLElement, timeoutMs = 6000) => {
+    const timeout = new Promise<void>((resolve) => window.setTimeout(resolve, timeoutMs));
     if ('fonts' in document) {
-      await document.fonts.ready.catch(() => undefined);
+      await Promise.race([document.fonts.ready.catch(() => undefined), timeout]);
     }
 
     const images = Array.from(root.querySelectorAll('img'));
-    await Promise.all(
-      images.map((img) => {
-        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
-        return new Promise<void>((resolve) => {
-          const done = () => resolve();
-          img.addEventListener('load', done, { once: true });
-          img.addEventListener('error', done, { once: true });
-        });
-      }),
-    );
+    await Promise.race([
+      Promise.all(
+        images.map((img) => {
+          if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+          return new Promise<void>((resolve) => {
+            const done = () => resolve();
+            img.addEventListener('load', done, { once: true });
+            img.addEventListener('error', done, { once: true });
+          });
+        }),
+      ).then(() => undefined),
+      timeout,
+    ]);
   };
 
   const handleDownloadPDF = async () => {
@@ -376,13 +393,18 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       const CONTENT_BOTTOM = FOOTER_LINE_Y - 7;
       const CONTENT_H = CONTENT_BOTTOM - MARGIN_TOP;
       const GAP = 2.2;
-      const PDF_SCALE = 1.35;
-      const JPEG_QUALITY = 0.84;
+      const rawSections = Array.from(root.querySelectorAll<HTMLElement>('[data-pdf-section]'));
+      const sections = rawSections.filter((section) => {
+        const box = section.getBoundingClientRect();
+        return box.width > 1 && box.height > 1 && window.getComputedStyle(section).display !== 'none';
+      });
+      if (sections.length === 0) throw new Error('Nenhuma seção marcada para PDF.');
+
+      const hasManyBlocks = sections.length > 80;
+      const PDF_SCALE = hasManyBlocks ? 1.05 : 1.2;
+      const JPEG_QUALITY = hasManyBlocks ? 0.76 : 0.8;
 
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-      const sections = Array.from(root.querySelectorAll<HTMLElement>('[data-pdf-section]'));
-      if (sections.length === 0) throw new Error('Nenhuma seção marcada para PDF.');
 
       let currentY = MARGIN_TOP;
 
