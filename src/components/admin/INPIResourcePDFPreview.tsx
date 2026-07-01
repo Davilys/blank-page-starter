@@ -659,16 +659,66 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
 
       <div 
         ref={printRef}
-        className="bg-white text-gray-900 shadow-2xl mx-auto overflow-hidden rounded-lg"
-        style={{ width: '210mm', minHeight: '297mm', fontFamily: "Georgia, serif", fontSize: '12pt', lineHeight: '1.8' }}
+        className="legal-body bg-white text-gray-900 shadow-2xl mx-auto overflow-hidden rounded-lg print-target"
+        style={{ width: '210mm', minHeight: '297mm', fontFamily: "Georgia, 'Times New Roman', serif", fontSize: '11.5pt', lineHeight: '1.7' }}
       >
+        <style>{`
+          .legal-body { color: #1a1a1a; }
+          .legal-body .legal-p {
+            text-align: justify;
+            text-justify: inter-word;
+            hyphens: auto;
+            -webkit-hyphens: auto;
+            -ms-hyphens: auto;
+            overflow-wrap: break-word;
+            word-break: normal;
+            text-indent: 1.25cm;
+            margin: 0 0 0.55em 0;
+            orphans: 3;
+            widows: 3;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          .legal-body .legal-p-short {
+            text-align: left;
+            text-indent: 0;
+          }
+          .legal-body .legal-list {
+            text-align: left;
+            hyphens: auto;
+            overflow-wrap: break-word;
+          }
+          .legal-body .legal-heading {
+            page-break-after: avoid;
+            break-after: avoid;
+          }
+          .legal-body .legal-table-wrap { page-break-inside: avoid; break-inside: avoid; }
+          .legal-body .legal-table { width: 100%; border-collapse: collapse; }
+          .legal-body .legal-table th,
+          .legal-body .legal-table td {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            vertical-align: top;
+          }
+          @media print {
+            @page { size: A4; margin: 18mm 15mm 20mm 15mm; }
+            body > *:not(.printing-inpi-doc-wrapper) { visibility: hidden; }
+            .print-target, .print-target * { visibility: visible; }
+            .print-target { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none !important; border-radius: 0 !important; }
+            .print\\:hidden { display: none !important; }
+          }
+          body.printing-inpi-doc > *:not(.print-target-holder) { display: none !important; }
+        `}</style>
+
         {/* Header */}
-        <div className="w-full" style={{ height: '8px', background: 'linear-gradient(90deg, #1e3a5f 0%, #2a5080 50%, #1e3a5f 100%)' }} />
-        <div className="w-full" style={{ height: '3px', background: 'linear-gradient(90deg, #c8af37, #d4c050, #c8af37)' }} />
+        <div data-pdf-section>
+          <div className="w-full" style={{ height: '8px', background: 'linear-gradient(90deg, #1e3a5f 0%, #2a5080 50%, #1e3a5f 100%)' }} />
+          <div className="w-full" style={{ height: '3px', background: 'linear-gradient(90deg, #c8af37, #d4c050, #c8af37)' }} />
+        </div>
 
         <div className="px-16 py-10">
           {/* Letterhead */}
-          <div className="flex items-start justify-between mb-6">
+          <div data-pdf-section className="flex items-start justify-between mb-6">
             <div className="flex items-center gap-5">
               <img 
                 src={logoWebmarcas} 
@@ -690,13 +740,13 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           </div>
 
           {/* Double separator */}
-          <div className="w-full mb-8">
+          <div data-pdf-section className="w-full mb-8">
             <div style={{ height: '2px', background: 'linear-gradient(90deg, #1e3a5f, #2a5080, #1e3a5f)' }} />
             <div style={{ height: '1px', marginTop: '2px', background: 'linear-gradient(90deg, transparent, #c8af37, transparent)' }} />
           </div>
 
           {/* Document title badge (centered) */}
-          <div className="mb-6 text-center">
+          <div data-pdf-section className="mb-6 text-center">
             <div className="inline-block px-8 py-2 rounded" style={{ background: '#1e3a5f' }}>
               <p className="text-white font-bold tracking-wide text-sm uppercase">
                 {isNotif
@@ -725,12 +775,12 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           </div>
 
           {/* Content */}
-          <div className="text-justify" style={{ color: '#1a1a1a' }}>
+          <div style={{ color: '#1a1a1a' }}>
             {renderContent()}
           </div>
 
           {/* Signature */}
-          <div className="mt-16 text-center">
+          <div data-pdf-section className="mt-16 text-center">
             {!isExtrajudicialDoc && (
               <>
                 <p className="mb-4" style={{ color: '#374151' }}>Termos em que,</p>
@@ -757,7 +807,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           </div>
 
           {/* Footer */}
-          <div className="mt-16 pt-3" style={{ borderTop: '2px solid #1e3a5f' }}>
+          <div data-pdf-section className="mt-16 pt-3" style={{ borderTop: '2px solid #1e3a5f' }}>
             <div className="mb-2" style={{ height: '1px', background: 'linear-gradient(90deg, transparent, #c8af37, transparent)' }} />
             <div className="flex justify-center gap-6 text-xs flex-wrap" style={{ color: '#888' }}>
               <span>📍 Av. Brigadeiro Luiz Antônio, 2696, Centro — São Paulo/SP</span>
@@ -770,7 +820,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           {/* ANEXOS DOCUMENTAIS */}
           {annexEvidences.length > 0 && (
             <div className="mt-16">
-              <div className="text-center mb-6">
+              <div data-pdf-section className="text-center mb-6">
                 <div className="inline-block px-8 py-2 rounded" style={{ background: '#1e3a5f' }}>
                   <p className="text-white font-bold tracking-wide text-sm uppercase">
                     Anexos Documentais
@@ -779,7 +829,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
               </div>
               <div className="space-y-10">
                 {annexEvidences.map((ev) => (
-                  <div key={ev.id} className="text-center break-inside-avoid page-break-before-always">
+                  <div key={ev.id} data-pdf-section className="text-center break-inside-avoid page-break-before-always">
                     <p className="text-sm font-semibold mb-2" style={{ color: '#1e3a5f' }}>
                       Doc. {String(ev.docNumber).padStart(2, '0')} — {ev.caption || ev.source_file_name}
                     </p>
