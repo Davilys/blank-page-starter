@@ -679,7 +679,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
             hyphens: auto;
             -webkit-hyphens: auto;
             -ms-hyphens: auto;
-            overflow-wrap: break-word;
+            overflow-wrap: anywhere;
             word-break: normal;
             text-indent: 1.25cm;
             margin: 0 0 0.55em 0;
@@ -693,9 +693,19 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
             text-indent: 0;
           }
           .legal-body .legal-list {
-            text-align: left;
+            text-align: left !important;
+            text-justify: auto !important;
+            letter-spacing: normal !important;
+            word-spacing: normal !important;
             hyphens: auto;
-            overflow-wrap: break-word;
+            -webkit-hyphens: auto;
+            overflow-wrap: anywhere;
+            word-break: normal;
+            padding-left: 1.5em;
+            text-indent: -1.1em;
+            margin: 0 0 0.4em 0;
+            page-break-inside: avoid;
+            break-inside: avoid;
           }
           .legal-body .legal-heading {
             page-break-after: avoid;
