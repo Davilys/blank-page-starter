@@ -523,9 +523,18 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         }
       }
 
-      const isList = /^[-–•]\s/.test(trimmed);
-      if (isList) {
-        return <p key={idx} data-pdf-section className="legal-list mb-3 pl-6" style={{ textIndent: '0' }}>{renderInlineMarkdown(trimmed)}</p>;
+      // Tolerant bullet detection: accepts -, –, —, •, *, ·, optional indent,
+      // and any whitespace (including non-breaking space) after the marker.
+      const BULLET_RE = /^\s{0,4}[-–—•*·][\s\u00a0\t]+/;
+      if (BULLET_RE.test(trimmed)) {
+        // Normalize the leading marker to "- " so renderInlineMarkdown never
+        // sees a weird non-breaking space that could disable wrapping.
+        const normalized = trimmed.replace(BULLET_RE, '- ');
+        return (
+          <p key={idx} data-pdf-section className="legal-list mb-3">
+            {renderInlineMarkdown(normalized)}
+          </p>
+        );
       }
       
       // Short lines (e.g. "EXCELENTÍSSIMO...") should not be stretched by justify
