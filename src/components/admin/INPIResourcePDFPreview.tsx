@@ -223,6 +223,7 @@ const imageToBase64 = (src: string): Promise<string> => {
 export function INPIResourcePDFPreview({ resource, content, resourceType }: INPIResourcePDFPreviewProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState('');
   const [evidences, setEvidences] = useState<ResourceEvidence[]>([]);
   const [liveContent, setLiveContent] = useState<string>(content);
   const [isEditing, setIsEditing] = useState(false);
@@ -266,7 +267,8 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       const list = ((data as any[]) || []) as ResourceEvidence[];
       let n = 1;
       const numbered = list.map((r) => ({ ...r, docNumber: n++ }));
-      // sign + dataurl
+      // Sign URLs only. Avoid converting every evidence to base64 upfront;
+      // html2canvas can capture the signed image URLs directly with useCORS.
       await Promise.all(
         numbered.map(async (r) => {
           const { data: s } = await supabase.storage
@@ -274,24 +276,6 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
             .createSignedUrl(r.storage_path, 3600);
           if (s?.signedUrl) {
             r.signedUrl = s.signedUrl;
-            try {
-              const resp = await fetch(s.signedUrl);
-              const blob = await resp.blob();
-              r.dataUrl = await new Promise<string>((resolve, reject) => {
-                const fr = new FileReader();
-                fr.onload = () => resolve(fr.result as string);
-                fr.onerror = reject;
-                fr.readAsDataURL(blob);
-              });
-              const dims = await new Promise<{ w: number; h: number }>((resolve) => {
-                const img = new Image();
-                img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
-                img.onerror = () => resolve({ w: 800, h: 1000 });
-                img.src = r.dataUrl!;
-              });
-              r.width = dims.w;
-              r.height = dims.h;
-            } catch { /* ignore */ }
           }
         }),
       );
@@ -352,84 +336,77 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
     setTimeout(() => document.body.classList.remove('printing-inpi-doc'), 1000);
   };
 
+  const waitForDocumentAssets = async (root: HTMLElement) => {
+    if ('fonts' in document) {
+      await document.fonts.ready.catch(() => undefined);
+    }
+
+    const images = Array.from(root.querySelectorAll('img'));
+    await Promise.all(
+      images.map((img) => {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          const done = () => resolve();
+          img.addEventListener('load', done, { once: true });
+          img.addEventListener('error', done, { once: true });
+        });
+      }),
+    );
+  };
+
   const handleDownloadPDF = async () => {
     setIsGeneratingPDF(true);
+    setPdfProgress('Preparando páginas...');
 
     try {
       const root = printRef.current;
       if (!root) throw new Error('Preview não disponível.');
 
-      // A4 dimensions (mm) and safe printable area (leaves room for header/footer strip)
+      await waitForDocumentAssets(root);
+
+      // A4 dimensions (mm). The preview already contains safe inner margins;
+      // exporting it as a full-page canvas keeps layout fidelity with far fewer captures.
       const A4_W = 210;
       const A4_H = 297;
-      const MARGIN_X = 15;
-      const MARGIN_TOP = 18;
-      const MARGIN_BOTTOM = 18;
-      const CONTENT_W = A4_W - MARGIN_X * 2;
-      const CONTENT_H = A4_H - MARGIN_TOP - MARGIN_BOTTOM;
-      const GAP = 2.5;
+      const FOOTER_Y = 286;
+      const PDF_SCALE = 1.4;
+      const JPEG_QUALITY = 0.86;
 
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-      const sections = Array.from(
-        root.querySelectorAll<HTMLElement>('[data-pdf-section]'),
-      );
-      if (sections.length === 0) throw new Error('Nenhuma seção marcada para PDF.');
+      setPdfProgress('Renderizando documento...');
+      const fullCanvas = await html2canvas(root, {
+        scale: PDF_SCALE,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        logging: false,
+        windowWidth: root.scrollWidth,
+        windowHeight: root.scrollHeight,
+      });
 
-      let currentY = MARGIN_TOP;
+      const pxPerMM = fullCanvas.width / A4_W;
+      const pageHeightPx = Math.floor(A4_H * pxPerMM);
+      const totalSlices = Math.max(1, Math.ceil(fullCanvas.height / pageHeightPx));
 
-      for (const section of sections) {
-        // Force layout & make sure webfonts/images are ready before snapshot
-        const canvas = await html2canvas(section, {
-          scale: 2,
-          useCORS: true,
-          allowTaint: false,
-          backgroundColor: '#ffffff',
-          logging: false,
-          windowWidth: root.scrollWidth,
-        });
+      setPdfProgress('Montando PDF...');
+      for (let pageIndex = 0; pageIndex < totalSlices; pageIndex++) {
+        if (pageIndex > 0) pdf.addPage();
 
-        const pxWidth = canvas.width;
-        const pxHeight = canvas.height;
-        // Fit to content width in mm
-        const heightMM = (pxHeight * CONTENT_W) / pxWidth;
+        const offsetPx = pageIndex * pageHeightPx;
+        const sliceHeightPx = Math.min(pageHeightPx, fullCanvas.height - offsetPx);
+        const sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = fullCanvas.width;
+        sliceCanvas.height = pageHeightPx;
+        const ctx = sliceCanvas.getContext('2d');
 
-        // If section is taller than a full page, slice it vertically across pages
-        if (heightMM > CONTENT_H) {
-          const pxPerMM = pxWidth / CONTENT_W;
-          const sliceHeightPx = Math.floor(CONTENT_H * pxPerMM);
-          let offsetPx = 0;
-          while (offsetPx < pxHeight) {
-            const remainingPx = Math.min(sliceHeightPx, pxHeight - offsetPx);
-            const sliceCanvas = document.createElement('canvas');
-            sliceCanvas.width = pxWidth;
-            sliceCanvas.height = remainingPx;
-            const ctx = sliceCanvas.getContext('2d');
-            if (ctx) {
-              ctx.fillStyle = '#ffffff';
-              ctx.fillRect(0, 0, pxWidth, remainingPx);
-              ctx.drawImage(canvas, 0, offsetPx, pxWidth, remainingPx, 0, 0, pxWidth, remainingPx);
-            }
-            const sliceHeightMM = (remainingPx * CONTENT_W) / pxWidth;
-            if (offsetPx > 0 || currentY + sliceHeightMM > MARGIN_TOP + CONTENT_H) {
-              pdf.addPage();
-              currentY = MARGIN_TOP;
-            }
-            pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.92), 'JPEG', MARGIN_X, currentY, CONTENT_W, sliceHeightMM);
-            currentY += sliceHeightMM + GAP;
-            offsetPx += remainingPx;
-          }
-          continue;
+        if (ctx) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+          ctx.drawImage(fullCanvas, 0, offsetPx, fullCanvas.width, sliceHeightPx, 0, 0, fullCanvas.width, sliceHeightPx);
         }
 
-        const remaining = MARGIN_TOP + CONTENT_H - currentY;
-        if (heightMM > remaining && currentY > MARGIN_TOP) {
-          pdf.addPage();
-          currentY = MARGIN_TOP;
-        }
-
-        pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', MARGIN_X, currentY, CONTENT_W, heightMM);
-        currentY += heightMM + GAP;
+        pdf.addImage(sliceCanvas.toDataURL('image/jpeg', JPEG_QUALITY), 'JPEG', 0, 0, A4_W, A4_H);
       }
 
       // Footer with pagination on every page
@@ -438,19 +415,20 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         pdf.setPage(i);
         pdf.setDrawColor(30, 58, 95);
         pdf.setLineWidth(0.4);
-        pdf.line(MARGIN_X, A4_H - MARGIN_BOTTOM + 4, A4_W - MARGIN_X, A4_H - MARGIN_BOTTOM + 4);
+        pdf.line(15, FOOTER_Y, A4_W - 15, FOOTER_Y);
         pdf.setFontSize(7.5);
         pdf.setTextColor(110, 110, 110);
         pdf.text(
           'Av. Brigadeiro Luiz Antônio, 2696, Centro — São Paulo/SP  |  (11) 9 1112-0225  |  juridico@webmarcas.net',
           A4_W / 2,
-          A4_H - MARGIN_BOTTOM + 9,
+          FOOTER_Y + 5,
           { align: 'center' },
         );
         pdf.setTextColor(130, 130, 130);
-        pdf.text(`${i} / ${totalPages}`, A4_W - MARGIN_X, A4_H - MARGIN_BOTTOM + 9, { align: 'right' });
+        pdf.text(`${i} / ${totalPages}`, A4_W - 15, FOOTER_Y + 5, { align: 'right' });
       }
 
+      setPdfProgress('Baixando arquivo...');
       pdf.save(pdfFileName);
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -461,6 +439,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       });
     } finally {
       setIsGeneratingPDF(false);
+      setPdfProgress('');
     }
   };
 
@@ -630,7 +609,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           {isGeneratingPDF ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Gerando PDF...
+              {pdfProgress || 'Gerando PDF...'}
             </>
           ) : (
             <>
