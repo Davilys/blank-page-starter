@@ -374,41 +374,30 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
 
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-      setPdfProgress('Renderizando documento...');
-      const fullCanvas = await html2canvas(root, {
-        scale: PDF_SCALE,
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: '#ffffff',
-        logging: false,
-        windowWidth: root.scrollWidth,
-        windowHeight: root.scrollHeight,
-      });
+      const pageHeightCssPx = root.scrollWidth * (A4_H / A4_W);
+      const totalSlices = Math.max(1, Math.ceil(root.scrollHeight / pageHeightCssPx));
 
-      const pxPerMM = fullCanvas.width / A4_W;
-      const pageHeightPx = Math.floor(A4_H * pxPerMM);
-      const totalSlices = Math.max(1, Math.ceil(fullCanvas.height / pageHeightPx));
-
-      setPdfProgress('Montando PDF...');
       for (let pageIndex = 0; pageIndex < totalSlices; pageIndex++) {
+        setPdfProgress(`Renderizando página ${pageIndex + 1}/${totalSlices}...`);
         if (pageIndex > 0) pdf.addPage();
 
-        const offsetPx = pageIndex * pageHeightPx;
-        const sliceHeightPx = Math.min(pageHeightPx, fullCanvas.height - offsetPx);
-        const sliceCanvas = document.createElement('canvas');
-        sliceCanvas.width = fullCanvas.width;
-        sliceCanvas.height = pageHeightPx;
-        const ctx = sliceCanvas.getContext('2d');
+        const pageCanvas = await html2canvas(root, {
+          scale: PDF_SCALE,
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: '#ffffff',
+          logging: false,
+          windowWidth: root.scrollWidth,
+          windowHeight: pageHeightCssPx,
+          width: root.scrollWidth,
+          height: pageHeightCssPx,
+          y: pageIndex * pageHeightCssPx,
+        });
 
-        if (ctx) {
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
-          ctx.drawImage(fullCanvas, 0, offsetPx, fullCanvas.width, sliceHeightPx, 0, 0, fullCanvas.width, sliceHeightPx);
-        }
-
-        pdf.addImage(sliceCanvas.toDataURL('image/jpeg', JPEG_QUALITY), 'JPEG', 0, 0, A4_W, A4_H);
+        pdf.addImage(pageCanvas.toDataURL('image/jpeg', JPEG_QUALITY), 'JPEG', 0, 0, A4_W, A4_H);
       }
 
+      setPdfProgress('Montando PDF...');
       // Footer with pagination on every page
       const totalPages = pdf.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
