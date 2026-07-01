@@ -8,6 +8,7 @@ import { ptBR } from 'date-fns/locale';
 import logoWebmarcas from '@/assets/webmarcas-logo-new.png';
 import signatureImage from '@/assets/davilys-signature.png';
 import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ResourceEvidence {
