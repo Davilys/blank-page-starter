@@ -763,7 +763,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           {/* Document title badge (centered) */}
           <div data-pdf-section className="mb-6 text-center">
             <div className="inline-block px-8 py-2 rounded" style={{ background: '#1e3a5f' }}>
-              <p className="font-bold tracking-wide text-sm uppercase" style={{ color: '#ffffff' }}>
+              <p data-pdf-badge className="font-bold tracking-wide text-sm uppercase" style={{ color: '#ffffff' }}>
                 {isNotif
                   ? 'NOTIFICAÇÃO EXTRAJUDICIAL'
                     : isRespostaNotif
