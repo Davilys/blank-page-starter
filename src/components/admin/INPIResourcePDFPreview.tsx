@@ -355,30 +355,67 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   const handleDownloadPDF = async () => {
     setIsGeneratingPDF(true);
 
+    const originalSrcs: Array<{ el: HTMLImageElement; src: string }> = [];
     try {
       const root = printRef.current;
       if (!root) throw new Error('Preview não disponível.');
 
-      // A4 dimensions (mm) and safe printable area (leaves room for header/footer strip)
+      // A4 full page — pixel-perfect capture of the preview (210mm wide).
       const A4_W = 210;
       const A4_H = 297;
-      const MARGIN_X = 15;
-      const MARGIN_TOP = 18;
-      const MARGIN_BOTTOM = 18;
-      const CONTENT_W = A4_W - MARGIN_X * 2;
-      const CONTENT_H = A4_H - MARGIN_TOP - MARGIN_BOTTOM;
-      const GAP = 2.5;
+      const CONTENT_W = A4_W;
+      const CONTENT_H = A4_H;
+
+      // 1) Embed logo + signature as base64 to avoid html2canvas losing them.
+      try {
+        const [logoData, sigData] = await Promise.all([
+          imageToBase64(logoWebmarcas).catch(() => null),
+          imageToBase64(signatureImage).catch(() => null),
+        ]);
+        const imgs = Array.from(root.querySelectorAll('img')) as HTMLImageElement[];
+        for (const el of imgs) {
+          const src = el.getAttribute('src') || '';
+          if (logoData && src === logoWebmarcas) {
+            originalSrcs.push({ el, src });
+            el.src = logoData;
+          } else if (sigData && src === signatureImage) {
+            originalSrcs.push({ el, src });
+            el.src = sigData;
+          }
+        }
+      } catch { /* keep originals */ }
+
+      // 2) Wait until every image in the preview is fully decoded.
+      const imgs = Array.from(root.querySelectorAll('img')) as HTMLImageElement[];
+      await Promise.all(
+        imgs.map(async (img) => {
+          if (img.complete && img.naturalWidth > 0) {
+            try { await (img as any).decode?.(); } catch { /* ignore */ }
+            return;
+          }
+          await new Promise<void>((resolve) => {
+            img.onload = () => resolve();
+            img.onerror = () => resolve();
+          });
+          try { await (img as any).decode?.(); } catch { /* ignore */ }
+        }),
+      );
 
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-      // Single-shot render of the whole preview, then slice into A4 pages.
+      // 3) Single-shot render at the preview's native width (=210mm ~ 794px).
+      const captureWidth = root.offsetWidth;
+      const captureHeight = root.scrollHeight;
       const canvas = await html2canvas(root, {
         scale: 2,
         useCORS: true,
         allowTaint: false,
         backgroundColor: '#ffffff',
         logging: false,
-        windowWidth: root.scrollWidth,
+        width: captureWidth,
+        height: captureHeight,
+        windowWidth: captureWidth,
+        windowHeight: captureHeight,
       });
 
       const pxWidth = canvas.width;
@@ -401,30 +438,11 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         }
         const sliceHeightMM = (remainingPx * CONTENT_W) / pxWidth;
         if (pageIndex > 0) pdf.addPage();
-        pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.92), 'JPEG', MARGIN_X, MARGIN_TOP, CONTENT_W, sliceHeightMM);
+        pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, CONTENT_W, sliceHeightMM);
         offsetPx += remainingPx;
         pageIndex += 1;
       }
-      void GAP;
-
-      // Footer with pagination on every page
-      const totalPages = pdf.getNumberOfPages();
-      for (let i = 1; i <= totalPages; i++) {
-        pdf.setPage(i);
-        pdf.setDrawColor(30, 58, 95);
-        pdf.setLineWidth(0.4);
-        pdf.line(MARGIN_X, A4_H - MARGIN_BOTTOM + 4, A4_W - MARGIN_X, A4_H - MARGIN_BOTTOM + 4);
-        pdf.setFontSize(7.5);
-        pdf.setTextColor(110, 110, 110);
-        pdf.text(
-          'Av. Brigadeiro Luiz Antônio, 2696, Centro — São Paulo/SP  |  (11) 9 1112-0225  |  juridico@webmarcas.net',
-          A4_W / 2,
-          A4_H - MARGIN_BOTTOM + 9,
-          { align: 'center' },
-        );
-        pdf.setTextColor(130, 130, 130);
-        pdf.text(`${i} / ${totalPages}`, A4_W - MARGIN_X, A4_H - MARGIN_BOTTOM + 9, { align: 'right' });
-      }
+      void A4_H;
 
       pdf.save(pdfFileName);
     } catch (error) {
@@ -435,6 +453,10 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         variant: 'destructive',
       });
     } finally {
+      // Restore original <img> src values
+      for (const { el, src } of originalSrcs) {
+        try { el.src = src; } catch { /* ignore */ }
+      }
       setIsGeneratingPDF(false);
     }
   };
