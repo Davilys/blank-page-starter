@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, Outlet } from "react-router-dom";
 import { useEffect, lazy, Suspense } from "react";
 import { connectivityRetry, connectivityRetryDelay } from "@/lib/networkResilience";
+const PDFTestHarness = lazy(() => import("./pages/dev/PDFTestHarness"));
 
 const SectionRedirect = ({ section }: { section: string }) => {
   const navigate = useNavigate();
