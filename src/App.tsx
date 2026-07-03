@@ -118,6 +118,9 @@ const App = () => (
             <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<Index />} />
+              {import.meta.env.DEV && (
+                <Route path="/__pdf-test" element={<PDFTestHarness />} />
+              )}
               <Route path="/registro" element={<Registro />} />
               <Route path="/registrar" element={<Registrar />} />
               <Route path="/status-pedido" element={<StatusPedido />} />
