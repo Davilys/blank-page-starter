@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, Outlet } from "react-router-dom";
 import { useEffect, lazy, Suspense } from "react";
 import { connectivityRetry, connectivityRetryDelay } from "@/lib/networkResilience";
+const PDFTestHarness = lazy(() => import("./pages/dev/PDFTestHarness"));
 
 const SectionRedirect = ({ section }: { section: string }) => {
   const navigate = useNavigate();
@@ -118,6 +119,9 @@ const App = () => (
             <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<Index />} />
+              {import.meta.env.DEV && (
+                <Route path="/__pdf-test" element={<PDFTestHarness />} />
+              )}
               <Route path="/registro" element={<Registro />} />
               <Route path="/registrar" element={<Registrar />} />
               <Route path="/status-pedido" element={<StatusPedido />} />

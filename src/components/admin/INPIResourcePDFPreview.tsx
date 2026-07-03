@@ -434,17 +434,30 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
               el.src = sigDataUrl;
             }
           }
-          // Normalize the badge text in the clone so html2canvas renders it reliably
-          const badge = clonedDoc.querySelector('[data-pdf-badge]') as HTMLElement | null;
-          if (badge) {
-            const text = badge.textContent || '';
-            badge.textContent = text;
-            badge.style.color = '#ffffff';
-            badge.style.letterSpacing = 'normal';
-            badge.style.textTransform = 'uppercase';
-            badge.style.fontWeight = '700';
-            const parent = badge.parentElement;
-            if (parent) parent.style.background = '#1e3a5f';
+          // html2canvas fails to render a block-level <p> inside an inline-block
+          // container (badge boxes come out empty). Rebuild each badge as an
+          // inline-block <span> carrying the box styles + text directly.
+          const cloneWin = clonedDoc.defaultView || window;
+          const badgePs = Array.from(clonedDoc.querySelectorAll('.print-target p')) as HTMLElement[];
+          for (const p of badgePs) {
+            const parent = p.parentElement;
+            if (!parent) continue;
+            const parentStyle = cloneWin.getComputedStyle(parent);
+            if (parentStyle.display !== 'inline-block') continue;
+            const pStyle = cloneWin.getComputedStyle(p);
+            const span = clonedDoc.createElement('span');
+            span.textContent = (p.textContent || '').trim().toUpperCase();
+            span.style.display = 'inline-block';
+            span.style.background = parentStyle.backgroundColor || '#1e3a5f';
+            span.style.borderRadius = parentStyle.borderRadius;
+            span.style.padding = `${parentStyle.paddingTop} ${parentStyle.paddingRight} ${parentStyle.paddingBottom} ${parentStyle.paddingLeft}`;
+            span.style.color = pStyle.color || '#ffffff';
+            span.style.fontFamily = pStyle.fontFamily;
+            span.style.fontSize = pStyle.fontSize;
+            span.style.fontWeight = pStyle.fontWeight || '700';
+            span.style.letterSpacing = pStyle.letterSpacing;
+            span.style.lineHeight = pStyle.lineHeight;
+            parent.replaceWith(span);
           }
         },
       });
