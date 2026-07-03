@@ -767,10 +767,10 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           .legal-body { color: #1a1a1a; }
           .legal-body .legal-p {
             text-align: left;
-            hyphens: auto;
-            -webkit-hyphens: auto;
-            -ms-hyphens: auto;
-            overflow-wrap: anywhere;
+            hyphens: none;
+            -webkit-hyphens: none;
+            -ms-hyphens: none;
+            overflow-wrap: break-word;
             word-break: normal;
             text-indent: 0;
             margin: 0 0 0.55em 0;
@@ -788,9 +788,9 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
             text-justify: auto !important;
             letter-spacing: normal !important;
             word-spacing: normal !important;
-            hyphens: auto;
-            -webkit-hyphens: auto;
-            overflow-wrap: anywhere;
+            hyphens: none;
+            -webkit-hyphens: none;
+            overflow-wrap: break-word;
             word-break: normal;
             padding-left: 1.5em;
             text-indent: -1.1em;
