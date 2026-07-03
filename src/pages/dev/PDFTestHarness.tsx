@@ -1,4 +1,7 @@
 import { INPIResourcePDFPreview } from '@/components/admin/INPIResourcePDFPreview';
+import html2canvas from 'html2canvas';
+
+(window as any).__h2c = html2canvas;
 
 const mockResource: any = {
   id: '00000000-0000-0000-0000-000000000000',
