@@ -1,30 +1,41 @@
-## Causa do travamento
+## Escopo
 
-No commit anterior a geração do PDF foi convertida para modo "seção por seção": o código percorre cada elemento com `data-pdf-section` e chama `html2canvas` uma vez para cada. Como praticamente todo parágrafo, item de lista, cabeçalho, tabela e bloco de anexo do preview recebe o atributo `data-pdf-section` (linhas 477, 487, 498, 534, 566, 598, 733, 740, 762, 768, 802, 829, 842, 851), um recurso típico gera **80–200+ chamadas** de `html2canvas` sequenciais. Cada chamada força reflow + rasterização em `scale: 2`. Resultado: parece travar em "Gerando PDF…" ou demora minutos.
+Duas correções cirúrgicas em `src/components/admin/INPIResourcePDFPreview.tsx`. Sem tocar em pipeline de download (que voltou a funcionar), prompts, banco ou outros componentes.
 
-O CSS de bullets/`overflow-wrap` da correção anterior está correto e não é a causa — o problema é exclusivamente o loop de rasterização.
+## Problema 1 — Cabeçalho quebrado no PDF baixado
 
-## Correção
+Comparando as imagens:
+- **Preview (image-165):** título "WEBMARCAS INTELLIGENCE PI" em uma linha; badge "RECURSO ADMINISTRATIVO" com texto branco visível.
+- **PDF baixado (image-166):** título quebrado em duas linhas ("WEBMARCAS INTELLIGENCE / PI"); badge azul aparece sem o texto ("RECURSO ADMINISTRATIVO" some).
 
-Escopo: apenas `src/components/admin/INPIResourcePDFPreview.tsx`, função `handleDownloadPDF`. Sem tocar em CSS, prompts, banco ou outros componentes.
+Causas:
+1. O título usa `text-2xl font-bold tracking-wider` + `letterSpacing: '0.15em'` (linha 724). O `html2canvas` mede glifos ligeiramente diferente do browser e, no `scale: 2`, o texto excede a largura disponível e quebra.
+2. O texto do badge usa a classe Tailwind `text-white` (linha 745). `html2canvas` frequentemente falha a resolver a variável CSS `--tw-text-opacity` usada pelo Tailwind, resultando em cor herdada (dark/transparente) — texto some sobre fundo azul-marinho.
 
-Voltar ao pipeline single-shot que funcionava antes, mantendo margens e rodapé paginado:
+Correção:
+- No `<h1>` do letterhead (linha 724): adicionar `whiteSpace: 'nowrap'` no style inline e reduzir `letterSpacing` de `0.15em` para `0.08em` (mantém o visual de rastreamento, mas dá folga para o `html2canvas`). Manter o `text-2xl` e a fonte inalterados.
+- No `<p>` do badge (linha 745): trocar a dependência da classe `text-white` por style inline `color: '#ffffff'` (mantendo classes de peso/tamanho). Aplicar a mesma correção nos outros dois badges — "ANEXOS DOCUMENTAIS" (linha 819) — para consistência.
 
-1. Chamar `html2canvas` **uma única vez** sobre `printRef.current` (com `scale: 2`, `useCORS`, `backgroundColor: '#fff'`, `windowWidth: printRef.scrollWidth`).
-2. Calcular altura total em mm proporcional à largura útil (`A4 - 2*margem`).
-3. Fatiar o canvas único em páginas A4 por `drawImage` para um canvas temporário do tamanho da página, adicionando `pdf.addPage()` conforme necessário — mesmo algoritmo de slicing atual, mas rodando sobre 1 canvas em vez de N.
-4. Manter o rodapé com "Av. Brigadeiro…" e paginação `i / total` no laço final já existente.
-5. Remover o loop `for (const section of sections)` e o uso de `[data-pdf-section]` no download. O atributo pode ficar no JSX (inofensivo) — não vou removê-lo para não expandir o diff.
+Isso garante que o cabeçalho impresso/baixado fique visualmente idêntico ao preview.
 
-Isso restaura o tempo de geração para poucos segundos e produz visualmente o mesmo PDF (o slicing global respeita as margens; quebras de página no meio de parágrafo eram aceitáveis na versão anterior que a usuária pediu para restaurar).
+## Problema 2 — Texto do corpo deve ficar alinhado à esquerda
 
-## Validação
+Atualmente `.legal-p` tem `text-align: justify` + `text-indent: 1.25cm` (linhas 651–664). O usuário pediu **Left Align** (esquerda, sem justificação, começando do lado esquerdo).
 
-- Abrir um recurso de Indeferimento com muitos parágrafos (ex.: "Mega Robô de Led") e clicar em **Baixar PDF**: deve concluir em <10 s e salvar o arquivo.
-- Conferir que o preview continua com os bullets alinhados (correção anterior preservada).
-- Testar também Oposição e Exigência de Mérito (mesmo componente).
+Correção em `<style>` (bloco a partir da linha 649):
+- `.legal-body .legal-p`: mudar `text-align: justify` → `text-align: left`; remover `text-justify: inter-word`; remover `text-indent: 1.25cm` (definir `text-indent: 0`). Manter `hyphens: auto`, `overflow-wrap: anywhere`, `page-break-inside: avoid`, margens.
+- `.legal-body .legal-p-short`: já está `text-align: left; text-indent: 0` — mantido.
+- `.legal-list`: já está `text-align: left !important` — mantido.
+- Cabeçalhos (`.legal-heading`), metadados, tabelas e assinatura ficam inalterados.
 
 ## Fora do escopo
 
-- Não altero `handlePrint`, prompts, `adjust-inpi-resource`, banco, ou os markers `[IMG:]`.
-- Não removo o atributo `data-pdf-section` do JSX para manter o diff mínimo.
+- Pipeline `handleDownloadPDF` (single-shot `html2canvas` + slicing) permanece exatamente como está.
+- Rodapé paginado, prompts, `adjust-inpi-resource`, `handlePrint` e o Supabase — não tocar.
+- Correções de bullets (`.legal-list`) e wrap de números de processo — preservadas.
+
+## Validação
+
+- Abrir "Mega Robô de Led" em Indeferimento, clicar em **Download PDF**: cabeçalho deve mostrar "WEBMARCAS INTELLIGENCE PI" em UMA linha e o badge "RECURSO ADMINISTRATIVO" com o texto branco visível.
+- Corpo do recurso deve começar do lado esquerdo (sem justificação, sem recuo de primeira linha).
+- Testar também em Oposição e Exigência de Mérito (mesmo componente).

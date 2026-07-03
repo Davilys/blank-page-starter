@@ -649,14 +649,13 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         <style>{`
           .legal-body { color: #1a1a1a; }
           .legal-body .legal-p {
-            text-align: justify;
-            text-justify: inter-word;
+            text-align: left;
             hyphens: auto;
             -webkit-hyphens: auto;
             -ms-hyphens: auto;
             overflow-wrap: anywhere;
             word-break: normal;
-            text-indent: 1.25cm;
+            text-indent: 0;
             margin: 0 0 0.55em 0;
             orphans: 3;
             widows: 3;
@@ -721,7 +720,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
                 style={{ width: '75px', height: '75px' }} 
               />
               <div>
-                <h1 className="text-2xl font-bold tracking-wider" style={{ color: '#1e3a5f', letterSpacing: '0.15em' }}>WEBMARCAS INTELLIGENCE PI</h1>
+                <h1 className="text-2xl font-bold" style={{ color: '#1e3a5f', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>WEBMARCAS INTELLIGENCE PI</h1>
                 <p className="text-sm mt-1" style={{ color: '#666' }}>Propriedade Intelectual e Registro de Marcas</p>
               </div>
             </div>
@@ -742,7 +741,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           {/* Document title badge (centered) */}
           <div data-pdf-section className="mb-6 text-center">
             <div className="inline-block px-8 py-2 rounded" style={{ background: '#1e3a5f' }}>
-              <p className="text-white font-bold tracking-wide text-sm uppercase">
+              <p className="font-bold tracking-wide text-sm uppercase" style={{ color: '#ffffff' }}>
                 {isNotif
                   ? 'NOTIFICAÇÃO EXTRAJUDICIAL'
                     : isRespostaNotif
@@ -816,7 +815,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
             <div className="mt-16">
               <div data-pdf-section className="text-center mb-6">
                 <div className="inline-block px-8 py-2 rounded" style={{ background: '#1e3a5f' }}>
-                  <p className="text-white font-bold tracking-wide text-sm uppercase">
+                  <p className="font-bold tracking-wide text-sm uppercase" style={{ color: '#ffffff' }}>
                     Anexos Documentais
                   </p>
                 </div>
