@@ -465,28 +465,79 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       const pxWidth = canvas.width;
       const pxHeight = canvas.height;
       const pxPerMM = pxWidth / CONTENT_W;
-      const pageHeightPx = Math.floor(CONTENT_H * pxPerMM);
 
+      // Reserve room at the bottom of every page for the footer bar.
+      const FOOTER_H_MM = 17;
+      const usablePagePx = Math.floor((A4_H - FOOTER_H_MM) * pxPerMM);
+
+      // Collect safe break boundaries (tops of block elements) so pages never
+      // cut through a line of text. Coordinates are mapped into canvas pixels.
+      const rootRect = root.getBoundingClientRect();
+      const domToCanvas = pxHeight / root.scrollHeight;
+      const boundarySet = new Set<number>();
+      const blockEls = Array.from(
+        root.querySelectorAll('[data-pdf-section], .legal-p, .legal-p-short, .legal-list, .legal-heading, .legal-table-wrap, h1, h2, h3, img'),
+      ) as HTMLElement[];
+      for (const el of blockEls) {
+        const top = el.getBoundingClientRect().top - rootRect.top;
+        if (top > 0) boundarySet.add(Math.floor(top * domToCanvas));
+      }
+      const boundaries = Array.from(boundarySet).sort((a, b) => a - b);
+
+      // First pass: compute cut points snapped to element boundaries.
+      const cuts: Array<{ start: number; height: number }> = [];
       let offsetPx = 0;
-      let pageIndex = 0;
       while (offsetPx < pxHeight) {
-        const remainingPx = Math.min(pageHeightPx, pxHeight - offsetPx);
+        const target = offsetPx + usablePagePx;
+        let end = Math.min(target, pxHeight);
+        if (target < pxHeight) {
+          // Snap to the last element boundary within the page (but keep at
+          // least 40% of the page filled to avoid degenerate tiny pages).
+          const minEnd = offsetPx + Math.floor(usablePagePx * 0.4);
+          for (let i = boundaries.length - 1; i >= 0; i--) {
+            const b = boundaries[i];
+            if (b <= target && b > minEnd) { end = b - 2; break; }
+            if (b <= minEnd) break;
+          }
+        }
+        cuts.push({ start: offsetPx, height: end - offsetPx });
+        offsetPx = end;
+      }
+
+      const totalPages = cuts.length;
+      const drawFooter = (pageNum: number) => {
+        const lineY = A4_H - FOOTER_H_MM + 3;
+        pdf.setDrawColor(30, 58, 95);
+        pdf.setLineWidth(0.7);
+        pdf.line(15, lineY, A4_W - 15, lineY);
+        pdf.setDrawColor(200, 175, 55);
+        pdf.setLineWidth(0.25);
+        pdf.line(15, lineY + 1, A4_W - 15, lineY + 1);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(110, 110, 110);
+        pdf.text('Av. Brigadeiro Luiz Antônio, 2696, Centro — São Paulo/SP — CEP 01402-000', A4_W / 2, lineY + 5.2, { align: 'center' });
+        pdf.text('Tel: (11) 9 1112-0225  |  juridico@webmarcas.net  |  www.webmarcas.net', A4_W / 2, lineY + 8.8, { align: 'center' });
+        pdf.setTextColor(90, 90, 90);
+        pdf.text(`${pageNum}/${totalPages}`, A4_W - 15, lineY + 5.2, { align: 'right' });
+      };
+
+      // Second pass: render each page slice + footer.
+      cuts.forEach((cut, pageIndex) => {
         const sliceCanvas = document.createElement('canvas');
         sliceCanvas.width = pxWidth;
-        sliceCanvas.height = remainingPx;
+        sliceCanvas.height = cut.height;
         const ctx = sliceCanvas.getContext('2d');
         if (ctx) {
           ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, pxWidth, remainingPx);
-          ctx.drawImage(canvas, 0, offsetPx, pxWidth, remainingPx, 0, 0, pxWidth, remainingPx);
+          ctx.fillRect(0, 0, pxWidth, cut.height);
+          ctx.drawImage(canvas, 0, cut.start, pxWidth, cut.height, 0, 0, pxWidth, cut.height);
         }
-        const sliceHeightMM = (remainingPx * CONTENT_W) / pxWidth;
+        const sliceHeightMM = (cut.height * CONTENT_W) / pxWidth;
         if (pageIndex > 0) pdf.addPage();
         pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, CONTENT_W, sliceHeightMM);
-        offsetPx += remainingPx;
-        pageIndex += 1;
-      }
-      void A4_H;
+        drawFooter(pageIndex + 1);
+      });
 
       pdf.save(pdfFileName);
     } catch (error) {
