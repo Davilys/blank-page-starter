@@ -365,13 +365,18 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       const A4_H = 297;
       const CONTENT_W = A4_W;
       const CONTENT_H = A4_H;
+      const NATIVE_WIDTH_PX = 794; // 210mm at 96dpi — matches the preview's native A4 width
 
       // 1) Embed logo + signature as base64 to avoid html2canvas losing them.
+      let logoDataUrl: string | null = null;
+      let sigDataUrl: string | null = null;
       try {
         const [logoData, sigData] = await Promise.all([
           imageToBase64(logoWebmarcas).catch(() => null),
           imageToBase64(signatureImage).catch(() => null),
         ]);
+        logoDataUrl = logoData;
+        sigDataUrl = sigData;
         const imgs = Array.from(root.querySelectorAll('img')) as HTMLImageElement[];
         for (const el of imgs) {
           const src = el.getAttribute('src') || '';
@@ -404,7 +409,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
       // 3) Single-shot render at the preview's native width (=210mm ~ 794px).
-      const captureWidth = root.offsetWidth;
+      const captureWidth = NATIVE_WIDTH_PX;
       const captureHeight = root.scrollHeight;
       const canvas = await html2canvas(root, {
         scale: 2,
@@ -416,6 +421,32 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         height: captureHeight,
         windowWidth: captureWidth,
         windowHeight: captureHeight,
+        scrollX: 0,
+        scrollY: -window.scrollY,
+        onclone: (clonedDoc) => {
+          // Re-apply base64 images inside the clone (the clone may still hold original srcs)
+          const cloneImgs = Array.from(clonedDoc.querySelectorAll('img')) as HTMLImageElement[];
+          for (const el of cloneImgs) {
+            const src = el.getAttribute('src') || '';
+            if (logoDataUrl && (src === logoWebmarcas || src.includes('webmarcas-logo'))) {
+              el.src = logoDataUrl;
+            } else if (sigDataUrl && src === signatureImage) {
+              el.src = sigDataUrl;
+            }
+          }
+          // Normalize the badge text in the clone so html2canvas renders it reliably
+          const badge = clonedDoc.querySelector('[data-pdf-badge]') as HTMLElement | null;
+          if (badge) {
+            const text = badge.textContent || '';
+            badge.textContent = text;
+            badge.style.color = '#ffffff';
+            badge.style.letterSpacing = 'normal';
+            badge.style.textTransform = 'uppercase';
+            badge.style.fontWeight = '700';
+            const parent = badge.parentElement;
+            if (parent) parent.style.background = '#1e3a5f';
+          }
+        },
       });
 
       const pxWidth = canvas.width;
@@ -763,7 +794,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           {/* Document title badge (centered) */}
           <div data-pdf-section className="mb-6 text-center">
             <div className="inline-block px-8 py-2 rounded" style={{ background: '#1e3a5f' }}>
-              <p className="font-bold tracking-wide text-sm uppercase" style={{ color: '#ffffff' }}>
+              <p data-pdf-badge className="font-bold tracking-wide text-sm uppercase" style={{ color: '#ffffff' }}>
                 {isNotif
                   ? 'NOTIFICAÇÃO EXTRAJUDICIAL'
                     : isRespostaNotif

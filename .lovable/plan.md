@@ -1,36 +1,18 @@
-## Plano de validação do PDF de Recurso INPI
+# Corrigir exportação do PDF (logo + texto do badge) sem tocar no preview
 
-O código atual do `handleDownloadPDF` em `src/components/admin/INPIResourcePDFPreview.tsx` (linhas 355–462) já contém as correções combinadas:
+## Diagnóstico
+- O texto "RECURSO ADMINISTRATIVO" já é um nó de texto real no DOM — o problema está na captura do html2canvas (clone interno pode perder fonte/letter-spacing e posição do scroll).
+- A logo é convertida para base64, mas a troca acontece no DOM real; o clone que o html2canvas usa pode ser capturado antes da imagem decodificar dentro do clone.
+- A largura de captura usa `root.offsetWidth`, que pode divergir de 794px (210mm) se o container estiver escalado/limitado no diálogo, mudando a quebra de linhas em relação ao preview.
 
-- Logo/assinatura embutidos em base64 antes do `html2canvas` (linhas 370–386).
-- Espera de `decode()`/`onload` de todas as `<img>` do preview (linhas 388–402).
-- Captura em largura nativa do preview (210 mm ≈ 794 px), sem `MARGIN_X`/`MARGIN_TOP` (linhas 406–419).
-- Fatiamento A4 sem redução, `addImage` em `(0, 0, 210, sliceHeightMM)` (linhas 428–444).
-- Rodapé programático removido; rodapé do preview é preservado.
-- Restauração dos `src` originais em `finally` (linhas 455–461).
+## Alterações (apenas em `handleDownloadPDF` de `src/components/admin/INPIResourcePDFPreview.tsx`)
+1. **Callback `onclone` do html2canvas**:
+   - Reaplicar as imagens em base64 diretamente nos `<img>` do clone (logo e assinatura), garantindo que o clone já contenha data URLs.
+   - Normalizar o badge no clone: garantir `color:#ffffff`, `background:#1e3a5f`, remover `letter-spacing` problemático e forçar o texto como nó direto (estilos inline explícitos) para eliminar qualquer falha de renderização do texto branco.
+2. **Corrigir deslocamento de scroll**: adicionar `scrollX: 0` e `scrollY: -window.scrollY` na configuração do html2canvas (bug clássico que desloca/oculta conteúdo quando a página está rolada).
+3. **Largura fixa de captura**: capturar sempre a 794px (largura nativa A4 do preview) em vez de `root.offsetWidth`, garantindo quebras de linha idênticas ao preview.
+4. Manter todo o restante intacto: fatiamento A4, qualidade JPEG, restauração dos `src` no `finally`, e nenhum estilo/cor/fonte do preview será alterado.
 
-Como estou em plan mode, não posso executar Playwright/build. Proponho validar assim que aprovado:
-
-### Passos de validação (execução após aprovação)
-
-1. **Build check** — rodar typecheck para garantir que nenhuma edição anterior deixou erro.
-2. **Playwright headless** contra `http://localhost:8080`:
-   - Restaurar sessão Supabase via env vars.
-   - Navegar até `/admin/recursos-inpi`, abrir um recurso já aprovado (ex.: "Mega Robô de Led").
-   - Screenshot do preview (`preview.png`).
-   - Interceptar `jsPDF.save` via `page.evaluate` para capturar o blob do PDF gerado, salvar em `/tmp/browser/recurso/out.pdf`.
-   - Converter página 1 do PDF com `pdftoppm -jpeg -r 150` e comparar visualmente com `preview.png`.
-3. **Checklist visual** (bug-hunt, não confirmação):
-   - Logo WebMarcas visível no PDF.
-   - Cabeçalho "RECURSO ADMINISTRATIVO" ocupando a mesma largura relativa do preview.
-   - Badges com texto branco sobre azul.
-   - Corpo do texto alinhado à esquerda, sem indent, sem justificação.
-   - Assinatura renderizada.
-   - Rodapé do preview presente (sem overlay duplicado).
-   - Proporções 1:1 entre preview e PDF (sem 30% de redução).
-4. **Testar tipos adicionais**: Oposição, Exigência de Mérito, Notificação Extrajudicial — mesmo componente, mesmo pipeline.
-5. Se algum item falhar, listar defeitos e propor correção pontual (ainda dentro de `handleDownloadPDF`, sem tocar no preview/CSS).
-
-### Fora do escopo
-
-Nenhuma alteração de código nesta etapa — apenas verificação. Qualquer correção necessária será proposta em novo plano.
+## Validação
+- Typecheck/build.
+- Não é possível teste E2E autenticado (Supabase externo), então após implementar peço que baixe o PDF de um recurso aprovado e compare lado a lado com o preview.
