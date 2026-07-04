@@ -48,10 +48,9 @@ export default function LembreteConfirmDialog({ open, onOpenChange, invoices, on
       setStats({ ok, fail, skip });
       setProgress(Math.round(((i + 1) / invoices.length) * 100));
 
-      // Delay aleatório 5–10s entre envios (humaniza). Sem delay para envio único.
+      // Delay de 1 minuto entre envios (a 1ª sai imediata). Sem delay em envio único.
       if (invoices.length > 1 && i < invoices.length - 1) {
-        const waitMs = 5000 + Math.floor(Math.random() * 5000);
-        await new Promise((r) => setTimeout(r, waitMs));
+        await new Promise((r) => setTimeout(r, 60_000));
       }
     }
     setSending(false);
@@ -90,7 +89,7 @@ export default function LembreteConfirmDialog({ open, onOpenChange, invoices, on
             {invoices.length > 1 && (
               <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-md p-2">
                 <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>Envios sequenciais com intervalo automático de 5 a 10 segundos entre cada cliente. Não feche a janela.</span>
+                <span>Envios sequenciais: o 1º sai imediatamente e os demais com intervalo de 1 minuto entre cada cliente. Não feche a janela.</span>
               </div>
             )}
           </div>
