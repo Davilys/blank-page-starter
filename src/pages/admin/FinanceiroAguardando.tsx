@@ -2,7 +2,10 @@ import { lazy, Suspense, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Clock, ArrowLeft, CalendarClock, ListChecks, Loader2, Bell } from "lucide-react";
+import { Clock, ArrowLeft, CalendarClock, ListChecks, Loader2, Bell, RefreshCw } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 const AguardandoTab = lazy(() => import("@/components/admin/financeiro/aguardando/AguardandoTab"));
 
@@ -11,6 +14,24 @@ type TabKey = "d0" | "d3" | "all";
 export default function FinanceiroAguardando() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<TabKey>("d0");
+  const [syncing, setSyncing] = useState(false);
+  const qc = useQueryClient();
+
+  const handleSyncAsaas = async () => {
+    setSyncing(true);
+    const toastId = toast.loading("Sincronizando com Asaas...");
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-asaas-invoices");
+      if (error) throw error;
+      toast.success(`Sincronização concluída${(data as any)?.updated ? ` — ${(data as any).updated} atualizadas` : ""}`, { id: toastId });
+      qc.invalidateQueries({ queryKey: ["financeiro-aguardando"] });
+      qc.invalidateQueries({ queryKey: ["cobranca-historico-lembretes"] });
+    } catch (e: any) {
+      toast.error(`Erro ao sincronizar: ${e?.message ?? e}`, { id: toastId });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
     <div className="p-4 md:p-6 space-y-5">
@@ -32,6 +53,16 @@ export default function FinanceiroAguardando() {
               </div>
             </div>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSyncAsaas}
+            disabled={syncing}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Sincronizando..." : "Sincronizar com Asaas"}
+          </Button>
         </div>
       </div>
 
