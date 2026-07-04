@@ -1,29 +1,34 @@
-## Problema identificado
+## Objetivo
+Testar de verdade o envio do lembrete D-0 para **davillys@gmail.com** e **WhatsApp 11989832130**, verificar se chega nos dois canais, e — se algum falhar — corrigir até funcionar.
 
-Hoje o lembrete de vencimento (D-0 e D-3) envia via WhatsApp usando um webhook **dedicado ao financeiro/devedores**:
+## Como o teste será feito (sem alterar código de produção)
 
-```
-FINANCEIRO_WEBHOOK = https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/17504/Z6cCNjvBc9uv/
-```
+O `lembrar-fatura-vencendo` só aceita `invoice_id` (busca destinatário do banco). Para testar com o e-mail/telefone específicos que você forneceu **sem criar fatura fake**, vou disparar diretamente a função `send-multichannel-notification` via `supabase--curl_edge_functions`, usando **exatamente o mesmo payload** que o `lembrar-fatura-vencendo` monta:
 
-Já o botão **"Enviar Notificação + Cobrança"** da aba **Serviços** do cliente (`ServiceActionPanel.tsx`) chama `send-multichannel-notification` **sem** `whatsapp_webhook_override` — portanto usa o webhook padrão configurado em `system_settings.botconversa` (o mesmo usado pelas demais notificações do CRM).
+- `event_type: "manual"`
+- `channels: ["whatsapp", "email"]`
+- `recipient: { nome: "Davillys (Teste)", email: "davillys@gmail.com", phone: "11989832130" }`
+- `custom_message`: template WhatsApp do lembrete D-0 ("Olá, *Davillys*! Passando para lembrar que sua cobrança…")
+- `custom_html` + `custom_subject`: template de e-mail do lembrete D-0
+- **SEM `whatsapp_webhook_override`** (usa o webhook padrão do BotConversa, igual ao botão "Enviar Notificação + Cobrança")
 
-Por isso os fluxos disparam por webhooks diferentes.
+Isso reproduz 1:1 o que o `lembrar-fatura-vencendo` faz quando o botão "Enviar agora" é clicado no modal Aguardando.
 
-## Correção
+## Passos
 
-Alinhar o lembrete de vencimento ao mesmo webhook do botão da aba Serviços — ou seja, **remover o override** e deixar a função usar o webhook padrão do BotConversa (`system_settings.botconversa`), exatamente como o ServiceActionPanel faz.
+1. **Disparar o teste** chamando `send-multichannel-notification` com o payload acima.
+2. **Ler a resposta JSON** — ela retorna `results.whatsapp` e `results.email` com `success/error/response`.
+3. **Ler logs** de `send-multichannel-notification` e de `send-email` para confirmar o dispatch.
+4. **Você confere na caixa de entrada** (davillys@gmail.com) e no WhatsApp (11989832130).
 
-### Arquivo alterado
-- `supabase/functions/lembrar-fatura-vencendo/index.ts`
-  - Remover a constante `FINANCEIRO_WEBHOOK`.
-  - Remover a chave `whatsapp_webhook_override` do payload do `send-multichannel-notification`.
-  - Manter todo o resto (template, idempotência 20h, canais Email+WhatsApp, log em `cobranca_historico`).
+## Diagnóstico e correção
 
-### Não muda
-- `cobrar-fatura-vencida` (cobrança de vencidos) **continua** com o `FINANCEIRO_WEBHOOK` dedicado — este fluxo é o de devedores e o usuário só pediu alinhamento do lembrete de vencimento.
-- Cron `cron-lembretes-vencimento` não muda: ele apenas invoca `lembrar-fatura-vencendo`.
-- UI da aba "Aguardando" não muda.
+Dependendo do resultado:
 
-## Resultado esperado
-Ao clicar em "Enviar agora" no modal de lembretes (Vence hoje / Vence em 3 dias), o WhatsApp sai pelo **mesmo webhook** usado pelo botão "Enviar Notificação + Cobrança" da ficha do cliente.
+- **Email falhou** → checar `send-email` (Resend/SMTP), remetente, quota. Corrigir credenciais/config se necessário.
+- **WhatsApp falhou** → checar `system_settings.botconversa` (webhook padrão configurado). Se estiver vazio ou apontando para o webhook errado, ajustar o valor via migration/SQL. Testar novamente.
+- **Ambos OK** → confirmado que o pipeline do lembrete funciona; o botão "Enviar agora" produzirá o mesmo resultado em produção.
+
+## O que NÃO muda
+- Sem alteração em `lembrar-fatura-vencendo`, `cron-lembretes-vencimento`, UI da aba Aguardando, ou template.
+- Correções, se necessárias, ficarão restritas a: `system_settings.botconversa` (config), ou config do `send-email`.
