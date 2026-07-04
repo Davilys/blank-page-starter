@@ -1,37 +1,29 @@
-## Ajustes na central "Aguardando"
+## Problema identificado
 
-### 1. Botão "Sincronizar com Asaas"
-- Adicionar botão no topo da página `/admin/financeiro/aguardando` (ao lado do título), com ícone de refresh.
-- Ao clicar: chama a edge function existente de sync do Asaas (a mesma usada em `Financeiro.tsx` para atualizar faturas). Mostra toast "Sincronizando..." → "Lista atualizada".
-- Após sucesso, refaz o `refetch()` da query das faturas aguardando.
+Hoje o lembrete de vencimento (D-0 e D-3) envia via WhatsApp usando um webhook **dedicado ao financeiro/devedores**:
 
-### 2. Remover modo "Simular"
-- Remover o botão/opção "Simular" do `LembreteConfirmDialog.tsx`.
-- Remover parâmetro `dry_run` da chamada da edge function `lembrar-fatura-vencendo`.
-- Ao clicar em **Enviar**, dispara o envio real imediatamente (Email + WhatsApp via webhook BotConversa) — sem preview de JSON.
+```
+FINANCEIRO_WEBHOOK = https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/17504/Z6cCNjvBc9uv/
+```
 
-### 3. Delay automático entre envios (envio em lote)
-- Quando o admin seleciona múltiplos clientes e clica em "Enviar lembrete":
-  - Loop no frontend: para cada fatura selecionada, chama `lembrar-fatura-vencendo` sequencialmente.
-  - Entre cada chamada, aguarda **delay aleatório entre 5s e 10s** (humaniza o disparo e evita bloqueio do webhook, mesmo padrão do fluxo de vencidos).
-  - Progresso visível: "Enviando 2 de 15..." com barra de progresso no dialog.
-  - Ao final: toast com resumo "15 lembretes enviados com sucesso" (ou X sucessos / Y falhas).
-- Envio individual (1 cliente): dispara imediatamente sem delay.
+Já o botão **"Enviar Notificação + Cobrança"** da aba **Serviços** do cliente (`ServiceActionPanel.tsx`) chama `send-multichannel-notification` **sem** `whatsapp_webhook_override` — portanto usa o webhook padrão configurado em `system_settings.botconversa` (o mesmo usado pelas demais notificações do CRM).
 
-### 4. Confirmação antes do envio
-- O dialog passa a ser apenas de **confirmação** (não mais simulação):
-  - Lista resumida: "Você vai enviar N lembretes por Email + WhatsApp"
-  - Mostra alguns nomes de exemplo (primeiros 3 + "e mais X...")
-  - Botões: **Cancelar** | **Enviar agora** (destaque)
-- Após clique em "Enviar agora", começa o loop com delay e mostra progresso ao vivo.
+Por isso os fluxos disparam por webhooks diferentes.
 
-### Arquivos a editar
-- `src/pages/admin/FinanceiroAguardando.tsx` — adicionar botão de sync Asaas no header
-- `src/components/admin/financeiro/aguardando/LembreteConfirmDialog.tsx` — remover simular, adicionar progresso, delay 5–10s entre envios
-- `src/components/admin/financeiro/aguardando/AguardandoTab.tsx` — remover referências a dry-run
-- `supabase/functions/lembrar-fatura-vencendo/index.ts` — remover branch `dry_run` (envio sempre real)
+## Correção
 
-### Detalhes técnicos
-- Delay: `await new Promise(r => setTimeout(r, 5000 + Math.random() * 5000))` entre cada invoke.
-- Sync Asaas: reutiliza a edge function que `Financeiro.tsx` já invoca (identifico o nome ao entrar em build mode; provavelmente `sync-asaas-invoices` ou similar).
-- Idempotência dos 20h da edge function permanece — evita duplicar se admin clicar duas vezes.
+Alinhar o lembrete de vencimento ao mesmo webhook do botão da aba Serviços — ou seja, **remover o override** e deixar a função usar o webhook padrão do BotConversa (`system_settings.botconversa`), exatamente como o ServiceActionPanel faz.
+
+### Arquivo alterado
+- `supabase/functions/lembrar-fatura-vencendo/index.ts`
+  - Remover a constante `FINANCEIRO_WEBHOOK`.
+  - Remover a chave `whatsapp_webhook_override` do payload do `send-multichannel-notification`.
+  - Manter todo o resto (template, idempotência 20h, canais Email+WhatsApp, log em `cobranca_historico`).
+
+### Não muda
+- `cobrar-fatura-vencida` (cobrança de vencidos) **continua** com o `FINANCEIRO_WEBHOOK` dedicado — este fluxo é o de devedores e o usuário só pediu alinhamento do lembrete de vencimento.
+- Cron `cron-lembretes-vencimento` não muda: ele apenas invoca `lembrar-fatura-vencendo`.
+- UI da aba "Aguardando" não muda.
+
+## Resultado esperado
+Ao clicar em "Enviar agora" no modal de lembretes (Vence hoje / Vence em 3 dias), o WhatsApp sai pelo **mesmo webhook** usado pelo botão "Enviar Notificação + Cobrança" da ficha do cliente.
