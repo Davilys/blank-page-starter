@@ -685,7 +685,13 @@ export default function AdminFinanceiro() {
             <motion.div key={stat.title} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
               <Card
                 className={cn('relative overflow-hidden border transition-all hover:shadow-lg hover:shadow-black/10 hover:-translate-y-0.5', stat.border, stat.title === 'Vencido' && 'cursor-pointer')}
-                onClick={stat.title === 'Vencido' ? () => navigate('/admin/financeiro/vencidos') : undefined}
+                onClick={
+                  stat.title === 'Vencido'
+                    ? () => navigate('/admin/financeiro/vencidos')
+                    : stat.title === 'Aguardando'
+                    ? () => navigate('/admin/financeiro/aguardando')
+                    : undefined
+                }
               >
                 <div className={cn('absolute inset-0 bg-gradient-to-br opacity-60', stat.accent)} />
                 <CardContent className="relative pt-5 pb-4 px-5">
@@ -700,6 +706,7 @@ export default function AdminFinanceiro() {
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
                     {stat.title}
                     {stat.title === 'Vencido' && <span className="ml-1 text-[10px] normal-case text-red-400">(clique p/ cobrar)</span>}
+                    {stat.title === 'Aguardando' && <span className="ml-1 text-[10px] normal-case text-amber-600">(clique p/ lembrar)</span>}
                   </p>
                   {canViewFinancialValues ? (
                     <p className={cn('text-xl font-bold', stat.color)}>
