@@ -89,7 +89,7 @@ export default function LembreteConfirmDialog({ open, onOpenChange, invoices, on
             {invoices.length > 1 && (
               <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-md p-2">
                 <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>Envios sequenciais com intervalo automático de 5 a 10 segundos entre cada cliente. Não feche a janela.</span>
+                <span>Envios sequenciais: o 1º sai imediatamente e os demais com intervalo de 1 minuto entre cada cliente. Não feche a janela.</span>
               </div>
             )}
           </div>
