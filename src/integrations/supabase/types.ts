@@ -615,6 +615,7 @@ export type Database = {
           metadata: Json | null
           proxima_acao_em: string | null
           status: string
+          tipo: string
           updated_at: string
           user_id: string | null
         }
@@ -633,6 +634,7 @@ export type Database = {
           metadata?: Json | null
           proxima_acao_em?: string | null
           status?: string
+          tipo?: string
           updated_at?: string
           user_id?: string | null
         }
@@ -651,6 +653,7 @@ export type Database = {
           metadata?: Json | null
           proxima_acao_em?: string | null
           status?: string
+          tipo?: string
           updated_at?: string
           user_id?: string | null
         }

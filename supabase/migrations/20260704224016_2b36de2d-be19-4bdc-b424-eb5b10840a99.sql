@@ -1,0 +1,2 @@
+ALTER TABLE public.cobranca_historico ADD COLUMN IF NOT EXISTS tipo TEXT NOT NULL DEFAULT 'cobranca_vencida';
+CREATE INDEX IF NOT EXISTS idx_cobranca_historico_tipo_invoice ON public.cobranca_historico(tipo, invoice_id, enviada_em DESC);
