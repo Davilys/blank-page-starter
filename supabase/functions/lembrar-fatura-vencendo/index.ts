@@ -9,6 +9,10 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// Mesmo webhook BotConversa usado nas cobranças de vencidos.
+const FINANCEIRO_WEBHOOK =
+  "https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/17504/Z6cCNjvBc9uv/";
+
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—";
   try {
@@ -160,6 +164,7 @@ serve(async (req) => {
           custom_html: emailHtml,
           custom_subject: subject,
           data: { link, marca: (invoice as any).description || "sua fatura" },
+          whatsapp_webhook_override: FINANCEIRO_WEBHOOK,
         },
       },
     );
