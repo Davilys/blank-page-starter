@@ -684,7 +684,7 @@ export default function AdminFinanceiro() {
           ].map((stat, i) => (
             <motion.div key={stat.title} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
               <Card
-                className={cn('relative overflow-hidden border transition-all hover:shadow-lg hover:shadow-black/10 hover:-translate-y-0.5', stat.border, stat.title === 'Vencido' && 'cursor-pointer')}
+                className={cn('relative overflow-hidden border transition-all hover:shadow-lg hover:shadow-black/10 hover:-translate-y-0.5', stat.border, (stat.title === 'Vencido' || stat.title === 'Aguardando') && 'cursor-pointer')}
                 onClick={
                   stat.title === 'Vencido'
                     ? () => navigate('/admin/financeiro/vencidos')
