@@ -55,10 +55,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const url = new URL(req.url);
-    const dryRunQ = url.searchParams.get("dry_run") === "1";
     const body = await req.json().catch(() => ({}));
-    const dry_run: boolean = !!body.dry_run || dryRunQ;
     const invoice_id: string | undefined = body.invoice_id;
     const tipo: "d3" | "d0" = body.tipo === "d3" ? "d3" : "d0";
     const channels: Array<"whatsapp" | "email"> = Array.isArray(body.channels) && body.channels.length
@@ -90,7 +87,7 @@ serve(async (req) => {
     const tipoKey = tipo === "d3" ? "lembrete_d3" : "lembrete_d0";
 
     // Idempotência: bloqueia reenvio se já houver do mesmo tipo nas últimas 20h.
-    if (!force && !dry_run) {
+    if (!force) {
       const since = new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString();
       const { data: recent } = await admin
         .from("cobranca_historico")
@@ -154,23 +151,6 @@ serve(async (req) => {
         error: "Cliente sem telefone/e-mail cadastrados",
         details: { invoice_id, has_user: !!(invoice as any).user_id, has_contract: !!(invoice as any).contract_id },
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    // DRY RUN: retorna preview sem gravar/disparar.
-    if (dry_run) {
-      return new Response(JSON.stringify({
-        dry_run: true,
-        invoice_id,
-        tipo: tipoKey,
-        recipient: { nome, email, phone },
-        channels: finalChannels,
-        subject,
-        whatsapp_message: waMsg,
-        email_html: emailHtml,
-        link,
-        due_date: dataStr,
-        amount: valor,
-      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const { data: notifResult, error: notifErr } = await admin.functions.invoke(
