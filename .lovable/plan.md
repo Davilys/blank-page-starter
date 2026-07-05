@@ -1,34 +1,30 @@
 ## Objetivo
-Testar de verdade o envio do lembrete D-0 para **davillys@gmail.com** e **WhatsApp 11989832130**, verificar se chega nos dois canais, e — se algum falhar — corrigir até funcionar.
+Fazer com que a tela "Lembretes de Vencimento" (Aguardando) mostre **apenas faturas que ainda existem e estão ativas no Asaas**. Faturas que foram excluídas/removidas no Asaas devem sumir do CRM automaticamente ao sincronizar.
 
-## Como o teste será feito (sem alterar código de produção)
+## Diagnóstico
+Hoje o `sync-asaas-invoices` só atualiza status/valor/vencimento das faturas pendentes. Quando o Asaas retorna **404** (fatura deletada) ou **status = DELETED**, o código apenas loga o erro e segue — a fatura continua "pending" no banco e aparece na aba Aguardando.
 
-O `lembrar-fatura-vencendo` só aceita `invoice_id` (busca destinatário do banco). Para testar com o e-mail/telefone específicos que você forneceu **sem criar fatura fake**, vou disparar diretamente a função `send-multichannel-notification` via `supabase--curl_edge_functions`, usando **exatamente o mesmo payload** que o `lembrar-fatura-vencendo` monta:
+## Mudanças
 
-- `event_type: "manual"`
-- `channels: ["whatsapp", "email"]`
-- `recipient: { nome: "Davillys (Teste)", email: "davillys@gmail.com", phone: "11989832130" }`
-- `custom_message`: template WhatsApp do lembrete D-0 ("Olá, *Davillys*! Passando para lembrar que sua cobrança…")
-- `custom_html` + `custom_subject`: template de e-mail do lembrete D-0
-- **SEM `whatsapp_webhook_override`** (usa o webhook padrão do BotConversa, igual ao botão "Enviar Notificação + Cobrança")
+### 1) Edge function `sync-asaas-invoices` — detectar faturas removidas
+Para cada fatura pending/overdue com `asaas_invoice_id`:
+- Se o GET no Asaas retornar **404** (ou 400 com "not found"): marcar a fatura local como `status = 'cancelled'` e gravar `updated_at`. Não aparece mais em Aguardando (o filtro é `pending`/`overdue`).
+- Se o Asaas retornar `status = "DELETED"`: mesmo tratamento — marcar `cancelled` local.
+- Adicionar no mapper `mapAsaasStatus`: `'DELETED' -> 'cancelled'`.
+- Contadores no retorno: incluir `removed` (quantas foram canceladas por não existirem mais no Asaas) além do `synced` atual.
+- Manter o resto do comportamento (status, due_date, amount, payment_date).
 
-Isso reproduz 1:1 o que o `lembrar-fatura-vencendo` faz quando o botão "Enviar agora" é clicado no modal Aguardando.
+### 2) Auto-sync ao abrir a aba Aguardando
+Em `FinanceiroAguardando.tsx`: chamar `sync-asaas-invoices` automaticamente **uma vez ao montar a página** (silencioso, sem toast bloqueante — só um toast discreto de "Sincronizando..." → "Atualizado") e depois invalidar as queries. Assim, ao abrir a tela o usuário já vê a lista limpa sem precisar clicar em "Sincronizar com Asaas".
 
-## Passos
+### 3) Filtro defensivo no front (garantia extra)
+No `AguardandoTab` (query `financeiro-aguardando`): exigir `asaas_invoice_id NOT NULL` e `status IN ('pending','overdue')`. Faturas sem vínculo Asaas ou já canceladas nunca aparecem. (Verificar o filtro atual e ajustar se necessário — sem mudar layout.)
 
-1. **Disparar o teste** chamando `send-multichannel-notification` com o payload acima.
-2. **Ler a resposta JSON** — ela retorna `results.whatsapp` e `results.email` com `success/error/response`.
-3. **Ler logs** de `send-multichannel-notification` e de `send-email` para confirmar o dispatch.
-4. **Você confere na caixa de entrada** (davillys@gmail.com) e no WhatsApp (11989832130).
+## Nada muda
+- UI, cores, templates, cron diário, webhook do lembrete, delay de 1 min entre envios: **inalterados**.
+- Nenhuma migração de schema — só uso do valor `'cancelled'` já suportado em `invoices.status`.
 
-## Diagnóstico e correção
-
-Dependendo do resultado:
-
-- **Email falhou** → checar `send-email` (Resend/SMTP), remetente, quota. Corrigir credenciais/config se necessário.
-- **WhatsApp falhou** → checar `system_settings.botconversa` (webhook padrão configurado). Se estiver vazio ou apontando para o webhook errado, ajustar o valor via migration/SQL. Testar novamente.
-- **Ambos OK** → confirmado que o pipeline do lembrete funciona; o botão "Enviar agora" produzirá o mesmo resultado em produção.
-
-## O que NÃO muda
-- Sem alteração em `lembrar-fatura-vencendo`, `cron-lembretes-vencimento`, UI da aba Aguardando, ou template.
-- Correções, se necessárias, ficarão restritas a: `system_settings.botconversa` (config), ou config do `send-email`.
+## Como validar
+1. Abrir `/admin/financeiro/aguardando` → sync roda automático, faturas deletadas no Asaas somem.
+2. Botão "Sincronizar com Asaas" continua funcionando manualmente e mostra `X atualizadas · Y removidas`.
+3. Clicar em "Lembrar" só dispara para clientes que ainda existem no Asaas.
