@@ -29,7 +29,8 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
       let q = supabase
         .from("invoices")
         .select("id, user_id, amount, due_date, status, invoice_url, description, profiles:user_id(full_name,email,phone)")
-        .in("status", ["pending", "open"]);
+        .in("status", ["pending", "open"])
+        .not("asaas_invoice_id", "is", null);
 
       if (tab === "d0") q = q.eq("due_date", d0);
       else if (tab === "d3") q = q.eq("due_date", d3);

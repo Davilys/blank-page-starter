@@ -44,6 +44,7 @@ serve(async (req) => {
     console.log(`Found ${pendingInvoices.length} pending invoices to sync`);
 
     let synced = 0;
+    let removed = 0;
     const errors: string[] = [];
 
     for (const invoice of pendingInvoices) {
@@ -62,12 +63,47 @@ serve(async (req) => {
         if (!asaasResponse.ok) {
           const errText = await asaasResponse.text();
           console.error(`Asaas API error for ${invoice.asaas_invoice_id}: ${asaasResponse.status} - ${errText}`);
-          errors.push(`${invoice.asaas_invoice_id}: ${asaasResponse.status}`);
+          // Fatura não existe mais no Asaas (excluída) => cancelar localmente
+          const notFound =
+            asaasResponse.status === 404 ||
+            (asaasResponse.status === 400 && /not\s*found|invalid|does\s*not\s*exist/i.test(errText));
+          if (notFound) {
+            const { error: cancelErr } = await supabase
+              .from('invoices')
+              .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+              .eq('id', invoice.id);
+            if (cancelErr) {
+              errors.push(`${invoice.id}: cancel failed - ${cancelErr.message}`);
+            } else {
+              removed++;
+              console.log(`Invoice ${invoice.id} not found in Asaas -> cancelled`);
+            }
+          } else {
+            errors.push(`${invoice.asaas_invoice_id}: ${asaasResponse.status}`);
+          }
+          await new Promise((r) => setTimeout(r, 500));
           continue;
         }
 
         const asaasPayment = await asaasResponse.json();
         const asaasStatus = asaasPayment.status as string;
+
+        // Se o Asaas devolveu status DELETED, cancela localmente
+        if (asaasStatus === 'DELETED') {
+          const { error: cancelErr } = await supabase
+            .from('invoices')
+            .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+            .eq('id', invoice.id);
+          if (cancelErr) {
+            errors.push(`${invoice.id}: cancel failed - ${cancelErr.message}`);
+          } else {
+            removed++;
+            console.log(`Invoice ${invoice.id} DELETED in Asaas -> cancelled`);
+          }
+          await new Promise((r) => setTimeout(r, 500));
+          continue;
+        }
+
         const asaasDueDate: string | null = asaasPayment.dueDate || null;
         const asaasValue: number | null =
           typeof asaasPayment.value === 'number' ? asaasPayment.value : null;
@@ -137,11 +173,14 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         synced,
+        removed,
         total: pendingInvoices.length,
         errors: errors.length > 0 ? errors : undefined,
         message: synced > 0
-          ? `${synced} fatura(s) atualizada(s) de ${pendingInvoices.length} pendente(s)`
-          : 'Nenhuma fatura precisou ser atualizada',
+          ? `${synced} atualizada(s)${removed ? ` · ${removed} removida(s)` : ''} de ${pendingInvoices.length}`
+          : removed > 0
+            ? `${removed} fatura(s) removida(s) (não existem mais no Asaas)`
+            : 'Nenhuma fatura precisou ser atualizada',
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -169,6 +208,7 @@ function mapAsaasStatus(asaasStatus: string): string {
     'DUNNING_REQUESTED': 'overdue',
     'DUNNING_RECEIVED': 'received',
     'AWAITING_RISK_ANALYSIS': 'pending',
+    'DELETED': 'cancelled',
   };
   return map[asaasStatus] || 'pending';
 }
