@@ -1,13 +1,21 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Send, Bell, Mail, MessageCircle } from "lucide-react";
+import { Loader2, Send, Bell, Mail, MessageCircle, Link2 } from "lucide-react";
 import LembreteConfirmDialog, { type LembreteInvoice } from "./LembreteConfirmDialog";
 import { format, addDays, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
+import { loadClientForSheet } from "@/lib/clientSheet";
+import type { ClientWithProcess } from "@/components/admin/clients/ClientKanbanBoard";
+import { LinkClientToInvoiceDialog } from "./LinkClientToInvoiceDialog";
+
+const ClientDetailSheet = lazy(() =>
+  import("@/components/admin/clients/ClientDetailSheet").then((m) => ({ default: m.ClientDetailSheet }))
+);
 
 type TabKey = "d0" | "d3" | "all";
 
@@ -22,6 +30,9 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [openClient, setOpenClient] = useState<ClientWithProcess | null>(null);
+  const [loadingClient, setLoadingClient] = useState<string | null>(null);
+  const [linkDialog, setLinkDialog] = useState<{ asaas_payment_id: string | null; asaas_customer_id: string | null; invoice_id: string | null; nome: string | null } | null>(null);
 
   // Fonte da verdade: Asaas. Listamos cobranças ativas direto na API do Asaas
   // e enriquecemos com dados locais (perfil + invoice_id). Faturas que não
@@ -57,6 +68,29 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
       }));
     },
   });
+
+  const openClientFile = async (row: any) => {
+    if (!row.user_id) {
+      // órfão: abre diálogo para vincular
+      setLinkDialog({
+        asaas_payment_id: row.asaas_payment_id,
+        asaas_customer_id: row.asaas_customer_id ?? null,
+        invoice_id: row.id,
+        nome: row.profiles?.full_name ?? null,
+      });
+      return;
+    }
+    setLoadingClient(row.user_id);
+    try {
+      const full = await loadClientForSheet(row.user_id);
+      if (!full) { toast.error("Ficha do cliente não encontrada"); return; }
+      setOpenClient(full);
+    } catch (e: any) {
+      toast.error("Falha ao abrir ficha: " + (e.message || e));
+    } finally {
+      setLoadingClient(null);
+    }
+  };
 
   const historyQuery = useQuery({
     queryKey: ["cobranca-historico-lembretes"],
