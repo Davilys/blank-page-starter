@@ -296,6 +296,7 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
             client={openClient}
             open={!!openClient}
             onOpenChange={(v) => { if (!v) setOpenClient(null); }}
+            onUpdate={() => { query.refetch(); }}
           />
         </Suspense>
       )}
