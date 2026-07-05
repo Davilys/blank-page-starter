@@ -153,7 +153,7 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
           <tbody>
             {rows.map((r: any) => {
               const p = r.profiles ?? {};
-              const last = historyQuery.data?.get(r.id);
+              const last = r.id ? historyQuery.data?.get(r.id) : undefined;
               const tipoRow: "d0" | "d3" = r.due_date === d0 ? "d0" : "d3";
               const canRemind = !!r.id;
               return (
