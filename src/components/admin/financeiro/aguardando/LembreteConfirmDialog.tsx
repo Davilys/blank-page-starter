@@ -7,7 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export type LembreteInvoice = {
-  id: string;
+  id: string | null;
+  asaas_payment_id?: string | null;
   tipo: "d0" | "d3";
   cliente_nome?: string | null;
   amount?: number | null;
@@ -39,7 +40,12 @@ export default function LembreteConfirmDialog({ open, onOpenChange, invoices, on
       setCurrentName(inv.cliente_nome || "Cliente");
       try {
         const { data, error } = await supabase.functions.invoke("lembrar-fatura-vencendo", {
-          body: { invoice_id: inv.id, tipo: inv.tipo, origin: "manual_admin" },
+          body: {
+            invoice_id: inv.id ?? undefined,
+            asaas_payment_id: inv.asaas_payment_id ?? undefined,
+            tipo: inv.tipo,
+            origin: "manual_admin",
+          },
         });
         if (error) { fail++; }
         else if ((data as any)?.skipped) { skip++; }
@@ -79,7 +85,7 @@ export default function LembreteConfirmDialog({ open, onOpenChange, invoices, on
               <div className="text-xs text-muted-foreground">Clientes que receberão o lembrete:</div>
               <ul className="text-xs space-y-1">
                 {invoices.slice(0, 5).map((i) => (
-                  <li key={i.id}>• {i.cliente_nome || "Cliente"}</li>
+                  <li key={i.id ?? i.asaas_payment_id ?? i.cliente_nome}>• {i.cliente_nome || "Cliente"}</li>
                 ))}
                 {invoices.length > 5 && (
                   <li className="text-muted-foreground">…e mais {invoices.length - 5}</li>
