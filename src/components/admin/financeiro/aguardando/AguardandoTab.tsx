@@ -1,13 +1,21 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Send, Bell, Mail, MessageCircle } from "lucide-react";
+import { Loader2, Send, Bell, Mail, MessageCircle, Link2 } from "lucide-react";
 import LembreteConfirmDialog, { type LembreteInvoice } from "./LembreteConfirmDialog";
 import { format, addDays, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
+import { loadClientForSheet } from "@/lib/clientSheet";
+import type { ClientWithProcess } from "@/components/admin/clients/ClientKanbanBoard";
+import { LinkClientToInvoiceDialog } from "./LinkClientToInvoiceDialog";
+
+const ClientDetailSheet = lazy(() =>
+  import("@/components/admin/clients/ClientDetailSheet").then((m) => ({ default: m.ClientDetailSheet }))
+);
 
 type TabKey = "d0" | "d3" | "all";
 
@@ -22,6 +30,9 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [openClient, setOpenClient] = useState<ClientWithProcess | null>(null);
+  const [loadingClient, setLoadingClient] = useState<string | null>(null);
+  const [linkDialog, setLinkDialog] = useState<{ asaas_payment_id: string | null; asaas_customer_id: string | null; invoice_id: string | null; nome: string | null } | null>(null);
 
   // Fonte da verdade: Asaas. Listamos cobranças ativas direto na API do Asaas
   // e enriquecemos com dados locais (perfil + invoice_id). Faturas que não
@@ -43,6 +54,7 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
         row_key: it.asaas_payment_id,
         id: it.invoice_id,                 // invoice_id local (pode ser null)
         asaas_payment_id: it.asaas_payment_id,
+        asaas_customer_id: it.asaas_customer_id,
         user_id: it.user_id,
         amount: it.amount,
         due_date: it.due_date,
@@ -57,6 +69,29 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
       }));
     },
   });
+
+  const openClientFile = async (row: any) => {
+    if (!row.user_id) {
+      // órfão: abre diálogo para vincular
+      setLinkDialog({
+        asaas_payment_id: row.asaas_payment_id,
+        asaas_customer_id: row.asaas_customer_id ?? null,
+        invoice_id: row.id,
+        nome: row.profiles?.full_name ?? null,
+      });
+      return;
+    }
+    setLoadingClient(row.user_id);
+    try {
+      const full = await loadClientForSheet(row.user_id);
+      if (!full) { toast.error("Ficha do cliente não encontrada"); return; }
+      setOpenClient(full);
+    } catch (e: any) {
+      toast.error("Falha ao abrir ficha: " + (e.message || e));
+    } finally {
+      setLoadingClient(null);
+    }
+  };
 
   const historyQuery = useQuery({
     queryKey: ["cobranca-historico-lembretes"],
@@ -165,11 +200,31 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
                       onCheckedChange={() => toggle(r.row_key)}
                     />
                   </td>
-                  <td className="p-2">
-                    <div className="font-medium">{p.full_name || "—"}</div>
+                  <td
+                    className="p-2 cursor-pointer hover:text-primary"
+                    onClick={() => openClientFile(r)}
+                  >
+                    <div className="font-medium inline-flex items-center gap-1">
+                      {loadingClient === r.user_id && <Loader2 className="h-3 w-3 animate-spin" />}
+                      {p.full_name || "—"}
+                    </div>
                     <div className="text-xs text-muted-foreground">{p.email || "sem email"}</div>
-                    {!canRemind && (
-                      <div className="text-[10px] text-amber-600 mt-0.5">Sem vínculo local — envio manual apenas</div>
+                    {!r.user_id && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLinkDialog({
+                            asaas_payment_id: r.asaas_payment_id,
+                            asaas_customer_id: r.asaas_customer_id ?? null,
+                            invoice_id: r.id,
+                            nome: p.full_name ?? null,
+                          });
+                        }}
+                        className="mt-1 inline-flex items-center gap-1 text-[10px] font-medium text-amber-600 hover:underline"
+                      >
+                        <Link2 className="h-3 w-3" /> Cliente órfão — vincular
+                      </button>
                     )}
                   </td>
                   <td className="p-2 font-mono">
@@ -224,6 +279,27 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
         invoices={dialogInvoices}
         onDone={() => { query.refetch(); historyQuery.refetch(); setSelected(new Set()); }}
       />
+
+      <LinkClientToInvoiceDialog
+        open={!!linkDialog}
+        onOpenChange={(v) => { if (!v) setLinkDialog(null); }}
+        asaasCustomerId={linkDialog?.asaas_customer_id ?? null}
+        asaasPaymentId={linkDialog?.asaas_payment_id ?? null}
+        invoiceId={linkDialog?.invoice_id ?? null}
+        suggestedName={linkDialog?.nome ?? null}
+        onLinked={() => { setLinkDialog(null); query.refetch(); }}
+      />
+
+      {openClient && (
+        <Suspense fallback={null}>
+          <ClientDetailSheet
+            client={openClient}
+            open={!!openClient}
+            onOpenChange={(v) => { if (!v) setOpenClient(null); }}
+            onUpdate={() => { query.refetch(); }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
