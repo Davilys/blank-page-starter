@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -16,6 +16,28 @@ export default function FinanceiroAguardando() {
   const [tab, setTab] = useState<TabKey>("d0");
   const [syncing, setSyncing] = useState(false);
   const qc = useQueryClient();
+
+  const autoSyncRan = useRef(false);
+  useEffect(() => {
+    if (autoSyncRan.current) return;
+    autoSyncRan.current = true;
+    (async () => {
+      const toastId = toast.loading("Sincronizando com Asaas...");
+      try {
+        const { data, error } = await supabase.functions.invoke("sync-asaas-invoices");
+        if (error) throw error;
+        const d: any = data || {};
+        const parts: string[] = [];
+        if (d.synced) parts.push(`${d.synced} atualizada(s)`);
+        if (d.removed) parts.push(`${d.removed} removida(s)`);
+        toast.success(parts.length ? `Sincronizado: ${parts.join(" · ")}` : "Tudo sincronizado", { id: toastId });
+        qc.invalidateQueries({ queryKey: ["financeiro-aguardando"] });
+        qc.invalidateQueries({ queryKey: ["cobranca-historico-lembretes"] });
+      } catch (e: any) {
+        toast.error(`Falha ao sincronizar: ${e?.message ?? e}`, { id: toastId });
+      }
+    })();
+  }, [qc]);
 
   const handleSyncAsaas = async () => {
     setSyncing(true);
