@@ -2,14 +2,15 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Clock, ArrowLeft, CalendarClock, ListChecks, Loader2, Bell, RefreshCw } from "lucide-react";
+import { Clock, ArrowLeft, CalendarClock, ListChecks, Loader2, Bell, RefreshCw, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
 const AguardandoTab = lazy(() => import("@/components/admin/financeiro/aguardando/AguardandoTab"));
+const HistoricoLembretesTab = lazy(() => import("@/components/admin/financeiro/aguardando/HistoricoLembretesTab"));
 
-type TabKey = "d0" | "d3" | "all";
+type TabKey = "d0" | "d3" | "all" | "historico";
 
 export default function FinanceiroAguardando() {
   const navigate = useNavigate();
@@ -108,12 +109,19 @@ export default function FinanceiroAguardando() {
           >
             <ListChecks className="h-4 w-4" /> Todos aguardando
           </TabsTrigger>
+          <TabsTrigger
+            value="historico"
+            className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-teal-700 data-[state=active]:text-white"
+          >
+            <History className="h-4 w-4" /> Histórico
+          </TabsTrigger>
         </TabsList>
 
         <Suspense fallback={<div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
           <TabsContent value="d0" className="mt-0"><AguardandoTab tab="d0" /></TabsContent>
           <TabsContent value="d3" className="mt-0"><AguardandoTab tab="d3" /></TabsContent>
           <TabsContent value="all" className="mt-0"><AguardandoTab tab="all" /></TabsContent>
+          <TabsContent value="historico" className="mt-0"><HistoricoLembretesTab /></TabsContent>
         </Suspense>
       </Tabs>
     </div>
