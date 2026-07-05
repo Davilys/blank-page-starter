@@ -279,6 +279,26 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
         invoices={dialogInvoices}
         onDone={() => { query.refetch(); historyQuery.refetch(); setSelected(new Set()); }}
       />
+
+      <LinkClientToInvoiceDialog
+        open={!!linkDialog}
+        onOpenChange={(v) => { if (!v) setLinkDialog(null); }}
+        asaasCustomerId={linkDialog?.asaas_customer_id ?? null}
+        asaasPaymentId={linkDialog?.asaas_payment_id ?? null}
+        invoiceId={linkDialog?.invoice_id ?? null}
+        suggestedName={linkDialog?.nome ?? null}
+        onLinked={() => { setLinkDialog(null); query.refetch(); }}
+      />
+
+      {openClient && (
+        <Suspense fallback={null}>
+          <ClientDetailSheet
+            client={openClient}
+            open={!!openClient}
+            onOpenChange={(v) => { if (!v) setOpenClient(null); }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
