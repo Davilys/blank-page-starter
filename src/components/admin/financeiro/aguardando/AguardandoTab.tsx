@@ -200,11 +200,31 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
                       onCheckedChange={() => toggle(r.row_key)}
                     />
                   </td>
-                  <td className="p-2">
-                    <div className="font-medium">{p.full_name || "—"}</div>
+                  <td
+                    className="p-2 cursor-pointer hover:text-primary"
+                    onClick={() => openClientFile(r)}
+                  >
+                    <div className="font-medium inline-flex items-center gap-1">
+                      {loadingClient === r.user_id && <Loader2 className="h-3 w-3 animate-spin" />}
+                      {p.full_name || "—"}
+                    </div>
                     <div className="text-xs text-muted-foreground">{p.email || "sem email"}</div>
-                    {!canRemind && (
-                      <div className="text-[10px] text-amber-600 mt-0.5">Sem vínculo local — envio manual apenas</div>
+                    {!r.user_id && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLinkDialog({
+                            asaas_payment_id: r.asaas_payment_id,
+                            asaas_customer_id: r.asaas_customer_id ?? null,
+                            invoice_id: r.id,
+                            nome: p.full_name ?? null,
+                          });
+                        }}
+                        className="mt-1 inline-flex items-center gap-1 text-[10px] font-medium text-amber-600 hover:underline"
+                      >
+                        <Link2 className="h-3 w-3" /> Cliente órfão — vincular
+                      </button>
                     )}
                   </td>
                   <td className="p-2 font-mono">
