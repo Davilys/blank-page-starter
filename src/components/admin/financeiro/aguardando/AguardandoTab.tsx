@@ -113,7 +113,7 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
   const rows = query.data ?? [];
 
   const toggleAll = (checked: boolean) => {
-    if (checked) setSelected(new Set(rows.filter((r: any) => r.id).map((r: any) => r.row_key)));
+    if (checked) setSelected(new Set(rows.filter((r: any) => r.row_key).map((r: any) => r.row_key)));
     else setSelected(new Set());
   };
   const toggle = (id: string) => {
@@ -124,9 +124,10 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
 
   const dialogInvoices: LembreteInvoice[] = useMemo(() => {
     return rows
-      .filter((r: any) => selected.has(r.row_key) && r.id)
+      .filter((r: any) => selected.has(r.row_key))
       .map((r: any) => ({
         id: r.id,
+        asaas_payment_id: r.asaas_payment_id,
         tipo: (r.due_date === d0 ? "d0" : "d3") as "d0" | "d3",
         cliente_nome: r.profiles?.full_name ?? null,
         amount: r.amount,
@@ -150,7 +151,7 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setSelected(new Set(rows.filter((r: any) => r.id).map((r: any) => r.row_key)))}
+            onClick={() => setSelected(new Set(rows.filter((r: any) => r.row_key).map((r: any) => r.row_key)))}
             disabled={rows.length === 0}
           >
             Selecionar todos
@@ -190,7 +191,7 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
               const p = r.profiles ?? {};
               const last = r.id ? historyQuery.data?.get(r.id) : undefined;
               const tipoRow: "d0" | "d3" = r.due_date === d0 ? "d0" : "d3";
-              const canRemind = !!r.id;
+              const canRemind = !!(r.id || r.asaas_payment_id);
               return (
                 <tr key={r.row_key} className="border-t hover:bg-muted/20">
                   <td className="p-2">
