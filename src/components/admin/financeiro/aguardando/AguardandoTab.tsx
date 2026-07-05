@@ -23,22 +23,38 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  // Fonte da verdade: Asaas. Listamos cobranças ativas direto na API do Asaas
+  // e enriquecemos com dados locais (perfil + invoice_id). Faturas que não
+  // existem mais no Asaas simplesmente não aparecem.
   const query = useQuery({
-    queryKey: ["financeiro-aguardando", tab, d0, d3],
+    queryKey: ["financeiro-aguardando-asaas", tab, d0, d3],
     queryFn: async () => {
-      let q = supabase
-        .from("invoices")
-        .select("id, user_id, amount, due_date, status, invoice_url, description, profiles:user_id(full_name,email,phone)")
-        .in("status", ["pending", "open"])
-        .not("asaas_invoice_id", "is", null);
+      const body: Record<string, string> = {};
+      if (tab === "d0") body.date = d0;
+      else if (tab === "d3") body.date = d3;
+      else { body.date_from = d0; body.date_to = isoDate(addDays(today, 60)); }
 
-      if (tab === "d0") q = q.eq("due_date", d0);
-      else if (tab === "d3") q = q.eq("due_date", d3);
-      else q = q.gte("due_date", d0);
-
-      const { data, error } = await q.order("due_date", { ascending: true }).limit(500);
+      const { data, error } = await supabase.functions.invoke("list-asaas-due-invoices", { body });
       if (error) throw error;
-      return data ?? [];
+      const items = ((data as any)?.items ?? []) as Array<any>;
+      // Normaliza para o formato usado pela UI
+      return items.map((it) => ({
+        // usa asaas_payment_id como chave de seleção (garante unicidade mesmo sem invoice local)
+        row_key: it.asaas_payment_id,
+        id: it.invoice_id,                 // invoice_id local (pode ser null)
+        asaas_payment_id: it.asaas_payment_id,
+        user_id: it.user_id,
+        amount: it.amount,
+        due_date: it.due_date,
+        status: it.status,
+        invoice_url: it.invoice_url,
+        description: it.description,
+        profiles: {
+          full_name: it.cliente_nome,
+          email: it.cliente_email,
+          phone: it.cliente_phone,
+        },
+      }));
     },
   });
 
@@ -62,7 +78,7 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
   const rows = query.data ?? [];
 
   const toggleAll = (checked: boolean) => {
-    if (checked) setSelected(new Set(rows.map((r: any) => r.id)));
+    if (checked) setSelected(new Set(rows.filter((r: any) => r.id).map((r: any) => r.row_key)));
     else setSelected(new Set());
   };
   const toggle = (id: string) => {
@@ -73,7 +89,7 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
 
   const dialogInvoices: LembreteInvoice[] = useMemo(() => {
     return rows
-      .filter((r: any) => selected.has(r.id))
+      .filter((r: any) => selected.has(r.row_key) && r.id)
       .map((r: any) => ({
         id: r.id,
         tipo: (r.due_date === d0 ? "d0" : "d3") as "d0" | "d3",
@@ -99,7 +115,7 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setSelected(new Set(rows.map((r: any) => r.id)))}
+            onClick={() => setSelected(new Set(rows.filter((r: any) => r.id).map((r: any) => r.row_key)))}
             disabled={rows.length === 0}
           >
             Selecionar todos
@@ -137,16 +153,24 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
           <tbody>
             {rows.map((r: any) => {
               const p = r.profiles ?? {};
-              const last = historyQuery.data?.get(r.id);
+              const last = r.id ? historyQuery.data?.get(r.id) : undefined;
               const tipoRow: "d0" | "d3" = r.due_date === d0 ? "d0" : "d3";
+              const canRemind = !!r.id;
               return (
-                <tr key={r.id} className="border-t hover:bg-muted/20">
+                <tr key={r.row_key} className="border-t hover:bg-muted/20">
                   <td className="p-2">
-                    <Checkbox checked={selected.has(r.id)} onCheckedChange={() => toggle(r.id)} />
+                    <Checkbox
+                      checked={selected.has(r.row_key)}
+                      disabled={!canRemind}
+                      onCheckedChange={() => toggle(r.row_key)}
+                    />
                   </td>
                   <td className="p-2">
                     <div className="font-medium">{p.full_name || "—"}</div>
                     <div className="text-xs text-muted-foreground">{p.email || "sem email"}</div>
+                    {!canRemind && (
+                      <div className="text-[10px] text-amber-600 mt-0.5">Sem vínculo local — envio manual apenas</div>
+                    )}
                   </td>
                   <td className="p-2 font-mono">
                     {Number(r.amount || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
@@ -178,7 +202,8 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => { setSelected(new Set([r.id])); setDialogOpen(true); }}
+                      disabled={!canRemind}
+                      onClick={() => { setSelected(new Set([r.row_key])); setDialogOpen(true); }}
                     >
                       <Bell className="h-3.5 w-3.5 mr-1" /> Lembrar
                     </Button>
