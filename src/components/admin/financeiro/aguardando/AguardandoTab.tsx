@@ -54,6 +54,7 @@ export default function AguardandoTab({ tab }: { tab: TabKey }) {
         row_key: it.asaas_payment_id,
         id: it.invoice_id,                 // invoice_id local (pode ser null)
         asaas_payment_id: it.asaas_payment_id,
+        asaas_customer_id: it.asaas_customer_id,
         user_id: it.user_id,
         amount: it.amount,
         due_date: it.due_date,
