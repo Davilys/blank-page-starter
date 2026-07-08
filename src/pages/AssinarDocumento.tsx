@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Loader2, Download, Printer, CheckCircle, AlertCircle, FileText, CreditCard, QrCode, Copy, Shield, Plus } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import webmarcasLogo from '@/assets/webmarcas-logo-new.png';
+import { buildContractVerificationUrl, getContractVerificationBaseUrl } from '@/lib/contractVerification';
 
 // NCL class descriptions
 const NCL_CLASS_DESCRIPTIONS: Record<number, string> = {
@@ -814,12 +815,12 @@ export default function AssinarDocumento() {
                 <p className="text-xs text-blue-600 mt-4">
                   Verifique a autenticidade em:{' '}
                   <a 
-                    href={`/verificar-contrato?hash=${contract.blockchain_hash}`}
+                    href={buildContractVerificationUrl(contract.blockchain_hash)}
                     className="text-blue-700 hover:underline font-medium"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    {window.location.host}/verificar-contrato
+                    {getContractVerificationBaseUrl().replace(/^https?:\/\//, '')}/verificar-contrato
                   </a>
                 </p>
               </div>
