@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import { getLogoBase64, BlockchainSignature } from '@/components/contracts/ContractRenderer';
+import { getContractVerificationBaseUrl } from '@/lib/contractVerification';
 
 interface ContractPdfOptions {
   brandName: string;
@@ -290,7 +291,7 @@ export async function generateContractPDF(
     yPosition += 5;
     pdf.setTextColor(2, 132, 199);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(`Verifique a autenticidade em: ${window.location.origin}/verificar-contrato`, pageWidth / 2, yPosition, { align: 'center' });
+    pdf.text(`Verifique a autenticidade em: ${getContractVerificationBaseUrl()}/verificar-contrato`, pageWidth / 2, yPosition, { align: 'center' });
   }
 
   return pdf.output('blob');

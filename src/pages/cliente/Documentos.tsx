@@ -22,6 +22,7 @@ import { DocumentPreview } from '@/components/shared/DocumentPreview';
 import { DocumentRenderer, generateDocumentPrintHTML, getLogoBase64ForPDF } from '@/components/contracts/DocumentRenderer';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { buildContractVerificationUrl, getContractVerificationBaseUrl } from '@/lib/contractVerification';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface Document {
@@ -98,6 +99,17 @@ function formatSize(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function openContractVerification(contractId?: string, blockchainHash?: string | null) {
+  if (blockchainHash) {
+    window.open(buildContractVerificationUrl(blockchainHash), '_blank');
+    return;
+  }
+
+  if (contractId) {
+    window.open(`/verificar-contrato?id=${contractId}`, '_blank');
+  }
+}
+
 // Particles (deterministic)
 const PARTICLES = Array.from({ length: 12 }).map((_, i) => ({
   x: (i * 53.7 + 11) % 100, y: (i * 37.3 + 7) % 100,
@@ -154,7 +166,7 @@ function ContractPreviewModal({ contractId, name, signatureStatus, blockchainHas
         contractData.signatory_cpf || undefined,
         contractData.signatory_cnpj || undefined,
         undefined,
-        window.location.origin,
+        getContractVerificationBaseUrl(),
         logoBase64
       );
 
@@ -204,7 +216,7 @@ function ContractPreviewModal({ contractId, name, signatureStatus, blockchainHas
                   Salvar PDF
                 </Button>
               )}
-              <Button size="sm" variant="outline" onClick={() => window.open(`/verificar-contrato?id=${contractId}`, '_blank')} className="gap-1.5">
+              <Button size="sm" variant="outline" onClick={() => openContractVerification(contractId, contractData?.blockchain_hash || blockchainHash)} className="gap-1.5">
                 <ExternalLink className="h-3.5 w-3.5" />
                 Abrir
               </Button>
@@ -245,7 +257,7 @@ function ContractPreviewModal({ contractId, name, signatureStatus, blockchainHas
               <FileText className="h-14 w-14 opacity-30" />
               <p className="font-medium">Conteúdo não disponível</p>
               <p className="text-sm">Abra o contrato na página de verificação</p>
-              <Button size="sm" onClick={() => window.open(`/verificar-contrato?id=${contractId}`, '_blank')} className="gap-2 mt-2">
+              <Button size="sm" onClick={() => openContractVerification(contractId, contractData?.blockchain_hash || blockchainHash)} className="gap-2 mt-2">
                 <ExternalLink className="h-4 w-4" />
                 Abrir contrato
               </Button>
@@ -294,7 +306,7 @@ function DocCard({ doc, index }: { doc: Document; index: number }) {
 
         if (!data?.contract_html) {
           // Fallback: open verify page
-          window.open(`/verificar-contrato?id=${doc.contract_id}`, '_blank');
+          openContractVerification(doc.contract_id, data?.blockchain_hash);
           return;
         }
 
@@ -315,7 +327,7 @@ function DocCard({ doc, index }: { doc: Document; index: number }) {
           data.signatory_cpf || undefined,
           data.signatory_cnpj || undefined,
           undefined,
-          window.location.origin,
+          getContractVerificationBaseUrl(),
           logoBase64
         );
 
