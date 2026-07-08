@@ -109,7 +109,7 @@ function FullHtmlDocumentViewer({ htmlContent, blockchainSignature }: { htmlCont
 
       // Inject blockchain certification if signed and not already present
       if (blockchainSignature?.hash && !resolved.includes('CERTIFICAÇÃO DIGITAL E VALIDADE JURÍDICA') && resolved.includes('</body>')) {
-        const certSection = buildBlockchainCertificationHtml(blockchainSignature, origin);
+        const certSection = buildBlockchainCertificationHtml(blockchainSignature, getContractVerificationBaseUrl());
         resolved = resolved.replace('</body>', `${certSection}</body>`);
       }
 
