@@ -4400,6 +4400,30 @@ export type Database = {
         Returns: string
       }
       sync_intelligence_history: { Args: never; Returns: Json }
+      verify_contract_by_hash: {
+        Args: { p_hash: string }
+        Returns: {
+          blockchain_hash: string
+          blockchain_network: string
+          blockchain_timestamp: string
+          blockchain_tx_id: string
+          contract_number: string
+          signed_at: string
+          subject: string
+        }[]
+      }
+      verify_contract_by_id: {
+        Args: { p_contract_id: string }
+        Returns: {
+          blockchain_hash: string
+          blockchain_network: string
+          blockchain_timestamp: string
+          blockchain_tx_id: string
+          contract_number: string
+          signed_at: string
+          subject: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"

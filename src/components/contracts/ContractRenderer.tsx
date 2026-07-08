@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import webmarcasLogo from '@/assets/webmarcas-logo-mark.png';
 import { CheckCircle } from 'lucide-react';
+import { buildContractVerificationUrl, getContractVerificationBaseUrl } from '@/lib/contractVerification';
 
 export interface BlockchainSignature {
   hash?: string;
@@ -369,7 +370,7 @@ export function ContractRenderer({
               <div className="flex-shrink-0 text-center p-4 bg-white rounded-lg border border-slate-200">
                 <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: '#1f2937' }}>QR CODE DE VERIFICAÇÃO</p>
                 <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(`${window.location.origin}/verificar-contrato?hash=${blockchainSignature.hash}`)}`}
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(buildContractVerificationUrl(blockchainSignature.hash))}`}
                   alt="QR Code de Verificação"
                   className="w-32 h-32 mx-auto"
                 />
@@ -383,7 +384,7 @@ export function ContractRenderer({
                 Este documento foi assinado eletronicamente e possui validade jurídica conforme Lei 14.063/2020 e MP 2.200-2/2001.
               </p>
               <p className="text-xs mt-2" style={{ color: '#0284c7' }}>
-                Verifique a autenticidade em: {window.location.origin}/verificar-contrato
+                Verifique a autenticidade em: {getContractVerificationBaseUrl()}/verificar-contrato
               </p>
             </div>
           </div>
@@ -839,7 +840,7 @@ export function generateContractPrintHTML(
         <div style="flex-shrink: 0; text-align: center; padding: 16px; background: white; border-radius: 8px; border: 1px solid #e2e8f0;">
           <p style="font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #1e293b; margin-bottom: 12px;">QR CODE DE VERIFICAÇÃO</p>
           <img 
-            src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(`${window.location.origin}/verificar-contrato?hash=${blockchainSignature.hash}`)}" 
+            src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(buildContractVerificationUrl(blockchainSignature.hash))}" 
             alt="QR Code de Verificação"
             style="width: 140px; height: 140px;"
           />
@@ -853,7 +854,7 @@ export function generateContractPrintHTML(
           Este documento foi assinado eletronicamente e possui validade jurídica conforme Lei 14.063/2020 e MP 2.200-2/2001.
         </p>
         <p style="font-size: 11px; color: #0284c7; margin-top: 8px;">
-          Verifique a autenticidade em: ${window.location.origin}/verificar-contrato
+          Verifique a autenticidade em: ${getContractVerificationBaseUrl()}/verificar-contrato
         </p>
       </div>
     </div>

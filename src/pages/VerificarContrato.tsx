@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import webmarcasLogo from '@/assets/webmarcas-logo-new.png';
 import { supabase } from '@/integrations/supabase/client';
+import { isValidBlockchainHash, isValidUuid, normalizeBlockchainHash } from '@/lib/contractVerification';
 
 interface ContractVerification {
   found: boolean;
@@ -27,23 +28,73 @@ interface VerifyResult {
 
 export default function VerificarContrato() {
   const [searchParams] = useSearchParams();
-  const [hash, setHash] = useState(searchParams.get('hash') || '');
+  const [hash, setHash] = useState(normalizeBlockchainHash(searchParams.get('hash')));
   const [isSearching, setIsSearching] = useState(false);
   const [verification, setVerification] = useState<ContractVerification | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
   // Auto-search if hash is in URL
   useEffect(() => {
-    const urlHash = searchParams.get('hash');
-    if (urlHash && urlHash.length === 64) {
+    const urlHash = normalizeBlockchainHash(searchParams.get('hash'));
+    const contractId = searchParams.get('id');
+
+    if (isValidBlockchainHash(urlHash)) {
       setHash(urlHash);
       handleVerify(urlHash);
+      return;
+    }
+
+    if (isValidUuid(contractId)) {
+      handleVerifyById(contractId!);
     }
   }, [searchParams]);
 
+  const applyFoundContract = (contract: VerifyResult) => {
+    const verifiedHash = normalizeBlockchainHash(contract.blockchain_hash);
+    if (verifiedHash) setHash(verifiedHash);
+
+    setVerification({
+      found: true,
+      contractNumber: contract.contract_number || undefined,
+      signedAt: contract.blockchain_timestamp || contract.signed_at || undefined,
+      network: contract.blockchain_network || 'Bitcoin (OpenTimestamps)',
+      brandName: contract.subject || undefined,
+    });
+  };
+
+  const handleVerifyById = async (contractId: string) => {
+    setIsSearching(true);
+    setHasSearched(true);
+
+    try {
+      const { data, error } = await supabase
+        .rpc('verify_contract_by_id' as any, { p_contract_id: contractId });
+
+      if (error) {
+        console.error('Contract verification by id failed:', error);
+        setVerification({ found: false });
+        return;
+      }
+
+      if (!data || (Array.isArray(data) && data.length === 0)) {
+        setVerification({ found: false });
+        return;
+      }
+
+      applyFoundContract((Array.isArray(data) ? data[0] : data) as VerifyResult);
+    } catch (err) {
+      console.error('Verification by id error:', err);
+      setVerification({ found: false });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   const handleVerify = async (searchHash?: string) => {
-    const hashToSearch = searchHash || hash;
-    if (!hashToSearch || hashToSearch.length !== 64) {
+    const hashToSearch = normalizeBlockchainHash(searchHash || hash);
+    setHash(hashToSearch);
+
+    if (!isValidBlockchainHash(hashToSearch)) {
       return;
     }
 
@@ -55,17 +106,13 @@ export default function VerificarContrato() {
       const { data, error } = await supabase
         .rpc('verify_contract_by_hash' as any, { p_hash: hashToSearch });
 
-      if (error || !data || (Array.isArray(data) && data.length === 0)) {
+      if (error) {
+        console.error('Contract verification RPC failed:', error);
+        setVerification({ found: false });
+      } else if (!data || (Array.isArray(data) && data.length === 0)) {
         setVerification({ found: false });
       } else {
-        const contract = (Array.isArray(data) ? data[0] : data) as VerifyResult;
-        setVerification({
-          found: true,
-          contractNumber: contract.contract_number || undefined,
-          signedAt: contract.blockchain_timestamp || contract.signed_at || undefined,
-          network: contract.blockchain_network || 'Bitcoin (OpenTimestamps)',
-          brandName: contract.subject || undefined,
-        });
+        applyFoundContract((Array.isArray(data) ? data[0] : data) as VerifyResult);
       }
     } catch (err) {
       console.error('Verification error:', err);
@@ -128,14 +175,14 @@ export default function VerificarContrato() {
                   type="text"
                   placeholder="Ex: a1b2c3d4e5f6..."
                   value={hash}
-                  onChange={(e) => setHash(e.target.value.toLowerCase().replace(/[^a-f0-9]/g, ''))}
+                  onChange={(e) => setHash(normalizeBlockchainHash(e.target.value))}
                   className="pl-10 font-mono text-sm"
                   maxLength={64}
                 />
               </div>
               <Button 
                 onClick={() => handleVerify()}
-                disabled={hash.length !== 64 || isSearching}
+                disabled={!isValidBlockchainHash(hash) || isSearching}
                 className="bg-sky-600 hover:bg-sky-700"
               >
                 {isSearching ? 'Verificando...' : 'Verificar'}

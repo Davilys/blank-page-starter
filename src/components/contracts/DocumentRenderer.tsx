@@ -3,16 +3,16 @@ import { QRCodeSVG } from 'qrcode.react';
 import webmarcasLogo from '@/assets/webmarcas-logo-mark.png';
 import davilysSignature from '@/assets/davilys-signature.png';
 import { ContractRenderer } from '@/components/contracts/ContractRenderer';
+import { buildContractVerificationUrl, getContractVerificationBaseUrl, getContractVerificationHost } from '@/lib/contractVerification';
 
-// Função para gerar URL de verificação dinâmica baseada no domínio atual
+// Função para gerar URL oficial de verificação
 const getVerificationUrl = (hash: string) => {
-  const base = typeof window !== 'undefined' ? window.location.origin : 'https://webpatentes.com.br';
-  return `${base}/verificar-contrato?hash=${hash}`;
+  return buildContractVerificationUrl(hash);
 };
 
-// Função para obter o host atual para exibição
+// Função para obter o host oficial para exibição
 const getCurrentHost = () => {
-  return typeof window !== 'undefined' ? window.location.host : 'webpatentes.com.br';
+  return getContractVerificationHost();
 };
 
 interface BlockchainSignature {
@@ -109,7 +109,7 @@ function FullHtmlDocumentViewer({ htmlContent, blockchainSignature }: { htmlCont
 
       // Inject blockchain certification if signed and not already present
       if (blockchainSignature?.hash && !resolved.includes('CERTIFICAÇÃO DIGITAL E VALIDADE JURÍDICA') && resolved.includes('</body>')) {
-        const certSection = buildBlockchainCertificationHtml(blockchainSignature, origin);
+        const certSection = buildBlockchainCertificationHtml(blockchainSignature, getContractVerificationBaseUrl());
         resolved = resolved.replace('</body>', `${certSection}</body>`);
       }
 
@@ -443,7 +443,7 @@ export async function getLogoBase64ForPDF(): Promise<string> {
 const WEBMARCAS_LOGO_FALLBACK = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgNTAiPjxyZWN0IGZpbGw9IiMxZTNhNWYiIHdpZHRoPSIyMDAiIGhlaWdodD0iNTAiLz48dGV4dCB4PSIxMCIgeT0iMzUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNCIgZm9udC13ZWlnaHQ9ImJvbGQiIGZpbGw9IiNmZmYiPldlYk1hcmNhczwvdGV4dD48L3N2Zz4=';
 
 /** Gera o bloco HTML de certificação blockchain para injetar em qualquer contrato */
-function buildBlockchainCertificationHtml(sig: BlockchainSignature, verificationBase: string): string {
+function buildBlockchainCertificationHtml(sig: BlockchainSignature, verificationBase: string = getContractVerificationBaseUrl()): string {
   const verifyUrl = `${verificationBase}/verificar-contrato?hash=${sig.hash}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(verifyUrl)}`;
   return `
@@ -497,7 +497,7 @@ export function generateDocumentPrintHTML(
   baseUrl?: string,
   logoBase64?: string
 ): string {
-  const verificationBase = baseUrl || (typeof window !== 'undefined' ? window.location.origin : 'https://webpatentes.com.br');
+  const verificationBase = baseUrl || getContractVerificationBaseUrl();
 
   // Se for um HTML completo salvo, injetar a seção de certificação se o contrato estiver assinado
   const trimmed = content.trim();

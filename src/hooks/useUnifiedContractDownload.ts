@@ -1,4 +1,5 @@
 import webmarcasLogo from '@/assets/webmarcas-logo-new.png';
+import { buildContractVerificationUrl, getContractVerificationBaseUrl } from '@/lib/contractVerification';
 
 export interface BlockchainSignature {
   hash: string;
@@ -126,7 +127,7 @@ function generateContractHTML(
   // Build certification section if blockchain data exists
   let certificationSection = '';
   if (blockchainSignature?.hash) {
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(`${window.location.origin}/verificar-contrato?hash=${blockchainSignature.hash}`)}`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(buildContractVerificationUrl(blockchainSignature.hash))}`;
     
     certificationSection = `
       <!-- Footer before certification -->
@@ -195,7 +196,7 @@ function generateContractHTML(
             <p style="font-size: 10px; font-style: italic; color: #6b7280 !important;">
               Este documento foi assinado eletronicamente e possui validade jurídica conforme Lei 14.063/2020 e MP 2.200-2/2001.
             </p>
-            <p style="font-size: 10px; color: #0284c7 !important; margin-top: 8px;">${window.location.origin}/verificar-contrato</p>
+            <p style="font-size: 10px; color: #0284c7 !important; margin-top: 8px;">${getContractVerificationBaseUrl()}/verificar-contrato</p>
           </div>
         </div>
       </div>
