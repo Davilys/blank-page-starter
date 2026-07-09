@@ -341,7 +341,7 @@ export default function RegistrarMarca() {
           <p className="text-sm text-muted-foreground">
             Dúvidas? Fale com nossa equipe.{" "}
             <a
-              href="/cliente/chat-suporte"
+              href="/cliente/suporte"
               className="text-primary font-medium hover:underline"
             >
               Chat de Suporte →

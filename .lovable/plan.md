@@ -1,24 +1,48 @@
-Identifiquei a causa do erro na área do cliente em **Meus Processos**.
+Plano para corrigir a tela branca e validar a área do cliente inteira:
 
-O problema está no componente `PublicacoesCliente`: ele tenta usar `stCfg.bg`, mas quando a publicação vem do banco com um `status` não cadastrado em `STATUS_CONFIG`, a configuração fica `undefined` e a página inteira quebra.
+1. Corrigir a causa atual da tela branca em Meus Processos
+   - Arquivo principal: `src/pages/cliente/ProcessoDetalhe.tsx`.
+   - O erro atual vem de `PUB_STATUS_CONFIG[pub.status].bg` quando o status da publicação não existe no mapa.
+   - Criar fallback seguro para status de publicação, incluindo `default`, `depositada`, `em_andamento`, `publicado_rpi`, `em_exame` e qualquer status inesperado vindo do banco.
+   - Substituir todos os usos diretos de `PUB_STATUS_CONFIG[status]` por helper seguro.
 
-Plano de correção:
+2. Blindar datas inválidas no detalhe do processo
+   - Criar helper de data segura no `ProcessoDetalhe.tsx`.
+   - Evitar `format(new Date(...))`, `parseISO(...)`, `differenceInDays(...)` e `isBefore(...)` quando a data vier vazia, nula ou inválida.
+   - Aplicar isso em: dados do processo, timeline, publicações RPI, documentos e tabela de despachos.
 
-1. Corrigir o fallback de status em `PublicacoesCliente`.
-   - Adicionar uma configuração padrão real e segura.
-   - Se vier status desconhecido, nulo ou antigo do banco, a página não quebra.
+3. Revisar componentes da aba Meus Processos
+   - `src/components/cliente/PublicacoesCliente.tsx`: confirmar fallback seguro já aplicado e ajustar qualquer ponto restante.
+   - `src/components/cliente/ProcessList.tsx`: garantir fallback para status nulo/desconhecido.
+   - `src/components/cliente/ClientProcessKanban.tsx`: validar configuração do kanban vinda de `system_settings`; se vier inválida, usar etapas padrão sem quebrar.
 
-2. Proteger a renderização das publicações.
-   - Garantir que `bg`, `color` e `label` sempre existam antes de renderizar o badge.
-   - Exibir um status neutro quando o status não estiver mapeado.
+4. Auditar todas as abas da área do cliente contra tela branca
+   - Rotas a validar:
+     - `/cliente/dashboard`
+     - `/cliente/registrar-marca`
+     - `/cliente/processos`
+     - `/cliente/processos/:id`
+     - `/cliente/documentos`
+     - `/cliente/financeiro`
+     - `/cliente/analise-inteligente`
+     - `/cliente/suporte`
+     - `/cliente/configuracoes`
+   - Procurar e corrigir padrões perigosos:
+     - `CONFIG[valor].bg/color/label` sem fallback.
+     - `.map(...)` em valor que pode vir nulo.
+     - `format/parseISO/new Date` com data inválida.
+     - dados opcionais do Supabase usados como obrigatórios.
 
-3. Blindar datas inválidas na timeline e no prazo crítico.
-   - Evitar quebra se `proximo_prazo_critico`, `data_deposito`, `data_publicacao_rpi` ou outras datas vierem vazias/inválidas.
+5. Melhorar proteção de erro por seção
+   - Se necessário, colocar fallback local em blocos sensíveis da área do cliente para impedir que um único card/publicação derrube a página inteira.
+   - Manter o visual e fluxo atual, sem redesenhar a área do cliente.
 
-4. Manter o restante da área do cliente igual.
-   - Não alterar login, menu, financeiro, documentos, PDF, blockchain ou regras de negócio.
-   - Correção focada apenas em fazer a aba **Meus Processos** funcionar sem tela branca.
+6. Testar antes de concluir
+   - Testar navegação real com Playwright no preview local.
+   - Clicar nas abas do menu lateral da área do cliente.
+   - Entrar em Meus Processos, alternar Lista/Kanban e abrir um processo em andamento.
+   - Verificar console/runtime errors após cada rota.
+   - Só considerar resolvido se não aparecer mais tela branca nem erro `Cannot read properties of undefined (reading 'bg')`.
 
-5. Validar após aplicar.
-   - Abrir `/cliente/processos`.
-   - Confirmar que lista, kanban e publicações carregam sem cair na tela de erro.
+7. Publicação
+   - Após correção e teste completo, publicar apenas se a validação passar sem erro.

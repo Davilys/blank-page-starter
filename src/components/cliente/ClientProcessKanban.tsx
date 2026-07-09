@@ -44,8 +44,12 @@ export function ClientProcessKanban({ userId }: ClientProcessKanbanProps) {
       .eq('key', 'client_kanban_stages')
       .maybeSingle();
 
-    if (data?.value && typeof data.value === 'object' && 'stages' in (data.value as any)) {
-      setStages((data.value as any).stages);
+    const loadedStages = data?.value && typeof data.value === 'object' && 'stages' in (data.value as any)
+      ? (data.value as any).stages
+      : null;
+
+    if (Array.isArray(loadedStages) && loadedStages.every((stage) => stage?.id && stage?.name && stage?.color)) {
+      setStages(loadedStages);
     }
   };
 

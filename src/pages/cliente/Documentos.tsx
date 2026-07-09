@@ -24,6 +24,17 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { buildContractVerificationUrl, getContractVerificationBaseUrl } from '@/lib/contractVerification';
 
+const parseSafeDate = (value?: string | null) => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const formatRelativeSafe = (value?: string | null) => {
+  const date = parseSafeDate(value);
+  return date ? formatDistanceToNow(date, { addSuffix: true, locale: ptBR }) : '';
+};
+
 // ── Types ────────────────────────────────────────────────────────────────────
 interface Document {
   id: string;
@@ -278,9 +289,7 @@ function DocCard({ doc, index }: { doc: Document; index: number }) {
   const tab = getTabCfg(normalizeType(doc.document_type));
   const Icon = tab.icon;
   const rgb = tab.colorRgb;
-  const timeAgo = doc.created_at
-    ? formatDistanceToNow(new Date(doc.created_at), { addSuffix: true, locale: ptBR })
-    : '';
+  const timeAgo = formatRelativeSafe(doc.created_at);
 
   // Contract-specific actions
   const handleView = () => {

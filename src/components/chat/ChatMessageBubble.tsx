@@ -28,6 +28,12 @@ const formatSize = (bytes: number | null) => {
   return `${(bytes / 1048576).toFixed(1)} MB`;
 };
 
+const formatMessageTime = (value?: string | null) => {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : format(date, 'HH:mm');
+};
+
 // AudioPlayer is now in WhatsAppAudioPlayer.tsx
 
 export function ChatMessageBubble({ message, isOwnMessage, showAvatar = true }: ChatMessageBubbleProps) {
@@ -46,7 +52,7 @@ export function ChatMessageBubble({ message, isOwnMessage, showAvatar = true }: 
     );
   }
 
-  const timeStr = format(new Date(message.created_at), "HH:mm");
+  const timeStr = formatMessageTime(message.created_at);
 
   return (
     <div className={cn('flex gap-2 max-w-[75%] group mb-1', isOwnMessage ? 'ml-auto flex-row-reverse' : '')}>

@@ -50,6 +50,17 @@ const STATUS_CFG = {
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
+const parseSafeDate = (value?: string | null) => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const formatSafeDate = (value?: string | null) => {
+  const date = parseSafeDate(value);
+  return date ? format(date, 'dd/MM/yyyy') : 'N/A';
+};
+
 // Fixed particles - no Math.random()
 const PARTICLES = Array.from({ length: 18 }).map((_, i) => ({
   x: (i * 43.7 + 7) % 100, y: (i * 61.3 + 11) % 100,
@@ -107,12 +118,12 @@ function InvoiceCard({ invoice, index }: { invoice: Invoice; index: number }) {
             </span>
             <span className="text-[11px] text-muted-foreground flex items-center gap-1">
               <Calendar className="h-3 w-3" />
-              Vence: {format(new Date(invoice.due_date), "dd/MM/yyyy")}
+              Vence: {formatSafeDate(invoice.due_date)}
             </span>
             {invoice.payment_date && (
               <span className="text-[11px] text-emerald-500 flex items-center gap-1">
                 <CheckCircle className="h-3 w-3" />
-                Pago: {format(new Date(invoice.payment_date), "dd/MM/yyyy")}
+                Pago: {formatSafeDate(invoice.payment_date)}
               </span>
             )}
           </div>

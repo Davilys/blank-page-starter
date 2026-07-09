@@ -44,7 +44,8 @@ function INPISearchAnimation({ brandName }: { brandName: string }) {
     return () => clearInterval(timer);
   }, []);
 
-  const CurrentIcon = phases[currentPhase].icon;
+  const safePhase = phases[currentPhase] || phases[phases.length - 1];
+  const CurrentIcon = safePhase.icon;
 
   return (
     <motion.div

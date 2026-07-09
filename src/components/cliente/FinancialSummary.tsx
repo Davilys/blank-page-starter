@@ -49,7 +49,8 @@ export function FinancialSummary({ userId }: FinancialSummaryProps) {
   };
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('pt-BR');
+    const parsed = new Date(date);
+    return Number.isNaN(parsed.getTime()) ? 'N/A' : parsed.toLocaleDateString('pt-BR');
   };
 
   if (loading) {
