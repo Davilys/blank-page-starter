@@ -14,6 +14,22 @@ import {
 } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
 
+const parseSafeDate = (value?: string | null) => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const formatRelativeSafe = (value?: string | null) => {
+  const date = parseSafeDate(value);
+  return date ? formatDistanceToNow(date, { addSuffix: true, locale: ptBR }) : 'Data indisponível';
+};
+
+const formatShortDateSafe = (value?: string | null) => {
+  const date = parseSafeDate(value);
+  return date ? date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) : 'N/A';
+};
+
 // ─── Types ─────────────────────────────────────────────
 interface Stats {
   totalProcesses: number;
@@ -474,7 +490,7 @@ function NotifItem({ n, index }: { n: Notification; index: number }) {
           <p className="text-xs font-semibold truncate">{n.title}</p>
           <p className="text-[11px] text-muted-foreground truncate">{n.message}</p>
           <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-            {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: ptBR })}
+            {formatRelativeSafe(n.created_at)}
           </p>
         </div>
         {!n.read && (
@@ -575,7 +591,7 @@ function FinancialPanel({ userId }: { userId?: string }) {
   }, [userId]);
 
   const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
-  const fmtDate = (d: string) => new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+  const fmtDate = (d: string) => formatShortDateSafe(d);
 
   return (
     <motion.div
@@ -693,7 +709,7 @@ function QuickActions() {
     { label: 'Documentos',      icon: Shield,  to: '/cliente/documentos',       gradient: 'from-emerald-500 to-teal-400', glow: '16 185 129' },
     { label: 'Financeiro',      icon: TrendingUp,to: '/cliente/financeiro',     gradient: 'from-amber-500 to-orange-400', glow: '245 158 11' },
     { label: 'Suporte',         icon: Zap,     to: '/cliente/suporte',           gradient: 'from-rose-500 to-pink-400',    glow: '244 63 94'  },
-    { label: 'Chat',            icon: Activity,to: '/cliente/chat-suporte',     gradient: 'from-cyan-500 to-blue-400',    glow: '6 182 212'  },
+    { label: 'Chat',            icon: Activity,to: '/cliente/suporte',          gradient: 'from-cyan-500 to-blue-400',    glow: '6 182 212'  },
   ];
 
   return (

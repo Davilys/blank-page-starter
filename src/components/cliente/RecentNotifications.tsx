@@ -26,6 +26,17 @@ const typeConfig = {
   error: { icon: AlertTriangle, color: 'text-red-500', bg: 'bg-red-500/10' },
 };
 
+const parseSafeDate = (value?: string | null) => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const formatRelativeSafe = (value?: string | null) => {
+  const date = parseSafeDate(value);
+  return date ? formatDistanceToNow(date, { addSuffix: true, locale: ptBR }) : 'Data indisponível';
+};
+
 export function RecentNotifications({ userId }: RecentNotificationsProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,10 +114,7 @@ export function RecentNotifications({ userId }: RecentNotificationsProps) {
                       {notification.message}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {formatDistanceToNow(new Date(notification.created_at), {
-                        addSuffix: true,
-                        locale: ptBR,
-                      })}
+                      {formatRelativeSafe(notification.created_at)}
                     </p>
                   </div>
                   {!notification.read && (
