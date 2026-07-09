@@ -1,45 +1,24 @@
-## Diagnóstico da auditoria
+Identifiquei a causa do erro na área do cliente em **Meus Processos**.
 
-O problema não está no hash do contrato em si. Eu conferi o hash do print (`b5899a2bf90462f0ea3de4223192f7436869c58d31af21e3ae54bdb7d4613e45`) e ele existe no Supabase em um contrato assinado, com `signature_status = signed`, `blockchain_hash`, timestamp, txId e arquivo `.ots` gravados.
+O problema está no componente `PublicacoesCliente`: ele tenta usar `stCfg.bg`, mas quando a publicação vem do banco com um `status` não cadastrado em `STATUS_CONFIG`, a configuração fica `undefined` e a página inteira quebra.
 
-O erro principal é que a página pública `/verificar-contrato` chama a função RPC `verify_contract_by_hash`, mas essa função não existe mais no schema público do banco. Resultado: mesmo com o hash correto, a página cai como “Contrato Não Encontrado”.
+Plano de correção:
 
-Também encontrei inconsistências secundárias:
-- Alguns botões abrem `/verificar-contrato?id=...`, mas a tela só valida `?hash=...`.
-- PDFs/QR codes e e-mails podem usar o domínio atual do navegador (`window.location.origin`), gerando links diferentes dependendo de onde o contrato foi assinado/baixado.
-- A verificação deve aceitar o hash de forma canônica e pública, sem expor dados sensíveis do contrato.
+1. Corrigir o fallback de status em `PublicacoesCliente`.
+   - Adicionar uma configuração padrão real e segura.
+   - Se vier status desconhecido, nulo ou antigo do banco, a página não quebra.
 
-## Plano de correção
+2. Proteger a renderização das publicações.
+   - Garantir que `bg`, `color` e `label` sempre existam antes de renderizar o badge.
+   - Exibir um status neutro quando o status não estiver mapeado.
 
-1. **Restaurar a RPC pública de validação**
-   - Criar/recriar `public.verify_contract_by_hash(p_hash text)` como `SECURITY DEFINER`.
-   - Retornar apenas dados seguros: número do contrato, hash, txId, rede, timestamp, data de assinatura e assunto/marca.
-   - Validar somente contratos assinados e com hash blockchain preenchido.
-   - Conceder execução para `anon` e `authenticated`, mantendo a tabela protegida por RLS.
+3. Blindar datas inválidas na timeline e no prazo crítico.
+   - Evitar quebra se `proximo_prazo_critico`, `data_deposito`, `data_publicacao_rpi` ou outras datas vierem vazias/inválidas.
 
-2. **Tornar a tela `/verificar-contrato` compatível com links antigos**
-   - Continuar validando `?hash=...`.
-   - Corrigir ou tratar links com `?id=...` para não mostrarem inválido indevidamente.
-   - Normalizar o hash digitado/recebido: minúsculo, sem espaços e somente 64 caracteres hexadecimais.
-   - Exibir erro técnico no console quando a RPC falhar, para não mascarar problema futuro como “não encontrado”.
+4. Manter o restante da área do cliente igual.
+   - Não alterar login, menu, financeiro, documentos, PDF, blockchain ou regras de negócio.
+   - Correção focada apenas em fazer a aba **Meus Processos** funcionar sem tela branca.
 
-3. **Corrigir links internos que usam `id` no lugar de `hash`**
-   - Ajustar a área do cliente/documentos para abrir verificação com `?hash=<blockchain_hash>` quando o contrato estiver assinado.
-   - Se não houver hash, manter fallback seguro para visualização interna/documento.
-
-4. **Padronizar o domínio do QR Code e link de verificação**
-   - Usar uma função utilitária/canônica para montar o link público de verificação.
-   - Priorizar domínio oficial configurado/produção em vez do domínio temporário de preview quando o PDF/QR for gerado.
-   - Atualizar QR e texto de verificação no PDF assinado para apontarem para o mesmo link que a tela valida.
-
-5. **Validar com dados reais**
-   - Testar a RPC diretamente com o hash do print.
-   - Testar `/verificar-contrato?hash=b5899a2bf90462f0ea3de4223192f7436869c58d31af21e3ae54bdb7d4613e45` e confirmar que aparece como contrato verificado.
-   - Conferir que um hash inexistente continua retornando “Contrato Não Encontrado”.
-
-## Arquivos/áreas que serão alterados
-
-- Migração Supabase para restaurar `verify_contract_by_hash`.
-- `src/pages/VerificarContrato.tsx` para normalização, fallback e tratamento de erro.
-- `src/pages/cliente/Documentos.tsx` para não abrir verificação por `id` quando já existe hash.
-- Componentes/hooks de geração de PDF/QR se necessário para padronizar o link canônico.
+5. Validar após aplicar.
+   - Abrir `/cliente/processos`.
+   - Confirmar que lista, kanban e publicações carregam sem cair na tela de erro.
