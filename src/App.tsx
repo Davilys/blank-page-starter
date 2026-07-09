@@ -3,13 +3,15 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, Outlet } from "react-router-dom";
-import { useEffect, lazy, Suspense, Component, ReactNode } from "react";
+import { useEffect, lazy, Suspense, Component, ReactNode, ComponentType } from "react";
 import { connectivityRetry, connectivityRetryDelay } from "@/lib/networkResilience";
 
 // Lazy import with automatic reload on stale/failed dynamic chunk (fixes
 // "Failed to fetch dynamically imported module" white screens after deploys).
-const lazyWithRetry = <T extends { default: any }>(factory: () => Promise<T>) =>
-  lazy(async () => {
+const lazyWithRetry = <T extends ComponentType<any>>(
+  factory: () => Promise<{ default: T }>,
+) =>
+  lazy<T>(async () => {
     try {
       return await factory();
     } catch (err: any) {
@@ -19,7 +21,7 @@ const lazyWithRetry = <T extends { default: any }>(factory: () => Promise<T>) =>
         if (!sessionStorage.getItem(key)) {
           sessionStorage.setItem(key, "1");
           window.location.reload();
-          return new Promise<T>(() => {});
+          return new Promise<{ default: T }>(() => {});
         }
       }
       throw err;
