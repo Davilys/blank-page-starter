@@ -3,9 +3,53 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, Outlet } from "react-router-dom";
-import { useEffect, lazy, Suspense } from "react";
+import { useEffect, lazy, Suspense, Component, ReactNode } from "react";
 import { connectivityRetry, connectivityRetryDelay } from "@/lib/networkResilience";
-const PDFTestHarness = lazy(() => import("./pages/dev/PDFTestHarness"));
+
+// Lazy import with automatic reload on stale/failed dynamic chunk (fixes
+// "Failed to fetch dynamically imported module" white screens after deploys).
+const lazyWithRetry = <T extends { default: any }>(factory: () => Promise<T>) =>
+  lazy(async () => {
+    try {
+      return await factory();
+    } catch (err: any) {
+      const msg = String(err?.message || err);
+      if (/dynamically imported module|Importing a module script failed|Failed to fetch/i.test(msg)) {
+        const key = "__lovable_chunk_reload__";
+        if (!sessionStorage.getItem(key)) {
+          sessionStorage.setItem(key, "1");
+          window.location.reload();
+          return new Promise<T>(() => {});
+        }
+      }
+      throw err;
+    }
+  });
+
+class RouteErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error) { console.error("Route error:", error); }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center bg-background">
+          <h1 className="text-xl font-semibold">Algo deu errado ao carregar a página</h1>
+          <p className="text-sm text-muted-foreground max-w-md">{this.state.error.message}</p>
+          <button
+            className="px-4 py-2 rounded-md bg-primary text-primary-foreground"
+            onClick={() => window.location.reload()}
+          >
+            Recarregar
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const PDFTestHarness = lazyWithRetry(() => import("./pages/dev/PDFTestHarness"));
 
 const SectionRedirect = ({ section }: { section: string }) => {
   const navigate = useNavigate();
@@ -27,57 +71,57 @@ import { ChatModeProvider } from "@/contexts/ChatModeContext";
 import Index from "./pages/Index";
 
 // All other pages are lazy-loaded for code splitting
-const Registro = lazy(() => import("./pages/Registro"));
-const Registrar = lazy(() => import("./pages/Registrar"));
-const StatusPedido = lazy(() => import("./pages/StatusPedido"));
-const Obrigado = lazy(() => import("./pages/Obrigado"));
-const VerificarContrato = lazy(() => import("./pages/VerificarContrato"));
-const AssinarDocumento = lazy(() => import("./pages/AssinarDocumento"));
-const RegistroBlockchain = lazy(() => import("./pages/RegistroBlockchain"));
-const PoliticaPrivacidade = lazy(() => import("./pages/PoliticaPrivacidade"));
-const TermosUso = lazy(() => import("./pages/TermosUso"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const Blog = lazy(() => import("./pages/Blog"));
-const BlogPost = lazy(() => import("./pages/BlogPost"));
+const Registro = lazyWithRetry(() => import("./pages/Registro"));
+const Registrar = lazyWithRetry(() => import("./pages/Registrar"));
+const StatusPedido = lazyWithRetry(() => import("./pages/StatusPedido"));
+const Obrigado = lazyWithRetry(() => import("./pages/Obrigado"));
+const VerificarContrato = lazyWithRetry(() => import("./pages/VerificarContrato"));
+const AssinarDocumento = lazyWithRetry(() => import("./pages/AssinarDocumento"));
+const RegistroBlockchain = lazyWithRetry(() => import("./pages/RegistroBlockchain"));
+const PoliticaPrivacidade = lazyWithRetry(() => import("./pages/PoliticaPrivacidade"));
+const TermosUso = lazyWithRetry(() => import("./pages/TermosUso"));
+const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
+const Blog = lazyWithRetry(() => import("./pages/Blog"));
+const BlogPost = lazyWithRetry(() => import("./pages/BlogPost"));
 
 // Cliente pages
-const ClienteLogin = lazy(() => import("./pages/cliente/Login"));
-const ClienteDashboard = lazy(() => import("./pages/cliente/Dashboard"));
-const ClienteProcessos = lazy(() => import("./pages/cliente/Processos"));
-const ClienteProcessoDetalhe = lazy(() => import("./pages/cliente/ProcessoDetalhe"));
-const ClienteDocumentos = lazy(() => import("./pages/cliente/Documentos"));
-const ClienteFinanceiro = lazy(() => import("./pages/cliente/Financeiro"));
-const ClienteChatSuporte = lazy(() => import("./pages/cliente/ChatSuporte"));
-const ClienteConfiguracoes = lazy(() => import("./pages/cliente/Configuracoes"));
-const ClienteRegistrarMarca = lazy(() => import("./pages/cliente/RegistrarMarca"));
-const ClienteStatusPedido = lazy(() => import("./pages/cliente/StatusPedido"));
-const ClientePedidoConfirmado = lazy(() => import("./pages/cliente/PedidoConfirmado"));
-const ClienteRecuperarSenha = lazy(() => import("./pages/cliente/RecuperarSenha"));
-const ClienteRedefinirSenha = lazy(() => import("./pages/cliente/RedefinirSenha"));
-const ClienteAnaliseInteligente = lazy(() => import("./pages/cliente/AnaliseInteligente"));
+const ClienteLogin = lazyWithRetry(() => import("./pages/cliente/Login"));
+const ClienteDashboard = lazyWithRetry(() => import("./pages/cliente/Dashboard"));
+const ClienteProcessos = lazyWithRetry(() => import("./pages/cliente/Processos"));
+const ClienteProcessoDetalhe = lazyWithRetry(() => import("./pages/cliente/ProcessoDetalhe"));
+const ClienteDocumentos = lazyWithRetry(() => import("./pages/cliente/Documentos"));
+const ClienteFinanceiro = lazyWithRetry(() => import("./pages/cliente/Financeiro"));
+const ClienteChatSuporte = lazyWithRetry(() => import("./pages/cliente/ChatSuporte"));
+const ClienteConfiguracoes = lazyWithRetry(() => import("./pages/cliente/Configuracoes"));
+const ClienteRegistrarMarca = lazyWithRetry(() => import("./pages/cliente/RegistrarMarca"));
+const ClienteStatusPedido = lazyWithRetry(() => import("./pages/cliente/StatusPedido"));
+const ClientePedidoConfirmado = lazyWithRetry(() => import("./pages/cliente/PedidoConfirmado"));
+const ClienteRecuperarSenha = lazyWithRetry(() => import("./pages/cliente/RecuperarSenha"));
+const ClienteRedefinirSenha = lazyWithRetry(() => import("./pages/cliente/RedefinirSenha"));
+const ClienteAnaliseInteligente = lazyWithRetry(() => import("./pages/cliente/AnaliseInteligente"));
 
 // Admin pages
-const AdminLogin = lazy(() => import("./pages/admin/Login"));
-const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
-const AdminLeads = lazy(() => import("./pages/admin/Leads"));
-const AdminClientes = lazy(() => import("./pages/admin/Clientes"));
-const AdminContratos = lazy(() => import("./pages/admin/Contratos"));
-const AdminModelosContrato = lazy(() => import("./pages/admin/ModelosContrato"));
-const AdminProcessos = lazy(() => import("./pages/admin/Processos"));
-const AdminDocumentos = lazy(() => import("./pages/admin/Documentos"));
-const AdminFinanceiro = lazy(() => import("./pages/admin/Financeiro"));
-const AdminFinanceiroVencidos = lazy(() => import("./pages/admin/FinanceiroVencidos"));
-const AdminFinanceiroAguardando = lazy(() => import("./pages/admin/FinanceiroAguardando"));
-const AdminDevedores = lazy(() => import("./pages/admin/Devedores"));
-const AdminNotificacoes = lazy(() => import("./pages/admin/Notificacoes"));
-const AdminConfiguracoes = lazy(() => import("./pages/admin/Configuracoes"));
-const AdminRecursosINPI = lazy(() => import("./pages/admin/RecursosINPI"));
-const AdminRevistaINPI = lazy(() => import("./pages/admin/RevistaINPI"));
-const AdminPublicacoes = lazy(() => import("./pages/admin/Publicacoes"));
-const AdminEmails = lazy(() => import("./pages/admin/Emails"));
-const AdminChatAoVivo = lazy(() => import("./pages/admin/ChatAoVivo"));
-const AdminPremiacao = lazy(() => import("./pages/admin/Premiacao"));
-const AdminMarketingIntelligence = lazy(() => import("./pages/admin/MarketingIntelligence"));
+const AdminLogin = lazyWithRetry(() => import("./pages/admin/Login"));
+const AdminDashboard = lazyWithRetry(() => import("./pages/admin/Dashboard"));
+const AdminLeads = lazyWithRetry(() => import("./pages/admin/Leads"));
+const AdminClientes = lazyWithRetry(() => import("./pages/admin/Clientes"));
+const AdminContratos = lazyWithRetry(() => import("./pages/admin/Contratos"));
+const AdminModelosContrato = lazyWithRetry(() => import("./pages/admin/ModelosContrato"));
+const AdminProcessos = lazyWithRetry(() => import("./pages/admin/Processos"));
+const AdminDocumentos = lazyWithRetry(() => import("./pages/admin/Documentos"));
+const AdminFinanceiro = lazyWithRetry(() => import("./pages/admin/Financeiro"));
+const AdminFinanceiroVencidos = lazyWithRetry(() => import("./pages/admin/FinanceiroVencidos"));
+const AdminFinanceiroAguardando = lazyWithRetry(() => import("./pages/admin/FinanceiroAguardando"));
+const AdminDevedores = lazyWithRetry(() => import("./pages/admin/Devedores"));
+const AdminNotificacoes = lazyWithRetry(() => import("./pages/admin/Notificacoes"));
+const AdminConfiguracoes = lazyWithRetry(() => import("./pages/admin/Configuracoes"));
+const AdminRecursosINPI = lazyWithRetry(() => import("./pages/admin/RecursosINPI"));
+const AdminRevistaINPI = lazyWithRetry(() => import("./pages/admin/RevistaINPI"));
+const AdminPublicacoes = lazyWithRetry(() => import("./pages/admin/Publicacoes"));
+const AdminEmails = lazyWithRetry(() => import("./pages/admin/Emails"));
+const AdminChatAoVivo = lazyWithRetry(() => import("./pages/admin/ChatAoVivo"));
+const AdminPremiacao = lazyWithRetry(() => import("./pages/admin/Premiacao"));
+const AdminMarketingIntelligence = lazyWithRetry(() => import("./pages/admin/MarketingIntelligence"));
 
 // Minimal loading fallback
 const PageLoader = () => (
@@ -87,7 +131,7 @@ const PageLoader = () => (
 );
 
 // Lazy-load AdminLayout once for route wrapper
-const AdminLayout = lazy(() => import("@/components/admin/AdminLayout").then(m => ({ default: m.AdminLayout })));
+const AdminLayout = lazyWithRetry(() => import("@/components/admin/AdminLayout").then(m => ({ default: m.AdminLayout })));
 
 const AdminRouteWrapper = () => (
   <AdminLayout>
@@ -117,6 +161,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <RouteErrorBoundary>
             <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<Index />} />
@@ -188,6 +233,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
             </Suspense>
+            </RouteErrorBoundary>
           </BrowserRouter>
         </TooltipProvider>
         </ChatModeProvider>
