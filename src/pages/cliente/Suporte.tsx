@@ -79,6 +79,14 @@ const NOTIF_COLORS: Record<string, { border: string; bg: string }> = {
   payment: { border: 'border-l-emerald-500', bg: 'bg-emerald-500/5' },
 };
 
+const formatRelativeSafe = (value?: string | null) => {
+  if (!value) return 'Data indisponível';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? 'Data indisponível'
+    : formatDistanceToNow(date, { addSuffix: true, locale: ptBR });
+};
+
 export default function Suporte() {
   const navigate = useNavigate();
   const [user, setUser] = useState<SupabaseUser | null>(null);
@@ -530,7 +538,7 @@ export default function Suporte() {
                         <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{n.message}</p>
                         <p className="text-[10px] text-muted-foreground/60 mt-1.5 flex items-center gap-1">
                           <Clock className="h-2.5 w-2.5" />
-                          {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: ptBR })}
+                          {formatRelativeSafe(n.created_at)}
                         </p>
                       </div>
                     </div>
