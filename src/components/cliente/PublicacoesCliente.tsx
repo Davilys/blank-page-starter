@@ -8,6 +8,12 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  default: { label: 'Em andamento', color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-100 dark:bg-slate-900/40' },
+  depositada: { label: 'Depositada', color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/40' },
+  em_andamento: { label: 'Em andamento', color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/40' },
+  publicado_rpi: { label: 'Publicado RPI', color: 'text-indigo-700 dark:text-indigo-400', bg: 'bg-indigo-100 dark:bg-indigo-900/40' },
+  em_exame: { label: 'Em exame', color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/40' },
+  concedido: { label: 'Concedido', color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/40' },
   '003': { label: '003', color: 'text-yellow-700 dark:text-yellow-400', bg: 'bg-yellow-100 dark:bg-yellow-900/40' },
   oposicao: { label: 'Oposição', color: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/40' },
   exigencia_merito: { label: 'Exigência de Mérito', color: 'text-violet-700 dark:text-violet-400', bg: 'bg-violet-100 dark:bg-violet-900/40' },
@@ -16,6 +22,20 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
   certificado: { label: 'Certificado', color: 'text-teal-700 dark:text-teal-400', bg: 'bg-teal-100 dark:bg-teal-900/40' },
   renovacao: { label: 'Renovação', color: 'text-cyan-700 dark:text-cyan-400', bg: 'bg-cyan-100 dark:bg-cyan-900/40' },
   arquivado: { label: 'Arquivado', color: 'text-zinc-700 dark:text-zinc-400', bg: 'bg-zinc-100 dark:bg-zinc-900/40' },
+};
+
+const getStatusConfig = (status?: string | null) => {
+  if (!status) return STATUS_CONFIG.default;
+  return STATUS_CONFIG[status] || {
+    ...STATUS_CONFIG.default,
+    label: status.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()),
+  };
+};
+
+const parseSafeDate = (value?: string | null) => {
+  if (!value) return null;
+  const date = parseISO(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 };
 
 const TIMELINE_STEPS = [
@@ -87,8 +107,9 @@ export function PublicacoesCliente({ userId }: Props) {
       <CardContent className="space-y-4">
         {publicacoes.map(pub => {
           const proc = processMap.get(pub.process_id);
-          const stCfg = STATUS_CONFIG[pub.status] || STATUS_CONFIG.depositada;
-          const days = pub.proximo_prazo_critico ? differenceInDays(parseISO(pub.proximo_prazo_critico), new Date()) : null;
+          const stCfg = getStatusConfig(pub.status);
+          const prazoCritico = parseSafeDate(pub.proximo_prazo_critico);
+          const days = prazoCritico ? differenceInDays(prazoCritico, new Date()) : null;
 
           return (
             <div key={pub.id} className="border rounded-xl p-4 space-y-3">
@@ -114,8 +135,9 @@ export function PublicacoesCliente({ userId }: Props) {
               {/* Mini timeline */}
               <div className="flex items-center gap-1">
                 {TIMELINE_STEPS.map((step, i) => {
-                  const date = (pub as any)[step.key] as string | null;
-                  const completed = !!date && isBefore(parseISO(date), new Date());
+                  const dateValue = (pub as any)[step.key] as string | null;
+                  const date = parseSafeDate(dateValue);
+                  const completed = !!date && isBefore(date, new Date());
                   const Icon = step.icon;
                   return (
                     <div key={step.key} className="flex items-center">
@@ -126,7 +148,7 @@ export function PublicacoesCliente({ userId }: Props) {
                             ? 'bg-emerald-100 dark:bg-emerald-900/40 border-emerald-500 text-emerald-600'
                             : 'bg-muted border-border text-muted-foreground'
                         )}
-                        title={`${step.label}${date ? `: ${format(parseISO(date), 'dd/MM/yyyy', { locale: ptBR })}` : ''}`}
+                        title={`${step.label}${date ? `: ${format(date, 'dd/MM/yyyy', { locale: ptBR })}` : ''}`}
                       >
                         {completed ? <CheckCircle2 className="w-3 h-3" /> : <Icon className="w-3 h-3" />}
                       </div>
