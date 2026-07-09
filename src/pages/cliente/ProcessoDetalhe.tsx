@@ -113,6 +113,11 @@ interface PublicacaoMarca {
 }
 
 const PUB_STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  default: { label: 'Em andamento', color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-100 dark:bg-slate-900/40' },
+  depositada: { label: 'Depositada', color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/40' },
+  em_andamento: { label: 'Em andamento', color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/40' },
+  publicado_rpi: { label: 'Publicado RPI', color: 'text-indigo-700 dark:text-indigo-400', bg: 'bg-indigo-100 dark:bg-indigo-900/40' },
+  em_exame: { label: 'Em exame', color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/40' },
   '003': { label: '003', color: 'text-yellow-700 dark:text-yellow-400', bg: 'bg-yellow-100 dark:bg-yellow-900/40' },
   oposicao: { label: 'Oposição', color: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/40' },
   exigencia_merito: { label: 'Exig. Mérito', color: 'text-violet-700 dark:text-violet-400', bg: 'bg-violet-100 dark:bg-violet-900/40' },
@@ -121,6 +126,36 @@ const PUB_STATUS_CONFIG: Record<string, { label: string; color: string; bg: stri
   certificado: { label: 'Certificado', color: 'text-teal-700 dark:text-teal-400', bg: 'bg-teal-100 dark:bg-teal-900/40' },
   renovacao: { label: 'Renovação', color: 'text-cyan-700 dark:text-cyan-400', bg: 'bg-cyan-100 dark:bg-cyan-900/40' },
   arquivado: { label: 'Arquivado', color: 'text-zinc-700 dark:text-zinc-400', bg: 'bg-zinc-100 dark:bg-zinc-900/40' },
+};
+
+const formatStatusLabel = (status?: string | null) => {
+  if (!status) return PUB_STATUS_CONFIG.default.label;
+  return status.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const getPubStatusConfig = (status?: string | null) => {
+  if (!status) return PUB_STATUS_CONFIG.default;
+  return PUB_STATUS_CONFIG[status] || {
+    ...PUB_STATUS_CONFIG.default,
+    label: formatStatusLabel(status),
+  };
+};
+
+const parseSafeDate = (value?: string | null) => {
+  if (!value) return null;
+  const date = parseISO(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const parseSafeNativeDate = (value?: string | null) => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const formatSafeDate = (value?: string | null, pattern = 'dd/MM/yyyy') => {
+  const date = parseSafeNativeDate(value);
+  return date ? format(date, pattern, { locale: ptBR }) : 'N/A';
 };
 
 const PUB_TIMELINE_STEPS = [
@@ -491,7 +526,7 @@ export default function ProcessoDetalhe() {
                 <div>
                   <p className="text-sm text-muted-foreground">Data de Depósito</p>
                   <p className="font-medium">
-                    {format(new Date(process.deposit_date), 'dd/MM/yyyy', { locale: ptBR })}
+                    {formatSafeDate(process.deposit_date)}
                   </p>
                 </div>
               )}
@@ -499,7 +534,7 @@ export default function ProcessoDetalhe() {
                 <div>
                   <p className="text-sm text-muted-foreground">Data de Concessão</p>
                   <p className="font-medium">
-                    {format(new Date(process.grant_date), 'dd/MM/yyyy', { locale: ptBR })}
+                    {formatSafeDate(process.grant_date)}
                   </p>
                 </div>
               )}
@@ -507,7 +542,7 @@ export default function ProcessoDetalhe() {
                 <div>
                   <p className="text-sm text-muted-foreground">Validade</p>
                   <p className="font-medium">
-                    {format(new Date(process.expiry_date), 'dd/MM/yyyy', { locale: ptBR })}
+                    {formatSafeDate(process.expiry_date)}
                   </p>
                 </div>
               )}
@@ -522,7 +557,7 @@ export default function ProcessoDetalhe() {
                 <p className="text-sm">{process.next_step}</p>
                 {process.next_step_date && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    Previsão: {format(new Date(process.next_step_date), 'dd/MM/yyyy', { locale: ptBR })}
+                    Previsão: {formatSafeDate(process.next_step_date)}
                   </p>
                 )}
               </div>
@@ -584,7 +619,7 @@ export default function ProcessoDetalhe() {
                           )}
                           {event.event_date && (
                             <p className="text-xs text-muted-foreground mt-1">
-                              {format(new Date(event.event_date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                              {formatSafeDate(event.event_date, "dd/MM/yyyy 'às' HH:mm")}
                             </p>
                           )}
                         </div>
@@ -609,8 +644,9 @@ export default function ProcessoDetalhe() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {publicacoes.map(pub => {
-                    const stCfg = PUB_STATUS_CONFIG[pub.status] || PUB_STATUS_CONFIG.depositada;
-                    const days = pub.proximo_prazo_critico ? differenceInDays(parseISO(pub.proximo_prazo_critico), new Date()) : null;
+                    const stCfg = getPubStatusConfig(pub.status);
+                    const prazoCritico = parseSafeDate(pub.proximo_prazo_critico);
+                    const days = prazoCritico ? differenceInDays(prazoCritico, new Date()) : null;
 
                     return (
                       <div key={pub.id} className="border rounded-xl p-4 space-y-3">
@@ -638,8 +674,9 @@ export default function ProcessoDetalhe() {
                         {/* Mini timeline */}
                         <div className="flex items-center gap-1 flex-wrap">
                           {PUB_TIMELINE_STEPS.map((step, i) => {
-                            const date = (pub as any)[step.key] as string | null;
-                            const completed = !!date && isBefore(parseISO(date), new Date());
+                            const dateValue = (pub as any)[step.key] as string | null;
+                            const date = parseSafeDate(dateValue);
+                            const completed = !!date && isBefore(date, new Date());
                             const Icon = step.icon;
                             return (
                               <div key={step.key} className="flex items-center">
@@ -650,7 +687,7 @@ export default function ProcessoDetalhe() {
                                       ? 'bg-emerald-100 dark:bg-emerald-900/40 border-emerald-500 text-emerald-600'
                                       : 'bg-muted border-border text-muted-foreground'
                                   )}
-                                  title={`${step.label}${date ? `: ${format(parseISO(date), 'dd/MM/yyyy', { locale: ptBR })}` : ''}`}
+                                  title={`${step.label}${date ? `: ${format(date, 'dd/MM/yyyy', { locale: ptBR })}` : ''}`}
                                 >
                                   {completed ? <CheckCircle2 className="w-3 h-3" /> : <Icon className="w-3 h-3" />}
                                 </div>
@@ -719,9 +756,9 @@ export default function ProcessoDetalhe() {
                             </TableCell>
                             <TableCell>
                               {entry.publication_date 
-                                ? format(new Date(entry.publication_date), 'dd/MM/yyyy', { locale: ptBR })
+                                ? formatSafeDate(entry.publication_date)
                                 : entry.rpi_uploads?.rpi_date
-                                  ? format(new Date(entry.rpi_uploads.rpi_date), 'dd/MM/yyyy', { locale: ptBR })
+                                  ? formatSafeDate(entry.rpi_uploads.rpi_date)
                                   : 'N/A'}
                             </TableCell>
                             <TableCell>
@@ -776,7 +813,7 @@ export default function ProcessoDetalhe() {
                               <span>{formatFileSize(doc.file_size)}</span>
                               {doc.created_at && (
                                 <span>
-                                  {format(new Date(doc.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                                  {formatSafeDate(doc.created_at)}
                                 </span>
                               )}
                             </div>
