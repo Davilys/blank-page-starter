@@ -507,19 +507,36 @@ async function tryDownloadRpiXml(rpiNumber: number, sessionCookies: string | nul
 
   for (const url of urls) {
     console.log(`Trying URL: ${url}`);
-    try {
-      const response = await fetchWithSession(url, sessionCookies);
-
-      if (!response.ok) {
-        console.log(`URL ${url} returned status ${response.status}`);
-        // Check if redirected to login
-        const redirectUrl = response.headers.get('location') || '';
-        if (redirectUrl.includes('login')) {
-          console.log('Redirected to login - session may have expired');
-        }
-        await response.text(); // consume body
-        continue;
+    // Retry on transient failures (503/504/429) — INPI portal is flaky.
+    let response: Response | null = null;
+    const maxAttempts = 4;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        response = await fetchWithSession(url, sessionCookies);
+      } catch (err) {
+        console.log(`Fetch error on ${url} attempt ${attempt}: ${err}`);
+        response = null;
       }
+      if (response && response.ok) break;
+      const status = response?.status ?? 0;
+      if (![0, 429, 502, 503, 504].includes(status)) break;
+      const delay = 800 * attempt;
+      console.log(`Transient ${status} on ${url}, retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})`);
+      if (response) await response.text().catch(() => {});
+      await new Promise((r) => setTimeout(r, delay));
+      response = null;
+    }
+    if (!response) continue;
+    if (!response.ok) {
+      console.log(`URL ${url} returned status ${response.status}`);
+      const redirectUrl = response.headers.get('location') || '';
+      if (redirectUrl.includes('login')) {
+        console.log('Redirected to login - session may have expired');
+      }
+      await response.text();
+      continue;
+    }
+    try {
 
       const contentType = response.headers.get('content-type') || '';
       console.log(`Content-Type: ${contentType}`);
