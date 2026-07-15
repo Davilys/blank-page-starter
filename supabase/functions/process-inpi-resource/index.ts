@@ -137,20 +137,103 @@ function convertToResponsesFormat(userContent: any[]): any[] {
     if (part.type === 'text') {
       parts.push({ type: 'input_text', text: part.text });
     } else if (part.type === 'file') {
-      parts.push({
-        type: 'input_file',
-        filename: part.file.filename,
-        file_data: part.file.file_data,
-      });
+      if (part.file.file_id) {
+        parts.push({ type: 'input_file', file_id: part.file.file_id });
+      } else {
+        parts.push({
+          type: 'input_file',
+          filename: part.file.filename,
+          file_data: part.file.file_data,
+        });
+      }
     } else if (part.type === 'image_url') {
-      parts.push({
-        type: 'input_image',
-        image_url: part.image_url.url,
-        detail: 'high',
-      });
+      if (part.image_url.file_id) {
+        parts.push({ type: 'input_image', file_id: part.image_url.file_id, detail: 'high' });
+      } else {
+        parts.push({
+          type: 'input_image',
+          image_url: part.image_url.url,
+          detail: 'high',
+        });
+      }
     }
   }
   return parts;
+}
+
+// ═══════════════════════════════════════════════════════════
+// HELPER: Upload files to OpenAI Files API once and cache the
+// file_id. This is the single biggest performance win — instead of
+// re-uploading the same base64 PDF/image 3× (extraction + pass1 +
+// pass2) we send the raw bytes once and reference the file_id in
+// every subsequent call.
+// ═══════════════════════════════════════════════════════════
+function base64ToUint8Array(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+async function uploadFileToOpenAI(
+  apiKey: string,
+  bytes: Uint8Array,
+  filename: string,
+  mimeType: string,
+): Promise<string | null> {
+  try {
+    const form = new FormData();
+    form.append('purpose', 'user_data');
+    form.append('file', new File([bytes as unknown as BlobPart], filename, { type: mimeType }));
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000);
+    const resp = await fetch('https://api.openai.com/v1/files', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+    });
+    clearTimeout(timeout);
+    if (!resp.ok) {
+      const txt = await resp.text().catch(() => '');
+      console.warn('OpenAI file upload failed:', resp.status, txt.substring(0, 200));
+      return null;
+    }
+    const data = await resp.json();
+    return data.id || null;
+  } catch (e) {
+    console.warn('OpenAI file upload exception:', (e as Error).message);
+    return null;
+  }
+}
+
+// Upload each attached file once and convert fileParts to reference file_id.
+// Falls back to base64 embedding if upload fails (backwards compatible).
+async function maybeReplaceFilePartsWithFileIds(
+  apiKey: string,
+  fileParts: any[],
+  sourceFiles: Array<{ base64: string; type: string; name?: string }>,
+): Promise<void> {
+  if (fileParts.length === 0 || sourceFiles.length !== fileParts.length) return;
+  await Promise.all(
+    fileParts.map(async (part, i) => {
+      const src = sourceFiles[i];
+      if (!src?.base64 || !src?.type) return;
+      try {
+        const bytes = base64ToUint8Array(src.base64);
+        const filename = src.name || (part.type === 'file' ? part.file.filename : 'image');
+        const fileId = await uploadFileToOpenAI(apiKey, bytes, filename, src.type);
+        if (!fileId) return;
+        if (part.type === 'file') {
+          part.file = { filename, file_id: fileId };
+        } else if (part.type === 'image_url') {
+          part.image_url = { file_id: fileId };
+        }
+      } catch (e) {
+        console.warn('file_id swap failed:', (e as Error).message);
+      }
+    }),
+  );
 }
 
 // ═══════════════════════════════════════════════════════════
