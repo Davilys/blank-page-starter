@@ -962,7 +962,11 @@ export default function RecursosINPI() {
         body: {
           currentContent: draftContent,
           adjustmentInstructions: '',
-          evidences: rows.map((r) => ({
+          evidences: rows.map((r, i) => ({
+            docNumber: i + 1,
+            display_order: r.display_order,
+            party: (r as any).party || 'cliente',
+            placement: r.placement,
             caption: r.caption,
             ocr_text: r.ocr_text,
             source_file_name: r.source_file_name,
