@@ -1,0 +1,2 @@
+ALTER TABLE public.inpi_resource_evidences ADD COLUMN IF NOT EXISTS party TEXT NOT NULL DEFAULT 'cliente' CHECK (party IN ('cliente','concorrente'));
+CREATE INDEX IF NOT EXISTS idx_inpi_resource_evidences_party ON public.inpi_resource_evidences(resource_id, party, display_order);

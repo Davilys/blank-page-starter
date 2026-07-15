@@ -1790,6 +1790,7 @@ export type Database = {
           mime_type: string
           ocr_text: string | null
           page_number: number | null
+          party: string
           placement: string
           resource_id: string
           source_file_name: string | null
@@ -1806,6 +1807,7 @@ export type Database = {
           mime_type?: string
           ocr_text?: string | null
           page_number?: number | null
+          party?: string
           placement?: string
           resource_id: string
           source_file_name?: string | null
@@ -1822,6 +1824,7 @@ export type Database = {
           mime_type?: string
           ocr_text?: string | null
           page_number?: number | null
+          party?: string
           placement?: string
           resource_id?: string
           source_file_name?: string | null
