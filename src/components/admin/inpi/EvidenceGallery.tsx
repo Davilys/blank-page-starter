@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Loader2, Upload, X, ArrowUp, ArrowDown, Image as ImageIcon, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 export interface EvidenceRow {
   id: string;
@@ -21,6 +22,7 @@ export interface EvidenceRow {
   placement: 'inline' | 'annex';
   display_order: number;
   included: boolean;
+  party?: 'cliente' | 'concorrente';
 }
 
 interface Props {
@@ -46,6 +48,7 @@ export function EvidenceGallery({ open, onOpenChange, resourceId, onChanged, onR
   const [uploading, setUploading] = useState(false);
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
   const [regenerating, setRegenerating] = useState(false);
+  const [activeParty, setActiveParty] = useState<'cliente' | 'concorrente'>('cliente');
 
   const fetchRows = async () => {
     setLoading(true);
@@ -81,7 +84,7 @@ export function EvidenceGallery({ open, onOpenChange, resourceId, onChanged, onR
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, resourceId]);
 
-  const handleUpload = async (files: FileList | null) => {
+  const handleUpload = async (files: FileList | null, party: 'cliente' | 'concorrente') => {
     if (!files || files.length === 0) return;
     const arr = Array.from(files);
     const invalid = arr.filter(
@@ -97,7 +100,7 @@ export function EvidenceGallery({ open, onOpenChange, resourceId, onChanged, onR
         arr.map(async (f) => ({ name: f.name, type: f.type, base64: await fileToBase64(f) })),
       );
       const { data, error } = await supabase.functions.invoke('extract-resource-evidences', {
-        body: { resource_id: resourceId, files: filesB64, ocr: true },
+        body: { resource_id: resourceId, files: filesB64, ocr: true, party },
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Falha ao extrair evidências');
@@ -152,6 +155,9 @@ export function EvidenceGallery({ open, onOpenChange, resourceId, onChanged, onR
     return map;
   }, [rows]);
 
+  const rowsForParty = (p: 'cliente' | 'concorrente') =>
+    rows.filter((r) => (r.party || 'cliente') === p);
+
   const handleRegenerate = async () => {
     if (!onRegenerate) return;
     setRegenerating(true);
@@ -176,26 +182,79 @@ export function EvidenceGallery({ open, onOpenChange, resourceId, onChanged, onR
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-wrap gap-2 items-center border-b pb-3 mb-3">
-          <label className="inline-flex">
-            <input
-              type="file"
-              accept="application/pdf,image/*"
-              multiple
-              hidden
-              onChange={(e) => handleUpload(e.target.files)}
-            />
-            <Button asChild variant="default" disabled={uploading}>
-              <span>
-                {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-                {uploading ? 'Extraindo…' : 'Anexar PDFs / imagens'}
-              </span>
-            </Button>
-          </label>
-          <Badge variant="secondary">{rows.filter((r) => r.included).length} incluídas</Badge>
-          <Badge variant="outline">{rows.filter((r) => r.included && r.placement === 'inline').length} inline</Badge>
-          <Badge variant="outline">{rows.filter((r) => r.included && r.placement === 'annex').length} no anexo</Badge>
+        <Tabs value={activeParty} onValueChange={(v) => setActiveParty(v as 'cliente' | 'concorrente')}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="cliente">
+              Evidências do Cliente
+              <Badge variant="secondary" className="ml-2">{rowsForParty('cliente').length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="concorrente">
+              Evidências do Concorrente
+              <Badge variant="secondary" className="ml-2">{rowsForParty('concorrente').length}</Badge>
+            </TabsTrigger>
+          </TabsList>
 
+          {(['cliente', 'concorrente'] as const).map((party) => (
+            <TabsContent key={party} value={party} className="mt-3">
+              <div className="flex flex-wrap gap-2 items-center border-b pb-3 mb-3">
+                <label className="inline-flex">
+                  <input
+                    type="file"
+                    accept="application/pdf,image/*"
+                    multiple
+                    hidden
+                    onChange={(e) => handleUpload(e.target.files, party)}
+                  />
+                  <Button asChild variant="default" disabled={uploading}>
+                    <span>
+                      {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                      {uploading
+                        ? 'Extraindo…'
+                        : party === 'cliente'
+                          ? 'Anexar provas do cliente (logo, site, fachada, produto…)'
+                          : 'Anexar provas do concorrente (pedido INPI, site, produto…)'}
+                    </span>
+                  </Button>
+                </label>
+                <Badge variant="outline">
+                  {rowsForParty(party).filter((r) => r.included).length} incluídas
+                </Badge>
+              </div>
+
+              {loading ? (
+                <div className="flex items-center justify-center py-10 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" /> Carregando…
+                </div>
+              ) : rowsForParty(party).length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground text-sm">
+                  {party === 'cliente'
+                    ? 'Nenhuma prova do cliente ainda. Anexe logotipo, print do site, fachada, produtos, embalagens, material publicitário.'
+                    : 'Nenhuma prova do concorrente ainda. Anexe print do pedido no INPI, site do concorrente, logotipo, produtos ou material publicitário.'}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {rowsForParty(party).map((r, idx, arr) => (
+                    <EvidenceCard
+                      key={r.id}
+                      row={r}
+                      idx={idx}
+                      total={arr.length}
+                      docNumber={docNumbers[r.id]}
+                      signedUrl={signedUrls[r.id]}
+                      onMove={move}
+                      onDelete={deleteRow}
+                      onUpdate={updateRow}
+                      onCaptionLocal={(id, v) => setRows((p) => p.map((x) => x.id === id ? { ...x, caption: v } : x))}
+                    />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          ))}
+        </Tabs>
+
+        <div className="flex flex-wrap gap-2 items-center mt-4 pt-3 border-t">
+          <Badge variant="secondary">{rows.filter((r) => r.included).length} incluídas no total</Badge>
           {onRegenerate && (
             <div className="ml-auto">
               <Button onClick={handleRegenerate} disabled={regenerating || rows.filter((r) => r.included).length === 0} variant="secondary">
@@ -206,95 +265,97 @@ export function EvidenceGallery({ open, onOpenChange, resourceId, onChanged, onR
           )}
         </div>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-10 text-muted-foreground">
-            <Loader2 className="h-5 w-5 mr-2 animate-spin" /> Carregando…
-          </div>
-        ) : rows.length === 0 ? (
-          <div className="text-center py-10 text-muted-foreground">
-            Nenhuma evidência ainda. Anexe PDFs (prints, decisões, fotos do produto) para começar.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {rows.map((r, idx) => (
-              <div key={r.id} className={`border rounded-lg p-3 space-y-2 ${r.included ? '' : 'opacity-50'}`}>
-                <div className="flex items-start gap-2">
-                  <div className="flex flex-col gap-1">
-                    <Button size="icon" variant="ghost" onClick={() => move(r.id, -1)} disabled={idx === 0}>
-                      <ArrowUp className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" onClick={() => move(r.id, +1)} disabled={idx === rows.length - 1}>
-                      <ArrowDown className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="flex-1">
-                    {signedUrls[r.id] ? (
-                      <img
-                        src={signedUrls[r.id]}
-                        alt={r.caption || 'evidência'}
-                        className="w-full h-40 object-contain bg-muted rounded"
-                      />
-                    ) : (
-                      <div className="w-full h-40 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">
-                        sem preview
-                      </div>
-                    )}
-                  </div>
-                  <Button size="icon" variant="ghost" onClick={() => deleteRow(r.id)}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                <div className="flex items-center gap-2 text-xs">
-                  {r.included && (
-                    <Badge variant="default">Doc. {String(docNumbers[r.id]).padStart(2, '0')}</Badge>
-                  )}
-                  <span className="text-muted-foreground truncate flex-1">
-                    {r.source_file_name}{r.page_number ? ` — pág. ${r.page_number}` : ''}
-                  </span>
-                </div>
-
-                <Input
-                  value={r.caption || ''}
-                  placeholder="Legenda da evidência"
-                  onChange={(e) => setRows((p) => p.map((x) => x.id === r.id ? { ...x, caption: e.target.value } : x))}
-                  onBlur={(e) => updateRow(r.id, { caption: e.target.value })}
-                />
-
-                <div className="flex items-center gap-4 text-xs">
-                  <label className="flex items-center gap-2">
-                    <Switch checked={r.included} onCheckedChange={(v) => updateRow(r.id, { included: v })} />
-                    Incluir
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <Switch
-                      checked={r.placement === 'inline'}
-                      onCheckedChange={(v) => updateRow(r.id, { placement: v ? 'inline' : 'annex' })}
-                    />
-                    Inline (no argumento)
-                  </label>
-                </div>
-
-                {r.ocr_text && (
-                  <details className="text-xs text-muted-foreground">
-                    <summary className="cursor-pointer">Ver OCR</summary>
-                    <Textarea
-                      className="mt-1 text-xs h-24"
-                      value={r.ocr_text}
-                      readOnly
-                    />
-                  </details>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function EvidenceCard({
+  row: r,
+  idx,
+  total,
+  docNumber,
+  signedUrl,
+  onMove,
+  onDelete,
+  onUpdate,
+  onCaptionLocal,
+}: {
+  row: EvidenceRow;
+  idx: number;
+  total: number;
+  docNumber?: number;
+  signedUrl?: string;
+  onMove: (id: string, dir: -1 | 1) => void;
+  onDelete: (id: string) => void;
+  onUpdate: (id: string, patch: Partial<EvidenceRow>) => void;
+  onCaptionLocal: (id: string, value: string) => void;
+}) {
+  return (
+    <div className={`border rounded-lg p-3 space-y-2 ${r.included ? '' : 'opacity-50'}`}>
+      <div className="flex items-start gap-2">
+        <div className="flex flex-col gap-1">
+          <Button size="icon" variant="ghost" onClick={() => onMove(r.id, -1)} disabled={idx === 0}>
+            <ArrowUp className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="ghost" onClick={() => onMove(r.id, +1)} disabled={idx === total - 1}>
+            <ArrowDown className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="flex-1">
+          {signedUrl ? (
+            <img src={signedUrl} alt={r.caption || 'evidência'} className="w-full h-40 object-contain bg-muted rounded" />
+          ) : (
+            <div className="w-full h-40 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">
+              sem preview
+            </div>
+          )}
+        </div>
+        <Button size="icon" variant="ghost" onClick={() => onDelete(r.id)}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className="flex items-center gap-2 text-xs">
+        {r.included && docNumber !== undefined && (
+          <Badge variant="default">Doc. {String(docNumber).padStart(2, '0')}</Badge>
+        )}
+        <span className="text-muted-foreground truncate flex-1">
+          {r.source_file_name}{r.page_number ? ` — pág. ${r.page_number}` : ''}
+        </span>
+      </div>
+
+      <Input
+        value={r.caption || ''}
+        placeholder="Legenda da evidência"
+        onChange={(e) => onCaptionLocal(r.id, e.target.value)}
+        onBlur={(e) => onUpdate(r.id, { caption: e.target.value })}
+      />
+
+      <div className="flex items-center gap-4 text-xs">
+        <label className="flex items-center gap-2">
+          <Switch checked={r.included} onCheckedChange={(v) => onUpdate(r.id, { included: v })} />
+          Incluir
+        </label>
+        <label className="flex items-center gap-2">
+          <Switch
+            checked={r.placement === 'inline'}
+            onCheckedChange={(v) => onUpdate(r.id, { placement: v ? 'inline' : 'annex' })}
+          />
+          Inline (no argumento)
+        </label>
+      </div>
+
+      {r.ocr_text && (
+        <details className="text-xs text-muted-foreground">
+          <summary className="cursor-pointer">Ver OCR</summary>
+          <Textarea className="mt-1 text-xs h-24" value={r.ocr_text} readOnly />
+        </details>
+      )}
+    </div>
   );
 }
 
