@@ -177,6 +177,8 @@ Deno.serve(async (req) => {
     const resourceId: string = body.resource_id;
     const files: FileInput[] = body.files || [];
     const doOcr: boolean = body.ocr !== false;
+    const party: 'cliente' | 'concorrente' =
+      body.party === 'concorrente' ? 'concorrente' : 'cliente';
 
     if (!resourceId || files.length === 0) {
       return new Response(JSON.stringify({ error: 'resource_id e files são obrigatórios' }), {
@@ -211,7 +213,7 @@ Deno.serve(async (req) => {
         });
         if (upErr) { console.warn('upload img err:', upErr.message); continue; }
         const meta = doOcr ? await ocrAndCaptionImage(bytes, `Imagem anexa: ${f.name}`, f.type) : { caption: f.name, ocr: '' };
-        const row: EvidenceRow = {
+        const row: EvidenceRow & { party: string } = {
           resource_id: resourceId,
           storage_path: path,
           page_number: null,
@@ -222,6 +224,7 @@ Deno.serve(async (req) => {
           placement: 'annex',
           display_order: order++,
           included: true,
+          party,
         };
         const { data: ins } = await admin.from('inpi_resource_evidences').insert(row).select().single();
         if (ins) inserted.push(ins as unknown as EvidenceRow);
@@ -246,7 +249,7 @@ Deno.serve(async (req) => {
           const meta = (doOcr && im.mime === 'image/jpeg')
             ? await ocrAndCaptionImage(im.bytes, `${f.name} — pág. ${im.page}`, 'image/jpeg')
             : { caption: `${f.name} — pág. ${im.page}`, ocr: '' };
-          const row: EvidenceRow = {
+          const row: EvidenceRow & { party: string } = {
             resource_id: resourceId,
             storage_path: path,
             page_number: im.page,
@@ -257,6 +260,7 @@ Deno.serve(async (req) => {
             placement: 'annex',
             display_order: order++,
             included: true,
+            party,
           };
           const { data: ins } = await admin.from('inpi_resource_evidences').insert(row).select().single();
           if (ins) inserted.push(ins as unknown as EvidenceRow);
