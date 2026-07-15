@@ -1365,7 +1365,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
     // STANDARD INPI RESOURCE FLOW — TWO-PASS GENERATION
     // (indeferimento, exigencia_merito, oposicao)
     // ═════════════════════════════════════════════════════
-    const { fileBase64, fileType, files: multiFiles, generationPass, pass1Content: providedPass1Content, extractedData: providedExtractedData, userOrientation } = body;
+    const { fileBase64, fileType, files: multiFiles, generationPass, pass1Content: providedPass1Content, extractedData: providedExtractedData, userOrientation, evidences: providedEvidences } = body;
     const requestedPass = generationPass || body.pass;
     const resourceTypeLabel = RESOURCE_TYPE_LABELS[resourceType] || 'RECURSO ADMINISTRATIVO';
 
@@ -1378,25 +1378,70 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
 
     // Build file parts for all calls
     const fileParts: any[] = [];
+    const sourceFilesForUpload: Array<{ base64: string; type: string; name?: string }> = [];
     if (multiFiles && multiFiles.length > 0) {
       for (const file of multiFiles) {
         if (file.type === 'application/pdf') {
           fileParts.push({ type: 'file', file: { filename: file.name || 'doc.pdf', file_data: `data:application/pdf;base64,${file.base64}` } });
+          sourceFilesForUpload.push({ base64: file.base64, type: 'application/pdf', name: file.name || 'doc.pdf' });
         } else {
           fileParts.push({ type: 'image_url', image_url: { url: `data:${file.type};base64,${file.base64}` } });
+          sourceFilesForUpload.push({ base64: file.base64, type: file.type, name: file.name || 'image' });
         }
       }
     } else if (fileBase64 && fileType) {
       if (fileType === 'application/pdf') {
         fileParts.push({ type: 'file', file: { filename: 'documento_inpi.pdf', file_data: `data:application/pdf;base64,${fileBase64}` } });
+        sourceFilesForUpload.push({ base64: fileBase64, type: 'application/pdf', name: 'documento_inpi.pdf' });
       } else {
         fileParts.push({ type: 'image_url', image_url: { url: `data:${fileType};base64,${fileBase64}` } });
+        sourceFilesForUpload.push({ base64: fileBase64, type: fileType, name: 'image' });
       }
     } else if (requestedPass !== 'pass2') {
       return new Response(JSON.stringify({ error: 'Nenhum arquivo fornecido' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    // Upload each attached file ONCE to OpenAI Files API and reuse
+    // the file_id across extraction + pass1 + pass2. Cuts total payload
+    // by ~66% and slashes generation latency.
+    console.time('file_upload_dedupe');
+    await maybeReplaceFilePartsWithFileIds(OPENAI_API_KEY, fileParts, sourceFilesForUpload);
+    console.timeEnd('file_upload_dedupe');
     const fileResponseParts = convertToResponsesFormat(fileParts);
+
+    // ─────────────────────────────────────────────────────
+    // EVIDENCE BLOCK: inject client & competitor evidences
+    // (caption + OCR text) into the prompt so the AI can cite
+    // them as [DOC:NN] markers in the correct paragraphs.
+    // Preserves all existing behavior when no evidences are passed.
+    // ─────────────────────────────────────────────────────
+    const buildEvidenceBlock = (): string => {
+      if (!Array.isArray(providedEvidences) || providedEvidences.length === 0) return '';
+      const cliente = providedEvidences.filter((e: any) => (e.party || 'cliente') === 'cliente');
+      const concorr = providedEvidences.filter((e: any) => e.party === 'concorrente');
+      const format = (list: any[]) =>
+        list.map((e: any) => {
+          const n = String(e.docNumber || e.display_order || 0).padStart(2, '0');
+          const cap = (e.caption || e.source_file_name || 'evidência').toString().slice(0, 200);
+          const ocr = (e.ocr_text || '').toString().slice(0, 400).replace(/\s+/g, ' ').trim();
+          return `[DOC:${n}] — ${cap}${ocr ? ` — OCR: "${ocr}"` : ''}`;
+        }).join('\n');
+
+      let block = `\n\n⚠️ EVIDÊNCIAS ANEXADAS PELO USUÁRIO (use como PROVAS dentro do recurso). Cite CADA marcador [DOC:NN] pelo menos uma vez, EXATAMENTE nesta forma, no parágrafo argumentativo apropriado. Não descreva a imagem — apenas insira o marcador literal, opcionalmente seguido por "(Doc. NN, anexo)".\n\n`;
+      if (cliente.length > 0) {
+        block += `EVIDÊNCIAS DO CLIENTE (uso real, boa-fé, distintividade adquirida, notoriedade):\n${format(cliente)}\n\n`;
+      }
+      if (concorr.length > 0) {
+        block += `EVIDÊNCIAS DO CONCORRENTE / OPOSITOR (colidência, má-fé, concorrência desleal, diluição):\n${format(concorr)}\n\n`;
+      }
+      block += `REGRAS DE USO DAS EVIDÊNCIAS:
+- Utilize APENAS informações verificáveis na legenda ou no OCR — NÃO invente fatos que não estejam ali.
+- Em caso de conflito entre os autos do INPI e as evidências, PREVALECEM os autos oficiais; as evidências apenas complementam.
+- Se a mesma evidência reforçar dois argumentos, cite-a na primeira ocorrência e faça referência textual à segunda ("como já demonstrado no [DOC:NN]").
+- Os marcadores [DOC:NN] serão substituídos pelas imagens reais no PDF final.\n`;
+      return block;
+    };
+    const evidenceBlock = buildEvidenceBlock();
 
     console.log('=== TWO-PASS GENERATION START ===');
     console.log('Resource type:', resourceType, '| Agent:', agentName || 'default', '| Files:', fileResponseParts.length);
@@ -1419,7 +1464,7 @@ SEÇÕES I A IV JÁ GERADAS:
 ${basePass1Content.substring(0, 6000)}
 ---
 
-Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo e nível de profundidade. ${resourceType === 'exigencia_merito' ? 'O texto total desta parte deve ter entre 800 e 1.400 palavras — SEJA OBJETIVO.' : 'O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.'}${userOrientationBlock}` },
+Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo e nível de profundidade. ${resourceType === 'exigencia_merito' ? 'O texto total desta parte deve ter entre 800 e 1.400 palavras — SEJA OBJETIVO.' : 'O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.'}${userOrientationBlock}${evidenceBlock}` },
       ];
 
       console.log('PASS 2 only: Generating Sections V-VIII...');
@@ -1458,29 +1503,32 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     const pass1System = buildPass1SystemPrompt(resourceType, resourceTypeLabel, currentDate, agentName, agentStrategy);
     const pass1User = [
       { type: 'input_text', text: resourceType === 'exigencia_merito'
-        ? `Analise o(s) documento(s) do INPI anexado(s) e elabore APENAS o miolo (Parte 1) do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. PASSO 1 (obrigatório, mental): classifique a exigência como TIPO A (especificação/classificação), TIPO B (prova de atividade/titularidade) ou TIPO C (oposição). Se TIPO A: gere no MÁXIMO 450-700 palavras (Síntese curta + Cumprimento com nova especificação); NÃO crie seções de boa-fé, conclusão extensa, não cite jurisprudência, doutrina nem examinador, não amplie escopo. Se TIPO B/C: siga estrutura I–IV mais densa, mas sem doutrina/jurisprudência. 🛑 PROIBIDO nesta Parte 1: escrever "Termos em que", "Pede deferimento", "São Paulo, ${currentDate}", linha de assinatura, "Davilys Danques", "CPF:" ou lista "(Doc. 01) – …". Isso será emitido APENAS na Parte 2. Termine após a última seção, sem fechamento. 🔒 Nunca invente produtos, serviços, documentos ou atividades que não estejam expressamente no processo/anexos.${userOrientationBlock}`
-        : `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do recurso administrativo. CADA seção deve ter a extensão MÍNIMA especificada. O texto total desta parte deve ter NO MÍNIMO 3.800 palavras. Desenvolva CADA argumento com máxima profundidade, como um escritório de PI de elite faria.` },
+        ? `Analise o(s) documento(s) do INPI anexado(s) e elabore APENAS o miolo (Parte 1) do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. PASSO 1 (obrigatório, mental): classifique a exigência como TIPO A (especificação/classificação), TIPO B (prova de atividade/titularidade) ou TIPO C (oposição). Se TIPO A: gere no MÁXIMO 450-700 palavras (Síntese curta + Cumprimento com nova especificação); NÃO crie seções de boa-fé, conclusão extensa, não cite jurisprudência, doutrina nem examinador, não amplie escopo. Se TIPO B/C: siga estrutura I–IV mais densa, mas sem doutrina/jurisprudência. 🛑 PROIBIDO nesta Parte 1: escrever "Termos em que", "Pede deferimento", "São Paulo, ${currentDate}", linha de assinatura, "Davilys Danques", "CPF:" ou lista "(Doc. 01) – …". Isso será emitido APENAS na Parte 2. Termine após a última seção, sem fechamento. 🔒 Nunca invente produtos, serviços, documentos ou atividades que não estejam expressamente no processo/anexos.${userOrientationBlock}${evidenceBlock}`
+        : `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do recurso administrativo. CADA seção deve ter a extensão MÍNIMA especificada. O texto total desta parte deve ter NO MÍNIMO 3.800 palavras. Desenvolva CADA argumento com máxima profundidade, como um escritório de PI de elite faria.${evidenceBlock}` },
       ...fileResponseParts,
     ];
 
     const pass2System = buildPass2SystemPrompt(resourceType, resourceTypeLabel, currentDate, agentName, agentStrategy);
     const pass2User = [
       { type: 'input_text', text: resourceType === 'exigencia_merito'
-        ? `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS o fechamento (Parte 2) do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Reclassifique a exigência: TIPO A (especificação), TIPO B (prova de atividade) ou TIPO C (oposição). Se TIPO A: produza SOMENTE uma seção curta "DOS PEDIDOS" (60-120 palavras) + encerramento único ("Termos em que / Pede deferimento / São Paulo, ${currentDate} / assinatura / CPF"); total 150-300 palavras; NÃO escreva Seções V/VI/VII; NÃO cite jurisprudência, doutrina ou examinador; NÃO amplie escopo. Se TIPO B/C: siga V–VIII + encerramento, sem doutrina/jurisprudência. 🔒 Nunca invente produtos, serviços, documentos ou atividades que não estejam no processo/anexos. O encerramento aparece UMA ÚNICA VEZ, ao final.${userOrientationBlock}`
-        : `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do recurso administrativo. Mantenha tom técnico, fundamentação robusta e conclusões objetivas. O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.` },
+        ? `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS o fechamento (Parte 2) do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Reclassifique a exigência: TIPO A (especificação), TIPO B (prova de atividade) ou TIPO C (oposição). Se TIPO A: produza SOMENTE uma seção curta "DOS PEDIDOS" (60-120 palavras) + encerramento único ("Termos em que / Pede deferimento / São Paulo, ${currentDate} / assinatura / CPF"); total 150-300 palavras; NÃO escreva Seções V/VI/VII; NÃO cite jurisprudência, doutrina ou examinador; NÃO amplie escopo. Se TIPO B/C: siga V–VIII + encerramento, sem doutrina/jurisprudência. 🔒 Nunca invente produtos, serviços, documentos ou atividades que não estejam no processo/anexos. O encerramento aparece UMA ÚNICA VEZ, ao final.${userOrientationBlock}${evidenceBlock}`
+        : `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do recurso administrativo. Mantenha tom técnico, fundamentação robusta e conclusões objetivas. O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.${evidenceBlock}` },
       ...fileResponseParts,
     ];
 
-    console.log('PASS 1 and PASS 2: Generating all sections in parallel...');
+    console.log('PASS 1 and PASS 2: Generating all sections in parallel...',
+      'evidences:', Array.isArray(providedEvidences) ? providedEvidences.length : 0);
     
     // Run extraction and both content passes in parallel. Sequential AI calls were
     // exceeding Supabase's 150s idle timeout before the function could respond.
     const shouldRunPass2Now = requestedPass !== 'pass1';
+    console.time('ai_generation');
     const [extractionResult, pass1Result, pass2Result] = await Promise.all([
-      callOpenAI(OPENAI_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, 1000, 0.1),
+      callOpenAI(OPENAI_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, 800, 0.1, 60000),
       callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 9000, 0.25),
       shouldRunPass2Now ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25) : Promise.resolve({ content: '' }),
     ]);
+    console.timeEnd('ai_generation');
 
     // Parse extracted data
     let extractedData = {
