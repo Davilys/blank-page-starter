@@ -150,52 +150,94 @@ ${formattingRules}`;
 
     console.log('Calling AI to adjust INPI resource, original length:', currentContent.length, 'chars');
 
-    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-5',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        max_completion_tokens: 32000,
-      }),
-    });
+    // Migrated to Responses API with minimal reasoning for much lower latency.
+    // Retries once on transient 429/5xx (backoff) before surfacing the error.
+    const callAdjust = async (attempt: number): Promise<Response> => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 140000);
+      try {
+        return await fetch('https://api.openai.com/v1/responses', {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-5-mini',
+            input: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: [{ type: 'input_text', text: userPrompt }] },
+            ],
+            max_output_tokens: 12000,
+            reasoning: { effort: 'minimal' },
+            text: { verbosity: 'high' },
+          }),
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+    };
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('AI API error:', aiResponse.status, errorText);
-      
-      if (aiResponse.status === 429) {
+    let aiResponse: Response | null = null;
+    let lastError = '';
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        aiResponse = await callAdjust(attempt);
+        if (aiResponse.ok) break;
+        const status = aiResponse.status;
+        if (status !== 429 && status < 500) break; // non-retryable
+        lastError = await aiResponse.text();
+        console.warn(`Adjust attempt ${attempt + 1} failed: ${status}`);
+        await new Promise((r) => setTimeout(r, 1500 * Math.pow(2, attempt)));
+      } catch (err) {
+        const isAbort = err instanceof Error && err.name === 'AbortError';
+        lastError = isAbort ? 'timeout' : (err as Error).message;
+        console.warn(`Adjust attempt ${attempt + 1} exception: ${lastError}`);
+        if (isAbort) break;
+        await new Promise((r) => setTimeout(r, 1500 * Math.pow(2, attempt)));
+      }
+    }
+
+    if (!aiResponse || !aiResponse.ok) {
+      const status = aiResponse?.status || 504;
+      console.error('AI API error after retries:', status, lastError.substring(0, 500));
+      if (status === 429) {
         return new Response(
-          JSON.stringify({ error: 'Limite de requisições excedido. Tente novamente em alguns minutos.' }),
+          JSON.stringify({ error: 'Limite de requisições excedido. Tente novamente em alguns minutos.', retryable: true }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      
       return new Response(
-        JSON.stringify({ error: 'Erro ao ajustar recurso com IA' }),
+        JSON.stringify({ error: 'Erro ao ajustar recurso com IA', retryable: true }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const aiData = await aiResponse.json();
-    const adjustedContent = aiData.choices?.[0]?.message?.content;
+    // Extract text from Responses API output
+    let adjustedContent = '';
+    if (aiData.output && Array.isArray(aiData.output)) {
+      for (const item of aiData.output) {
+        if (item.type === 'message' && item.content) {
+          for (const part of item.content) {
+            if (part.type === 'output_text') adjustedContent += part.text;
+          }
+        }
+      }
+    }
 
     if (!adjustedContent) {
       console.error('Empty AI response for adjustment');
       return new Response(
-        JSON.stringify({ error: 'Resposta vazia da IA' }),
+        JSON.stringify({ error: 'Resposta vazia da IA', retryable: true }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     let trimmed = adjustedContent.trim();
     console.log('Adjusted content length:', trimmed.length, 'chars (original:', currentContent.length, 'chars)');
+    const unchanged = trimmed === currentContent.trim();
 
     // Diagnóstico: avisar se o modelo devolveu texto idêntico ao rascunho (ajustes não aplicados)
     if (trimmed === currentContent.trim()) {
@@ -244,7 +286,8 @@ ${formattingRules}`;
     return new Response(
       JSON.stringify({
         success: true,
-        adjusted_content: trimmed
+        adjusted_content: trimmed,
+        unchanged,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
