@@ -1,244 +1,84 @@
-## Escopo
+# Plano — Validação, Testes e Correção do módulo Recursos INPI
 
-Correções pontuais no módulo Recursos INPI, preservando layout, fluxo, prompts e download atual. Nada de reestrutura visual.
+Objetivo: validar as mudanças recentes (Files API, evidências Cliente/Concorrente, `[DOC:NN]`, ajustes com IA otimizados) e corrigir qualquer regressão antes de considerar concluído.
 
----
+## Fase 1 — Auditoria de código (sem mudanças)
 
-### 1. Performance na geração do rascunho (`process-inpi-resource`)
+1. Reler os arquivos tocados para checar coerência:
+   - `supabase/functions/process-inpi-resource/index.ts` (Files API + evidenceBlock nos 2 passes + procurador/notificação intactos)
+   - `supabase/functions/adjust-inpi-resource/index.ts` (Responses API, timeout, retry)
+   - `supabase/functions/extract-resource-evidences/index.ts` (coluna `party` gravada)
+   - `src/components/admin/inpi/EvidenceGallery.tsx` (abas Cliente/Concorrente, filtro por `party`, contadores)
+   - `src/components/admin/INPIResourcePDFPreview.tsx` (render de `[DOC:NN]` inline + anexos + rodapé/cabeçalho intactos + PDF)
+   - `src/pages/admin/RecursosINPI.tsx` (regenerar envia `party`/`docNumber`)
+2. Remover imports/variáveis não usados que aparecerem; garantir tipagens; sem lockfile/regen de deno.lock.
 
-Hoje `PASS 1` e `PASS 2` já rodam em paralelo, mas em cada chamada os PDFs/imagens de entrada são reenviados por completo em base64 dentro de cada `input_file`/`input_image`. Isso multiplica o payload por 3 (extração + pass1 + pass2) e é o principal responsável pela lentidão/timeouts.
+## Fase 2 — Testes E2E via Playwright (localhost:8080, sessão admin injetada)
 
-Mudanças (sem tocar em prompts):
+Roteiro num único script `/tmp/browser/recursos_inpi/audit.py` com screenshots por cenário:
 
-- Fazer upload dos arquivos anexados **uma única vez** para a OpenAI Files API (`/v1/files`, `purpose=user_data`) e reutilizar o `file_id` nas 3 chamadas paralelas via `{ type: 'input_file', file_id }`.
-- Para imagens, usar o mesmo `file_id` com `{ type: 'input_image', file_id }`.
-- Baixar `max_output_tokens` da extração para 800 e forçar `reasoning: { effort: 'minimal' }` também no gpt-5 do adjust (hoje o `gpt-5` roda com reasoning padrão “medium”, que é o segundo gargalo).
-- Aumentar `timeoutMs` interno para 140s e tratar erro 408 devolvendo o `pass1_content` já pronto quando o `pass2` estourar (o front já sabe lidar com `partial: true`).
-- Registrar tempos por etapa (`console.time`) para monitorar em produção.
+- **C1 Criar recurso**: abrir `/admin/recursos-inpi`, escolher tipo, agente, anexar 1 PDF pequeno, gerar rascunho; medir tempos console (`file_upload_dedupe`, `ai_generation`).
+- **C2 Ajustes com IA**: rodar 2 ajustes seguidos, medir latência, garantir zero timeout.
+- **C3 Evidências Cliente**: upload 2 imagens na aba Cliente; recarregar; confirmar contagem e `party='cliente'` via `supabase.from('inpi_resource_evidences').select`.
+- **C4 Evidências Concorrente**: upload 2 imagens na aba Concorrente; confirmar isolamento entre abas.
+- **C5 Regenerar com evidências**: clicar "Regenerar", validar no texto retornado a presença dos marcadores `[DOC:01]…[DOC:0N]` e que Cliente/Concorrente estão citados nos parágrafos corretos.
+- **C6 Preview**: abrir preview, screenshot; verificar que imagens inline aparecem no lugar dos marcadores, cabeçalho e rodapé preservados, quebras de página nas fronteiras seguras (regra já existente).
+- **C7 PDF**: baixar; abrir com `pdftoppm`; comparar visualmente com o preview (mesmas imagens, mesma paginação, evidências não citadas apenas no anexo final).
+- **C8 DOCX**: se houver rota de download DOCX ativa, repetir; se não estiver implementado, registrar no relatório (não estava no escopo aprovado anterior).
 
-Isso não altera prompt, estrutura da resposta, nem o front-end.
+Cada cenário grava:
+- Screenshot antes/depois
+- Métricas de tempo (`console.time` do backend + `performance.now` no cliente)
+- Erros de console/network
 
----
+## Fase 3 — Testes de erro / robustez
 
-### 2. Estabilidade e velocidade de "Ajustes com IA" (`adjust-inpi-resource`)
+Executar via `supabase--curl_edge_functions` chamando `process-inpi-resource` e `adjust-inpi-resource` com payloads adversariais:
+- PDF vazio, imagem corrompida, arquivo >20MB → esperar 400/mensagem clara.
+- Simular timeout OpenAI (arquivo grande) → validar retry/timeout do `adjust-inpi-resource`.
+- Payload sem evidências → gerar deve continuar funcionando (retrocompatibilidade).
+- OCR vazio nas evidências → verificar que o bloco ainda cita o marcador usando só a legenda.
 
-- Migrar a chamada de `chat/completions` (gpt-5, reasoning medium, 32k tokens) para `responses` com `gpt-5-mini`, `reasoning: { effort: 'minimal' }`, `text: { verbosity: 'high' }` e `max_output_tokens: 12000` — mesmo padrão já usado com sucesso em `process-inpi-resource`. Reduz o tempo de resposta de ~90–150s para ~20–40s.
-- Envolver o `fetch` num `AbortController` (timeout 140s) e devolver 408 amigável em vez de travar até o Supabase matar o request.
-- Tratar `429`/`5xx` retornando `{ error, retryable: true }` para o front reexibir o botão sem quebrar a UI.
-- Retornar `adjusted_content` mesmo quando o modelo devolver texto idêntico ao rascunho (hoje isso vira warning apenas em log; adicionar `unchanged: true` no JSON para o front avisar o usuário).
+## Fase 4 — Testes de regressão
 
-Nenhum prompt é modificado.
+Confirmar que os fluxos existentes seguem intactos:
+- `troca_procurador` / `nomeacao_procurador` (single-pass, sem `evidenceBlock` injetado).
+- `notificacao_extrajudicial`.
+- Numeração `Doc. NN` no rodapé de anexos.
+- Download PDF do módulo (respeita as correções anteriores: hífen, alinhamento, badges brancos, cabeçalho, quebra em fronteiras).
 
----
+## Fase 5 — Correções
 
-### 3. Duas áreas de upload de evidências (Cliente × Concorrente)
+Para cada falha detectada:
+1. Identificar causa raiz (log da edge function + trace do Playwright).
+2. Aplicar patch mínimo no arquivo responsável.
+3. Redeploy se for edge function (`supabase--deploy_edge_functions`).
+4. Reexecutar apenas o(s) cenário(s) afetado(s).
+5. Loop até 100% verde.
 
-Schema:
+Correções previsíveis já mapeadas (aplico apenas se confirmadas nos testes):
+- Se upload ao Files API falhar por MIME (`image/jp2`) — fallback já existe (base64), mas devo garantir que `image_url` com `file_id` não seja enviado quando o modelo rejeitar; nesse caso, degradar para data URL.
+- Se `evidenceBlock` estourar contexto (>10 evidências longas), truncar OCR para 300 chars por doc.
+- Se o preview não estiver interpretando `[DOC:NN]` para party="concorrente" (só cliente), ajustar o parser para renderizar independente de party.
 
-- Migration adicionando `party TEXT NOT NULL DEFAULT 'cliente' CHECK (party IN ('cliente','concorrente'))` em `public.inpi_resource_evidences`.
-- Backfill: registros existentes ficam como `cliente`.
+## Fase 6 — Relatório final
 
-Edge function `extract-resource-evidences`:
-
-- Aceitar `party` no body (default `cliente`) e gravar na coluna.
-
-UI (`EvidenceGallery.tsx` + `RecursosINPI.tsx`):
-
-- Adicionar `Tabs` no topo do diálogo: **Evidências do Cliente** | **Evidências do Concorrente**.
-- Cada aba tem seu próprio botão “Anexar PDFs / imagens” que dispara `extract-resource-evidences` com `party` correspondente.
-- Listagem filtrada por aba, contadores separados, e a numeração `Doc. NN` continua contínua para não quebrar marcadores `[DOC:N]` existentes.
-- No botão “Evidências” do painel principal, exibir `evidenceCount` total como já é hoje.
-
----
-
-### 4. IA lê e cita as evidências dentro do recurso
-
-Hoje o pipeline principal ignora o conteúdo das evidências (só o adjust as usa). Vamos alimentar a geração inicial:
-
-Backend (`process-inpi-resource`):
-
-- Aceitar `evidences: [{ id, docNumber, party, caption, ocr_text, storage_path }]` no body (opcional).
-- Se vier lista, montar dois blocos determinísticos no `pass1User`/`pass2User`, **antes** dos arquivos do processo:
-  - `EVIDÊNCIAS DO CLIENTE (use para fundamentar uso real, boa-fé, distintividade adquirida):` seguido de `[DOC:NN] — legenda — Texto OCR: "..."`.
-  - `EVIDÊNCIAS DO CONCORRENTE / OPOSITOR (use para colidência, má-fé, concorrência desleal):` no mesmo formato.
-- Acrescentar a instrução “Cite cada `[DOC:NN]` pelo menos uma vez no parágrafo argumentativo apropriado; não descreva a imagem, apenas insira o marcador literal `[DOC:NN]`.” — isto **complementa** o prompt, não substitui nada.
-- Além do texto OCR, subir cada imagem `.jpg/.png` como `input_image` (via `file_id`) para o modelo realmente enxergar a evidência. PDFs de decisão vão como `input_file`.
-
-Front (`RecursosINPI.tsx`):
-
-- Antes de chamar `process-inpi-resource`, buscar `inpi_resource_evidences` do resource (já existe query similar), montar signed URLs curtas e enviar array `evidences` no body — igual ao que o adjust já faz.
-
-Resultado: o rascunho gerado já vem com `[DOC:NN]` inseridos no lugar certo.
-
----
-
-### 5. Imagens dentro do PDF final (não apenas anexo)
-
-O `INPIResourcePDFPreview.tsx` já resolve `[DOC:NN]` inline (linhas 634–667). Ajustes:
-
-- Confirmar que `evidenceByNum` inclui evidências das duas partes (cliente e concorrente) — trocar filtro para não depender de `placement === 'inline'`; qualquer `[DOC:NN]` presente no texto vira `<figure>` inline no PDF.
-- Manter a seção “Anexo — Evidências” ao final apenas para as evidências que **não** foram citadas no corpo (evita duplicidade). As citadas ficam apenas inline.
-- Legenda no PDF passa a mostrar `Doc. NN — {caption} ({party === 'concorrente' ? 'evidência do concorrente' : 'evidência do cliente'})`.
-
-Sem mudanças no algoritmo de paginação, quebra de página, cabeçalho ou rodapé — só o conteúdo dos marcadores.
-
----
+Ao término, entregar em chat:
+- Tabela: cenário → status (✅/❌) → tempo antes/depois.
+- Lista de bugs encontrados e correções aplicadas.
+- Confirmação de regressão zero.
+- Screenshots-chave do preview e PDF pós-evidências.
 
 ## Detalhes técnicos
 
-- Migration nova: `ALTER TABLE public.inpi_resource_evidences ADD COLUMN party TEXT NOT NULL DEFAULT 'cliente' CHECK (party IN ('cliente','concorrente'));`
-- Edge functions redeployadas: `process-inpi-resource`, `adjust-inpi-resource`, `extract-resource-evidences`.
-- OpenAI Files API upload usa `multipart/form-data`; cache in-memory por request (Map `sha256(base64)->file_id`) para deduplicar quando o mesmo arquivo aparece em `pass1`/`pass2`/extração.
-- Nenhum prompt jurídico é alterado.
-- Nenhum componente visual do painel Recursos INPI é reestruturado — apenas as `Tabs` dentro do diálogo de evidências.
+- Autenticação Playwright: usar `LOVABLE_BROWSER_SUPABASE_*` do sandbox para logar como admin sem UI.
+- Métricas de backend lidas via `supabase--edge_function_logs` filtrando `file_upload_dedupe` e `ai_generation`.
+- Comparação PDF↔Preview: `pdftoppm -r 120 recurso.pdf page` + inspeção visual de cada página.
+- Não alterar o prompt do agente nem a estrutura de saída; apenas o wrapper de evidências.
+- Rollback: nenhuma migration nova nesta fase; apenas edits + redeploy edge functions.
 
-## Riscos
+## Fora de escopo
 
-- Uploads muito grandes (>25 MB por arquivo) precisam continuar em base64 embutido — a Files API tem limite. Fallback mantém o comportamento atual.
-- Se a OpenAI ficar instável, o `pass2` pode falhar; já cobrimos devolvendo `pass1_content` com `partial: true`.
-
-## O que fica igual
-
-- Layout, tipografia, fluxo do usuário, cabeçalho, rodapé, paginação e download do PDF.
-- Prompts do agente e do ajuste (só adicionamos o bloco de evidências, sem tocar no conteúdo jurídico).
-- Numeração `[DOC:NN]` e comportamento do preview. não implemente apenas "parcialmente" o que você espera.
-  ### 1. Garantir que nenhuma funcionalidade existente seja quebrada (muito importante)
-  Acrescente:
-  > **Compatibilidade obrigatória:** Todas as funcionalidades atuais devem continuar funcionando exatamente como hoje. As alterações devem ser totalmente retrocompatíveis. Nenhum endpoint, prompt, fluxo, preview, download ou integração existente pode ser removido ou ter seu comportamento alterado.
-  ---
-  ### 2. Não gerar "alucinações" ao interpretar evidências
-  Hoje você pede para a IA analisar imagens.
-  Mas acrescente uma regra:
-  > A IA deve utilizar apenas informações realmente identificáveis nas evidências anexadas. Não deve presumir fatos inexistentes nem criar descrições que não possam ser verificadas na imagem ou no OCR.
-  Isso evita recursos jurídicos contendo informações inventadas.
-  ---
-  ### 3. Prioridade das evidências
-  Isso é extremamente importante.
-  Adicionar:
-  > Quando houver conflito entre o conteúdo dos autos do INPI e as evidências anexadas, o conteúdo oficial dos autos deverá prevalecer. As evidências servirão apenas para complementar a fundamentação.
-  ---
-  ### 4. Ordem das evidências
-  Especifique isso.
-  Por exemplo:No recurso, as evidências devem aparecer exatamente na ordem em que forem citadas no texto.
-  Exemplo:
-  Argumentação...
-  [DOC:01]
-  (imagem)
-  Continuação...
-  [DOC:02]
-  (imagem)
-  ...
-  Assim evita todas as imagens aparecerem no final do documento.
-  ---
-  ### 5. Não repetir evidências
-  Adicionar:
-  > Se a mesma evidência for utilizada diversas vezes, inserir a imagem apenas na primeira citação e, nas demais, apenas manter o marcador [DOC:NN].
-  Isso deixa o PDF mais limpo.
-  ---
-  ### 6. Melhorar OCR
-  Hoje você cita OCR.
-  Eu acrescentaria:
-  > Para imagens contendo texto, utilizar OCR antes da geração do recurso. Para logotipos ou fotografias, utilizar análise visual (Vision) em conjunto com OCR quando disponível.
-  Assim ele entende que nem toda imagem possui texto.
-  ---
-  ### 7. Cache das evidências
-  Muito importante.
-  Adicionar:
-  ```
-
-  ```
-  ```
-  Se o usuário gerar novamente o recurso sem alterar as evidências, reutilizar a análise anterior das imagens e OCR, evitando novo processamento desnecessário.
-  ```
-  Isso diminui muito o tempo.
-  ---
-  ### 8. Barra de progresso
-  Eu pediria isso.
-  ```
-
-  ```
-  ```
-  Durante a geração do recurso, informar o andamento.
-
-  Exemplo:
-
-  ✓ Extraindo processo
-  ✓ Analisando documentos
-  ✓ Analisando evidências
-  ✓ Elaborando fundamentação
-  ✓ Revisando texto
-  ✓ Finalizando PDF
-
-  ```
-  O usuário percebe que não travou.
-  ---
-  ### 9. Retry automático
-  Você tratou 429.
-  Eu acrescentaria:
-  ```
-
-  ```
-  ```
-  Antes de retornar erro ao usuário, realizar até 2 novas tentativas automáticas em erros transitórios (429, 500, 502, 503 e 504), utilizando backoff exponencial.
-  ```
-  Isso reduz muito os erros percebidos.
-  ---
-  ### 10. Logs completos
-  Adicionar:
-  ```
-
-  ```
-  ```
-  Registrar em log:
-
-  - tempo de upload
-  - tempo da IA
-  - tempo do OCR
-  - tempo do PDF
-  - quantidade de tokens
-  - tamanho dos arquivos
-  - modelo utilizado
-  - quantidade de evidências
-  - falhas por etapa
-
-  ```
-  Depois fica muito mais fácil descobrir gargalos.
-  ---
-  ### 11. Não diminuir a qualidade jurídica
-  Eu colocaria essa observação.
-  ```
-
-  ```
-  ```
-  As otimizações de performance não podem reduzir a qualidade técnica da fundamentação jurídica nem simplificar a argumentação produzida pelo agente.
-  ```
-  ---
-  ### 12. Critério de aceite (faltou)
-  Eu sempre adiciono um bloco de aceite.
-  ```
-
-  ```
-  ```
-  Critérios de Aceite
-
-  ✔ Geração do rascunho concluída sem timeout.
-
-  ✔ Ajustes com IA concluídos sem erros.
-
-  ✔ Evidências do Cliente e Concorrente separadas.
-
-  ✔ IA cita corretamente os marcadores [DOC:NN].
-
-  ✔ As imagens aparecem dentro do PDF exatamente onde são citadas.
-
-  ✔ Evidências não citadas permanecem apenas no anexo.
-
-  ✔ Nenhuma funcionalidade existente foi alterada.
-
-  ✔ O preview e o PDF possuem exatamente o mesmo conteúdo.
-
-  ✔ Downloads DOCX e PDF preservam as imagens inline.
-
-  ✔ O usuário consegue regenerar o recurso sem reenviar as evidências.
-
-  ```
+- Adicionar geração DOCX se ainda não existir (a spec pede validar; se ausente, apenas reportar).
+- Trocar modelo de IA.
+- Redesenhar UI da galeria.

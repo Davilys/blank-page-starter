@@ -121,11 +121,13 @@ REGRAS DE FORMATAÇÃO (preserve OU adicione conforme o ajuste pedir):
     const evidenceBlock = hasEvidences
       ? '\n\nEVIDÊNCIAS DOCUMENTAIS ANEXADAS (insira marcadores [DOC:N] no corpo do recurso, na seção argumentativa adequada):\n' +
         evidences.map((e: any, i: number) => {
-          const n = String(i + 1).padStart(2, '0');
+          const n = String(e.docNumber || i + 1).padStart(2, '0');
+          const party = e.party === 'concorrente' ? '[CONCORRENTE]' : '[CLIENTE]';
           const cap = (e.caption || e.source_file_name || 'evidência').toString().slice(0, 200);
           const ocr = (e.ocr_text || '').toString().slice(0, 400);
-          return `[DOC:${n}] — ${cap}${ocr ? ` — Texto da página: "${ocr.replace(/\s+/g, ' ').trim()}"` : ''}`;
+          return `[DOC:${n}] ${party} — ${cap}${ocr ? ` — Texto: "${ocr.replace(/\s+/g, ' ').trim()}"` : ''}`;
         }).join('\n')
+        + '\n\nREGRAS: [CLIENTE] = provas de uso/notoriedade do titular — cite em argumentos de boa-fé, distintividade adquirida e uso real. [CONCORRENTE] = provas contra o opositor — cite em argumentos de colidência, má-fé, concorrência desleal. Nunca invente fatos além do que está na legenda/OCR; em caso de conflito com os autos do INPI, prevalecem os autos.'
       : '';
 
     const userPrompt = `ORIENTAÇÕES DE AJUSTE DO USUÁRIO (LEIA PRIMEIRO, interprete cada pedido e aplique COMPLETAMENTE ao rascunho abaixo):
