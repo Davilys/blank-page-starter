@@ -486,7 +486,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       const domToCanvas = pxHeight / root.scrollHeight;
       const boundarySet = new Set<number>();
       const blockEls = Array.from(
-        root.querySelectorAll('[data-pdf-section], .legal-p, .legal-p-short, .legal-list, .legal-heading, .legal-table-wrap, h1, h2, h3, img'),
+        root.querySelectorAll('[data-pdf-section], .legal-p, .legal-p-short, .legal-list, .legal-heading, .legal-table-wrap, .legal-figure, figure, h1, h2, h3, img'),
       ) as HTMLElement[];
       for (const el of blockEls) {
         const top = el.getBoundingClientRect().top - rootRect.top;
