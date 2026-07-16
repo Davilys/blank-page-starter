@@ -1,84 +1,50 @@
-# Plano — Validação, Testes e Correção do módulo Recursos INPI
+## Objetivo
 
-Objetivo: validar as mudanças recentes (Files API, evidências Cliente/Concorrente, `[DOC:NN]`, ajustes com IA otimizados) e corrigir qualquer regressão antes de considerar concluído.
+Fazer com que **todas as evidências anexadas (Cliente e Concorrente) apareçam embutidas dentro do corpo do recurso**, no ponto onde a IA as cita, e **remover a seção duplicada de anexos no final**. A numeração `Doc. NN` continua existindo (para referência jurídica no texto), mas a imagem só é renderizada uma única vez, inline.
 
-## Fase 1 — Auditoria de código (sem mudanças)
+## Escopo das mudanças
 
-1. Reler os arquivos tocados para checar coerência:
-   - `supabase/functions/process-inpi-resource/index.ts` (Files API + evidenceBlock nos 2 passes + procurador/notificação intactos)
-   - `supabase/functions/adjust-inpi-resource/index.ts` (Responses API, timeout, retry)
-   - `supabase/functions/extract-resource-evidences/index.ts` (coluna `party` gravada)
-   - `src/components/admin/inpi/EvidenceGallery.tsx` (abas Cliente/Concorrente, filtro por `party`, contadores)
-   - `src/components/admin/INPIResourcePDFPreview.tsx` (render de `[DOC:NN]` inline + anexos + rodapé/cabeçalho intactos + PDF)
-   - `src/pages/admin/RecursosINPI.tsx` (regenerar envia `party`/`docNumber`)
-2. Remover imports/variáveis não usados que aparecerem; garantir tipagens; sem lockfile/regen de deno.lock.
+### 1. `supabase/functions/process-inpi-resource/index.ts`
+- Reforçar o prompt do Pass 2 (redação) para tornar **obrigatória** a citação de **cada** evidência via `[DOC:NN]` em um parágrafo adequado da fundamentação:
+  - Evidências `[CLIENTE]` → citadas nos tópicos de comprovação de uso/notoriedade/anterioridade da requerente.
+  - Evidências `[CONCORRENTE]` → citadas nos tópicos de colidência/má-fé/prints do infrator.
+- Adicionar validação pós-geração: se algum `[DOC:NN]` esperado não aparecer no texto, injetar automaticamente uma linha `Conforme se verifica em [DOC:NN] — <legenda>.` no bloco temático mais próximo, garantindo 100% inline.
 
-## Fase 2 — Testes E2E via Playwright (localhost:8080, sessão admin injetada)
+### 2. `supabase/functions/adjust-inpi-resource/index.ts`
+- Mesma regra: prompt de ajuste preserva todos os `[DOC:NN]` existentes e não permite removê-los, para não "quebrar" imagens inline após um ajuste.
 
-Roteiro num único script `/tmp/browser/recursos_inpi/audit.py` com screenshots por cenário:
+### 3. `src/components/admin/INPIResourcePDFPreview.tsx`
+- **Remover a renderização da seção final de anexos numerados** (bloco "ANEXOS — Doc. 01, Doc. 02…").
+- Manter apenas o render inline no ponto do marcador `[DOC:NN]` com legenda curta abaixo da imagem (`Doc. NN — <caption>`).
+- Se uma evidência marcada como `included` não tiver marcador correspondente no texto (fallback de segurança), anexá-la ao final do último parágrafo temático como figura inline — nunca criar página de anexos separada.
+- Ajustar paginação para tratar figuras como blocos indivisíveis (não cortar imagem no meio da página — já existe boundary-snap, apenas incluir `.legal-figure` no seletor).
 
-- **C1 Criar recurso**: abrir `/admin/recursos-inpi`, escolher tipo, agente, anexar 1 PDF pequeno, gerar rascunho; medir tempos console (`file_upload_dedupe`, `ai_generation`).
-- **C2 Ajustes com IA**: rodar 2 ajustes seguidos, medir latência, garantir zero timeout.
-- **C3 Evidências Cliente**: upload 2 imagens na aba Cliente; recarregar; confirmar contagem e `party='cliente'` via `supabase.from('inpi_resource_evidences').select`.
-- **C4 Evidências Concorrente**: upload 2 imagens na aba Concorrente; confirmar isolamento entre abas.
-- **C5 Regenerar com evidências**: clicar "Regenerar", validar no texto retornado a presença dos marcadores `[DOC:01]…[DOC:0N]` e que Cliente/Concorrente estão citados nos parágrafos corretos.
-- **C6 Preview**: abrir preview, screenshot; verificar que imagens inline aparecem no lugar dos marcadores, cabeçalho e rodapé preservados, quebras de página nas fronteiras seguras (regra já existente).
-- **C7 PDF**: baixar; abrir com `pdftoppm`; comparar visualmente com o preview (mesmas imagens, mesma paginação, evidências não citadas apenas no anexo final).
-- **C8 DOCX**: se houver rota de download DOCX ativa, repetir; se não estiver implementado, registrar no relatório (não estava no escopo aprovado anterior).
+### 4. `src/pages/admin/RecursosINPI.tsx`
+- Nenhuma mudança de UI obrigatória. O botão "Regenerar com evidências" continua igual.
+- Remover badge/contador "X no anexo" se existir, já que a noção de anexo desaparece.
 
-Cada cenário grava:
-- Screenshot antes/depois
-- Métricas de tempo (`console.time` do backend + `performance.now` no cliente)
-- Erros de console/network
-
-## Fase 3 — Testes de erro / robustez
-
-Executar via `supabase--curl_edge_functions` chamando `process-inpi-resource` e `adjust-inpi-resource` com payloads adversariais:
-- PDF vazio, imagem corrompida, arquivo >20MB → esperar 400/mensagem clara.
-- Simular timeout OpenAI (arquivo grande) → validar retry/timeout do `adjust-inpi-resource`.
-- Payload sem evidências → gerar deve continuar funcionando (retrocompatibilidade).
-- OCR vazio nas evidências → verificar que o bloco ainda cita o marcador usando só a legenda.
-
-## Fase 4 — Testes de regressão
-
-Confirmar que os fluxos existentes seguem intactos:
-- `troca_procurador` / `nomeacao_procurador` (single-pass, sem `evidenceBlock` injetado).
-- `notificacao_extrajudicial`.
-- Numeração `Doc. NN` no rodapé de anexos.
-- Download PDF do módulo (respeita as correções anteriores: hífen, alinhamento, badges brancos, cabeçalho, quebra em fronteiras).
-
-## Fase 5 — Correções
-
-Para cada falha detectada:
-1. Identificar causa raiz (log da edge function + trace do Playwright).
-2. Aplicar patch mínimo no arquivo responsável.
-3. Redeploy se for edge function (`supabase--deploy_edge_functions`).
-4. Reexecutar apenas o(s) cenário(s) afetado(s).
-5. Loop até 100% verde.
-
-Correções previsíveis já mapeadas (aplico apenas se confirmadas nos testes):
-- Se upload ao Files API falhar por MIME (`image/jp2`) — fallback já existe (base64), mas devo garantir que `image_url` com `file_id` não seja enviado quando o modelo rejeitar; nesse caso, degradar para data URL.
-- Se `evidenceBlock` estourar contexto (>10 evidências longas), truncar OCR para 300 chars por doc.
-- Se o preview não estiver interpretando `[DOC:NN]` para party="concorrente" (só cliente), ajustar o parser para renderizar independente de party.
-
-## Fase 6 — Relatório final
-
-Ao término, entregar em chat:
-- Tabela: cenário → status (✅/❌) → tempo antes/depois.
-- Lista de bugs encontrados e correções aplicadas.
-- Confirmação de regressão zero.
-- Screenshots-chave do preview e PDF pós-evidências.
+### 5. Banco de dados
+- Sem migração. O campo `placement` (`inline`/`annex`) fica no schema mas passa a ser ignorado pela renderização — todas as evidências viram inline. Preservado para retrocompatibilidade caso queira reverter.
 
 ## Detalhes técnicos
 
-- Autenticação Playwright: usar `LOVABLE_BROWSER_SUPABASE_*` do sandbox para logar como admin sem UI.
-- Métricas de backend lidas via `supabase--edge_function_logs` filtrando `file_upload_dedupe` e `ai_generation`.
-- Comparação PDF↔Preview: `pdftoppm -r 120 recurso.pdf page` + inspeção visual de cada página.
-- Não alterar o prompt do agente nem a estrutura de saída; apenas o wrapper de evidências.
-- Rollback: nenhuma migration nova nesta fase; apenas edits + redeploy edge functions.
+- **Ordem de citação**: Cliente antes de Concorrente dentro de cada tópico jurídico, respeitando a numeração `display_order` já existente.
+- **Legenda inline**: fonte 10pt, itálico, centralizada abaixo da imagem, formato `Doc. NN — <caption OCR>`.
+- **Largura da imagem inline**: máx. 70% da coluna de texto, altura auto, `object-fit: contain`.
+- **Fallback IA falha**: se a IA gerar texto sem nenhum `[DOC:NN]`, o pós-processamento no backend injeta um parágrafo final "Documentos comprobatórios anexos: [DOC:01] [DOC:02]…" para garantir que as imagens apareçam.
+- **PDF**: sem mudança no motor (`html2canvas`+`jsPDF`), apenas o DOM muda. As correções anteriores (hífen, alinhamento, badges brancos, quebra em fronteiras seguras) são preservadas.
+- **Retrocompatibilidade de recursos antigos**: se um recurso já gerado tiver `<seção de anexos>` no HTML salvo, o preview detecta e não renderiza duplicado.
 
 ## Fora de escopo
 
-- Adicionar geração DOCX se ainda não existir (a spec pede validar; se ausente, apenas reportar).
-- Trocar modelo de IA.
-- Redesenhar UI da galeria.
+- Não altero o fluxo de upload nem a galeria de evidências (abas Cliente/Concorrente permanecem).
+- Não mudo o modelo de IA nem a estrutura de 2-pass.
+- Não removo a coluna `placement` do banco.
+- Não altero PDF de procurador/notificação extrajudicial.
+
+## Validação após implementar
+
+1. Gerar recurso novo com 2 evidências Cliente + 2 Concorrente.
+2. Confirmar no preview: 4 imagens inline, zero seção "ANEXOS" no final.
+3. Baixar PDF e conferir mesma paginação.
+4. Rodar "Ajustar com IA" e confirmar que os `[DOC:NN]` sobrevivem.
