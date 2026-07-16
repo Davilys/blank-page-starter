@@ -897,6 +897,28 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           {/* Content */}
           <div style={{ color: '#1a1a1a' }}>
             {renderContent()}
+            {uncitedEvidences.length > 0 && (
+              <div data-pdf-section className="mt-6">
+                <p className="legal-p" style={{ fontStyle: 'italic', color: '#374151' }}>
+                  Para complementação probatória, seguem, ainda, os seguintes documentos comprobatórios anexos:
+                </p>
+                {uncitedEvidences.map((ev) => (
+                  <figure key={ev.id} data-pdf-section className="my-4 mx-auto text-center legal-figure" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                    {ev.signedUrl && (
+                      <img
+                        src={ev.signedUrl}
+                        alt={ev.caption || `Doc. ${ev.docNumber}`}
+                        className="mx-auto border rounded"
+                        style={{ maxWidth: '70%', maxHeight: '340px', objectFit: 'contain' }}
+                      />
+                    )}
+                    <figcaption className="text-xs mt-2" style={{ color: '#555' }}>
+                      <strong>Doc. {String(ev.docNumber).padStart(2, '0')}</strong> — {ev.caption || ev.source_file_name}
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Signature */}
