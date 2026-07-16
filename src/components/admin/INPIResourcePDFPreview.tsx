@@ -301,8 +301,18 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   }, [resource.id]);
 
   const evidenceByNum = (n: number) => evidences.find((e) => e.docNumber === n);
-  const inlineEvidences = evidences.filter((e) => e.placement === 'inline');
-  const annexEvidences = evidences; // all included evidences also appear in annex
+  // Detect which [DOC:NN] markers actually appear in the AI-generated text.
+  // Any evidence NOT cited will be appended inline at the end of the content
+  // as a safety fallback — we never render a separate "ANEXOS" section.
+  const citedDocNums = new Set<number>();
+  {
+    const re = /\[DOC:(\d{1,3})\]/gi;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(liveContent)) !== null) {
+      citedDocNums.add(parseInt(m[1], 10));
+    }
+  }
+  const uncitedEvidences = evidences.filter((e) => e.docNumber != null && !citedDocNums.has(e.docNumber));
 
   const isNotif = isNotificacao(resourceType);
   const isRespostaNotif = isRespostaNotificacao(resourceType);
@@ -476,7 +486,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       const domToCanvas = pxHeight / root.scrollHeight;
       const boundarySet = new Set<number>();
       const blockEls = Array.from(
-        root.querySelectorAll('[data-pdf-section], .legal-p, .legal-p-short, .legal-list, .legal-heading, .legal-table-wrap, h1, h2, h3, img'),
+        root.querySelectorAll('[data-pdf-section], .legal-p, .legal-p-short, .legal-list, .legal-heading, .legal-table-wrap, .legal-figure, figure, h1, h2, h3, img'),
       ) as HTMLElement[];
       for (const el of blockEls) {
         const top = el.getBoundingClientRect().top - rootRect.top;
@@ -887,6 +897,28 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           {/* Content */}
           <div style={{ color: '#1a1a1a' }}>
             {renderContent()}
+            {uncitedEvidences.length > 0 && (
+              <div data-pdf-section className="mt-6">
+                <p className="legal-p" style={{ fontStyle: 'italic', color: '#374151' }}>
+                  Para complementação probatória, seguem, ainda, os seguintes documentos comprobatórios anexos:
+                </p>
+                {uncitedEvidences.map((ev) => (
+                  <figure key={ev.id} data-pdf-section className="my-4 mx-auto text-center legal-figure" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                    {ev.signedUrl && (
+                      <img
+                        src={ev.signedUrl}
+                        alt={ev.caption || `Doc. ${ev.docNumber}`}
+                        className="mx-auto border rounded"
+                        style={{ maxWidth: '70%', maxHeight: '340px', objectFit: 'contain' }}
+                      />
+                    )}
+                    <figcaption className="text-xs mt-2" style={{ color: '#555' }}>
+                      <strong>Doc. {String(ev.docNumber).padStart(2, '0')}</strong> — {ev.caption || ev.source_file_name}
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Signature */}
@@ -927,40 +959,6 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
             </div>
           </div>
 
-          {/* ANEXOS DOCUMENTAIS */}
-          {annexEvidences.length > 0 && (
-            <div className="mt-16">
-              <div data-pdf-section className="text-center mb-6">
-                <div className="inline-block px-8 py-2 rounded" style={{ background: '#1e3a5f' }}>
-                  <p className="font-bold tracking-wide text-sm uppercase" style={{ color: '#ffffff' }}>
-                    Anexos Documentais
-                  </p>
-                </div>
-              </div>
-              <div className="space-y-10">
-                {annexEvidences.map((ev) => (
-                  <div key={ev.id} data-pdf-section className="text-center break-inside-avoid page-break-before-always">
-                    <p className="text-sm font-semibold mb-2" style={{ color: '#1e3a5f' }}>
-                      Doc. {String(ev.docNumber).padStart(2, '0')} — {ev.caption || ev.source_file_name}
-                    </p>
-                    {ev.signedUrl && (
-                      <img
-                        src={ev.signedUrl}
-                        alt={ev.caption || `Doc. ${ev.docNumber}`}
-                        className="mx-auto border rounded shadow"
-                        style={{ maxWidth: '90%', maxHeight: '600px', objectFit: 'contain' }}
-                      />
-                    )}
-                    {ev.source_file_name && (
-                      <p className="text-xs mt-2" style={{ color: '#777' }}>
-                        Origem: {ev.source_file_name}{ev.page_number ? ` — página ${ev.page_number}` : ''}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
