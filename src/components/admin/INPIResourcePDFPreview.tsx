@@ -301,8 +301,18 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   }, [resource.id]);
 
   const evidenceByNum = (n: number) => evidences.find((e) => e.docNumber === n);
-  const inlineEvidences = evidences.filter((e) => e.placement === 'inline');
-  const annexEvidences = evidences; // all included evidences also appear in annex
+  // Detect which [DOC:NN] markers actually appear in the AI-generated text.
+  // Any evidence NOT cited will be appended inline at the end of the content
+  // as a safety fallback — we never render a separate "ANEXOS" section.
+  const citedDocNums = new Set<number>();
+  {
+    const re = /\[DOC:(\d{1,3})\]/gi;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(liveContent)) !== null) {
+      citedDocNums.add(parseInt(m[1], 10));
+    }
+  }
+  const uncitedEvidences = evidences.filter((e) => e.docNumber != null && !citedDocNums.has(e.docNumber));
 
   const isNotif = isNotificacao(resourceType);
   const isRespostaNotif = isRespostaNotificacao(resourceType);
