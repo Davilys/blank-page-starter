@@ -937,40 +937,6 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
             </div>
           </div>
 
-          {/* ANEXOS DOCUMENTAIS */}
-          {annexEvidences.length > 0 && (
-            <div className="mt-16">
-              <div data-pdf-section className="text-center mb-6">
-                <div className="inline-block px-8 py-2 rounded" style={{ background: '#1e3a5f' }}>
-                  <p className="font-bold tracking-wide text-sm uppercase" style={{ color: '#ffffff' }}>
-                    Anexos Documentais
-                  </p>
-                </div>
-              </div>
-              <div className="space-y-10">
-                {annexEvidences.map((ev) => (
-                  <div key={ev.id} data-pdf-section className="text-center break-inside-avoid page-break-before-always">
-                    <p className="text-sm font-semibold mb-2" style={{ color: '#1e3a5f' }}>
-                      Doc. {String(ev.docNumber).padStart(2, '0')} — {ev.caption || ev.source_file_name}
-                    </p>
-                    {ev.signedUrl && (
-                      <img
-                        src={ev.signedUrl}
-                        alt={ev.caption || `Doc. ${ev.docNumber}`}
-                        className="mx-auto border rounded shadow"
-                        style={{ maxWidth: '90%', maxHeight: '600px', objectFit: 'contain' }}
-                      />
-                    )}
-                    {ev.source_file_name && (
-                      <p className="text-xs mt-2" style={{ color: '#777' }}>
-                        Origem: {ev.source_file_name}{ev.page_number ? ` — página ${ev.page_number}` : ''}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
