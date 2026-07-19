@@ -156,7 +156,7 @@ const Header = () => {
             {navItems.map((item) => (
                 <a
                   key={item.label}
-                  href={isHomePage ? item.href : `/${item.href}`}
+                  href={item.isRoute ? item.href : (isHomePage ? item.href : `/${item.href}`)}
                   onClick={(e) => { handleAnchorClick(e, item.href); setIsMobileMenuOpen(false); }}
                   className="px-4 py-3 text-[hsl(222_40%_25%)] hover:text-[hsl(222_92%_54%)] transition-colors rounded-xl hover:bg-[hsl(220_33%_96%)] touch-target font-medium"
                 >
