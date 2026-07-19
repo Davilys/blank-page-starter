@@ -400,7 +400,7 @@ export function ViabilityStep({ onNext }: ViabilityStepProps) {
                 type="submit"
                 disabled={isSearching}
                 size="lg"
-                className="w-full h-14 text-base font-bold rounded-xl text-white bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600 hover:from-emerald-600 hover:via-green-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/40 hover:shadow-emerald-500/60 transition-all duration-300 hover:-translate-y-0.5 ring-2 ring-emerald-400/30 hover:ring-emerald-400/60 animate-pulse-subtle"
+                className="w-full h-14 text-base font-bold rounded-xl text-white bg-gradient-to-r from-[hsl(20_100%_55%)] via-[hsl(17_100%_52%)] to-[hsl(14_100%_48%)] hover:brightness-110 shadow-[0_18px_36px_-12px_hsla(20,100%,50%,0.55)] hover:shadow-[0_22px_44px_-12px_hsla(20,100%,50%,0.7)] transition-all duration-300 hover:-translate-y-0.5 ring-1 ring-[hsl(20_100%_55%)]/30"
               >
                 <Search className="w-5 h-5 mr-2" />
                 Gerar Laudo Técnico Gratuito
