@@ -745,10 +745,12 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         // sees a weird non-breaking space that could disable wrapping.
         const normalized = trimmed.replace(BULLET_RE, '- ');
         return (
-          <p key={idx} data-pdf-section className="legal-list mb-3">
-            {renderMarkedInline(normalized, `list-${idx}`)}
+          <div key={idx} data-pdf-section className="legal-list mb-3">
+            <p>
+              {renderMarkedInline(normalized, `list-${idx}`)}
+            </p>
             {renderEvidenceFigures(parseEvidenceMarkers(normalized).markers, `list-${idx}`)}
-          </p>
+          </div>
         );
       }
       
@@ -808,7 +810,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
               <Pencil className="h-4 w-4" />
               Editar PDF
             </Button>
-            <Button onClick={handleDownloadPDF} disabled={isGeneratingPDF} className="gap-2 rounded-xl shadow-lg shadow-primary/15">
+            <Button onClick={handleDownloadPDF} disabled={isGeneratingPDF || isLoadingEvidence} className="gap-2 rounded-xl shadow-lg shadow-primary/15">
           {isLoadingEvidence ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -980,7 +982,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
                 </p>
                 {uncitedEvidences.map((ev) => (
                   <figure key={ev.id} data-pdf-section className="my-4 mx-auto text-center legal-figure" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                    {ev.signedUrl && (
+                    {getEvidenceSrc(ev) && (
                       <img
                         src={getEvidenceSrc(ev)}
                         alt={ev.caption || `Doc. ${ev.docNumber}`}
