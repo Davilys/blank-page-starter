@@ -28,8 +28,12 @@ const CTASection = () => {
           </div>
 
           {/* Heading */}
-          <h2 className="font-display font-black text-white leading-[1.05] tracking-[-0.03em] text-4xl md:text-6xl lg:text-7xl max-w-4xl mx-auto">
-            {t("cta.title")} <span className="text-white">{t("cta.titleHighlight")}</span>
+          <h2
+            className="font-display font-black leading-[1.05] tracking-[-0.03em] text-4xl md:text-6xl lg:text-7xl max-w-4xl mx-auto"
+            style={{ color: "#ffffff" }}
+          >
+            {t("cta.title")}{" "}
+            <span style={{ color: "#ffffff" }}>{t("cta.titleHighlight")}</span>
           </h2>
 
           <p className="mt-6 text-white/85 text-base md:text-lg max-w-2xl mx-auto">
