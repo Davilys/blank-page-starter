@@ -1,10 +1,7 @@
 import { Shield, FileSignature, UserCheck, CalendarCheck, Star, Zap } from "lucide-react";
-import { useState, useEffect } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { motion, AnimatePresence } from "framer-motion";
-import { AnimatedCounter } from "@/components/admin/dashboard/AnimatedCounter";
+import { motion } from "framer-motion";
 import ViabilitySearchSection from "@/components/sections/ViabilitySearchSection";
-import ClientLogosMarquee from "@/components/sections/ClientLogosSection";
 import ScribbleUnderline from "@/components/decorative/ScribbleUnderline";
 import WaveDivider from "@/components/decorative/WaveDivider";
 import seal48h from "@/assets/rebrand/seal-48h.png";
@@ -14,16 +11,6 @@ import consultant3 from "@/assets/consultants/consultant-3.jpg";
 
 const HeroSection = () => {
   const { t } = useLanguage();
-  const [phraseIndex, setPhraseIndex] = useState(0);
-
-  const phrases = [t("hero.phrase1"), t("hero.phrase2"), t("hero.phrase3")];
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPhraseIndex((prev) => (prev + 1) % phrases.length);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [phrases.length]);
 
   const trustPills = [
     { icon: Shield, label: "Protocolo em 48h" },
@@ -51,22 +38,13 @@ const HeroSection = () => {
 
             {/* Heading */}
             <h1 className="font-display text-[2.5rem] sm:text-5xl xl:text-[3.75rem] font-bold leading-[1.1] mb-6 text-white">
-              {t("hero.title")}{" "}
-              <span className="inline-block overflow-hidden h-[1.15em] align-bottom relative">
-                <AnimatePresence mode="wait">
-                  <motion.span
-                    key={phraseIndex}
-                    initial={{ y: '100%', opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    exit={{ y: '-100%', opacity: 0 }}
-                    transition={{ duration: 0.5, ease: "easeInOut" }}
-                    className="inline-block text-white relative"
-                  >
-                    {phrases[phraseIndex]}
-                    <ScribbleUnderline />
-                  </motion.span>
-                </AnimatePresence>
-              </span>
+              {t("hero.title")}
+              <br />
+              faça o <span className="relative inline-block">
+                registro
+                <ScribbleUnderline />
+              </span>{" "}
+              agora!
             </h1>
 
             {/* Subtitle */}
