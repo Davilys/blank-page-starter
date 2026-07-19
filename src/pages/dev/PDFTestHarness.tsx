@@ -1,12 +1,37 @@
 import { INPIResourcePDFPreview } from '@/components/admin/INPIResourcePDFPreview';
+import { supabase } from '@/integrations/supabase/client';
 import html2canvas from 'html2canvas';
+import { useEffect, useState } from 'react';
 
-(window as any).__h2c = html2canvas;
+declare global {
+  interface Window {
+    __h2c?: typeof html2canvas;
+  }
+}
 
-const mockResource: any = {
+window.__h2c = html2canvas;
+
+type HarnessResource = {
+  id: string;
+  brand_name: string | null;
+  process_number: string | null;
+  ncl_class: string | null;
+  holder: string | null;
+  approved_at: string | null;
+};
+
+type HarnessResourceRow = HarnessResource & {
+  resource_type?: string | null;
+  final_content?: string | null;
+  draft_content?: string | null;
+};
+
+const mockResource: HarnessResource = {
   id: '0964fe3f-e1ca-48b4-b4e8-d1cf8fee9f47',
   brand_name: 'Opera Idiomas',
   process_number: '937364827',
+  ncl_class: '16',
+  holder: 'OPERA IDIOMAS INSTITUICAO EDUCACIONAL LTDA',
   approved_at: new Date().toISOString(),
 };
 
@@ -64,9 +89,35 @@ III – DA JURISPRUDÊNCIA
 19. A motivação do indeferimento está expressa em termos sintéticos no documento decisório, e a marca reproduz ou imita os seguintes registros de terceiros, sendo, portanto, irregistrável de acordo com o inciso XIX do Art. 124 da LPI. Transcrito na própria peça o dispositivo legal invocado, verifica-se que não são registráveis como marca a reprodução ou imitação, no todo ou em parte, ainda que com acréscimo, de marca alheia registrada, para distinguir ou certificar produto ou serviço idêntico, semelhante ou afim, suscetível de causar confusão ou associação com marca alheia.`;
 
 export default function PDFTestHarness() {
+  const [resource, setResource] = useState<HarnessResource>(mockResource);
+  const [content, setContent] = useState(mockContent);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from('inpi_resources')
+      .select('id, brand_name, process_number, ncl_class, holder, approved_at, resource_type, final_content, draft_content')
+      .eq('id', mockResource.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        const row = data as HarnessResourceRow;
+        setResource({
+          id: row.id,
+          brand_name: row.brand_name,
+          process_number: row.process_number,
+          ncl_class: row.ncl_class,
+          holder: row.holder,
+          approved_at: row.approved_at,
+        });
+        setContent(row.final_content || row.draft_content || mockContent);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <div style={{ padding: 24, background: '#e5e7eb', minHeight: '100vh' }}>
-      <INPIResourcePDFPreview resource={mockResource} content={mockContent} resourceType="indeferimento" />
+      <INPIResourcePDFPreview resource={resource} content={content} resourceType="indeferimento" />
     </div>
   );
 }

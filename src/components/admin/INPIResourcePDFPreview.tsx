@@ -42,6 +42,14 @@ interface INPIResourcePDFPreviewProps {
   resourceType?: string;
 }
 
+type SupabaseTableClient = typeof supabase & {
+  from(table: 'inpi_resources' | 'inpi_resource_evidences'): ReturnType<typeof supabase.from>;
+};
+
+type SupabaseErrorLike = {
+  message?: string;
+};
+
 const isNotificacao = (type?: string) => type === 'notificacao_extrajudicial';
 const isRespostaNotificacao = (type?: string) => type === 'resposta_notificacao_extrajudicial';
 const isExtrajudicial = (type?: string) => isNotificacao(type) || isRespostaNotificacao(type);
@@ -202,20 +210,32 @@ const isHeadingLine = (text: string): boolean => {
   return /^(I{1,4}V?\s*[–—-]|V?I{0,4}\s*[–—-]|[A-Z][A-Z\s–—-]{5,}$|DO[S]?\s|DA[S]?\s|CONCLUS|PEDIDO|FATOS|FUNDAMENT|RECURSO|EXCELENT|NOTIFICA)/i.test(trimmed);
 };
 
+const imageDataUrlCache = new Map<string, string>();
+
 const imageToBase64 = (src: string): Promise<string> => {
+  const cached = imageDataUrlCache.get(src);
+  if (cached) return Promise.resolve(cached);
+
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
+    const timer = setTimeout(() => reject(new Error('Tempo excedido ao preparar imagem.')), 5000);
     img.onload = () => {
+      clearTimeout(timer);
       const canvas = document.createElement('canvas');
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
       const ctx = canvas.getContext('2d');
       if (!ctx) { reject('No canvas context'); return; }
       ctx.drawImage(img, 0, 0);
-      resolve(canvas.toDataURL('image/png'));
+      const dataUrl = canvas.toDataURL('image/png');
+      imageDataUrlCache.set(src, dataUrl);
+      resolve(dataUrl);
     };
-    img.onerror = reject;
+    img.onerror = () => {
+      clearTimeout(timer);
+      reject(new Error('Falha ao preparar imagem.'));
+    };
     img.src = src;
   });
 };
@@ -287,6 +307,55 @@ const blobToOptimizedDataUrl = async (blob: Blob): Promise<{ dataUrl: string; wi
   }
 };
 
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
+
+type DecodableImage = HTMLImageElement & { decode?: () => Promise<void> };
+
+const decodeImageSafely = async (img: HTMLImageElement): Promise<void> => {
+  const decode = (img as DecodableImage).decode;
+  if (!decode) return;
+  try {
+    await decode.call(img);
+  } catch {
+    // Browser has already loaded enough pixels for canvas capture.
+  }
+};
+
+const waitForImageReady = async (img: HTMLImageElement, timeoutMs = 5000): Promise<void> => {
+  if (img.complete) {
+    if (img.naturalWidth > 0) {
+      await decodeImageSafely(img);
+    }
+    return;
+  }
+
+  await withTimeout(
+    new Promise<void>((resolve) => {
+      const done = () => resolve();
+      img.addEventListener('load', done, { once: true });
+      img.addEventListener('error', done, { once: true });
+    }),
+    timeoutMs,
+    'Tempo excedido ao carregar uma imagem do recurso.',
+  ).catch(() => undefined);
+
+  if (img.complete && img.naturalWidth > 0) {
+    await decodeImageSafely(img);
+  }
+};
+
 export function INPIResourcePDFPreview({ resource, content, resourceType }: INPIResourcePDFPreviewProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -306,16 +375,17 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
     setIsSavingEdit(true);
     try {
       const updateField = 'final_content';
-      const { error } = await supabase
-        .from('inpi_resources' as any)
+      const { error } = await (supabase as SupabaseTableClient)
+        .from('inpi_resources')
         .update({ [updateField]: editDraft })
         .eq('id', resource.id);
       if (error) throw error;
       setLiveContent(editDraft);
       setIsEditing(false);
       toast({ title: 'Alterações salvas', description: 'O conteúdo do recurso foi atualizado.' });
-    } catch (err: any) {
-      toast({ title: 'Erro ao salvar', description: err?.message || 'Tente novamente.', variant: 'destructive' });
+    } catch (err: unknown) {
+      const error = err as SupabaseErrorLike;
+      toast({ title: 'Erro ao salvar', description: error?.message || 'Tente novamente.', variant: 'destructive' });
     } finally {
       setIsSavingEdit(false);
     }
@@ -335,8 +405,8 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
     let cancelled = false;
     (async () => {
       setIsLoadingEvidence(true);
-      const { data, error } = await supabase
-        .from('inpi_resource_evidences' as any)
+      const { data, error } = await (supabase as SupabaseTableClient)
+        .from('inpi_resource_evidences')
         .select('*')
         .eq('resource_id', resource.id)
         .eq('included', true)
@@ -349,7 +419,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         }
         return;
       }
-      const list = ((data as any[]) || []) as ResourceEvidence[];
+      const list = ((data as unknown[]) || []) as ResourceEvidence[];
       let n = 1;
       const numbered = list.map((r) => ({ ...r, docNumber: n++ }));
       // Sign URLs server-side via edge function (bypasses broken storage RLS path)
@@ -541,6 +611,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
     setIsGeneratingPDF(true);
 
     const originalSrcs: Array<{ el: HTMLImageElement; src: string }> = [];
+    let exportHostForCleanup: HTMLDivElement | null = null;
     try {
       const root = printRef.current;
       if (!root) throw new Error('Preview não disponível.');
@@ -577,115 +648,109 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
 
       // 2) Wait until every image in the preview is fully decoded.
       const imgs = Array.from(root.querySelectorAll('img')) as HTMLImageElement[];
-      await Promise.all(
-        imgs.map(async (img) => {
-          if (img.complete && img.naturalWidth > 0) {
-            try { await (img as any).decode?.(); } catch { /* ignore */ }
-            return;
-          }
-          await new Promise<void>((resolve) => {
-            img.onload = () => resolve();
-            img.onerror = () => resolve();
-          });
-          try { await (img as any).decode?.(); } catch { /* ignore */ }
-        }),
-      );
+      await Promise.all(imgs.map((img) => waitForImageReady(img, 5000)));
 
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-      // 3) Single-shot render at the preview's native width (=210mm ~ 794px).
-      const captureWidth = NATIVE_WIDTH_PX;
-      const captureHeight = root.scrollHeight;
-      const canvas = await html2canvas(root, {
-        scale: 1.55,
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: '#ffffff',
-        logging: false,
-        width: captureWidth,
-        height: captureHeight,
-        windowWidth: captureWidth,
-        windowHeight: captureHeight,
-        scrollX: 0,
-        scrollY: -window.scrollY,
-        onclone: (clonedDoc) => {
-          // Re-apply base64 images inside the clone (the clone may still hold original srcs)
-          const cloneImgs = Array.from(clonedDoc.querySelectorAll('img')) as HTMLImageElement[];
-          for (const el of cloneImgs) {
-            const src = el.getAttribute('src') || '';
-            if (logoDataUrl && (src === logoWebmarcas || src.includes('webmarcas-logo'))) {
-              el.src = logoDataUrl;
-            } else if (sigDataUrl && src === signatureImage) {
-              el.src = sigDataUrl;
-            }
+      const applyHtml2CanvasCloneFixes = (clonedDoc: Document) => {
+        // Re-apply base64 images inside the clone (the clone may still hold original srcs)
+        const cloneImgs = Array.from(clonedDoc.querySelectorAll('img')) as HTMLImageElement[];
+        for (const el of cloneImgs) {
+          const src = el.getAttribute('src') || '';
+          if (logoDataUrl && (src === logoWebmarcas || src.includes('webmarcas-logo'))) {
+            el.src = logoDataUrl;
+          } else if (sigDataUrl && src === signatureImage) {
+            el.src = sigDataUrl;
           }
-          // html2canvas fails to render a block-level <p> inside an inline-block
-          // container (badge boxes come out empty). Rebuild each badge as an
-          // inline-block <span> carrying the box styles + text directly.
-          const cloneWin = clonedDoc.defaultView || window;
-          const badgePs = Array.from(clonedDoc.querySelectorAll('.print-target p')) as HTMLElement[];
-          for (const p of badgePs) {
-            const parent = p.parentElement;
-            if (!parent) continue;
-            const parentStyle = cloneWin.getComputedStyle(parent);
-            if (parentStyle.display !== 'inline-block') continue;
-            const pStyle = cloneWin.getComputedStyle(p);
-            const span = clonedDoc.createElement('span');
-            span.textContent = (p.textContent || '').trim().toUpperCase();
-            span.style.display = 'inline-block';
-            span.style.background = parentStyle.backgroundColor || '#1e3a5f';
-            span.style.borderRadius = parentStyle.borderRadius;
-            span.style.padding = `${parentStyle.paddingTop} ${parentStyle.paddingRight} ${parentStyle.paddingBottom} ${parentStyle.paddingLeft}`;
-            span.style.color = pStyle.color || '#ffffff';
-            span.style.fontFamily = pStyle.fontFamily;
-            span.style.fontSize = pStyle.fontSize;
-            span.style.fontWeight = pStyle.fontWeight || '700';
-            span.style.letterSpacing = pStyle.letterSpacing;
-            span.style.lineHeight = pStyle.lineHeight;
-            parent.replaceWith(span);
-          }
-        },
-      });
+        }
+        // html2canvas fails to render a block-level <p> inside an inline-block
+        // container (badge boxes come out empty). Rebuild each badge as an
+        // inline-block <span> carrying the box styles + text directly.
+        const cloneWin = clonedDoc.defaultView || window;
+        const badgePs = Array.from(clonedDoc.querySelectorAll('.print-target p')) as HTMLElement[];
+        for (const p of badgePs) {
+          const parent = p.parentElement;
+          if (!parent) continue;
+          const parentStyle = cloneWin.getComputedStyle(parent);
+          if (parentStyle.display !== 'inline-block') continue;
+          const pStyle = cloneWin.getComputedStyle(p);
+          const span = clonedDoc.createElement('span');
+          span.textContent = (p.textContent || '').trim().toUpperCase();
+          span.style.display = 'inline-block';
+          span.style.background = parentStyle.backgroundColor || '#1e3a5f';
+          span.style.borderRadius = parentStyle.borderRadius;
+          span.style.padding = `${parentStyle.paddingTop} ${parentStyle.paddingRight} ${parentStyle.paddingBottom} ${parentStyle.paddingLeft}`;
+          span.style.color = pStyle.color || '#ffffff';
+          span.style.fontFamily = pStyle.fontFamily;
+          span.style.fontSize = pStyle.fontSize;
+          span.style.fontWeight = pStyle.fontWeight || '700';
+          span.style.letterSpacing = pStyle.letterSpacing;
+          span.style.lineHeight = pStyle.lineHeight;
+          parent.replaceWith(span);
+        }
+      };
 
-      const pxWidth = canvas.width;
-      const pxHeight = canvas.height;
-      const pxPerMM = pxWidth / CONTENT_W;
+      // 3) Render page-by-page at the preview's native width (=210mm ~ 794px).
+      // This avoids one huge html2canvas bitmap, which was the main cause of
+      // slow downloads, browser memory spikes and intermittent failures.
+      const captureWidth = NATIVE_WIDTH_PX;
+
+      const exportHost = document.createElement('div');
+      exportHost.style.position = 'fixed';
+      exportHost.style.left = '-10000px';
+      exportHost.style.top = '0';
+      exportHost.style.width = `${captureWidth}px`;
+      exportHost.style.background = '#ffffff';
+      exportHost.style.zIndex = '-1';
+      exportHostForCleanup = exportHost;
+      const exportRoot = root.cloneNode(true) as HTMLElement;
+      exportRoot.style.width = '210mm';
+      exportRoot.style.minHeight = '297mm';
+      exportRoot.style.boxShadow = 'none';
+      exportRoot.style.borderRadius = '0';
+      exportRoot.style.overflow = 'visible';
+      exportHost.appendChild(exportRoot);
+      document.body.appendChild(exportHost);
+
+      await Promise.all((Array.from(exportRoot.querySelectorAll('img')) as HTMLImageElement[]).map((img) => waitForImageReady(img, 3000)));
+
+      const fullHeightCssPx = Math.ceil(exportRoot.scrollHeight);
+      const cssPxPerMM = captureWidth / CONTENT_W;
 
       // Reserve room at the bottom of every page for the footer bar.
       const FOOTER_H_MM = 17;
-      const usablePagePx = Math.floor((A4_H - FOOTER_H_MM) * pxPerMM);
+      const usablePageCssPx = Math.floor((A4_H - FOOTER_H_MM) * cssPxPerMM);
 
       // Collect safe break boundaries (tops of block elements) so pages never
-      // cut through a line of text. Coordinates are mapped into canvas pixels.
-      const rootRect = root.getBoundingClientRect();
-      const domToCanvas = pxHeight / root.scrollHeight;
+      // cut through a line of text. Coordinates are kept in CSS pixels.
+      const rootRect = exportRoot.getBoundingClientRect();
       const boundarySet = new Set<number>();
       const blockEls = Array.from(
-        root.querySelectorAll('[data-pdf-section], .legal-p, .legal-p-short, .legal-list, .legal-heading, .legal-table-wrap, .legal-figure, figure, h1, h2, h3, img'),
+        exportRoot.querySelectorAll('[data-pdf-section], .legal-p, .legal-p-short, .legal-list, .legal-heading, .legal-table-wrap, .legal-figure, figure, h1, h2, h3, img'),
       ) as HTMLElement[];
       for (const el of blockEls) {
         const top = el.getBoundingClientRect().top - rootRect.top;
-        if (top > 0) boundarySet.add(Math.floor(top * domToCanvas));
+        if (top > 0) boundarySet.add(Math.floor(top));
       }
       const boundaries = Array.from(boundarySet).sort((a, b) => a - b);
 
       // First pass: compute cut points snapped to element boundaries.
       const cuts: Array<{ start: number; height: number }> = [];
       let offsetPx = 0;
-      while (offsetPx < pxHeight) {
-        const target = offsetPx + usablePagePx;
-        let end = Math.min(target, pxHeight);
-        if (target < pxHeight) {
+      while (offsetPx < fullHeightCssPx) {
+        const target = offsetPx + usablePageCssPx;
+        let end = Math.min(target, fullHeightCssPx);
+        if (target < fullHeightCssPx) {
           // Snap to the last element boundary within the page (but keep at
           // least 40% of the page filled to avoid degenerate tiny pages).
-          const minEnd = offsetPx + Math.floor(usablePagePx * 0.4);
+          const minEnd = offsetPx + Math.floor(usablePageCssPx * 0.4);
           for (let i = boundaries.length - 1; i >= 0; i--) {
             const b = boundaries[i];
             if (b <= target && b > minEnd) { end = b - 2; break; }
             if (b <= minEnd) break;
           }
         }
-        cuts.push({ start: offsetPx, height: end - offsetPx });
+        cuts.push({ start: offsetPx, height: Math.max(1, end - offsetPx) });
         offsetPx = end;
       }
 
@@ -707,22 +772,57 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         pdf.text(`${pageNum}/${totalPages}`, A4_W - 15, lineY + 5.2, { align: 'right' });
       };
 
-      // Second pass: render each page slice + footer.
-      cuts.forEach((cut, pageIndex) => {
-        const sliceCanvas = document.createElement('canvas');
-        sliceCanvas.width = pxWidth;
-        sliceCanvas.height = cut.height;
-        const ctx = sliceCanvas.getContext('2d');
-        if (ctx) {
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, pxWidth, cut.height);
-          ctx.drawImage(canvas, 0, cut.start, pxWidth, cut.height, 0, 0, pxWidth, cut.height);
-        }
-        const sliceHeightMM = (cut.height * CONTENT_W) / pxWidth;
+      // Second pass: capture one clipped page at a time + footer.
+      for (let pageIndex = 0; pageIndex < cuts.length; pageIndex++) {
+        const cut = cuts[pageIndex];
+        const pageFrame = document.createElement('div');
+        pageFrame.style.width = `${captureWidth}px`;
+        pageFrame.style.height = `${cut.height}px`;
+        pageFrame.style.overflow = 'hidden';
+        pageFrame.style.position = 'relative';
+        pageFrame.style.background = '#ffffff';
+
+        const pageRoot = exportRoot.cloneNode(true) as HTMLElement;
+        pageRoot.style.position = 'absolute';
+        pageRoot.style.left = '0';
+        pageRoot.style.top = `-${cut.start}px`;
+        pageRoot.style.width = '210mm';
+        pageRoot.style.boxShadow = 'none';
+        pageRoot.style.borderRadius = '0';
+        pageRoot.style.overflow = 'visible';
+        pageFrame.appendChild(pageRoot);
+        exportHost.appendChild(pageFrame);
+
+        await Promise.all((Array.from(pageFrame.querySelectorAll('img')) as HTMLImageElement[]).map((img) => waitForImageReady(img, 2500)));
+
+        const pageCanvas = await withTimeout(
+          html2canvas(pageFrame, {
+            scale: 1.25,
+            useCORS: true,
+            allowTaint: false,
+            backgroundColor: '#ffffff',
+            logging: false,
+            width: captureWidth,
+            height: cut.height,
+            windowWidth: captureWidth,
+            windowHeight: Math.max(cut.height, 900),
+            scrollX: 0,
+            scrollY: 0,
+            onclone: applyHtml2CanvasCloneFixes,
+          }),
+          25000,
+          `Tempo excedido ao renderizar a página ${pageIndex + 1} do PDF.`,
+        );
+
+        pageFrame.remove();
+        const sliceHeightMM = (pageCanvas.height * CONTENT_W) / pageCanvas.width;
         if (pageIndex > 0) pdf.addPage();
-        pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.86), 'JPEG', 0, 0, CONTENT_W, sliceHeightMM, undefined, 'FAST');
+        pdf.addImage(pageCanvas.toDataURL('image/jpeg', 0.82), 'JPEG', 0, 0, CONTENT_W, sliceHeightMM, undefined, 'FAST');
         drawFooter(pageIndex + 1);
-      });
+      }
+
+      exportHost.remove();
+      exportHostForCleanup = null;
 
       pdf.save(pdfFileName);
     } catch (error) {
@@ -737,6 +837,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       for (const { el, src } of originalSrcs) {
         try { el.src = src; } catch { /* ignore */ }
       }
+      try { exportHostForCleanup?.remove(); } catch { /* ignore */ }
       setIsGeneratingPDF(false);
     }
   };
