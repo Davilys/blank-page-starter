@@ -4,29 +4,30 @@ import html2canvas from 'html2canvas';
 (window as any).__h2c = html2canvas;
 
 const mockResource: any = {
-  id: '00000000-0000-0000-0000-000000000000',
-  brand_name: 'Mega Robô de Led',
-  process_number: '937059455',
+  id: '0964fe3f-e1ca-48b4-b4e8-d1cf8fee9f47',
+  brand_name: 'Opera Idiomas',
+  process_number: '937364827',
+  approved_at: new Date().toISOString(),
 };
 
 const mockContent = `EXCELENTÍSSIMO SENHOR PRESIDENTE DA DIRETORIA DE MARCAS, PATENTES E DESENHOS INDUSTRIAIS DO INSTITUTO NACIONAL DA PROPRIEDADE INDUSTRIAL – INPI
 
-Processo INPI nº: 937059455
-Marca: Mega Robô de Led
-Classe NCL (12ª Ed.): 41
-Titular/Requerente: MEGA ROBO DE LED - ENTRETENIMENTO EM EVENTOS LTDA [BR/SP]
-Examinador(a): ELAINE VIANNA SARAIVA
+Processo INPI nº: 937364827
+Marca: Opera Idiomas
+Classe NCL (12ª Ed.): 16
+Titular/Requerente: OPERA IDIOMAS INSTITUICAO EDUCACIONAL LTDA [BR/BA]
+Examinador(a): VINICIUS PILLAR LEAL
 Procurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79
 
 I – SÍNTESE DOS FATOS E DO HISTÓRICO PROCESSUAL
 
-1. Com a devida vênia do ilustre examinador, inicia-se a presente peça com a exposição cronológica e pormenorizada dos fatos que motivaram o indeferimento ora atacado, a fim de demonstrar, de forma inequívoca, as nulidades de análise e as insuficiências motivacionais do despacho decisório do INPI. Trata-se do pedido de registro de marca depositado em 18/11/2024, sob o Processo nº 937059455, para a marca mista "Mega Robô de Led", requerida na natureza de Marca de Produto e Serviço.
+1. Com a devida vênia do ilustre examinador, inicia-se a presente peça com a exposição cronológica e pormenorizada dos fatos que motivaram o indeferimento ora atacado, com prova documental inserida no corpo do recurso [DOC:01].
 
-2. O presente recurso demonstrará que a decisão de indeferimento carece de fundamentação adequada, violando princípios basilares do direito administrativo, notadamente o dever de motivação dos atos administrativos previsto no art. 50 da Lei nº 9.784/99.
+2. O conjunto probatório demonstra a existência e apresentação visual da marca, bem como o contexto documental analisado [DOC:02].
 
 II – DO DIREITO
 
-3. A marca em questão possui distintividade suficiente para o registro, conforme se demonstrará a seguir, com base na Lei da Propriedade Industrial (Lei nº 9.279/96) e na jurisprudência consolidada.
+3. A marca em questão possui distintividade suficiente para o registro, conforme se demonstrará a seguir, com base na Lei da Propriedade Industrial (Lei nº 9.279/96), inclusive pela prova de uso e apresentação ao consumidor [DOC:03].
 
 III – DA JURISPRUDÊNCIA
 

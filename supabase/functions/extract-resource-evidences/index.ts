@@ -7,6 +7,22 @@ const corsHeaders = {
 
 const BUCKET = 'inpi-resource-evidence';
 
+const isJpeg = (bytes: Uint8Array) => bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+const isPng = (bytes: Uint8Array) =>
+  bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+const looksZlibWrapped = (bytes: Uint8Array) => bytes.length > 2 && bytes[0] === 0x78;
+
+async function inflateZlibIfImage(bytes: Uint8Array): Promise<Uint8Array> {
+  if (isJpeg(bytes) || isPng(bytes) || !looksZlibWrapped(bytes)) return bytes;
+  try {
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
+    const inflated = new Uint8Array(await new Response(stream).arrayBuffer());
+    return (isJpeg(inflated) || isPng(inflated)) ? inflated : bytes;
+  } catch (_e) {
+    return bytes;
+  }
+}
+
 interface FileInput {
   name: string;
   type: string; // mime
@@ -239,22 +255,24 @@ Deno.serve(async (req) => {
           console.log('No embedded images in PDF:', f.name);
         }
         for (const im of imgs) {
-          const ext = im.mime === 'image/jpeg' ? 'jpg' : (im.mime === 'image/jp2' ? 'jp2' : 'bin');
+          const imageBytes = im.mime === 'image/jpeg' ? await inflateZlibIfImage(im.bytes) : im.bytes;
+          const normalizedMime = isJpeg(imageBytes) ? 'image/jpeg' : isPng(imageBytes) ? 'image/png' : im.mime;
+          const ext = normalizedMime === 'image/jpeg' ? 'jpg' : (normalizedMime === 'image/png' ? 'png' : (normalizedMime === 'image/jp2' ? 'jp2' : 'bin'));
           const path = `${resourceId}/${crypto.randomUUID()}_p${im.page}.${ext}`;
-          const { error: upErr } = await admin.storage.from(BUCKET).upload(path, im.bytes, {
-            contentType: im.mime, upsert: false,
+          const { error: upErr } = await admin.storage.from(BUCKET).upload(path, imageBytes, {
+            contentType: normalizedMime, upsert: false,
           });
           if (upErr) { console.warn('upload img err:', upErr.message); continue; }
           // OCR only for jpeg (gateway accepts data:image/jpeg). Skip jp2.
-          const meta = (doOcr && im.mime === 'image/jpeg')
-            ? await ocrAndCaptionImage(im.bytes, `${f.name} — pág. ${im.page}`, 'image/jpeg')
+          const meta = (doOcr && normalizedMime === 'image/jpeg')
+            ? await ocrAndCaptionImage(imageBytes, `${f.name} — pág. ${im.page}`, 'image/jpeg')
             : { caption: `${f.name} — pág. ${im.page}`, ocr: '' };
           const row: EvidenceRow & { party: string } = {
             resource_id: resourceId,
             storage_path: path,
             page_number: im.page,
             source_file_name: f.name,
-            mime_type: im.mime,
+            mime_type: normalizedMime,
             caption: meta.caption,
             ocr_text: meta.ocr,
             placement: 'inline',

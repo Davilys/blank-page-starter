@@ -42,6 +42,15 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+function normalizeSignedUrl(url: string) {
+  if (!url) return '';
+  if (/^https?:\/\//i.test(url)) return url;
+  const base = import.meta.env.VITE_SUPABASE_URL || '';
+  if (!base) return url;
+  const normalizedPath = url.startsWith('/storage/v1') ? url : `/storage/v1${url.startsWith('/') ? url : `/${url}`}`;
+  return `${base.replace(/\/$/, '')}${normalizedPath}`;
+}
+
 export function EvidenceGallery({ open, onOpenChange, resourceId, onChanged, onRegenerate }: Props) {
   const [rows, setRows] = useState<EvidenceRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -64,16 +73,24 @@ export function EvidenceGallery({ open, onOpenChange, resourceId, onChanged, onR
     }
     const list = (data as unknown as EvidenceRow[]) || [];
     setRows(list);
-    // Gera signed URLs em lote
+    // Gera signed URLs em lote via Edge Function, igual ao PDF final.
+    // Isso evita quebra por RLS do bucket privado e ainda repara imagens antigas extraídas de PDF.
     const urls: Record<string, string> = {};
-    await Promise.all(
-      list.map(async (r) => {
-        const { data: s } = await supabase.storage
-          .from('inpi-resource-evidence')
-          .createSignedUrl(r.storage_path, 3600);
-        if (s?.signedUrl) urls[r.id] = s.signedUrl;
-      }),
-    );
+    if (list.length > 0) {
+      const { data: signRes, error: signErr } = await supabase.functions.invoke('sign-inpi-evidence', {
+        body: { paths: list.map((r) => r.storage_path), repair: true },
+      });
+      if (signErr) {
+        console.error('Erro ao assinar previews de evidências:', signErr);
+      } else {
+        const signedRows: Array<{ path: string; signedUrl?: string; signedURL?: string }> = signRes?.urls || [];
+        const byPath = new Map(signedRows.map((u) => [u.path, normalizeSignedUrl(u.signedUrl || u.signedURL || '')]));
+        list.forEach((r) => {
+          const signed = byPath.get(r.storage_path);
+          if (signed) urls[r.id] = signed;
+        });
+      }
+    }
     setSignedUrls(urls);
     setLoading(false);
     onChanged?.(list);
