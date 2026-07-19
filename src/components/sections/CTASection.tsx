@@ -1,49 +1,74 @@
-import { ArrowRight, Shield } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ArrowRight, MessageCircle, Zap } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 const CTASection = () => {
   const { t } = useLanguage();
 
   return (
-    <section className="section-padding relative overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-3xl" />
+    <section className="relative py-12 md:py-20 px-4">
+      <div className="mx-auto max-w-6xl rounded-[2rem] md:rounded-[2.5rem] hero-blue-bg relative overflow-hidden px-6 py-14 md:px-16 md:py-20 text-center">
+        {/* soft dotted texture */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.08]"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 1px 1px, #ffffff 1px, transparent 0)",
+            backgroundSize: "30px 30px",
+          }}
+          aria-hidden="true"
+        />
+        <div className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-[hsl(20_100%_55%_/_0.25)] blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
 
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="glass-card max-w-4xl mx-auto p-8 md:p-12 text-center">
-          {/* Icon */}
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary/25">
-            <Shield className="w-8 h-8 text-primary-foreground" />
+        <div className="relative z-10">
+          {/* Orange badge */}
+          <div className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[hsl(20_100%_55%)] to-[hsl(14_100%_48%)] px-5 py-2.5 text-white shadow-[0_10px_24px_-8px_hsla(20,100%,45%,0.6)] mb-8">
+            <Zap className="w-4 h-4 fill-white" />
+            <span className="text-xs font-black uppercase tracking-[0.18em]">Última chamada</span>
           </div>
 
-          {/* Content */}
-          <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-            {t("cta.title")}{" "}
-            <span className="gradient-text">{t("cta.titleHighlight")}</span>
+          {/* Heading */}
+          <h2 className="font-display font-black text-white leading-[1.05] tracking-[-0.03em] text-4xl md:text-6xl lg:text-7xl max-w-4xl mx-auto">
+            {t("cta.title")} <span className="text-white">{t("cta.titleHighlight")}</span>
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
+
+          <p className="mt-6 text-white/85 text-base md:text-lg max-w-2xl mx-auto">
             {t("cta.subtitle")}
           </p>
 
+          {/* Investment box */}
+          <div className="mt-10 mx-auto max-w-2xl rounded-3xl border border-white/25 bg-white/10 backdrop-blur px-6 py-8 md:px-10 md:py-10">
+            <div className="text-[hsl(20_100%_65%)] text-xs md:text-sm font-black uppercase tracking-[0.28em]">
+              Investimento
+            </div>
+            <div className="mt-3 font-display font-black text-white leading-none tracking-[-0.03em] text-[2.5rem] md:text-[4rem]">
+              A partir de <span className="whitespace-nowrap">R$ 699</span>
+            </div>
+            <div className="mt-3 text-sm text-white/80">à vista no PIX (ou parcelado no cartão)</div>
+          </div>
+
+          <p className="mt-5 text-white/70 text-xs md:text-sm">
+            Taxas oficiais do INPI cobradas à parte, conforme tabela vigente.
+          </p>
+
           {/* CTAs */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button variant="hero" size="xl" asChild>
-              <a href="#consultar" className="group">
-                {t("cta.button1")}
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </a>
-            </Button>
-            <Button variant="hero-outline" size="xl" asChild>
-              <a
-                href="https://wa.me/5511911120225?text=Olá! Gostaria de falar com um especialista sobre registro de marca."
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {t("cta.button2")}
-              </a>
-            </Button>
+          <div className="mt-10 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+            <a
+              href="#consultar"
+              className="group inline-flex items-center justify-center gap-2 rounded-full bg-white text-[hsl(226_95%_28%)] font-black uppercase tracking-wide text-sm px-8 py-4 shadow-[0_18px_38px_-14px_rgba(0,0,0,0.4)] hover:-translate-y-0.5 transition"
+            >
+              {t("cta.button1")}
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition" />
+            </a>
+            <a
+              href="https://wa.me/5511911120225?text=Olá! Gostaria de falar com um especialista sobre registro de marca."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-white/50 bg-white/10 backdrop-blur text-white font-black uppercase tracking-wide text-sm px-8 py-4 hover:bg-white/20 transition"
+            >
+              <MessageCircle className="w-4 h-4" />
+              {t("cta.button2")}
+            </a>
           </div>
         </div>
       </div>
