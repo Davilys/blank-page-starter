@@ -88,7 +88,7 @@ const Header = () => {
           {/* Desktop CTA + Controls */}
           <div className="hidden md:flex items-center gap-2 lg:gap-3">
             {/* Phone contact block — only on blue hero */}
-            <a href="tel:+551191112025" className="hidden xl:flex items-center gap-2.5 pr-2">
+            <a href="tel:+551191112025" className="hidden 2xl:flex items-center gap-2.5 pr-2">
               <span className={`w-10 h-10 rounded-full flex items-center justify-center ${!isScrolled && isHomePage ? "bg-white/15" : "bg-primary/10"}`}>
                 <Phone className={`w-4 h-4 ${!isScrolled && isHomePage ? "text-white" : "text-primary"}`} strokeWidth={2.4} />
               </span>
