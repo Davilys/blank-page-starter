@@ -23,6 +23,12 @@ const Header = () => {
   }, []);
 
   const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, anchor: string) => {
+    // Route links (start with "/") should navigate normally, not scroll.
+    if (anchor.startsWith('/')) {
+      e.preventDefault();
+      navigate(anchor);
+      return;
+    }
     e.preventDefault();
     if (isHomePage) {
       const el = document.querySelector(anchor);
@@ -36,7 +42,7 @@ const Header = () => {
     { label: "Início", href: "#home", isRoute: false },
     { label: "Como funciona", href: "#como-funciona", isRoute: false },
     { label: "Diferenciais", href: "#beneficios", isRoute: false },
-    { label: "Clientes", href: "#depoimentos", isRoute: false },
+    { label: "Registrar", href: "/registrar", isRoute: true },
     { label: "FAQ", href: "#faq", isRoute: false },
   ];
 
@@ -72,7 +78,7 @@ const Header = () => {
             {navItems.map((item) => (
                 <a
                   key={item.label}
-                  href={isHomePage ? item.href : `/${item.href}`}
+                  href={item.isRoute ? item.href : (isHomePage ? item.href : `/${item.href}`)}
                   onClick={(e) => handleAnchorClick(e, item.href)}
                   className={`px-3 py-2 text-sm font-semibold transition-colors rounded-lg whitespace-nowrap ${
                     !isScrolled && isHomePage
@@ -150,7 +156,7 @@ const Header = () => {
             {navItems.map((item) => (
                 <a
                   key={item.label}
-                  href={isHomePage ? item.href : `/${item.href}`}
+                  href={item.isRoute ? item.href : (isHomePage ? item.href : `/${item.href}`)}
                   onClick={(e) => { handleAnchorClick(e, item.href); setIsMobileMenuOpen(false); }}
                   className="px-4 py-3 text-[hsl(222_40%_25%)] hover:text-[hsl(222_92%_54%)] transition-colors rounded-xl hover:bg-[hsl(220_33%_96%)] touch-target font-medium"
                 >
