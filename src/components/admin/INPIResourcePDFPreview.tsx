@@ -40,6 +40,7 @@ interface INPIResourcePDFPreviewProps {
   resource: ResourceData;
   content: string;
   resourceType?: string;
+  debugEvidenceOverride?: ResourceEvidence[];
 }
 
 type SupabaseTableClient = typeof supabase & {
@@ -356,7 +357,7 @@ const waitForImageReady = async (img: HTMLImageElement, timeoutMs = 5000): Promi
   }
 };
 
-export function INPIResourcePDFPreview({ resource, content, resourceType }: INPIResourcePDFPreviewProps) {
+export function INPIResourcePDFPreview({ resource, content, resourceType, debugEvidenceOverride }: INPIResourcePDFPreviewProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [evidences, setEvidences] = useState<ResourceEvidence[]>([]);
@@ -404,6 +405,12 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      if (debugEvidenceOverride) {
+        let n = 1;
+        setEvidences(debugEvidenceOverride.map((r) => ({ ...r, docNumber: r.docNumber || n++ })));
+        setIsLoadingEvidence(false);
+        return;
+      }
       setIsLoadingEvidence(true);
       const { data, error } = await (supabase as SupabaseTableClient)
         .from('inpi_resource_evidences')
@@ -460,7 +467,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       }
     })();
     return () => { cancelled = true; };
-  }, [resource.id]);
+  }, [resource.id, debugEvidenceOverride]);
 
   const evidenceByNum = (n: number) => evidences.find((e) => e.docNumber === n);
   // Detect which [DOC:NN] markers actually appear in the AI-generated text.
@@ -709,6 +716,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       exportRoot.style.boxShadow = 'none';
       exportRoot.style.borderRadius = '0';
       exportRoot.style.overflow = 'visible';
+      exportRoot.querySelector('[data-pdf-final-footer]')?.remove();
       exportHost.appendChild(exportRoot);
       document.body.appendChild(exportHost);
 
@@ -772,49 +780,52 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         pdf.text(`${pageNum}/${totalPages}`, A4_W - 15, lineY + 5.2, { align: 'right' });
       };
 
-      // Second pass: capture one clipped page at a time + footer.
+      // Second pass: capture the document once and slice the bitmap by the
+      // already-computed safe boundaries. The previous per-page html2canvas
+      // loop cloned and rendered the whole legal document once for every page;
+      // on long resources with several evidence images that caused timeouts and
+      // intermittent browser memory failures during download.
+      const maxCanvasHeight = 30000;
+      const maxCanvasArea = 90000000;
+      const captureScale = Math.min(
+        1.15,
+        maxCanvasHeight / Math.max(fullHeightCssPx, 1),
+        Math.sqrt(maxCanvasArea / Math.max(captureWidth * fullHeightCssPx, 1)),
+      );
+
+      const fullCanvas = await withTimeout(
+        html2canvas(exportRoot, {
+          scale: Math.max(0.55, captureScale),
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: '#ffffff',
+          logging: false,
+          width: captureWidth,
+          height: fullHeightCssPx,
+          windowWidth: captureWidth,
+          windowHeight: Math.max(900, Math.min(fullHeightCssPx, 4000)),
+          scrollX: 0,
+          scrollY: 0,
+          onclone: applyHtml2CanvasCloneFixes,
+        }),
+        Math.min(120000, 45000 + cuts.length * 1800),
+        'Tempo excedido ao renderizar o PDF completo.',
+      );
+
+      const scaleY = fullCanvas.height / Math.max(fullHeightCssPx, 1);
       for (let pageIndex = 0; pageIndex < cuts.length; pageIndex++) {
         const cut = cuts[pageIndex];
-        const pageFrame = document.createElement('div');
-        pageFrame.style.width = `${captureWidth}px`;
-        pageFrame.style.height = `${cut.height}px`;
-        pageFrame.style.overflow = 'hidden';
-        pageFrame.style.position = 'relative';
-        pageFrame.style.background = '#ffffff';
+        const sy = Math.max(0, Math.floor(cut.start * scaleY));
+        const sh = Math.max(1, Math.min(fullCanvas.height - sy, Math.ceil(cut.height * scaleY)));
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = fullCanvas.width;
+        pageCanvas.height = sh;
+        const ctx = pageCanvas.getContext('2d');
+        if (!ctx) throw new Error('Canvas indisponível ao fatiar PDF.');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        ctx.drawImage(fullCanvas, 0, sy, fullCanvas.width, sh, 0, 0, fullCanvas.width, sh);
 
-        const pageRoot = exportRoot.cloneNode(true) as HTMLElement;
-        pageRoot.style.position = 'absolute';
-        pageRoot.style.left = '0';
-        pageRoot.style.top = `-${cut.start}px`;
-        pageRoot.style.width = '210mm';
-        pageRoot.style.boxShadow = 'none';
-        pageRoot.style.borderRadius = '0';
-        pageRoot.style.overflow = 'visible';
-        pageFrame.appendChild(pageRoot);
-        exportHost.appendChild(pageFrame);
-
-        await Promise.all((Array.from(pageFrame.querySelectorAll('img')) as HTMLImageElement[]).map((img) => waitForImageReady(img, 2500)));
-
-        const pageCanvas = await withTimeout(
-          html2canvas(pageFrame, {
-            scale: 1.25,
-            useCORS: true,
-            allowTaint: false,
-            backgroundColor: '#ffffff',
-            logging: false,
-            width: captureWidth,
-            height: cut.height,
-            windowWidth: captureWidth,
-            windowHeight: Math.max(cut.height, 900),
-            scrollX: 0,
-            scrollY: 0,
-            onclone: applyHtml2CanvasCloneFixes,
-          }),
-          25000,
-          `Tempo excedido ao renderizar a página ${pageIndex + 1} do PDF.`,
-        );
-
-        pageFrame.remove();
         const sliceHeightMM = (pageCanvas.height * CONTENT_W) / pageCanvas.width;
         if (pageIndex > 0) pdf.addPage();
         pdf.addImage(pageCanvas.toDataURL('image/jpeg', 0.82), 'JPEG', 0, 0, CONTENT_W, sliceHeightMM, undefined, 'FAST');
@@ -1193,7 +1204,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           </div>
 
           {/* Footer */}
-          <div data-pdf-section className="mt-16 pt-3" style={{ borderTop: '2px solid #1e3a5f' }}>
+          <div data-pdf-section data-pdf-final-footer className="mt-16 pt-3" style={{ borderTop: '2px solid #1e3a5f' }}>
             <div className="mb-2" style={{ height: '1px', background: 'linear-gradient(90deg, transparent, #c8af37, transparent)' }} />
             <div className="flex justify-center gap-6 text-xs flex-wrap" style={{ color: '#888' }}>
               <span>📍 Av. Brigadeiro Luiz Antônio, 2696, Centro — São Paulo/SP</span>
