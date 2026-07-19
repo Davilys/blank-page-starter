@@ -3,6 +3,7 @@ import Footer from "@/components/layout/Footer";
 import WhatsAppButton from "@/components/layout/WhatsAppButton";
 import SocialProofNotification from "@/components/SocialProofNotification";
 import HeroSection from "@/components/sections/HeroSection";
+import StatsBandSection from "@/components/sections/StatsBandSection";
 import BenefitsSection from "@/components/sections/BenefitsSection";
 import ClientLogosMarquee from "@/components/sections/ClientLogosSection";
 import HowItWorksSection from "@/components/sections/HowItWorksSection";
@@ -20,6 +21,7 @@ const Index = () => {
       <main className="mobile-compact">
         <HeroSection />
         <ClientLogosMarquee />
+        <StatsBandSection />
         <BenefitsSection />
         <HowItWorksSection />
         <PricingSection />

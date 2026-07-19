@@ -378,6 +378,31 @@
     background: hsla(222, 92%, 54%, 0.1);
   }
 
+  /* ── Pricing card retint to match reference ── */
+  .brand-public #precos .bg-accent\/20 {
+    background: hsla(20, 100%, 55%, 0.15) !important;
+  }
+  .brand-public #precos .text-accent {
+    color: hsl(20 100% 50%) !important;
+  }
+  .brand-public #precos .bg-clip-text.text-transparent {
+    background-image: linear-gradient(180deg, hsl(222 92% 54%), hsl(226 95% 40%)) !important;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent !important;
+  }
+  /* Payment method pills */
+  .brand-public #precos .bg-muted\/50 {
+    background: hsl(220 33% 97%) !important;
+    border-color: hsl(220 20% 92%) !important;
+    border-radius: 1rem !important;
+  }
+  .brand-public #precos .text-primary { color: hsl(222 92% 54%) !important; }
+  .brand-public #precos .bg-primary\/10 { background: hsla(222, 92%, 54%, 0.1) !important; }
+  .brand-public #precos .bg-primary\/5 { background: hsla(222, 92%, 54%, 0.06) !important; }
+  .brand-public #precos .border-primary\/20 { border-color: hsla(222, 92%, 54%, 0.2) !important; }
+  .brand-public #precos .border-primary\/30 { border-color: hsla(222, 92%, 54%, 0.35) !important; }
+
   /* HowItWorks hero-gradient tint → subtle blue wash */
   .brand-public .bg-hero-gradient {
     background: radial-gradient(ellipse 80% 60% at 50% 0%, hsla(222, 92%, 54%, 0.08), transparent 70%);
