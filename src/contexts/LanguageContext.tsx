@@ -542,18 +542,9 @@ const translations: Record<Language, Record<string, string>> = {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 const detectLanguage = (): Language => {
-  // Check localStorage first
+  // Site é BR-first: sempre PT por padrão, respeitando escolha manual salva.
   const stored = localStorage.getItem("language") as Language | null;
   if (stored && ["pt", "en", "es"].includes(stored)) return stored;
-  
-  // Detect from browser
-  const browserLang = navigator.language.split("-")[0].toLowerCase();
-  
-  if (browserLang === "pt") return "pt";
-  if (browserLang === "es") return "es";
-  if (browserLang === "en") return "en";
-  
-  // Default to Portuguese for Brazil site
   return "pt";
 };
 
