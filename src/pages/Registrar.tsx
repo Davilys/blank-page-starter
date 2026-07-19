@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { CheckoutProgress } from "@/components/cliente/checkout/CheckoutProgress";
 import { ViabilityStep } from "@/components/cliente/checkout/ViabilityStep";
 import { PersonalDataStep, type PersonalData } from "@/components/cliente/checkout/PersonalDataStep";
@@ -12,13 +11,13 @@ import { PlanSelectionStep } from "@/components/cliente/checkout/PlanSelectionSt
 import { PaymentStep } from "@/components/cliente/checkout/PaymentStep";
 import { ContractStep } from "@/components/cliente/checkout/ContractStep";
 import { toast } from "sonner";
-import { Moon, Sun, Award, Users, Zap, ShieldCheck, BadgeCheck } from "lucide-react";
-import { useTheme } from "@/contexts/ThemeContext";
+import { Award, Users, Zap, ShieldCheck, BadgeCheck } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import SocialProofNotification from "@/components/SocialProofNotification";
 import type { ViabilityResult } from "@/lib/api/viability";
 import type { PlanType } from "@/hooks/useContractTemplate";
-import logo from "@/assets/webmarcas-logo.png";
+import Header from "@/components/layout/Header";
+import ScribbleUnderline from "@/components/decorative/ScribbleUnderline";
 import WhatsAppButton from "@/components/layout/WhatsAppButton";
 
 // Dynamic text options for typing effect
@@ -32,7 +31,6 @@ const dynamicTexts = [
 
 export default function Registrar() {
   const navigate = useNavigate();
-  const { theme, toggleTheme } = useTheme();
   const { t } = useLanguage();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -240,50 +238,32 @@ export default function Registrar() {
   };
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Background decorative elements */}
-      <div className="absolute inset-0 bg-hero-gradient" />
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-accent/5 rounded-full blur-3xl" />
-      <div className="absolute top-1/2 right-1/3 w-64 h-64 bg-primary/3 rounded-full blur-2xl" />
+    <div className="brand-public min-h-screen relative overflow-hidden bg-[hsl(220_33%_98%)]">
+      {/* Blue hero band (top) */}
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-[420px] md:h-[520px] hero-blue-bg"
+        style={{ background: "var(--gradient-hero-blue)" }}
+      />
+      <div aria-hidden className="absolute top-24 -left-20 w-96 h-96 rounded-full bg-white/5 blur-3xl" />
+      <div aria-hidden className="absolute top-40 right-0 w-80 h-80 rounded-full bg-[hsl(20_100%_55%)]/10 blur-3xl" />
 
       {/* Social Proof Notifications */}
       <SocialProofNotification />
 
-      {/* Header with logo and theme toggle */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            <a href="/" className="flex items-center gap-2 group">
-              <img src={logo} alt="WebMarcas" className="h-10 transition-transform group-hover:scale-105" />
-              <span className="font-display text-xl font-bold hidden sm:inline">
-                Web<span className="gradient-text">Marcas</span>
-              </span>
-            </a>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              className="w-9 h-9 rounded-lg"
-              aria-label="Alternar tema"
-            >
-              {theme === "light" ? (
-                <Moon className="w-5 h-5" />
-              ) : (
-                <Sun className="w-5 h-5" />
-              )}
-            </Button>
-          </div>
-        </div>
-      </header>
+      {/* Public Header (matches landing rebrand) */}
+      <Header />
 
       {/* Main content */}
-      <main className="relative z-10 w-full max-w-2xl mx-auto px-4 pt-24 pb-8">
+      <main className="relative z-10 w-full max-w-2xl mx-auto px-4 pt-28 md:pt-36 pb-10">
         {/* Badge */}
-        <div className="flex justify-center mb-6 animate-fade-in">
-          <div className="inline-flex items-center gap-2 badge-premium">
-            <Award className="w-4 h-4" />
-            <span>{t("hero.badge")}</span>
+        <div className="flex justify-center mb-5 animate-fade-in">
+          <div
+            className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[11px] font-extrabold tracking-[0.18em] uppercase text-white shadow-[0_10px_20px_-6px_hsla(20,100%,50%,0.55)]"
+            style={{ background: "linear-gradient(180deg, hsl(20 100% 55%), hsl(14 100% 50%))" }}
+          >
+            <Award className="w-3.5 h-3.5" />
+            <span>Registro de Marcas · INPI</span>
           </div>
         </div>
 
@@ -293,26 +273,37 @@ export default function Registrar() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="font-display text-3xl sm:text-4xl md:text-5xl font-bold leading-tight mb-4 text-center mx-auto max-w-3xl text-balance"
+            className="font-display text-3xl sm:text-4xl md:text-5xl font-black leading-[1.05] mb-4 text-center mx-auto max-w-3xl text-white"
           >
             <span className="block">Apenas 5 minutos.</span>
-            <span className="block gradient-text">Registre sua marca!</span>
+            <span className="block">
+              <span className="relative inline-block">
+                Registre
+                <ScribbleUnderline />
+              </span>{" "}
+              sua marca!
+            </span>
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.15 }}
-            className="text-lg text-muted-foreground max-w-xl mx-auto"
+            className="text-base md:text-lg text-white/85 max-w-xl mx-auto"
           >
             Consulta de viabilidade gratuita no INPI + análise técnica em minutos. Processo 100% online conduzido por especialistas.
           </motion.p>
         </div>
 
         {/* Progress bar */}
-        <CheckoutProgress currentStep={step} />
+        <div className="rounded-2xl bg-white/95 backdrop-blur-sm p-3 md:p-4 mb-4 shadow-[0_18px_50px_-20px_hsla(226,95%,20%,0.35)] border border-white/40">
+          <CheckoutProgress currentStep={step} />
+        </div>
 
         {/* Form card */}
-        <Card className="shadow-xl border border-border bg-card/95 backdrop-blur-sm">
+        <Card
+          className="border border-white/60 bg-white"
+          style={{ boxShadow: "var(--shadow-card-hero)" }}
+        >
           <CardContent className="p-6 md:p-8">
             {step === 1 && (
               <ViabilityStep onNext={handleViabilityNext} />
@@ -412,23 +403,23 @@ export default function Registrar() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.1 + i * 0.08 }}
-              className="flex items-center gap-2.5 px-3 py-3 rounded-xl bg-card/95 border border-border shadow-sm hover:shadow-md hover:border-primary/40 transition-all"
+              className="flex items-center gap-2.5 px-3 py-3 rounded-xl bg-white border border-[hsl(220_20%_92%)] shadow-sm hover:shadow-md hover:border-[hsl(20_100%_55%)]/50 transition-all"
             >
-              <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary shrink-0">
+              <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-[hsl(20_100%_55%)]/10 text-[hsl(14_100%_45%)] shrink-0">
                 <item.icon className="w-4 h-4" />
               </div>
-              <span className="text-xs sm:text-sm font-semibold text-foreground leading-tight">
+              <span className="text-xs sm:text-sm font-bold text-[hsl(222_47%_15%)] leading-tight">
                 {item.label}
               </span>
             </motion.div>
           ))}
         </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
+        <p className="text-center text-xs text-[hsl(222_25%_40%)] mt-6">
           Ao continuar, você concorda com nossos{" "}
-          <a href="/termos" className="underline hover:text-primary transition-colors">Termos de Uso</a>
+          <a href="/termos" className="underline hover:text-[hsl(14_100%_45%)] transition-colors">Termos de Uso</a>
           {" "}e{" "}
-          <a href="/privacidade" className="underline hover:text-primary transition-colors">Política de Privacidade</a>.
+          <a href="/privacidade" className="underline hover:text-[hsl(14_100%_45%)] transition-colors">Política de Privacidade</a>.
         </p>
       </main>
 
