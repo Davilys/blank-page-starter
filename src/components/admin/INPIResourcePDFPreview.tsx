@@ -266,16 +266,23 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       const list = ((data as any[]) || []) as ResourceEvidence[];
       let n = 1;
       const numbered = list.map((r) => ({ ...r, docNumber: n++ }));
-      // sign + dataurl
-      await Promise.all(
-        numbered.map(async (r) => {
-          const { data: s } = await supabase.storage
-            .from('inpi-resource-evidence')
-            .createSignedUrl(r.storage_path, 3600);
-          if (s?.signedUrl) {
-            r.signedUrl = s.signedUrl;
+      // Sign URLs server-side via edge function (bypasses broken storage RLS path)
+      try {
+        const { data: signRes, error: signErr } = await supabase.functions.invoke(
+          'sign-inpi-evidence',
+          { body: { paths: numbered.map((r) => r.storage_path) } },
+        );
+        if (signErr) throw signErr;
+        const urls: Array<{ path: string; signedUrl: string; error: string | null }> =
+          signRes?.urls || [];
+        const urlByPath = new Map(urls.map((u) => [u.path, u.signedUrl]));
+        await Promise.all(
+          numbered.map(async (r) => {
+            const signedUrl = urlByPath.get(r.storage_path);
+            if (!signedUrl) return;
+            r.signedUrl = signedUrl;
             try {
-              const resp = await fetch(s.signedUrl);
+              const resp = await fetch(signedUrl);
               const blob = await resp.blob();
               r.dataUrl = await new Promise<string>((resolve, reject) => {
                 const fr = new FileReader();
@@ -292,9 +299,11 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
               r.width = dims.w;
               r.height = dims.h;
             } catch { /* ignore */ }
-          }
-        }),
-      );
+          }),
+        );
+      } catch (e) {
+        console.error('Falha ao assinar URLs de evidências:', e);
+      }
       if (!cancelled) setEvidences(numbered);
     })();
     return () => { cancelled = true; };
