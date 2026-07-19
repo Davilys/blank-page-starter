@@ -1,92 +1,110 @@
 import { Search, FileText, CreditCard, FileSignature, CheckCircle } from "lucide-react";
+import { motion } from "framer-motion";
 import { useLanguage } from "@/contexts/LanguageContext";
+
+const BLUE = "hsl(226 95% 40%)";
+const BLUE_SOFT = "hsl(222 92% 96%)";
 
 const HowItWorksSection = () => {
   const { t } = useLanguage();
 
   const steps = [
-    {
-      icon: Search,
-      step: "01",
-      title: t("howItWorks.step1.title"),
-      description: t("howItWorks.step1.desc"),
-    },
-    {
-      icon: FileText,
-      step: "02",
-      title: t("howItWorks.step2.title"),
-      description: t("howItWorks.step2.desc"),
-    },
-    {
-      icon: CreditCard,
-      step: "03",
-      title: t("howItWorks.step3.title"),
-      description: t("howItWorks.step3.desc"),
-    },
-    {
-      icon: FileSignature,
-      step: "04",
-      title: t("howItWorks.step4.title"),
-      description: t("howItWorks.step4.desc"),
-    },
-    {
-      icon: CheckCircle,
-      step: "05",
-      title: t("howItWorks.step5.title"),
-      description: t("howItWorks.step5.desc"),
-    },
+    { icon: Search, step: "01", title: t("howItWorks.step1.title"), description: t("howItWorks.step1.desc") },
+    { icon: FileText, step: "02", title: t("howItWorks.step2.title"), description: t("howItWorks.step2.desc") },
+    { icon: CreditCard, step: "03", title: t("howItWorks.step3.title"), description: t("howItWorks.step3.desc") },
+    { icon: FileSignature, step: "04", title: t("howItWorks.step4.title"), description: t("howItWorks.step4.desc") },
+    { icon: CheckCircle, step: "05", title: t("howItWorks.step5.title"), description: t("howItWorks.step5.desc") },
   ];
 
   return (
-    <section id="como-funciona" className="section-padding relative overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 bg-hero-gradient opacity-50" />
-      <div className="absolute bottom-0 left-0 w-80 h-80 bg-accent/5 rounded-full blur-3xl" />
-
-      <div className="container mx-auto px-4 relative z-10">
+    <section id="como-funciona" className="relative py-20 md:py-28 bg-[hsl(220_33%_98%)]">
+      <div className="container mx-auto px-4 max-w-6xl relative z-10">
         {/* Header */}
-        <div className="text-center max-w-2xl mx-auto mb-16">
-          <span className="badge-premium mb-4 inline-flex">{t("howItWorks.badge")}</span>
-          <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <span
+            className="inline-flex items-center rounded-full px-5 py-2 text-sm font-bold mb-6"
+            style={{ background: BLUE_SOFT, color: BLUE }}
+          >
+            {t("howItWorks.badge")}
+          </span>
+          <h2
+            className="font-display font-black leading-[1.05] tracking-[-0.03em] text-4xl md:text-6xl mb-5"
+            style={{ color: "hsl(226 60% 10%)" }}
+          >
             {t("howItWorks.title")}{" "}
-            <span className="gradient-text">{t("howItWorks.titleHighlight")}</span>?
+            <span style={{ color: BLUE }}>{t("howItWorks.titleHighlight")}</span>?
           </h2>
-          <p className="text-muted-foreground text-lg">
-            {t("howItWorks.subtitle")}
-          </p>
+          <p className="text-lg text-muted-foreground">{t("howItWorks.subtitle")}</p>
         </div>
 
         {/* Steps */}
-        <div className="max-w-4xl mx-auto">
-          {steps.map((step, index) => (
-            <div
-              key={index}
-              className="relative flex gap-6 mb-8 last:mb-0"
-            >
-              {/* Line connector */}
-              {index < steps.length - 1 && (
-                <div className="absolute left-6 top-16 w-0.5 h-full bg-gradient-to-b from-primary/50 to-transparent" />
-              )}
+        <div className="relative max-w-4xl mx-auto pl-4 md:pl-6">
+          {steps.map((s, index) => {
+            const Icon = s.icon;
+            const isLast = index === steps.length - 1;
+            return (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.45, delay: index * 0.06 }}
+                className="relative flex gap-5 md:gap-8 pb-10 last:pb-0"
+              >
+                {/* Connector line */}
+                {!isLast && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute top-14 left-[26px] md:left-[30px] w-[2px] h-full"
+                    style={{
+                      backgroundImage:
+                        "linear-gradient(to bottom, hsl(222 92% 54% / 0.5) 0 6px, transparent 6px 12px)",
+                      backgroundSize: "2px 12px",
+                    }}
+                  />
+                )}
 
-              {/* Icon */}
-              <div className="relative flex-shrink-0">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center shadow-lg shadow-primary/25">
-                  <step.icon className="w-6 h-6 text-primary-foreground" />
+                {/* Icon bubble */}
+                <div className="relative flex-shrink-0">
+                  <div
+                    className="w-[52px] h-[52px] md:w-[60px] md:h-[60px] rounded-2xl flex items-center justify-center shadow-[0_14px_28px_-10px_hsla(222,92%,40%,0.5)]"
+                    style={{
+                      background: `linear-gradient(180deg, hsl(222 92% 54%), ${BLUE})`,
+                    }}
+                  >
+                    <Icon className="w-6 h-6 md:w-7 md:h-7 text-white" strokeWidth={2.25} />
+                  </div>
                 </div>
-              </div>
 
-              {/* Content */}
-              <div className="glass-card flex-1 p-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-md">
-                    {t("howItWorks.step")} {step.step}
-                  </span>
-                  <h3 className="font-display text-xl font-semibold">{step.title}</h3>
+                {/* Card */}
+                <div
+                  className="flex-1 rounded-2xl bg-white px-6 py-6 md:px-8 md:py-7 border"
+                  style={{
+                    borderColor: "hsl(220 25% 92%)",
+                    boxShadow: "0 4px 20px -8px hsla(226,60%,15%,0.08)",
+                  }}
+                >
+                  <div className="flex items-center gap-3 mb-2 flex-wrap">
+                    <span
+                      className="text-[11px] font-black tracking-[0.15em] px-3 py-1 rounded-full"
+                      style={{ background: BLUE_SOFT, color: BLUE }}
+                    >
+                      {t("howItWorks.step")} {s.step}
+                    </span>
+                    <h3
+                      className="font-display text-xl md:text-2xl font-black tracking-[-0.02em]"
+                      style={{ color: "hsl(226 60% 10%)" }}
+                    >
+                      {s.title}
+                    </h3>
+                  </div>
+                  <p className="text-muted-foreground text-[15px] md:text-base leading-relaxed">
+                    {s.description}
+                  </p>
                 </div>
-                <p className="text-muted-foreground">{step.description}</p>
-              </div>
-            </div>
-          ))}
+              </motion.div>
+            );
+          })}
         </div>
       </div>
     </section>
