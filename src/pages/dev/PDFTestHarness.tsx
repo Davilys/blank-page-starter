@@ -26,6 +26,21 @@ type HarnessResourceRow = HarnessResource & {
   draft_content?: string | null;
 };
 
+type HarnessEvidence = {
+  id: string;
+  storage_path: string;
+  caption: string | null;
+  source_file_name: string | null;
+  page_number: number | null;
+  placement: 'inline' | 'annex';
+  display_order: number;
+  included: boolean;
+  docNumber?: number;
+  dataUrl?: string;
+  width?: number;
+  height?: number;
+};
+
 const mockResource: HarnessResource = {
   id: '0964fe3f-e1ca-48b4-b4e8-d1cf8fee9f47',
   brand_name: 'Opera Idiomas',
@@ -88,9 +103,59 @@ III – DA JURISPRUDÊNCIA
 
 19. A motivação do indeferimento está expressa em termos sintéticos no documento decisório, e a marca reproduz ou imita os seguintes registros de terceiros, sendo, portanto, irregistrável de acordo com o inciso XIX do Art. 124 da LPI. Transcrito na própria peça o dispositivo legal invocado, verifica-se que não são registráveis como marca a reprodução ou imitação, no todo ou em parte, ainda que com acréscimo, de marca alheia registrada, para distinguir ou certificar produto ou serviço idêntico, semelhante ou afim, suscetível de causar confusão ou associação com marca alheia.`;
 
+const createEvidenceDataUrl = (index: number) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1100;
+  canvas.height = 1450;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = index % 2 === 0 ? '#f4f7fb' : '#fff7ed';
+  ctx.fillRect(38, 38, canvas.width - 76, canvas.height - 76);
+  ctx.strokeStyle = '#1e3a5f';
+  ctx.lineWidth = 8;
+  ctx.strokeRect(58, 58, canvas.width - 116, canvas.height - 116);
+  ctx.fillStyle = '#1e3a5f';
+  ctx.font = 'bold 78px Georgia';
+  ctx.fillText(`EVIDÊNCIA ${index}`, 110, 170);
+  ctx.fillStyle = '#c46a21';
+  ctx.fillRect(110, 225, 700, 28);
+  ctx.fillStyle = '#111827';
+  ctx.font = '36px Georgia';
+  for (let i = 0; i < 20; i++) {
+    ctx.fillText(`Linha demonstrativa de prova documental ${index}.${i + 1}`, 110, 340 + i * 48);
+  }
+  return canvas.toDataURL('image/jpeg', 0.82);
+};
+
 export default function PDFTestHarness() {
   const [resource, setResource] = useState<HarnessResource>(mockResource);
   const [content, setContent] = useState(mockContent);
+  const [debugEvidence, setDebugEvidence] = useState<HarnessEvidence[] | undefined>();
+
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has('heavy')) return;
+    const evidences = Array.from({ length: 7 }, (_, i) => {
+      const n = i + 1;
+      return {
+        id: `debug-${n}`,
+        storage_path: `debug/evidence-${n}.jpg`,
+        caption: `Evidência pesada simulada ${n}`,
+        source_file_name: `evidencia-${n}.jpg`,
+        page_number: n,
+        placement: 'inline' as const,
+        display_order: n,
+        included: true,
+        docNumber: n,
+        dataUrl: createEvidenceDataUrl(n),
+        width: 1100,
+        height: 1450,
+      };
+    });
+    setDebugEvidence(evidences);
+    setContent(`${mockContent}\n\n20. Prova complementar inserida no corpo do recurso [DOC:04].\n\n21. Prova complementar inserida no corpo do recurso [DOC:05].\n\n22. Prova complementar inserida no corpo do recurso [DOC:06].\n\n23. Prova complementar inserida no corpo do recurso [DOC:07].`);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -117,7 +182,7 @@ export default function PDFTestHarness() {
 
   return (
     <div style={{ padding: 24, background: '#e5e7eb', minHeight: '100vh' }}>
-      <INPIResourcePDFPreview resource={resource} content={content} resourceType="indeferimento" />
+      <INPIResourcePDFPreview resource={resource} content={content} resourceType="indeferimento" debugEvidenceOverride={debugEvidence} />
     </div>
   );
 }
