@@ -11,51 +11,27 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    // Check localStorage first
-    const stored = localStorage.getItem("theme") as Theme | null;
-    if (stored) return stored;
-    
-    // Then check system preference
-    if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      return "dark";
-    }
-    return "light";
-  });
+  // Dark mode was removed from the whole site — the new brand identity
+  // is light-only. We keep the ThemeProvider API for backwards compatibility
+  // but always force "light" and strip the .dark class from <html>.
+  const [theme] = useState<Theme>("light");
 
   useEffect(() => {
     const root = document.documentElement;
-    
-    if (theme === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
+    root.classList.remove("dark");
+    try {
+      localStorage.setItem("theme", "light");
+    } catch {
+      /* ignore */
     }
-    
-    localStorage.setItem("theme", theme);
-  }, [theme]);
-
-  // Listen for system preference changes
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    
-    const handleChange = (e: MediaQueryListEvent) => {
-      // Only auto-switch if user hasn't set a preference
-      if (!localStorage.getItem("theme")) {
-        setThemeState(e.matches ? "dark" : "light");
-      }
-    };
-
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
   const toggleTheme = () => {
-    setThemeState((prev) => (prev === "light" ? "dark" : "light"));
+    /* no-op: dark mode disabled site-wide */
   };
 
-  const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
+  const setTheme = (_newTheme: Theme) => {
+    /* no-op: dark mode disabled site-wide */
   };
 
   return (
