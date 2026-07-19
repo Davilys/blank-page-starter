@@ -716,6 +716,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
       exportRoot.style.boxShadow = 'none';
       exportRoot.style.borderRadius = '0';
       exportRoot.style.overflow = 'visible';
+      exportRoot.querySelector('[data-pdf-final-footer]')?.remove();
       exportHost.appendChild(exportRoot);
       document.body.appendChild(exportHost);
 
@@ -1203,7 +1204,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
           </div>
 
           {/* Footer */}
-          <div data-pdf-section className="mt-16 pt-3" style={{ borderTop: '2px solid #1e3a5f' }}>
+          <div data-pdf-section data-pdf-final-footer className="mt-16 pt-3" style={{ borderTop: '2px solid #1e3a5f' }}>
             <div className="mb-2" style={{ height: '1px', background: 'linear-gradient(90deg, transparent, #c8af37, transparent)' }} />
             <div className="flex justify-center gap-6 text-xs flex-wrap" style={{ color: '#888' }}>
               <span>📍 Av. Brigadeiro Luiz Antônio, 2696, Centro — São Paulo/SP</span>
