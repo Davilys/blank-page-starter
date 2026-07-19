@@ -6,7 +6,6 @@ import { AnimatedCounter } from "@/components/admin/dashboard/AnimatedCounter";
 import ViabilitySearchSection from "@/components/sections/ViabilitySearchSection";
 import ClientLogosMarquee from "@/components/sections/ClientLogosSection";
 import ScribbleUnderline from "@/components/decorative/ScribbleUnderline";
-import WaveDivider from "@/components/decorative/WaveDivider";
 import seal48h from "@/assets/rebrand/seal-48h.png";
 import consultant1 from "@/assets/consultants/consultant-1.jpg";
 import consultant2 from "@/assets/consultants/consultant-2.jpg";
@@ -32,17 +31,10 @@ const HeroSection = () => {
     { icon: Award, label: t("hero.trust.online"), color: "text-amber-600", bgColor: "bg-amber-500/10" },
   ];
 
-  const stats = [
-    { value: 11000, suffix: "+", label: t("hero.stats.brands") },
-    { value: 98, suffix: "%", label: t("hero.stats.success") },
-    { value: 48, suffix: "h", label: t("hero.stats.time") },
-    { value: 15, suffix: "+", label: t("hero.stats.experience") },
-  ];
-
   return (
     <section id="home" className="relative hero-blue-bg overflow-x-clip overflow-y-visible">
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-24 relative z-10 max-w-7xl">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16 relative z-10 max-w-7xl">
         {/* Two-column hero */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
           
@@ -129,34 +121,7 @@ const HeroSection = () => {
             </motion.div>
           ))}
         </div>
-
-        {/* Stats */}
-        <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-10 max-w-4xl mx-auto relative z-10">
-          {stats.map((stat, index) => (
-            <motion.div 
-              key={index} 
-              className="text-center"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.5 + index * 0.1 }}
-            >
-              <div className="font-display text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-2">
-                <AnimatedCounter 
-                  value={stat.value} 
-                  suffix={stat.suffix}
-                  duration={2.5}
-                />
-              </div>
-              <div className="text-sm md:text-base text-white/80 font-medium">
-                {stat.label}
-              </div>
-            </motion.div>
-          ))}
-        </div>
       </div>
-
-      {/* Wave divider transitioning to next section */}
-      <WaveDivider className="relative z-10" />
     </section>
   );
 };
