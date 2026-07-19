@@ -23,6 +23,12 @@ const Header = () => {
   }, []);
 
   const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, anchor: string) => {
+    // Route links (start with "/") should navigate normally, not scroll.
+    if (anchor.startsWith('/')) {
+      e.preventDefault();
+      navigate(anchor);
+      return;
+    }
     e.preventDefault();
     if (isHomePage) {
       const el = document.querySelector(anchor);
@@ -72,7 +78,7 @@ const Header = () => {
             {navItems.map((item) => (
                 <a
                   key={item.label}
-                  href={isHomePage ? item.href : `/${item.href}`}
+                  href={item.isRoute ? item.href : (isHomePage ? item.href : `/${item.href}`)}
                   onClick={(e) => handleAnchorClick(e, item.href)}
                   className={`px-3 py-2 text-sm font-semibold transition-colors rounded-lg whitespace-nowrap ${
                     !isScrolled && isHomePage
