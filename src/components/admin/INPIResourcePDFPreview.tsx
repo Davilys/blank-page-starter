@@ -224,6 +224,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   const printRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [evidences, setEvidences] = useState<ResourceEvidence[]>([]);
+  const [isLoadingEvidence, setIsLoadingEvidence] = useState(false);
   const [liveContent, setLiveContent] = useState<string>(content);
   const [isEditing, setIsEditing] = useState(false);
   const [editDraft, setEditDraft] = useState<string>(content);
@@ -257,54 +258,71 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
+      setIsLoadingEvidence(true);
+      const { data, error } = await supabase
         .from('inpi_resource_evidences' as any)
         .select('*')
         .eq('resource_id', resource.id)
         .eq('included', true)
         .order('display_order', { ascending: true });
+      if (error) {
+        console.error('Falha ao carregar evidências do recurso:', error);
+        if (!cancelled) {
+          setEvidences([]);
+          setIsLoadingEvidence(false);
+        }
+        return;
+      }
       const list = ((data as any[]) || []) as ResourceEvidence[];
       let n = 1;
       const numbered = list.map((r) => ({ ...r, docNumber: n++ }));
       // Sign URLs server-side via edge function (bypasses broken storage RLS path)
       try {
-        const { data: signRes, error: signErr } = await supabase.functions.invoke(
-          'sign-inpi-evidence',
-          { body: { paths: numbered.map((r) => r.storage_path) } },
-        );
-        if (signErr) throw signErr;
-        const urls: Array<{ path: string; signedUrl: string; error: string | null }> =
-          signRes?.urls || [];
-        const urlByPath = new Map(urls.map((u) => [u.path, u.signedUrl]));
-        await Promise.all(
-          numbered.map(async (r) => {
-            const signedUrl = urlByPath.get(r.storage_path);
-            if (!signedUrl) return;
-            r.signedUrl = signedUrl;
-            try {
-              const resp = await fetch(signedUrl);
-              const blob = await resp.blob();
-              r.dataUrl = await new Promise<string>((resolve, reject) => {
-                const fr = new FileReader();
-                fr.onload = () => resolve(fr.result as string);
-                fr.onerror = reject;
-                fr.readAsDataURL(blob);
-              });
-              const dims = await new Promise<{ w: number; h: number }>((resolve) => {
-                const img = new Image();
-                img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
-                img.onerror = () => resolve({ w: 800, h: 1000 });
-                img.src = r.dataUrl!;
-              });
-              r.width = dims.w;
-              r.height = dims.h;
-            } catch { /* ignore */ }
-          }),
-        );
+        if (numbered.length > 0) {
+          const { data: signRes, error: signErr } = await supabase.functions.invoke(
+            'sign-inpi-evidence',
+            { body: { paths: numbered.map((r) => r.storage_path) } },
+          );
+          if (signErr) throw signErr;
+          const urls: Array<{ path: string; signedUrl?: string; signedURL?: string; error: string | null }> =
+            signRes?.urls || [];
+          const urlByPath = new Map(urls.map((u) => [u.path, u.signedUrl || u.signedURL || '']));
+          await Promise.all(
+            numbered.map(async (r) => {
+              const signedUrl = urlByPath.get(r.storage_path);
+              if (!signedUrl) return;
+              r.signedUrl = signedUrl;
+              try {
+                const resp = await fetch(signedUrl);
+                if (!resp.ok) throw new Error(`Falha ao baixar evidência ${resp.status}`);
+                const blob = await resp.blob();
+                r.dataUrl = await new Promise<string>((resolve, reject) => {
+                  const fr = new FileReader();
+                  fr.onload = () => resolve(fr.result as string);
+                  fr.onerror = reject;
+                  fr.readAsDataURL(blob);
+                });
+                const dims = await new Promise<{ w: number; h: number }>((resolve) => {
+                  const img = new Image();
+                  img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+                  img.onerror = () => resolve({ w: 800, h: 1000 });
+                  img.src = r.dataUrl!;
+                });
+                r.width = dims.w;
+                r.height = dims.h;
+              } catch (err) {
+                console.error('Falha ao preparar evidência para PDF:', r.storage_path, err);
+              }
+            }),
+          );
+        }
       } catch (e) {
         console.error('Falha ao assinar URLs de evidências:', e);
       }
-      if (!cancelled) setEvidences(numbered);
+      if (!cancelled) {
+        setEvidences(numbered);
+        setIsLoadingEvidence(false);
+      }
     })();
     return () => { cancelled = true; };
   }, [resource.id]);
@@ -331,6 +349,85 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   const isExigenciaMerito = resourceType === 'exigencia_merito';
   const cleanedContent = stripOpeningMarkers(softCleanMarkdown(liveContent));
   const bodyContent = stripClosingFromContent(cleanedContent, resourceType);
+
+  const getEvidenceSrc = (ev?: ResourceEvidence) => ev?.dataUrl || ev?.signedUrl || '';
+
+  const findEvidenceBySlug = (slug: string) =>
+    evidences.find((e) => {
+      const cap = (e.caption || '').toLowerCase();
+      const src = (e.source_file_name || '').toLowerCase();
+      return cap.includes(slug.replace(/_/g, ' ')) || src.includes(slug);
+    });
+
+  type EvidenceMarker = { type: 'doc' | 'img'; n?: number; slug?: string };
+
+  const parseEvidenceMarkers = (text: string) => {
+    const markerRegex = /\[(DOC:(\d{1,3})|IMG:([a-z0-9_\-]+))\]/gi;
+    const parts: Array<{ type: 'text' | 'doc' | 'img'; value: string; n?: number; slug?: string }> = [];
+    const markers: EvidenceMarker[] = [];
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = markerRegex.exec(text)) !== null) {
+      if (m.index > last) parts.push({ type: 'text', value: text.slice(last, m.index) });
+      if (m[2]) {
+        const n = parseInt(m[2], 10);
+        parts.push({ type: 'doc', value: m[0], n });
+        markers.push({ type: 'doc', n });
+      } else if (m[3]) {
+        const slug = m[3].toLowerCase();
+        parts.push({ type: 'img', value: m[0], slug });
+        markers.push({ type: 'img', slug });
+      }
+      last = m.index + m[0].length;
+    }
+    if (last < text.length) parts.push({ type: 'text', value: text.slice(last) });
+    return { parts, markers };
+  };
+
+  const renderMarkedInline = (text: string, keyPrefix: string) => {
+    const { parts } = parseEvidenceMarkers(text);
+    return parts.map((p, i) => {
+      if (p.type === 'text') return <span key={`${keyPrefix}-t-${i}`}>{renderInlineMarkdown(p.value)}</span>;
+      if (p.type === 'doc') {
+        return <span key={`${keyPrefix}-d-${i}`} className="font-semibold" style={{ color: '#1e3a5f' }}>(Doc. {String(p.n).padStart(2, '0')})</span>;
+      }
+      return <span key={`${keyPrefix}-i-${i}`} className="font-semibold" style={{ color: '#1e3a5f' }}>(Imagem)</span>;
+    });
+  };
+
+  const uniqueMarkers = (markers: EvidenceMarker[]) => {
+    const seen = new Set<string>();
+    return markers.filter((m) => {
+      const key = m.type === 'doc' ? `doc-${m.n}` : `img-${m.slug}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
+  const renderEvidenceFigures = (markers: EvidenceMarker[], keyPrefix: string) => (
+    uniqueMarkers(markers).map((marker, i) => {
+      const ev = marker.type === 'doc' ? evidenceByNum(marker.n!) : findEvidenceBySlug(marker.slug!);
+      const imgSrc = getEvidenceSrc(ev);
+      if (!ev || !imgSrc) return null;
+      const label = marker.type === 'doc'
+        ? <><strong>Doc. {String(marker.n).padStart(2, '0')}</strong> — {ev.caption || ev.source_file_name}</>
+        : <>{ev.caption || ev.source_file_name}</>;
+      return (
+        <figure key={`${keyPrefix}-fig-${i}`} className="my-4 mx-auto text-center legal-figure" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+          <img
+            src={imgSrc}
+            alt={ev.caption || (marker.type === 'doc' ? `Doc. ${marker.n}` : marker.slug)}
+            className="mx-auto border rounded"
+            style={{ maxWidth: '70%', maxHeight: '340px', objectFit: 'contain' }}
+          />
+          <figcaption className="text-xs mt-2" style={{ color: '#555' }}>
+            {label}
+          </figcaption>
+        </figure>
+      );
+    })
+  );
 
   const approvalDate = resource.approved_at 
     ? format(new Date(resource.approved_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
@@ -372,6 +469,10 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
   };
 
   const handleDownloadPDF = async () => {
+    if (isLoadingEvidence) {
+      toast({ title: 'Aguarde', description: 'As evidências ainda estão sendo preparadas para entrar no PDF.' });
+      return;
+    }
     setIsGeneratingPDF(true);
 
     const originalSrcs: Array<{ el: HTMLImageElement; src: string }> = [];
@@ -605,6 +706,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       if (isMarkdownTable(trimmed)) {
         const tbl = parseMarkdownTable(trimmed);
         if (tbl) {
+          const tableMarkers = parseEvidenceMarkers(trimmed).markers;
           return (
             <div key={idx} data-pdf-section className="legal-table-wrap my-5">
               <table className="legal-table w-full text-sm" style={{ border: '1px solid #1e3a5f', tableLayout: 'auto', borderCollapse: 'collapse' }}>
@@ -612,7 +714,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
                   <tr style={{ background: '#1e3a5f' }}>
                     {tbl.headers.map((h, i) => (
                       <th key={i} className="px-3 py-2 text-left text-white font-semibold" style={{ borderRight: '1px solid #c8af37' }}>
-                        {renderInlineMarkdown(h)}
+                        {renderMarkedInline(h, `th-${idx}-${i}`)}
                       </th>
                     ))}
                   </tr>
@@ -622,13 +724,14 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
                     <tr key={ri} style={{ background: ri % 2 === 0 ? '#f7f9fc' : '#fff' }}>
                       {row.map((c, ci) => (
                         <td key={ci} className="px-3 py-2 align-top" style={{ borderTop: '1px solid #d4d8e0', borderRight: '1px solid #eef0f4', color: '#1a1a1a' }}>
-                          {renderInlineMarkdown(c)}
+                          {renderMarkedInline(c, `td-${idx}-${ri}-${ci}`)}
                         </td>
                       ))}
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {renderEvidenceFigures(tableMarkers, `table-${idx}`)}
             </div>
           );
         }
@@ -643,7 +746,8 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         const normalized = trimmed.replace(BULLET_RE, '- ');
         return (
           <p key={idx} data-pdf-section className="legal-list mb-3">
-            {renderInlineMarkdown(normalized)}
+            {renderMarkedInline(normalized, `list-${idx}`)}
+            {renderEvidenceFigures(parseEvidenceMarkers(normalized).markers, `list-${idx}`)}
           </p>
         );
       }
@@ -653,55 +757,13 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       // [DOC:N] and [IMG:slug] marker handling — split paragraph and insert <figure>
       const markerRegex = /\[(DOC:(\d{1,3})|IMG:([a-z0-9_\-]+))\]/gi;
       if (markerRegex.test(trimmed)) {
-        markerRegex.lastIndex = 0;
-        const parts: Array<{ type: 'text' | 'doc' | 'img'; value: string; n?: number; slug?: string }> = [];
-        let last = 0;
-        let m: RegExpExecArray | null;
-        while ((m = markerRegex.exec(trimmed)) !== null) {
-          if (m.index > last) parts.push({ type: 'text', value: trimmed.slice(last, m.index) });
-          if (m[2]) {
-            parts.push({ type: 'doc', value: m[0], n: parseInt(m[2], 10) });
-          } else if (m[3]) {
-            parts.push({ type: 'img', value: m[0], slug: m[3].toLowerCase() });
-          }
-          last = m.index + m[0].length;
-        }
-        if (last < trimmed.length) parts.push({ type: 'text', value: trimmed.slice(last) });
-        const findEvidenceBySlug = (slug: string) =>
-          evidences.find((e) => {
-            const cap = (e.caption || '').toLowerCase();
-            const src = (e.source_file_name || '').toLowerCase();
-            return cap.includes(slug.replace(/_/g, ' ')) || src.includes(slug);
-          });
+        const { markers } = parseEvidenceMarkers(trimmed);
         return (
           <div key={idx} data-pdf-section className="mb-4">
             <p className={`legal-p ${isShort ? 'legal-p-short' : ''}`}>
-              {parts.map((p, i) => {
-                if (p.type === 'text') return <span key={i}>{renderInlineMarkdown(p.value)}</span>;
-                if (p.type === 'doc') return <span key={i} className="font-semibold" style={{ color: '#1e3a5f' }}>(Doc. {String(p.n).padStart(2, '0')})</span>;
-                return null; // img markers handled below as figures only
-              })}
+              {renderMarkedInline(trimmed, `p-${idx}`)}
             </p>
-            {parts.filter(p => p.type === 'doc' || p.type === 'img').map((p, i) => {
-              const ev = p.type === 'doc' ? evidenceByNum(p.n!) : findEvidenceBySlug(p.slug!);
-              if (!ev?.signedUrl) return null;
-              const label = p.type === 'doc'
-                ? <><strong>Doc. {String(p.n).padStart(2, '0')}</strong> — {ev.caption || ev.source_file_name}</>
-                : <>{ev.caption || ev.source_file_name}</>;
-              return (
-                <figure key={`fig-${i}`} className="my-4 mx-auto text-center">
-                  <img
-                    src={ev.signedUrl}
-                    alt={ev.caption || (p.type === 'doc' ? `Doc. ${p.n}` : p.slug)}
-                    className="mx-auto border rounded"
-                    style={{ maxWidth: '70%', maxHeight: '340px', objectFit: 'contain' }}
-                  />
-                  <figcaption className="text-xs mt-2" style={{ color: '#555' }}>
-                    {label}
-                  </figcaption>
-                </figure>
-              );
-            })}
+            {renderEvidenceFigures(markers, `p-${idx}`)}
           </div>
         );
       }
@@ -747,7 +809,12 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
               Editar PDF
             </Button>
             <Button onClick={handleDownloadPDF} disabled={isGeneratingPDF} className="gap-2 rounded-xl shadow-lg shadow-primary/15">
-          {isGeneratingPDF ? (
+          {isLoadingEvidence ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Carregando evidências...
+            </>
+          ) : isGeneratingPDF ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
               Gerando PDF...
@@ -915,7 +982,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
                   <figure key={ev.id} data-pdf-section className="my-4 mx-auto text-center legal-figure" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                     {ev.signedUrl && (
                       <img
-                        src={ev.signedUrl}
+                        src={getEvidenceSrc(ev)}
                         alt={ev.caption || `Doc. ${ev.docNumber}`}
                         className="mx-auto border rounded"
                         style={{ maxWidth: '70%', maxHeight: '340px', objectFit: 'contain' }}
