@@ -220,6 +220,73 @@ const imageToBase64 = (src: string): Promise<string> => {
   });
 };
 
+const isJpegBytes = (bytes: Uint8Array) => bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+const isPngBytes = (bytes: Uint8Array) =>
+  bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+const isWebpBytes = (bytes: Uint8Array) =>
+  bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+  bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
+const looksZlibWrapped = (bytes: Uint8Array) => bytes.length > 2 && bytes[0] === 0x78;
+
+const toSafeArrayBuffer = (bytes: Uint8Array): ArrayBuffer => {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+};
+
+const inferMimeFromBytes = (bytes: Uint8Array, fallback = 'image/jpeg') => {
+  if (isJpegBytes(bytes)) return 'image/jpeg';
+  if (isPngBytes(bytes)) return 'image/png';
+  if (isWebpBytes(bytes)) return 'image/webp';
+  return fallback;
+};
+
+const inflateZlibImageBytes = async (bytes: Uint8Array): Promise<Uint8Array> => {
+  if (!looksZlibWrapped(bytes) || typeof DecompressionStream === 'undefined') return bytes;
+  try {
+    const stream = new Blob([toSafeArrayBuffer(bytes)]).stream().pipeThrough(new DecompressionStream('deflate'));
+    const inflated = new Uint8Array(await new Response(stream).arrayBuffer());
+    return (isJpegBytes(inflated) || isPngBytes(inflated) || isWebpBytes(inflated)) ? inflated : bytes;
+  } catch {
+    return bytes;
+  }
+};
+
+const blobToOptimizedDataUrl = async (blob: Blob): Promise<{ dataUrl: string; width: number; height: number }> => {
+  const rawBytes = new Uint8Array(await blob.arrayBuffer());
+  const bytes = await inflateZlibImageBytes(rawBytes);
+  const mime = inferMimeFromBytes(bytes, blob.type || 'image/jpeg');
+  const fixedBlob = new Blob([toSafeArrayBuffer(bytes)], { type: mime });
+  const objectUrl = URL.createObjectURL(fixedBlob);
+  try {
+    const img = new Image();
+    img.decoding = 'async';
+    const loaded = new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('Imagem de evidência inválida.'));
+    });
+    img.src = objectUrl;
+    await loaded;
+    const width = img.naturalWidth || 800;
+    const height = img.naturalHeight || 1000;
+    const maxSide = 1200;
+    const ratio = Math.min(1, maxSide / Math.max(width, height));
+    const targetW = Math.max(1, Math.round(width * ratio));
+    const targetH = Math.max(1, Math.round(height * ratio));
+    const canvas = document.createElement('canvas');
+    canvas.width = targetW;
+    canvas.height = targetH;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas indisponível.');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, targetW, targetH);
+    ctx.drawImage(img, 0, 0, targetW, targetH);
+    return { dataUrl: canvas.toDataURL('image/jpeg', 0.84), width, height };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+};
+
 export function INPIResourcePDFPreview({ resource, content, resourceType }: INPIResourcePDFPreviewProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -290,7 +357,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         if (numbered.length > 0) {
           const { data: signRes, error: signErr } = await supabase.functions.invoke(
             'sign-inpi-evidence',
-            { body: { paths: numbered.map((r) => r.storage_path) } },
+            { body: { paths: numbered.map((r) => r.storage_path), repair: true } },
           );
           if (signErr) throw signErr;
           const urls: Array<{ path: string; signedUrl?: string; signedURL?: string; error: string | null }> =
@@ -304,21 +371,10 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
               try {
                 const resp = await fetch(signedUrl);
                 if (!resp.ok) throw new Error(`Falha ao baixar evidência ${resp.status}`);
-                const blob = await resp.blob();
-                r.dataUrl = await new Promise<string>((resolve, reject) => {
-                  const fr = new FileReader();
-                  fr.onload = () => resolve(fr.result as string);
-                  fr.onerror = reject;
-                  fr.readAsDataURL(blob);
-                });
-                const dims = await new Promise<{ w: number; h: number }>((resolve) => {
-                  const img = new Image();
-                  img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
-                  img.onerror = () => resolve({ w: 800, h: 1000 });
-                  img.src = r.dataUrl!;
-                });
-                r.width = dims.w;
-                r.height = dims.h;
+                const optimized = await blobToOptimizedDataUrl(await resp.blob());
+                r.dataUrl = optimized.dataUrl;
+                r.width = optimized.width;
+                r.height = optimized.height;
               } catch (err) {
                 console.error('Falha ao preparar evidência para PDF:', r.storage_path, err);
               }
@@ -541,7 +597,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
       const captureWidth = NATIVE_WIDTH_PX;
       const captureHeight = root.scrollHeight;
       const canvas = await html2canvas(root, {
-        scale: 2,
+        scale: 1.55,
         useCORS: true,
         allowTaint: false,
         backgroundColor: '#ffffff',
@@ -664,7 +720,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
         }
         const sliceHeightMM = (cut.height * CONTENT_W) / pxWidth;
         if (pageIndex > 0) pdf.addPage();
-        pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, CONTENT_W, sliceHeightMM);
+        pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.86), 'JPEG', 0, 0, CONTENT_W, sliceHeightMM, undefined, 'FAST');
         drawFooter(pageIndex + 1);
       });
 
