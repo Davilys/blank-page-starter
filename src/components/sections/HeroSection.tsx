@@ -100,13 +100,10 @@ const HeroSection = () => {
 
           {/* Right — Viability Search */}
           <div className="w-full max-w-md mx-auto lg:max-w-none">
-            <ViabilitySearchSection compact />
+            <div className="rounded-3xl bg-white p-5 md:p-7 shadow-[0_24px_60px_-12px_rgba(11,22,60,0.35)]">
+              <ViabilitySearchSection compact />
+            </div>
           </div>
-        </div>
-
-        {/* Client Logos Marquee */}
-        <div className="mt-14 relative z-10">
-          <ClientLogosMarquee embedded />
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-4xl mx-auto mt-16 relative z-10">
