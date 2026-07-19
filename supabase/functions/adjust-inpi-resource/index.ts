@@ -101,9 +101,9 @@ O usuário anexou EVIDÊNCIAS (imagens, prints de site, fotos de produto, págin
 
 REGRAS:
 - Use a forma EXATA: [DOC:01], [DOC:02], [DOC:03]… (com dois dígitos, entre colchetes, sem espaços).
-- Cite cada doc PELO MENOS UMA VEZ no parágrafo argumentativo apropriado, ex.: "conforme se verifica do print do site do concorrente, anexado a esta peça como [DOC:03]…"
+- Cite cada doc PELO MENOS UMA VEZ no parágrafo argumentativo apropriado, ex.: "conforme se verifica do print do site do concorrente, juntado ao corpo desta peça como [DOC:03]…"
 - Use a legenda da evidência (e o texto OCR quando útil) para escolher ONDE inserir o marcador. Print de site → seções de uso anterior/concorrência/diluição. Foto de produto/rótulo → distintividade e uso comercial. Página de decisão INPI → história processual.
-- Os marcadores [DOC:N] serão substituídos automaticamente pela imagem real ao gerar o PDF — NÃO escreva descrições da imagem, apenas o marcador, opcionalmente seguido por uma referência como "(Doc. 03, anexo)".
+- Os marcadores [DOC:N] serão substituídos automaticamente pela imagem real dentro do corpo do PDF — NÃO escreva descrições da imagem, apenas o marcador, opcionalmente seguido por uma referência como "(Doc. 03)".
 - NÃO altere a numeração que o sistema atribuiu — use exatamente o número fornecido.
 - Preserve todos os marcadores [DOC:N] que já estiverem no texto original.
 ` : ''}`;
@@ -119,7 +119,7 @@ REGRAS DE FORMATAÇÃO (preserve OU adicione conforme o ajuste pedir):
 `;
 
     const evidenceBlock = hasEvidences
-      ? '\n\nEVIDÊNCIAS DOCUMENTAIS ANEXADAS (insira marcadores [DOC:N] no corpo do recurso, na seção argumentativa adequada):\n' +
+      ? '\n\nEVIDÊNCIAS DOCUMENTAIS INLINE (insira marcadores [DOC:N] no corpo do recurso, na seção argumentativa adequada):\n' +
         evidences.map((e: any, i: number) => {
           const n = String(e.docNumber || i + 1).padStart(2, '0');
           const party = e.party === 'concorrente' ? '[CONCORRENTE]' : '[CLIENTE]';

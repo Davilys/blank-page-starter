@@ -504,7 +504,7 @@ const FORMATTING_INSTRUCTIONS = `
 
    REGRAS dos marcadores:
    - Os marcadores serão SUBSTITUÍDOS pela imagem real na geração do PDF — NÃO descreva a imagem, apenas insira o marcador no fim da frase pertinente.
-   - Cite o número do Doc no texto também: "… conforme se vê do print em anexo (**Doc. 03**) [DOC:03]."
+   - Cite o número do Doc no texto também: "… conforme se vê do print juntado ao corpo desta peça (**Doc. 03**) [DOC:03]."
    - Não invente marcadores cujas evidências não tenham sido fornecidas.
 
 5. SEÇÕES — títulos em CAIXA-ALTA, sem markdown de cabeçalho (#), em linha própria. Ex.: "III – FUNDAMENTAÇÃO JURÍDICA APROFUNDADA".
@@ -1427,7 +1427,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
           return `[DOC:${n}] — ${cap}${ocr ? ` — OCR: "${ocr}"` : ''}`;
         }).join('\n');
 
-      let block = `\n\n⚠️ EVIDÊNCIAS ANEXADAS PELO USUÁRIO (use como PROVAS dentro do recurso). Cite CADA marcador [DOC:NN] pelo menos uma vez, EXATAMENTE nesta forma, no parágrafo argumentativo apropriado. Não descreva a imagem — apenas insira o marcador literal, opcionalmente seguido por "(Doc. NN, anexo)".\n\n`;
+      let block = `\n\n⚠️ EVIDÊNCIAS ENVIADAS PELO USUÁRIO (use como PROVAS INLINE dentro do corpo do recurso). Cite CADA marcador [DOC:NN] pelo menos uma vez, EXATAMENTE nesta forma, no parágrafo argumentativo apropriado. Não descreva a imagem — apenas insira o marcador literal, opcionalmente seguido por "(Doc. NN)".\n\n`;
       if (cliente.length > 0) {
         block += `EVIDÊNCIAS DO CLIENTE (uso real, boa-fé, distintividade adquirida, notoriedade):\n${format(cliente)}\n\n`;
       }
@@ -1438,7 +1438,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
 - Utilize APENAS informações verificáveis na legenda ou no OCR — NÃO invente fatos que não estejam ali.
 - Em caso de conflito entre os autos do INPI e as evidências, PREVALECEM os autos oficiais; as evidências apenas complementam.
 - Se a mesma evidência reforçar dois argumentos, cite-a na primeira ocorrência e faça referência textual à segunda ("como já demonstrado no [DOC:NN]").
-- Os marcadores [DOC:NN] serão substituídos pelas imagens reais no PDF final.\n`;
+- Os marcadores [DOC:NN] serão substituídos pelas imagens reais dentro do corpo do PDF final, sem seção de anexos duplicada.\n`;
       return block;
     };
     const evidenceBlock = buildEvidenceBlock();
