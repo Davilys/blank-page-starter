@@ -6,6 +6,7 @@ import { AnimatedCounter } from "@/components/admin/dashboard/AnimatedCounter";
 import ViabilitySearchSection from "@/components/sections/ViabilitySearchSection";
 import ClientLogosMarquee from "@/components/sections/ClientLogosSection";
 import ScribbleUnderline from "@/components/decorative/ScribbleUnderline";
+import WaveDivider from "@/components/decorative/WaveDivider";
 import seal48h from "@/assets/rebrand/seal-48h.png";
 import consultant1 from "@/assets/consultants/consultant-1.jpg";
 import consultant2 from "@/assets/consultants/consultant-2.jpg";
@@ -133,6 +134,7 @@ const HeroSection = () => {
         </div>
 
       </div>
+      <WaveDivider className="absolute bottom-0 left-0 right-0 z-10" fill="hsl(var(--background))" />
     </section>
   );
 };

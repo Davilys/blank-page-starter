@@ -26,7 +26,7 @@ const translations: Record<Language, Record<string, string>> = {
     "hero.phrase1": "faça o registro agora!",
     "hero.phrase2": "seja exclusivo agora!",
     "hero.phrase3": "torne única sua marca!",
-    "hero.subtitle": "Processo 100% online, protocolo em até 48h e garantia de registro. Dono da marca é quem registra primeiro. Proteja-se agora.",
+    "hero.subtitle": "Evite plágios e o uso indevido do seu nome. Protocolo oficial no INPI em até 48h com acompanhamento humano do início ao fim.",
     "hero.cta.check": "Consultar viabilidade",
     "hero.cta.register": "Registrar por R$699",
     "hero.trust.inpi": "Registro Nacional INPI",
