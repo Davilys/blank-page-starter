@@ -1,109 +1,43 @@
-# Rebrand visual — Landing Pública WebMarcas
+## Diagnóstico
 
-## Referência visual (como vai ficar)
+Verifiquei o fluxo `Recursos INPI → Aprovar → Gerar PDF Timbrado` (`INPIResourcePDFPreview.tsx`) e a galeria (`EvidenceGallery.tsx`). No banco os anexos existem, estão com `included=true`, `placement='inline'` e `party='cliente'|'concorrente'`. Mesmo assim as imagens não aparecem no recurso aprovado por três motivos combinados:
 
-<presentation-artifact path="webmarcas-rebrand-mockup.jpg" mime_type="image/jpeg"></presentation-artifact>
+1. **Marcadores dentro de tabelas markdown ficam como texto cru.** A imagem `image-209` mostra `[IMG:marca_cliente]` aparecendo literal dentro da tabela comparativa. Em `renderContent()` o parser de `[DOC:NN]` / `[IMG:slug]` só roda para parágrafos — as células da tabela chamam `renderInlineMarkdown(c)`, que não substitui marcadores por figuras nem por rótulos "(Doc. NN)".
+2. `**[IMG:slug]` não conta como "citado".** O `citedDocNums` só coleta `[DOC:NN]`. Como o prompt hoje mistura `[IMG:slug]` e `[DOC:NN]`, evidências referenciadas só por `[IMG:...]` acabam duplicando no bloco final (ou ficam órfãs quando o slug não bate com `caption/source_file_name`).
+3. **Prompts de geração/ajuste não garantem citação das evidências.** `process-inpi-resource` e `adjust-inpi-resource` não recebem a lista numerada de evidências disponíveis (com número Doc. NN, party e caption), então o modelo raramente insere `[DOC:NN]` — sobra só o fallback "uncited" no fim do documento e nada dentro da argumentação.
 
-## Regra de ouro (o que NÃO muda)
+## Correções
 
-- ❌ **Nenhum texto/copy** é alterado (títulos, subtítulos, CTAs, badges de trust, stats).
-- ❌ **Nenhum componente ou seção** é adicionado, removido ou reordenado.
-- ❌ **Nenhuma lógica**, rota, edge function, banco, hook ou contexto é tocado.
-- ❌ **Área Admin** (`/admin/*`) e **Área do Cliente** (`/cliente/*`) permanecem com o tema atual, sem qualquer mudança visual.
+### 1. `src/components/admin/INPIResourcePDFPreview.tsx`
 
-## O que MUDA (apenas visual, apenas rota pública)
+- Extrair o parser de marcadores para uma função `renderMarkersInline(text)` reutilizável que devolve nós React (spans "(Doc. NN)" + `<figure>` empilhadas).
+- Usar essa função nas **células de tabela** (`<td>`) e no cabeçalho: substituir `renderInlineMarkdown(c)` por uma versão que primeiro troca `[DOC:NN]`/`[IMG:slug]` por "(Doc. NN)" inline no texto da célula e, em seguida, insere `<figure>` logo abaixo da tabela (agrupadas por linha) — evitando quebrar o layout da tabela.
+- Ampliar `citedDocNums` para também consumir `[IMG:slug]` resolvidos via `findEvidenceBySlug`, para não duplicar a figura no bloco final.
+- Rotular o bloco "uncited" separando por party ("Provas do cliente" / "Provas do concorrente") e usando o mesmo estilo `legal-figure` já com `pageBreakInside: avoid`.
 
-### 1. Tokens de design (`src/index.css`)
+### 2. `src/components/admin/inpi/EvidenceGallery.tsx`
 
-Atualizar variáveis HSL da rota pública para paleta azul saturado + laranja:
+- Ao subir novos anexos, definir `placement: 'inline'` por padrão (hoje o backend grava `annex`), refletindo o comportamento "sempre inline" já acordado.
 
-- `--primary`: azul saturado `220 92% 54%` (era `#0066CC`) — para chips, links, título "poucos passos", CTA azul do form.
-- `--accent`: laranja vibrante `20 100% 55%` — para CTAs principais ("Consultar Minha Marca", scribble, checkmarks, badges).
-- `--hero-background`: azul profundo gradient (`220 92% 48%` → `225 95% 42%`) — fundo do Hero.
-- `--hero-foreground`: branco puro para textos sobre o azul.
-- `--card` do formulário: branco com shadow suave e radius `1.25rem`.
+### 3. `supabase/functions/process-inpi-resource/index.ts` e `supabase/functions/adjust-inpi-resource/index.ts`
 
-Adicionar tokens novos:
-- `--brand-orange`, `--brand-orange-glow`
-- `--gradient-hero-blue`
-- `--shadow-card-hero`
-- `--wave-divider` (para as ondas SVG entre seções)
+- Carregar `inpi_resource_evidences` (ordenadas, `included=true`) e injetar no prompt do sistema um bloco:
+  ```
+  EVIDÊNCIAS DISPONÍVEIS (cite obrigatoriamente com [DOC:NN]):
+  Doc. 01 (cliente) — <caption> [arquivo: <source_file_name>]
+  Doc. 02 (concorrente) — ...
+  ```
+- Regra explícita no prompt: "sempre que argumentar sobre logotipo, embalagem, canal de venda, uso real, indício de má-fé, exigência ou similitude visual, cite a evidência correspondente inserindo `[DOC:NN]` no final da frase". Manter `[IMG:slug]` apenas como alias tolerado.
+- No `adjust-inpi-resource`, incluir o mesmo bloco para que os "Ajustes com IA" preservem/adicionem citações em vez de apagá-las.
 
-### 2. Tipografia (`tailwind.config.ts` + `index.html`)
+### 4. Validação em preview real (antes de publicar)
 
-- Adicionar `Fraunces` (Google Fonts, weights 600/700/900) como `font-display`.
-- Manter `Inter` como `font-sans` (body).
-- Aplicar `font-display` nos H1/H2 das seções públicas (`hero.title`, títulos de `BenefitsSection`, `PricingSection`, `FAQSection`, etc.) via classe existente `font-display` — nenhum texto é reescrito.
+- Rodar Playwright em `http://localhost:8080/admin/recursos-inpi`, abrir o recurso `0964fe3f-e1ca-48b4-b4e8-d1cf8fee9f47` (7 evidências cliente já no banco), clicar em "Gerar PDF Timbrado" e capturar screenshots do diálogo de preview.
+- Confirmar visualmente: (a) rótulos `(Doc. NN)` no lugar de `[IMG:marca_cliente]` nas tabelas, (b) `<figure>` com a imagem correta abaixo, (c) nenhum bloco duplicado no final, (d) download PDF mantém as figuras (o pipeline de `html2canvas` já pré-carrega `dataUrl`, então nenhuma mudança adicional aqui).
+- Repetir a checagem para um recurso com evidências de concorrente (subir 1 via UI se necessário).
+- Somente após as duas verificações passarem, sinalizar publicação.
 
-### 3. Componentes de seção pública (só estilo, zero lógica)
+## Fora de escopo
 
-Ajustes exclusivamente em `className` e wrappers visuais:
-
-- `src/components/sections/HeroSection.tsx`
-  - Fundo: `bg-hero-gradient` → azul saturado full.
-  - Título: cor branca + font-display Fraunces chunky.
-  - Palavra "registro" (via span existente ou wrap novo puramente visual): adicionar SVG scribble laranja animado embaixo (novo componente `ScribbleUnderline.tsx` só decorativo).
-  - Card do formulário à direita: fundo branco, radius maior, shadow-card-hero.
-  - Chips (`Protocolo em 48h`, etc.): pill branco/translúcido com checkmark laranja.
-  - Avatares (AC/MR/JP): manter estrutura, apenas trocar cores para orange/green/blue.
-- `src/components/layout/Header.tsx`
-  - Sobre hero azul: logo/menu em branco quando na home.
-  - Botão "CONSULTAR MINHA MARCA" → variant laranja (`bg-accent`).
-  - Botão "ÁREA DO CLIENTE" → outlined branco.
-- `src/components/sections/*` (Benefits, HowItWorks, Pricing, Blockchain, Testimonials, BlogPreview, FAQ, CTA)
-  - Alternar bandas: `bg-background` (creme suave) e `bg-primary/5`.
-  - CTAs principais: cor `accent` (laranja); CTAs secundários: `primary` (azul).
-  - Divisores SVG wave entre seções (novo asset SVG).
-- `src/components/layout/Footer.tsx`
-  - Fundo azul escuro (`--primary` dark variant), texto branco, links laranja no hover.
-- `src/components/sections/RegistrationFormSection.tsx`
-  - Card branco, badge "CONSULTA GRATUITA" laranja pill, CTA `FALAR COM ESPECIALISTA` azul saturado.
-
-### 4. Novos arquivos criados (todos só visuais)
-
-- `src/components/decorative/ScribbleUnderline.tsx` — SVG path animado com `stroke-dashoffset`.
-- `src/components/decorative/WaveDivider.tsx` — SVG wave reutilizável entre seções.
-- `src/assets/rebrand/seal-48h.svg` — selo circular rotativo "48h no INPI" (substitui o atual se existir).
-
-### 5. Arquivos NÃO tocados (garantia)
-
-Todo `src/pages/admin/**`, `src/pages/cliente/**`, `src/components/admin/**`, `src/components/cliente/**`, `src/components/chat/**`, `supabase/**`, hooks, contexts (exceto `ThemeContext` que não muda), integrações, edge functions, migrations.
-
-## Escopo restrito — arquivos que serão modificados
-
-```
-src/index.css                                    (tokens HSL rota pública)
-tailwind.config.ts                               (fontFamily display: Fraunces)
-index.html                                       (Google Fonts Fraunces)
-src/components/layout/Header.tsx                 (cores dos botões)
-src/components/layout/Footer.tsx                 (fundo azul escuro)
-src/components/sections/HeroSection.tsx          (fundo azul + scribble)
-src/components/sections/BenefitsSection.tsx      (cores)
-src/components/sections/HowItWorksSection.tsx    (cores)
-src/components/sections/PricingSection.tsx       (cores)
-src/components/sections/BlockchainBanner.tsx     (cores)
-src/components/sections/TestimonialsSection.tsx  (cores)
-src/components/sections/BlogPreviewSection.tsx   (cores)
-src/components/sections/FAQSection.tsx           (cores)
-src/components/sections/CTASection.tsx           (cores)
-src/components/sections/RegistrationFormSection.tsx (card + badges)
-src/components/sections/ClientLogosSection.tsx   (bg claro)
-src/components/sections/ViabilitySearchSection.tsx (card branco)
-```
-
-Novos:
-```
-src/components/decorative/ScribbleUnderline.tsx
-src/components/decorative/WaveDivider.tsx
-```
-
-## Validação após implementação
-
-1. Preview visual da rota `/` comparada à mockup de referência acima.
-2. Navegar em `/admin` e `/cliente` para confirmar **zero mudança visual** nessas áreas (tema atual preservado).
-3. Confirmar que nenhum texto/copy foi alterado (diff apenas em `className` e wrappers).
-4. Rodar `bun run build` para garantir zero erros de tipo.
-
-## Detalhe técnico — isolamento admin/cliente
-
-O `ThemeContext` já governa `dark`/`light` global. Para garantir que a mudança de paleta atinja apenas a landing pública, os novos tokens (`--brand-orange`, `--hero-background`) são adicionados **globalmente** em `:root`, mas as classes que os consomem (`bg-hero-gradient`, `bg-accent`) são aplicadas **apenas nos componentes de `src/components/sections/*` e no `Header`/`Footer` da rota pública**. Como Admin e Cliente usam seus próprios layouts (`AdminLayout`, `ClientLayout`) sem essas classes, ficam intocados.
+- Layout do PDF, paginação, cabeçalho/rodapé, download DOCX — permanecem intocados.
+- Fluxo de checkout, área do cliente, rebrand público. corrija tabem ao fazer daoload do pdf esta dando erro 
