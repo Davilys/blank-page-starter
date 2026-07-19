@@ -115,10 +115,11 @@ export function EvidenceGallery({ open, onOpenChange, resourceId, onChanged, onR
   };
 
   const updateRow = async (id: string, patch: Partial<EvidenceRow>) => {
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+    const safePatch = { ...patch, placement: 'inline' as const };
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...safePatch } : r)));
     const { error } = await supabase
       .from('inpi_resource_evidences' as any)
-      .update(patch)
+      .update(safePatch)
       .eq('id', id);
     if (error) toast.error('Erro ao atualizar');
   };
@@ -340,13 +341,7 @@ function EvidenceCard({
           <Switch checked={r.included} onCheckedChange={(v) => onUpdate(r.id, { included: v })} />
           Incluir
         </label>
-        <label className="flex items-center gap-2">
-          <Switch
-            checked={r.placement === 'inline'}
-            onCheckedChange={(v) => onUpdate(r.id, { placement: v ? 'inline' : 'annex' })}
-          />
-          Inline (no argumento)
-        </label>
+        <span className="text-muted-foreground">Sempre inline no recurso</span>
       </div>
 
       {r.ocr_text && (
