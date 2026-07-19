@@ -134,6 +134,7 @@ const HeroSection = () => {
         </div>
 
       </div>
+      <WaveDivider className="relative z-10 -mb-px" fill="hsl(var(--background))" />
     </section>
   );
 };
