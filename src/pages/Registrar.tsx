@@ -391,11 +391,11 @@ export default function Registrar() {
 
         {/* Footer text */}
         {/* Trust badges row */}
-        <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
             { icon: Users, label: "+11.000 marcas" },
             { icon: Zap, label: "Protocolo em 48h" },
-            { icon: ShieldCheck, label: "Certificado Blockchain" },
+            { icon: ShieldCheck, label: "Blockchain" },
             { icon: BadgeCheck, label: "INPI Oficial" },
           ].map((item, i) => (
             <motion.div
@@ -403,12 +403,12 @@ export default function Registrar() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.1 + i * 0.08 }}
-              className="flex items-center gap-2.5 px-3 py-3 rounded-xl bg-white border border-[hsl(220_20%_92%)] shadow-sm hover:shadow-md hover:border-[hsl(20_100%_55%)]/50 transition-all"
+              className="flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-white border border-[hsl(220_20%_92%)] shadow-[0_6px_20px_-14px_hsla(226,80%,20%,0.4)] hover:shadow-[0_10px_26px_-14px_hsla(226,80%,20%,0.5)] hover:border-[hsl(20_100%_55%)]/50 transition-all"
             >
-              <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-[hsl(20_100%_55%)]/10 text-[hsl(14_100%_45%)] shrink-0">
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[hsl(20_100%_55%)]/12 text-[hsl(14_100%_45%)] shrink-0">
                 <item.icon className="w-4 h-4" />
               </div>
-              <span className="text-xs sm:text-sm font-bold text-[hsl(222_47%_15%)] leading-tight">
+              <span className="text-xs sm:text-sm font-extrabold text-[hsl(222_47%_15%)] leading-tight whitespace-nowrap">
                 {item.label}
               </span>
             </motion.div>
