@@ -655,19 +655,7 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
             )}
 
             <div className="flex-1" />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              className="w-8 h-8 rounded-xl hover:bg-accent/60 transition-all duration-300"
-              aria-label="Alternar tema"
-            >
-              {theme === 'dark' ? (
-                <Sun className="w-4 h-4 text-amber-400" />
-              ) : (
-                <Moon className="w-4 h-4 text-slate-500" />
-              )}
-            </Button>
+            {/* Dark mode removed site-wide — new brand identity is light-only. */}
           </header>
           
           {/* Main content */}
