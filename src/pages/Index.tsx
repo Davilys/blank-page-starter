@@ -4,6 +4,7 @@ import WhatsAppButton from "@/components/layout/WhatsAppButton";
 import SocialProofNotification from "@/components/SocialProofNotification";
 import HeroSection from "@/components/sections/HeroSection";
 import BenefitsSection from "@/components/sections/BenefitsSection";
+import ClientLogosMarquee from "@/components/sections/ClientLogosSection";
 import HowItWorksSection from "@/components/sections/HowItWorksSection";
 import PricingSection from "@/components/sections/PricingSection";
 import BlockchainBanner from "@/components/sections/BlockchainBanner";
@@ -14,10 +15,11 @@ import BlogPreviewSection from "@/components/sections/BlogPreviewSection";
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="brand-public min-h-screen bg-background">
       <Header />
       <main className="mobile-compact">
         <HeroSection />
+        <ClientLogosMarquee />
         <BenefitsSection />
         <HowItWorksSection />
         <PricingSection />

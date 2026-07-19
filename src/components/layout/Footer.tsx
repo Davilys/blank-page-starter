@@ -25,7 +25,7 @@ const Footer = () => {
   ];
 
   return (
-    <footer className="bg-card border-t border-border">
+    <footer className="footer-branded border-t border-white/10">
       <div className="container mx-auto px-4 py-12 md:py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
           {/* Brand */}
@@ -34,13 +34,13 @@ const Footer = () => {
               <img
                 src={webmarcasLogoMark}
                 alt="WebMarcas"
-                className="h-10 w-auto mix-blend-multiply dark:mix-blend-screen dark:invert"
+                className="h-10 w-auto brightness-0 invert"
               />
-              <span className="font-display text-xl font-bold">
-                WebMarcas <span className="gradient-text">Intelligence PI</span>
+              <span className="font-display text-xl font-bold text-white">
+                WebMarcas <span className="text-white/70">Intelligence PI</span>
               </span>
             </a>
-            <p className="text-muted-foreground text-sm leading-relaxed mb-4">
+            <p className="text-white/70 text-sm leading-relaxed mb-4">
               {t("footer.description")}
             </p>
             <div className="flex items-center gap-4">
@@ -48,13 +48,13 @@ const Footer = () => {
                 href="https://api.whatsapp.com/send/?phone=5511911120225&text=Ol%C3%A1%21+Estava+no+site+da+WebMarcas+e+quero+registrar+minha+marca.&type=phone_number&app_absent=0"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all"
+                className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-[hsl(var(--brand-orange))] transition-all"
               >
                 <Phone className="w-5 h-5" />
               </a>
               <a
                 href="mailto:ola@webmarcas.net"
-                className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all"
+                className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-[hsl(var(--brand-orange))] transition-all"
               >
                 <Mail className="w-5 h-5" />
               </a>
@@ -63,13 +63,13 @@ const Footer = () => {
 
           {/* Links */}
           <div>
-            <h4 className="font-display font-semibold mb-4">{t("footer.quickLinks")}</h4>
+            <h4 className="font-display font-semibold mb-4 text-white">{t("footer.quickLinks")}</h4>
             <ul className="space-y-3">
               {quickLinks.map((item) => (
                 <li key={item.href}>
                   <a
                     href={item.href}
-                    className="text-muted-foreground hover:text-foreground transition-colors text-sm"
+                    className="text-white/70 hover:text-[hsl(var(--brand-orange))] transition-colors text-sm"
                   >
                     {item.label}
                   </a>
@@ -80,21 +80,21 @@ const Footer = () => {
 
           {/* Services */}
           <div>
-            <h4 className="font-display font-semibold mb-4">{t("footer.services")}</h4>
+            <h4 className="font-display font-semibold mb-4 text-white">{t("footer.services")}</h4>
             <ul className="space-y-3">
               {services.map((item) => (
                 <li key={item.label}>
                   {item.href.startsWith("/") ? (
                     <Link
                       to={item.href}
-                      className="text-muted-foreground hover:text-foreground transition-colors text-sm"
+                      className="text-white/70 hover:text-[hsl(var(--brand-orange))] transition-colors text-sm"
                     >
                       {item.label}
                     </Link>
                   ) : (
                     <a
                       href={item.href}
-                      className="text-muted-foreground hover:text-foreground transition-colors text-sm"
+                      className="text-white/70 hover:text-[hsl(var(--brand-orange))] transition-colors text-sm"
                     >
                       {item.label}
                     </a>
@@ -106,17 +106,17 @@ const Footer = () => {
 
           {/* Contact */}
           <div>
-            <h4 className="font-display font-semibold mb-4">{t("footer.contact")}</h4>
+            <h4 className="font-display font-semibold mb-4 text-white">{t("footer.contact")}</h4>
             <ul className="space-y-3">
-              <li className="flex items-start gap-3 text-sm text-muted-foreground">
+              <li className="flex items-start gap-3 text-sm text-white/70">
                 <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>São Paulo - SP, Brasil</span>
               </li>
-              <li className="flex items-start gap-3 text-sm text-muted-foreground">
+              <li className="flex items-start gap-3 text-sm text-white/70">
                 <Phone className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>(11) 91112-0225</span>
               </li>
-              <li className="flex items-start gap-3 text-sm text-muted-foreground">
+              <li className="flex items-start gap-3 text-sm text-white/70">
                 <Mail className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>ola@webmarcas.net</span>
               </li>
@@ -125,16 +125,16 @@ const Footer = () => {
         </div>
 
         {/* Bottom */}
-        <div className="mt-12 pt-8 border-t border-border">
+        <div className="mt-12 pt-8 border-t border-white/10">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-muted-foreground text-center md:text-left">
+            <p className="text-sm text-white/60 text-center md:text-left">
               © {new Date().getFullYear()} WebMarcas Intelligence PI. {t("footer.rights")}
             </p>
             <div className="flex items-center gap-6">
-              <Link to="/politica-de-privacidade" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <Link to="/politica-de-privacidade" className="text-sm text-white/60 hover:text-white transition-colors">
                 {t("footer.privacy")}
               </Link>
-              <Link to="/termos-de-uso" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <Link to="/termos-de-uso" className="text-sm text-white/60 hover:text-white transition-colors">
                 {t("footer.terms")}
               </Link>
             </div>
