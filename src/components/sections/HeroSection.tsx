@@ -7,6 +7,7 @@ import ViabilitySearchSection from "@/components/sections/ViabilitySearchSection
 import ClientLogosMarquee from "@/components/sections/ClientLogosSection";
 import ScribbleUnderline from "@/components/decorative/ScribbleUnderline";
 import WaveDivider from "@/components/decorative/WaveDivider";
+import seal48h from "@/assets/rebrand/seal-48h.png";
 import consultant1 from "@/assets/consultants/consultant-1.jpg";
 import consultant2 from "@/assets/consultants/consultant-2.jpg";
 import consultant3 from "@/assets/consultants/consultant-3.jpg";
@@ -48,8 +49,7 @@ const HeroSection = () => {
           {/* Left — Text */}
           <div className="text-center lg:text-left">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 badge-premium mb-6 w-fit mx-auto lg:mx-0">
-              <Award className="w-4 h-4" />
+            <div className="hero-pill-badge mb-6 mx-auto lg:mx-0">
               <span>{t("hero.badge")}</span>
             </div>
 
@@ -99,8 +99,15 @@ const HeroSection = () => {
           </div>
 
           {/* Right — Viability Search */}
-          <div className="w-full max-w-md mx-auto lg:max-w-none">
-            <div className="rounded-3xl bg-white p-5 md:p-7 shadow-[0_24px_60px_-12px_rgba(11,22,60,0.35)]">
+          <div className="relative w-full max-w-md mx-auto lg:max-w-none">
+            {/* 48h floating seal */}
+            <img
+              src={seal48h}
+              alt="Registro no INPI em 48h"
+              className="pointer-events-none absolute -top-10 -right-4 sm:-right-6 md:-right-10 w-28 sm:w-32 md:w-36 z-20 drop-shadow-xl animate-[spin_28s_linear_infinite]"
+              style={{ animationDirection: "reverse" as any }}
+            />
+            <div className="relative rounded-[2rem] bg-white p-6 md:p-8 shadow-[0_28px_70px_-16px_rgba(11,22,60,0.4)]">
               <ViabilitySearchSection compact />
             </div>
           </div>

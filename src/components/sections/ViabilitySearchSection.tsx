@@ -548,73 +548,60 @@ const ViabilitySearchSection = ({ compact = false }: { compact?: boolean }) => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3 }}
-              className="text-center"
             >
-              {/* Title */}
-              <h2 className="hidden sm:block font-display text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-2 leading-tight whitespace-nowrap text-center">
-                Consulte a viabilidade da sua <span className="gradient-text">marca</span>
-              </h2>
-              <p className="hidden sm:block text-sm md:text-base text-muted-foreground mb-8">
-                Pesquisa automática na base oficial do INPI em tempo real.
-              </p>
-
-              {/* Feature Cards */}
-              <div className="grid grid-cols-3 gap-3 mb-8">
-                {FEATURE_CARDS.map((item, i) => (
-                  <div key={i} className="flex flex-col items-center gap-2 rounded-2xl border border-border/50 bg-card/50 px-3 py-4 text-center">
-                    <item.icon className="w-6 h-6 text-primary" strokeWidth={1.5} />
-                    <p className="font-semibold text-foreground text-sm leading-tight">{item.label}</p>
-                    <p className="text-xs text-muted-foreground leading-snug">{item.sub}</p>
-                  </div>
-                ))}
+              {/* Orange pill badge */}
+              <div className="flex justify-center mb-4">
+                <span className="badge-consulta">
+                  <Zap className="w-3.5 h-3.5" strokeWidth={2.5} />
+                  Consulta Gratuita
+                </span>
               </div>
 
-              {/* Form inside a card */}
-              <form onSubmit={handleSearch} className="rounded-2xl border border-border/50 bg-card/50 p-6 text-left">
-                <div className="space-y-5">
-                  <div>
-                    <label htmlFor="brandNameCompact" className="block text-sm font-bold text-foreground mb-2">
-                      Nome da Marca <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      id="brandNameCompact"
-                      type="text"
-                      value={brandName}
-                      onChange={(e) => setBrandName(e.target.value)}
-                      placeholder="Ex: WebMarcas, TechFlow, BioVida..."
-                      className="w-full h-12 rounded-xl border border-border/60 bg-background px-4 text-base text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all disabled:opacity-50"
-                      disabled={isSearching}
-                    />
-                  </div>
+              {/* Title — Fraunces chunky */}
+              <h2 className="font-display text-[1.9rem] sm:text-[2.15rem] leading-[1.05] font-bold text-center text-[hsl(222_47%_11%)] mb-8">
+                Consulte a viabilidade da sua{" "}
+                <span className="text-[hsl(222_92%_54%)]">marca</span>
+              </h2>
 
-                  <div>
-                    <label htmlFor="businessAreaCompact" className="block text-sm font-bold text-foreground mb-2">
-                      Ramo de Atividade <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      id="businessAreaCompact"
-                      type="text"
-                      value={businessArea}
-                      onChange={(e) => setBusinessArea(e.target.value)}
-                      placeholder="Ex: Serviços Jurídicos, Alimentação, Tecnologia..."
-                      className="w-full h-12 rounded-xl border border-border/60 bg-background px-4 text-base text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all disabled:opacity-50"
-                      disabled={isSearching}
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
+              {/* Form */}
+              <form onSubmit={handleSearch} className="space-y-5">
+                <div>
+                  <label htmlFor="brandNameCompact" className="form-label-caps">Nome da Marca</label>
+                  <input
+                    id="brandNameCompact"
+                    type="text"
+                    value={brandName}
+                    onChange={(e) => setBrandName(e.target.value)}
+                    placeholder="Como sua marca se chama?"
+                    className="form-pill-input"
                     disabled={isSearching}
-                    className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold text-base flex items-center justify-center gap-2.5 hover:bg-primary/90 active:scale-[0.98] transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    <Search className="w-5 h-5" />
-                    Consultar Viabilidade
-                  </button>
+                  />
                 </div>
 
-                <p className="mt-4 text-center text-xs text-muted-foreground">
-                  🔒 Consulta gratuita • Resultado em segundos • Sem cadastro necessário
-                </p>
+                <div>
+                  <label htmlFor="businessAreaCompact" className="form-label-caps">Ramo de Atividade</label>
+                  <input
+                    id="businessAreaCompact"
+                    type="text"
+                    value={businessArea}
+                    onChange={(e) => setBusinessArea(e.target.value)}
+                    placeholder="Ex: Serviços Jurídicos, Alimentação, Tecnologia..."
+                    className="form-pill-input"
+                    disabled={isSearching}
+                  />
+                </div>
+
+                <button type="submit" disabled={isSearching} className="btn-cta-solid mt-2">
+                  Consultar Viabilidade
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+
+                <div className="flex items-center justify-center gap-2 pt-1 text-xs text-[hsl(215_16%_47%)]">
+                  <Lock className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="font-semibold text-[hsl(222_47%_11%)]">100% Seguro</span>
+                  <span className="opacity-40">·</span>
+                  <a href="/politica-privacidade" className="underline hover:text-[hsl(222_92%_54%)]">Política de privacidade</a>
+                </div>
               </form>
             </motion.div>
           )

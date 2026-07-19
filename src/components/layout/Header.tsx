@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import webmarcasLogoMark from "@/assets/webmarcas-logo-mark.png";
-import { Menu, X, Moon, Sun, Globe } from "lucide-react";
+import { Menu, X, Moon, Sun, Globe, Phone, User, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage, type Language } from "@/contexts/LanguageContext";
@@ -151,16 +151,43 @@ const Header = () => {
               )}
             </Button>
 
-            <Button variant="ghost" size="sm" asChild>
-              <Link
-                to="/cliente/login"
-                className={!isScrolled && isHomePage ? "border border-white/60 text-white hover:bg-white/10 hover:text-white" : ""}
-              >
-                {t("nav.clientArea")}
-              </Link>
+            {/* Phone contact block — only on blue hero */}
+            {!isScrolled && isHomePage && (
+              <div className="hidden lg:flex items-center gap-2 pl-2 pr-3 mr-1 border-l border-white/20">
+                <span className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center">
+                  <Phone className="w-4 h-4 text-white" strokeWidth={2.4} />
+                </span>
+                <div className="leading-tight text-white">
+                  <div className="text-[10px] font-bold tracking-widest opacity-80">FALE CONOSCO</div>
+                  <div className="text-sm font-bold">(11) 91112-0225</div>
+                </div>
+              </div>
+            )}
+
+            <Button
+              size="sm"
+              className="rounded-full px-5 h-10 text-[11px] font-extrabold tracking-widest uppercase text-white shadow-[0_10px_20px_-6px_hsla(20,100%,50%,0.55)] hover:brightness-105"
+              style={{ background: "linear-gradient(180deg, hsl(20 100% 55%), hsl(14 100% 50%))" }}
+              asChild
+            >
+              <a href={isHomePage ? "#consultar" : "/#consultar"} onClick={(e) => handleAnchorClick(e, "#consultar")}>
+                {t("nav.checkBrand")} <ArrowRight className="w-4 h-4 ml-1" />
+              </a>
             </Button>
-            <Button size="sm" className="btn-orange rounded-full px-5" asChild>
-              <a href={isHomePage ? "#consultar" : "/#consultar"} onClick={(e) => handleAnchorClick(e, "#consultar")}>{t("nav.checkBrand")}</a>
+
+            <Button
+              size="sm"
+              variant="outline"
+              className={`rounded-full px-5 h-10 text-[11px] font-extrabold tracking-widest uppercase gap-1 ${
+                !isScrolled && isHomePage
+                  ? "border-white/70 text-white bg-transparent hover:bg-white/10 hover:text-white"
+                  : "border-primary/40 text-primary hover:bg-primary/5"
+              }`}
+              asChild
+            >
+              <Link to="/cliente/login">
+                <User className="w-3.5 h-3.5" /> {t("nav.clientArea")}
+              </Link>
             </Button>
           </div>
 
