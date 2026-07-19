@@ -254,6 +254,15 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
     }
   };
 
+  const normalizeSignedUrl = (url: string) => {
+    if (!url) return '';
+    if (/^https?:\/\//i.test(url)) return url;
+    const base = import.meta.env.VITE_SUPABASE_URL || '';
+    if (!base) return url;
+    const normalizedPath = url.startsWith('/storage/v1') ? url : `/storage/v1${url.startsWith('/') ? url : `/${url}`}`;
+    return `${base.replace(/\/$/, '')}${normalizedPath}`;
+  };
+
   // Fetch evidences for this resource + sign URLs + preload data URLs
   useEffect(() => {
     let cancelled = false;
@@ -286,7 +295,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
           if (signErr) throw signErr;
           const urls: Array<{ path: string; signedUrl?: string; signedURL?: string; error: string | null }> =
             signRes?.urls || [];
-          const urlByPath = new Map(urls.map((u) => [u.path, u.signedUrl || u.signedURL || '']));
+          const urlByPath = new Map(urls.map((u) => [u.path, normalizeSignedUrl(u.signedUrl || u.signedURL || '')]));
           await Promise.all(
             numbered.map(async (r) => {
               const signedUrl = urlByPath.get(r.storage_path);
@@ -978,7 +987,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType }: INPI
             {uncitedEvidences.length > 0 && (
               <div data-pdf-section className="mt-6">
                 <p className="legal-p" style={{ fontStyle: 'italic', color: '#374151' }}>
-                  Para complementação probatória, seguem, ainda, os seguintes documentos comprobatórios anexos:
+                  Para complementação probatória, seguem, ainda, os seguintes documentos comprobatórios incorporados ao corpo desta peça:
                 </p>
                 {uncitedEvidences.map((ev) => (
                   <figure key={ev.id} data-pdf-section className="my-4 mx-auto text-center legal-figure" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
