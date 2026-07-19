@@ -1,4 +1,4 @@
-import { Shield, Clock, CheckCircle, Award, Star } from "lucide-react";
+import { Shield, FileSignature, UserCheck, CalendarCheck, Star, Zap } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -24,11 +24,11 @@ const HeroSection = () => {
     return () => clearInterval(interval);
   }, [phrases.length]);
 
-  const trustBadges = [
-    { icon: Shield, label: t("hero.trust.inpi"), color: "text-blue-600", bgColor: "bg-blue-500/10" },
-    { icon: Clock, label: t("hero.trust.protocol"), color: "text-emerald-600", bgColor: "bg-emerald-500/10" },
-    { icon: CheckCircle, label: t("hero.trust.guarantee"), color: "text-violet-600", bgColor: "bg-violet-500/10" },
-    { icon: Award, label: t("hero.trust.online"), color: "text-amber-600", bgColor: "bg-amber-500/10" },
+  const trustPills = [
+    { icon: Shield, label: "Protocolo em 48h" },
+    { icon: FileSignature, label: "Contrato digital" },
+    { icon: UserCheck, label: "Especialista dedicado" },
+    { icon: CalendarCheck, label: "10 anos de vigência" },
   ];
 
   return (
@@ -40,9 +40,12 @@ const HeroSection = () => {
           
           {/* Left — Text */}
           <div className="text-center lg:text-left">
-            {/* Badge */}
-            <div className="hero-pill-badge mb-6 mx-auto lg:mx-0">
-              <span>{t("hero.badge")}</span>
+            {/* Orange badge */}
+            <div className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[hsl(20_100%_55%)] to-[hsl(14_100%_48%)] px-5 py-2.5 text-white shadow-[0_10px_24px_-8px_hsla(20,100%,45%,0.55)] mb-6 mx-auto lg:mx-0">
+              <Zap className="w-4 h-4 fill-white" />
+              <span className="text-[11px] md:text-xs font-black uppercase tracking-[0.18em]">
+                Registro de marcas · INPI
+              </span>
             </div>
 
             {/* Heading */}
@@ -66,27 +69,51 @@ const HeroSection = () => {
             </h1>
 
             {/* Subtitle */}
-            <p className="text-base md:text-lg text-white/85 max-w-lg mx-auto lg:mx-0 mb-10">
+            <p className="text-base md:text-lg text-white/85 max-w-lg mx-auto lg:mx-0 mb-8">
               {t("hero.subtitle")}
             </p>
 
-            {/* Social Proof */}
-            <div className="hidden sm:inline-flex flex-col sm:flex-row items-center lg:items-start gap-4 rounded-2xl bg-white/10 backdrop-blur border border-white/20 px-5 py-4 mx-auto lg:mx-0">
-              <div className="flex items-center -space-x-3 shrink-0">
-                <img src={consultant1} alt="Consultora" className="w-11 h-11 rounded-full border-2 border-white/40 object-cover" />
-                <img src={consultant2} alt="Consultor" className="w-11 h-11 rounded-full border-2 border-white/40 object-cover" />
-                <img src={consultant3} alt="Consultora" className="w-11 h-11 rounded-full border-2 border-white/40 object-cover" />
-              </div>
-              <div className="text-center sm:text-left">
-                <div className="flex items-center justify-center sm:justify-start gap-0.5 mb-1">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                  ))}
+            {/* Rating + social proof */}
+            <div className="flex flex-wrap items-center gap-4 justify-center lg:justify-start mb-8">
+              <div className="flex items-center -space-x-3">
+                <img src={consultant1} alt="" className="w-11 h-11 rounded-full border-2 border-white object-cover" />
+                <img src={consultant2} alt="" className="w-11 h-11 rounded-full border-2 border-white object-cover" />
+                <img src={consultant3} alt="" className="w-11 h-11 rounded-full border-2 border-white object-cover" />
+                <div className="w-11 h-11 rounded-full border-2 border-white bg-[hsl(20_100%_55%)] flex items-center justify-center text-white font-black text-sm">
+                  +
                 </div>
-                <p className="text-xs text-white/90 leading-snug max-w-[220px]">
-                  Consultores disponíveis durante todo processo do registro via WhatsApp.
+              </div>
+              <div className="text-left">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-0.5">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className="w-4 h-4 fill-[hsl(38_100%_55%)] text-[hsl(38_100%_55%)]" />
+                    ))}
+                  </div>
+                  <span className="font-display font-black text-white text-lg leading-none">4,9/5</span>
+                </div>
+                <p className="text-xs md:text-sm text-white/85 mt-1">
+                  Mais de <span className="font-bold text-white">11.000 marcas</span> protegidas
                 </p>
               </div>
+            </div>
+
+            {/* Trust pills */}
+            <div className="flex flex-wrap gap-2.5 justify-center lg:justify-start">
+              {trustPills.map((p, i) => (
+                <motion.span
+                  key={i}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35, delay: 0.25 + i * 0.06 }}
+                  className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur border border-white/25 px-4 py-2 text-white text-xs md:text-sm font-semibold"
+                >
+                  <span className="w-5 h-5 rounded-full bg-[hsl(20_100%_55%)] flex items-center justify-center">
+                    <p.icon className="w-3 h-3 text-white" strokeWidth={2.5} />
+                  </span>
+                  {p.label}
+                </motion.span>
+              ))}
             </div>
           </div>
 
@@ -105,22 +132,6 @@ const HeroSection = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-4xl mx-auto mt-16 relative z-10">
-          {trustBadges.map((item, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.3 + index * 0.1 }}
-              className="flex flex-col items-center gap-3 p-5 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 text-center"
-            >
-              <div className="p-3 rounded-xl bg-white/15">
-                <item.icon className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-sm font-medium text-white leading-tight">{item.label}</span>
-            </motion.div>
-          ))}
-        </div>
       </div>
     </section>
   );
