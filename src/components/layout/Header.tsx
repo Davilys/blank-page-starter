@@ -63,7 +63,7 @@ const Header = () => {
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 safe-area-top ${
         isScrolled
-          ? "md:bg-background/80 md:backdrop-blur-xl md:border-b md:border-border bg-transparent"
+          ? "bg-white/95 backdrop-blur-xl border-b border-border shadow-sm"
           : "bg-transparent header-on-blue"
       }`}
     >
@@ -219,7 +219,7 @@ const Header = () => {
               variant="ghost"
               size="icon"
               onClick={toggleTheme}
-              className="w-9 h-9"
+              className={`w-9 h-9 ${!isScrolled && isHomePage ? "text-white hover:bg-white/10 hover:text-white" : ""}`}
               aria-label="Alternar tema"
             >
               {theme === "light" ? (
@@ -231,7 +231,11 @@ const Header = () => {
 
             {/* Mobile Menu Button */}
             <button
-              className="p-2 text-foreground"
+              className={`p-2 rounded-full transition-colors ${
+                !isScrolled && isHomePage
+                  ? "text-white bg-white/10 hover:bg-white/20"
+                  : "text-foreground hover:bg-secondary"
+              }`}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               aria-label="Menu"
             >
@@ -243,14 +247,14 @@ const Header = () => {
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden bg-background/95 backdrop-blur-xl border-b border-border animate-fade-in">
+        <div className="md:hidden bg-white/98 backdrop-blur-xl border-b border-border animate-fade-in shadow-xl">
           <nav className="container mx-auto px-3 py-3 flex flex-col gap-1">
             {navItems.map((item) => (
               item.isRoute ? (
                 <Link
                   key={item.label}
                   to={item.href}
-                  className="px-4 py-3 font-medium text-primary hover:text-primary/80 transition-colors rounded-xl hover:bg-primary/10 touch-target"
+                  className="px-4 py-3 font-semibold text-[hsl(222_92%_54%)] hover:text-[hsl(226_95%_42%)] transition-colors rounded-xl hover:bg-[hsl(222_92%_54%)]/10 touch-target"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   {item.label}
@@ -260,19 +264,27 @@ const Header = () => {
                   key={item.label}
                   href={isHomePage ? item.href : `/${item.href}`}
                   onClick={(e) => { handleAnchorClick(e, item.href); setIsMobileMenuOpen(false); }}
-                  className="px-4 py-3 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-secondary touch-target"
+                  className="px-4 py-3 text-[hsl(222_40%_25%)] hover:text-[hsl(222_92%_54%)] transition-colors rounded-xl hover:bg-[hsl(220_33%_96%)] touch-target font-medium"
                 >
                   {item.label}
                 </a>
               )
             ))}
             <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-border">
-              <Button variant="ghost" className="justify-start touch-target" asChild>
-                <Link to="/cliente/login">{t("nav.clientArea")}</Link>
-              </Button>
-              <Button variant="primary" className="btn-glow touch-target" asChild>
-                <a href={isHomePage ? "#consultar" : "/#consultar"} onClick={(e) => { handleAnchorClick(e, "#consultar"); setIsMobileMenuOpen(false); }}>{t("nav.checkBrand")}</a>
-              </Button>
+              <a
+                href={isHomePage ? "#consultar" : "/#consultar"}
+                onClick={(e) => { handleAnchorClick(e, "#consultar"); setIsMobileMenuOpen(false); }}
+                className="btn-solid-orange touch-target"
+              >
+                {t("nav.checkBrand")} <ArrowRight className="w-4 h-4" />
+              </a>
+              <Link
+                to="/cliente/login"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="btn-outline-blue touch-target"
+              >
+                <User className="w-4 h-4" /> {t("nav.clientArea")}
+              </Link>
             </div>
           </nav>
         </div>
