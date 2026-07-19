@@ -277,7 +277,11 @@ export default function Registrar() {
           >
             <span className="block">Apenas 5 minutos.</span>
             <span className="block">
-              <ScribbleUnderline>Registre</ScribbleUnderline> sua marca!
+              <span className="relative inline-block">
+                Registre
+                <ScribbleUnderline />
+              </span>{" "}
+              sua marca!
             </span>
           </motion.h1>
           <motion.p
