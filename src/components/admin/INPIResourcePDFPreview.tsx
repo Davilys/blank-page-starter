@@ -357,6 +357,14 @@ const waitForImageReady = async (img: HTMLImageElement, timeoutMs = 5000): Promi
   }
 };
 
+const estimateCanvasDataUrlLength = (canvas: HTMLCanvasElement) => {
+  try {
+    return canvas.toDataURL('image/jpeg', 0.2).length;
+  } catch {
+    return 0;
+  }
+};
+
 export function INPIResourcePDFPreview({ resource, content, resourceType, debugEvidenceOverride }: INPIResourcePDFPreviewProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -780,55 +788,76 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
         pdf.text(`${pageNum}/${totalPages}`, A4_W - 15, lineY + 5.2, { align: 'right' });
       };
 
-      // Second pass: capture the document once and slice the bitmap by the
-      // already-computed safe boundaries. The previous per-page html2canvas
-      // loop cloned and rendered the whole legal document once for every page;
-      // on long resources with several evidence images that caused timeouts and
-      // intermittent browser memory failures during download.
-      const maxCanvasHeight = 30000;
-      const maxCanvasArea = 90000000;
-      const captureScale = Math.min(
-        1.15,
-        maxCanvasHeight / Math.max(fullHeightCssPx, 1),
-        Math.sqrt(maxCanvasArea / Math.max(captureWidth * fullHeightCssPx, 1)),
-      );
+      // Second pass: capture in safe chunks and then slice those chunks by the
+      // already-computed boundaries. Capturing the whole document as one bitmap
+      // still fails on very long resources because Chrome allows tall canvases
+      // to be created, but `toDataURL()` returns only "data:," once the canvas
+      // exceeds browser limits — jsPDF then throws during `addImage`.
+      const captureScale = 1.08;
+      const maxChunkCssHeight = Math.floor(24000 / captureScale);
+      const makeCanvas = async (offsetCssPx: number, heightCssPx: number) => {
+        const canvas = await withTimeout(
+          html2canvas(exportRoot, {
+            scale: captureScale,
+            useCORS: true,
+            allowTaint: false,
+            backgroundColor: '#ffffff',
+            logging: false,
+            width: captureWidth,
+            height: heightCssPx,
+            windowWidth: captureWidth,
+            windowHeight: Math.max(900, Math.min(heightCssPx, 4000)),
+            scrollX: 0,
+            scrollY: -offsetCssPx,
+            y: offsetCssPx,
+            onclone: applyHtml2CanvasCloneFixes,
+          }),
+          Math.min(90000, 30000 + Math.ceil(heightCssPx / usablePageCssPx) * 2500),
+          'Tempo excedido ao renderizar uma parte do PDF.',
+        );
+        if (estimateCanvasDataUrlLength(canvas) <= 6) {
+          throw new Error('O navegador recusou a imagem do PDF por limite de tamanho. O documento precisa ser dividido em partes menores.');
+        }
+        return canvas;
+      };
 
-      const fullCanvas = await withTimeout(
-        html2canvas(exportRoot, {
-          scale: Math.max(0.55, captureScale),
-          useCORS: true,
-          allowTaint: false,
-          backgroundColor: '#ffffff',
-          logging: false,
-          width: captureWidth,
-          height: fullHeightCssPx,
-          windowWidth: captureWidth,
-          windowHeight: Math.max(900, Math.min(fullHeightCssPx, 4000)),
-          scrollX: 0,
-          scrollY: 0,
-          onclone: applyHtml2CanvasCloneFixes,
-        }),
-        Math.min(120000, 45000 + cuts.length * 1800),
-        'Tempo excedido ao renderizar o PDF completo.',
-      );
-
-      const scaleY = fullCanvas.height / Math.max(fullHeightCssPx, 1);
+      let chunkStartCssPx = -1;
+      let chunkCanvas: HTMLCanvasElement | null = null;
+      let scaleY = captureScale;
       for (let pageIndex = 0; pageIndex < cuts.length; pageIndex++) {
         const cut = cuts[pageIndex];
-        const sy = Math.max(0, Math.floor(cut.start * scaleY));
-        const sh = Math.max(1, Math.min(fullCanvas.height - sy, Math.ceil(cut.height * scaleY)));
+        const needsNewChunk =
+          !chunkCanvas ||
+          cut.start < chunkStartCssPx ||
+          cut.start + cut.height > chunkStartCssPx + Math.floor(chunkCanvas.height / scaleY) - 2;
+        if (needsNewChunk) {
+          chunkStartCssPx = cut.start;
+          let chunkEndCssPx = Math.min(fullHeightCssPx, chunkStartCssPx + maxChunkCssHeight);
+          const minChunkEnd = Math.min(fullHeightCssPx, chunkStartCssPx + cut.height + 1);
+          for (let i = cuts.length - 1; i >= pageIndex; i--) {
+            const candidateEnd = cuts[i].start + cuts[i].height;
+            if (candidateEnd <= chunkEndCssPx) { chunkEndCssPx = Math.max(candidateEnd, minChunkEnd); break; }
+          }
+          chunkCanvas = await makeCanvas(chunkStartCssPx, Math.max(1, Math.ceil(chunkEndCssPx - chunkStartCssPx)));
+          scaleY = chunkCanvas.height / Math.max(chunkEndCssPx - chunkStartCssPx, 1);
+        }
+
+        const sy = Math.max(0, Math.floor((cut.start - chunkStartCssPx) * scaleY));
+        const sh = Math.max(1, Math.min(chunkCanvas.height - sy, Math.ceil(cut.height * scaleY)));
         const pageCanvas = document.createElement('canvas');
-        pageCanvas.width = fullCanvas.width;
+        pageCanvas.width = chunkCanvas.width;
         pageCanvas.height = sh;
         const ctx = pageCanvas.getContext('2d');
         if (!ctx) throw new Error('Canvas indisponível ao fatiar PDF.');
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-        ctx.drawImage(fullCanvas, 0, sy, fullCanvas.width, sh, 0, 0, fullCanvas.width, sh);
+        ctx.drawImage(chunkCanvas, 0, sy, chunkCanvas.width, sh, 0, 0, chunkCanvas.width, sh);
 
         const sliceHeightMM = (pageCanvas.height * CONTENT_W) / pageCanvas.width;
         if (pageIndex > 0) pdf.addPage();
-        pdf.addImage(pageCanvas.toDataURL('image/jpeg', 0.82), 'JPEG', 0, 0, CONTENT_W, sliceHeightMM, undefined, 'FAST');
+        const pageDataUrl = pageCanvas.toDataURL('image/jpeg', 0.82);
+        if (pageDataUrl.length <= 6) throw new Error('Falha ao converter uma página do PDF em imagem.');
+        pdf.addImage(pageDataUrl, 'JPEG', 0, 0, CONTENT_W, sliceHeightMM, undefined, 'FAST');
         drawFooter(pageIndex + 1);
       }
 
