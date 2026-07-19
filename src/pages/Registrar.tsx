@@ -17,7 +17,7 @@ import SocialProofNotification from "@/components/SocialProofNotification";
 import type { ViabilityResult } from "@/lib/api/viability";
 import type { PlanType } from "@/hooks/useContractTemplate";
 import Header from "@/components/layout/Header";
-import ScribbleUnderline from "@/components/ScribbleUnderline";
+import ScribbleUnderline from "@/components/decorative/ScribbleUnderline";
 import WhatsAppButton from "@/components/layout/WhatsAppButton";
 
 // Dynamic text options for typing effect
