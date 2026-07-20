@@ -127,10 +127,10 @@ const BenefitsSection = () => {
 
             {/* 48h seal overlay */}
             <Seal48h
-              size={130}
+              size={140}
               mainText="10"
               subText="ANOS"
-              className="absolute -top-24 -right-8 z-10 sm:-top-28 sm:-right-10 md:-top-32 md:-right-12 md:w-[150px] md:h-[150px]"
+              className="absolute -top-16 -right-4 z-10 sm:-top-20 sm:-right-6 md:-top-24 md:w-[160px] md:h-[160px]"
             />
           </div>
 
