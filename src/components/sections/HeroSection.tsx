@@ -37,7 +37,7 @@ const HeroSection = () => {
             </div>
 
             {/* Heading */}
-            <h1 className="font-display text-[2.5rem] sm:text-5xl xl:text-[3.75rem] font-bold leading-[1.1] mb-6 text-white">
+            <h1 className="font-display text-[2.75rem] sm:text-[3.25rem] xl:text-[4.25rem] font-black leading-[1.05] tracking-tight mb-6 text-white">
               {t("hero.title")}
               <br />
               faça o <span className="relative inline-block">
@@ -80,18 +80,15 @@ const HeroSection = () => {
             {/* Trust pills */}
             <div className="flex flex-wrap gap-2.5 justify-center lg:justify-start">
               {trustPills.map((p, i) => (
-                <motion.span
+                <span
                   key={i}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.35, delay: 0.25 + i * 0.06 }}
                   className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur border border-white/25 px-4 py-2 text-white text-xs md:text-sm font-semibold"
                 >
                   <span className="w-5 h-5 rounded-full bg-[hsl(20_100%_55%)] flex items-center justify-center">
                     <p.icon className="w-3 h-3 text-white" strokeWidth={2.5} />
                   </span>
                   {p.label}
-                </motion.span>
+                </span>
               ))}
             </div>
           </div>
