@@ -15,7 +15,7 @@ const Seal48h = ({ className, size = 160, mainText = "48h", subText = "NO INPI" 
   return (
     <div
       className={cn("relative pointer-events-none select-none", className)}
-      style={{ width: size, height: size, contain: "layout paint style", willChange: "transform" }}
+      style={{ width: size, height: size }}
       aria-label="Registro no INPI em 48 horas"
     >
       {/* Base: disco branco + borda azul-claro + sombra suave */}

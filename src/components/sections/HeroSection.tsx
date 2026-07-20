@@ -55,9 +55,9 @@ const HeroSection = () => {
             {/* Rating + social proof */}
             <div className="flex flex-wrap items-center gap-4 justify-center lg:justify-start mb-8">
               <div className="flex items-center -space-x-3">
-                <img src={consultant1} alt="" width={44} height={44} loading="lazy" decoding="async" className="w-11 h-11 rounded-full border-2 border-white object-cover" />
-                <img src={consultant2} alt="" width={44} height={44} loading="lazy" decoding="async" className="w-11 h-11 rounded-full border-2 border-white object-cover" />
-                <img src={consultant3} alt="" width={44} height={44} loading="lazy" decoding="async" className="w-11 h-11 rounded-full border-2 border-white object-cover" />
+                <img src={consultant1} alt="" className="w-11 h-11 rounded-full border-2 border-white object-cover" />
+                <img src={consultant2} alt="" className="w-11 h-11 rounded-full border-2 border-white object-cover" />
+                <img src={consultant3} alt="" className="w-11 h-11 rounded-full border-2 border-white object-cover" />
                 <div className="w-11 h-11 rounded-full border-2 border-white bg-[hsl(20_100%_55%)] flex items-center justify-center text-white font-black text-sm">
                   +
                 </div>
