@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import ViabilitySearchSection from "@/components/sections/ViabilitySearchSection";
 import ScribbleUnderline from "@/components/decorative/ScribbleUnderline";
 import WaveDivider from "@/components/decorative/WaveDivider";
-import seal48h from "@/assets/rebrand/seal-48h.png";
+import Seal48h from "@/components/decorative/Seal48h";
 import consultant1 from "@/assets/consultants/consultant-1.jpg";
 import consultant2 from "@/assets/consultants/consultant-2.jpg";
 import consultant3 from "@/assets/consultants/consultant-3.jpg";
@@ -95,12 +95,10 @@ const HeroSection = () => {
 
           {/* Right — Viability Search */}
           <div className="relative w-full max-w-md mx-auto lg:max-w-none">
-            {/* 48h floating seal */}
-            <img
-              src={seal48h}
-              alt="Registro no INPI em 48h"
-              className="pointer-events-none absolute -top-10 -right-4 sm:-right-6 md:-right-10 w-28 sm:w-32 md:w-36 z-20 drop-shadow-xl animate-[spin_28s_linear_infinite]"
-              style={{ animationDirection: "reverse" as any }}
+            {/* 48h floating seal (SVG animado, fundo transparente) */}
+            <Seal48h
+              size={148}
+              className="absolute -top-10 -right-4 sm:-right-6 md:-right-10 z-20 md:w-[170px] md:h-[170px]"
             />
             <div className="relative rounded-[2rem] bg-white p-6 md:p-8 shadow-[0_28px_70px_-16px_rgba(11,22,60,0.4)]">
               <ViabilitySearchSection compact />
