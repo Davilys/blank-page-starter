@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { Helmet } from "react-helmet-async";
 import { ArrowRight, Clock, Search, Tag, Sparkles } from "lucide-react";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -27,6 +28,14 @@ const Blog = () => {
 
   return (
     <>
+      <Helmet>
+        <title>Blog WebMarcas — Guias e Notícias sobre Registro de Marca no INPI</title>
+        <meta name="description" content="Aprenda tudo sobre registro de marca no INPI: viabilidade, oposição, renovação, classes de Nice, custos e estratégia de proteção. Guias práticos por especialistas." />
+        <link rel="canonical" href="https://webmarcas.net/blog" />
+        <meta property="og:url" content="https://webmarcas.net/blog" />
+        <meta property="og:title" content="Blog WebMarcas — Guias e Notícias sobre Registro de Marca no INPI" />
+        <meta property="og:description" content="Guias práticos sobre INPI, viabilidade, oposição, renovação e estratégia de marca." />
+      </Helmet>
       <Header />
       <main className="min-h-screen pt-20 md:pt-24">
         {/* Hero */}

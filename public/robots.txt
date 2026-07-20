@@ -12,3 +12,9 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /admin/
+Disallow: /cliente/
+Disallow: /assinar/
+Disallow: /__pdf-test
+
+Sitemap: https://webmarcas.net/sitemap.xml

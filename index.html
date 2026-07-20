@@ -7,66 +7,124 @@
     <meta name="description" content="Registre sua marca no INPI de forma 100% online. Protocolo em até 48h, garantia de registro e acompanhamento completo. Proteja seu negócio por R$699.">
     <meta name="keywords" content="registro de marca, INPI, propriedade intelectual, marca registrada, proteger marca, registro online">
     <meta name="author" content="WebMarcas" />
-    
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="theme-color" content="#005fe6" />
+    <meta name="format-detection" content="telephone=no" />
+
     <!-- Open Graph / Social -->
     <meta property="og:type" content="website" />
+    <meta property="og:locale" content="pt_BR" />
     <meta property="og:url" content="https://webmarcas.net/" />
     <meta property="og:site_name" content="WebMarcas" />
     <meta property="og:title" content="WebMarcas Intelligence PI - Registro de Marca Online | Proteja seu Negócio">
     <meta property="og:description" content="Registre sua marca no INPI de forma 100% online. Protocolo em até 48h, garantia de registro e acompanhamento completo. Proteja seu negócio por R$699.">
-    <meta property="og:image" content="https://webmarcas.net/favicon.png">
-    
+    <meta property="og:image" content="https://webmarcas.net/og-image.jpg">
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="WebMarcas Intelligence PI — Registro de marca no INPI" />
+
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="WebMarcas Intelligence PI - Registro de Marca Online | Proteja seu Negócio">
     <meta name="twitter:description" content="Registre sua marca no INPI de forma 100% online. Protocolo em até 48h, garantia de registro e acompanhamento completo. Proteja seu negócio por R$699.">
-    <meta name="twitter:image" content="https://webmarcas.net/favicon.png">
-    
-    <!-- Canonical -->
-    <link rel="canonical" href="https://webmarcas.net/" />
-    
+    <meta name="twitter:image" content="https://webmarcas.net/og-image.jpg">
+
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="shortcut icon" type="image/png" href="/favicon.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/favicon.png">
-    
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-1017056174"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'AW-1017056174');
-    </script>
 
     <!-- Preconnect to external resources for faster loading -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://scpbqsvwojhbxihyqbdz.supabase.co" />
-    
-    <!-- Preload critical font files -->
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" as="style" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" />
+    <link rel="dns-prefetch" href="https://connect.facebook.net" />
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+
+    <!-- Optimized font loading (3 weights instead of 10) -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;800&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;800&display=swap" media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;800&display=swap" /></noscript>
+
+    <!-- JSON-LD: Organization + WebSite -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://webmarcas.net/#organization",
+          "name": "WebMarcas Intelligence PI",
+          "url": "https://webmarcas.net/",
+          "logo": "https://webmarcas.net/favicon.png",
+          "description": "Especialistas em registro de marca no INPI. Protocolo em 48h, contrato digital e acompanhamento completo.",
+          "sameAs": ["https://www.instagram.com/webpatentes"],
+          "contactPoint": {
+            "@type": "ContactPoint",
+            "telephone": "+55-11-91112-0225",
+            "contactType": "customer service",
+            "areaServed": "BR",
+            "availableLanguage": "Portuguese"
+          }
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://webmarcas.net/#website",
+          "url": "https://webmarcas.net/",
+          "name": "WebMarcas",
+          "publisher": { "@id": "https://webmarcas.net/#organization" },
+          "inLanguage": "pt-BR"
+        },
+        {
+          "@type": "Service",
+          "name": "Registro de Marca no INPI",
+          "provider": { "@id": "https://webmarcas.net/#organization" },
+          "areaServed": "BR",
+          "description": "Serviço completo de registro de marca no INPI com protocolo em 48h.",
+          "offers": {
+            "@type": "Offer",
+            "price": "699",
+            "priceCurrency": "BRL",
+            "url": "https://webmarcas.net/registrar"
+          }
+        }
+      ]
+    }
+    </script>
 </head>
   <body>
-    <!-- Meta Pixel Code -->
+    <div id="root"></div>
+
+    <!-- Meta Pixel (deferred to not block render) -->
     <script>
-    !function(f,b,e,v,n,t,s)
-    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-    n.queue=[];t=b.createElement(e);t.async=!0;
-    t.src=v;s=b.getElementsByTagName(e)[0];
-    s.parentNode.insertBefore(t,s)}(window, document,'script',
-    'https://connect.facebook.net/en_US/fbevents.js');
-    fbq('init', '257440690498371');
-    fbq('track', 'PageView');
+    window.addEventListener('load', function() {
+      !function(f,b,e,v,n,t,s)
+      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+      n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t,s)}(window, document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', '257440690498371');
+      fbq('track', 'PageView');
+
+      // Google Ads (also deferred)
+      var g = document.createElement('script');
+      g.async = true;
+      g.src = 'https://www.googletagmanager.com/gtag/js?id=AW-1017056174';
+      document.head.appendChild(g);
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      window.gtag = gtag;
+      gtag('js', new Date());
+      gtag('config', 'AW-1017056174');
+    });
     </script>
-    <noscript><img height="1" width="1" style="display:none"
+    <noscript><img height="1" width="1" style="display:none" alt=""
     src="https://www.facebook.com/tr?id=257440690498371&ev=PageView&noscript=1"
     /></noscript>
-    <!-- End Meta Pixel Code -->
-    <div id="root"></div>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
