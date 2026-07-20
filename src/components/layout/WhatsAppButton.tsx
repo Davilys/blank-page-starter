@@ -1,3 +1,5 @@
+import atendenteImg from "@/assets/atendente-webmarcas.png";
+
 const WhatsAppButton = () => {
   const whatsappUrl =
     "https://api.whatsapp.com/send/?phone=5511911120225&text=Ol%C3%A1%21+Estava+no+site+da+WebMarcas+e+quero+registrar+minha+marca.&type=phone_number&app_absent=0";
@@ -7,12 +9,21 @@ const WhatsAppButton = () => {
       href={whatsappUrl}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="Fale conosco no WhatsApp"
-      className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-14 h-14 rounded-full bg-[#25D366] shadow-[0_10px_28px_rgba(37,211,102,0.5)] hover:scale-105 transition-transform"
+      aria-label="Fale conosco no WhatsApp com uma atendente"
+      className="fixed bottom-6 right-6 z-50 flex items-center gap-2 pl-1 pr-3 py-1 rounded-full bg-[#25D366] shadow-[0_8px_24px_rgba(37,211,102,0.45)] hover:scale-105 transition-transform animate-pulse-glow group"
     >
+      <span className="relative">
+        <img
+          src={atendenteImg}
+          alt="Atendente WebMarcas"
+          className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-md"
+          style={{ objectPosition: "50% 20%" }}
+        />
+        <span className="absolute top-0 right-0 w-3 h-3 rounded-full bg-green-400 border-2 border-white" />
+      </span>
       <svg
         viewBox="0 0 32 32"
-        className="w-8 h-8 text-white"
+        className="w-7 h-7 text-white"
         fill="currentColor"
         aria-hidden="true"
       >

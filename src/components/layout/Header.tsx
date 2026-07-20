@@ -42,7 +42,7 @@ const Header = () => {
     { label: "Início", href: "#home", isRoute: false },
     { label: "Como funciona", href: "#como-funciona", isRoute: false },
     { label: "Diferenciais", href: "#beneficios", isRoute: false },
-    { label: "Clientes", href: "#clientes", isRoute: false },
+    { label: "Registrar", href: "/registrar", isRoute: true },
     { label: "FAQ", href: "#faq", isRoute: false },
   ];
 
@@ -93,13 +93,13 @@ const Header = () => {
 
           {/* Desktop CTA + Controls */}
           <div className="hidden md:flex items-center gap-2 lg:gap-3">
-            {/* Phone contact block */}
-            <a href="tel:+5511911120225" className="hidden xl:flex items-center gap-2.5 pr-2">
+            {/* Phone contact block — only on blue hero */}
+            <a href="tel:+551191112025" className="hidden 2xl:flex items-center gap-2.5 pr-2">
               <span className={`w-10 h-10 rounded-full flex items-center justify-center ${!isScrolled && isHomePage ? "bg-white/15" : "bg-primary/10"}`}>
                 <Phone className={`w-4 h-4 ${!isScrolled && isHomePage ? "text-white" : "text-primary"}`} strokeWidth={2.4} />
               </span>
               <div className={`leading-tight ${!isScrolled && isHomePage ? "text-white" : "text-foreground"}`}>
-                <div className="text-[10px] font-bold tracking-[0.18em] opacity-70 uppercase">Fale conosco</div>
+                <div className="text-[9px] font-bold tracking-[0.18em] opacity-70">FALE CONOSCO</div>
                 <div className="text-sm font-extrabold">(11) 91112-0225</div>
               </div>
             </a>

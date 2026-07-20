@@ -21,7 +21,7 @@ const StatsBandSection = () => {
           <h2 className="font-display text-4xl md:text-5xl lg:text-6xl font-black text-foreground leading-tight">
             Uma trajetória construída
             <br />
-            em <span className="text-primary">confiança</span>
+            em <span className="text-primary italic">confiança</span>
           </h2>
         </div>
 
