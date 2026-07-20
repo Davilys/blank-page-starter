@@ -1,82 +1,93 @@
-import { 
-  Shield, 
-  FileCheck, 
-  Clock, 
-  Users, 
-  Scale, 
-  Headphones 
-} from "lucide-react";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { Clock, Headphones, FileSignature, Wallet, ChevronRight } from "lucide-react";
+import ScribbleUnderline from "@/components/decorative/ScribbleUnderline";
+import certificateImg from "@/assets/certificate-inpi.png";
+
+const benefits = [
+  {
+    icon: Clock,
+    title: "Protocolo em até 48h",
+    description: "Seu pedido entra no INPI em até 48h após a contratação.",
+  },
+  {
+    icon: Headphones,
+    title: "Acompanhamento humano",
+    description: "Um especialista real cuida do seu processo — nada de robô sumindo no meio.",
+  },
+  {
+    icon: FileSignature,
+    title: "Contrato digital",
+    description: "Você assina online, em minutos, sem precisar imprimir ou reconhecer firma.",
+  },
+  {
+    icon: Wallet,
+    title: "Pagamento flexível",
+    description: "À vista no PIX ou parcelado no cartão — condições adaptadas ao seu momento.",
+  },
+];
 
 const BenefitsSection = () => {
-  const { t } = useLanguage();
-
-  const benefits = [
-    {
-      icon: Shield,
-      title: t("benefits.protection.title"),
-      description: t("benefits.protection.desc"),
-    },
-    {
-      icon: FileCheck,
-      title: t("benefits.report.title"),
-      description: t("benefits.report.desc"),
-    },
-    {
-      icon: Clock,
-      title: t("benefits.protocol.title"),
-      description: t("benefits.protocol.desc"),
-    },
-    {
-      icon: Scale,
-      title: t("benefits.legal.title"),
-      description: t("benefits.legal.desc"),
-    },
-    {
-      icon: Users,
-      title: t("benefits.tracking.title"),
-      description: t("benefits.tracking.desc"),
-    },
-    {
-      icon: Headphones,
-      title: t("benefits.support.title"),
-      description: t("benefits.support.desc"),
-    },
-  ];
-
   return (
-    <section id="beneficios" className="section-padding bg-card relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-      
-      <div className="container mx-auto px-4 relative z-10">
+    <section
+      id="beneficios"
+      className="relative overflow-hidden bg-background py-20 md:py-28"
+    >
+      {/* soft ambient glow */}
+      <div className="pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-primary/5 blur-3xl" />
+
+      <div className="container relative z-10 mx-auto px-4">
         {/* Header */}
-        <div className="text-center max-w-2xl mx-auto mb-16">
-          <span className="badge-premium mb-4 inline-flex">{t("benefits.badge")}</span>
-          <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-            {t("benefits.title")}{" "}
-            <span className="gradient-text">{t("benefits.titleHighlight")}</span>?
-          </h2>
-          <p className="text-muted-foreground text-lg">
-            {t("benefits.subtitle")}
+        <div className="mx-auto mb-14 max-w-3xl text-center md:mb-20">
+          <p className="mb-5 text-[11px] font-bold uppercase tracking-[0.22em] text-[hsl(var(--brand-orange))]">
+            Por que a WebMarcas
           </p>
+          <h2 className="font-display text-4xl font-black leading-[1.05] tracking-[-0.02em] text-foreground sm:text-5xl md:text-6xl">
+            Cuidado{" "}
+            <span className="relative inline-block whitespace-nowrap">
+              de fim a fim,
+              <ScribbleUnderline />
+            </span>
+            <br />
+            sem pegadinhas.
+          </h2>
         </div>
 
-        {/* Benefits Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 stagger-children">
-          {benefits.map((benefit, index) => (
-            <div key={index} className="feature-card group">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
-                <benefit.icon className="w-6 h-6 text-primary" />
-              </div>
-              <h3 className="font-display text-xl font-semibold mb-2">
-                {benefit.title}
-              </h3>
-              <p className="text-muted-foreground">
-                {benefit.description}
-              </p>
-            </div>
-          ))}
+        {/* Content grid */}
+        <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-2 lg:items-center lg:gap-16">
+          {/* Certificate illustration */}
+          <div className="relative mx-auto w-full max-w-[520px]">
+            <div className="pointer-events-none absolute -inset-6 rounded-[3rem] bg-gradient-to-br from-primary/10 via-transparent to-[hsl(var(--brand-orange))]/10 blur-2xl" />
+            <img
+              src={certificateImg}
+              alt="Certificado de registro de marca no INPI"
+              width={1024}
+              height={1024}
+              loading="lazy"
+              className="relative w-full drop-shadow-[0_30px_60px_rgba(15,40,90,0.18)]"
+            />
+          </div>
+
+          {/* Benefit list */}
+          <ul className="flex flex-col gap-4">
+            {benefits.map((b) => (
+              <li
+                key={b.title}
+                className="group flex cursor-default items-start gap-5 rounded-2xl border border-border/60 bg-card p-5 shadow-[0_4px_20px_-8px_rgba(15,40,90,0.08)] transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[0_18px_40px_-18px_rgba(15,40,90,0.25)] md:p-6"
+              >
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/20">
+                  <b.icon className="h-5 w-5" strokeWidth={2.2} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-display text-lg font-bold text-foreground md:text-xl">
+                    {b.title}
+                  </h3>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground md:text-base">
+                    {b.description}
+                  </p>
+                </div>
+                <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-1 group-hover:text-primary" />
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </section>
