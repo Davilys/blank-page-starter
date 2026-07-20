@@ -1,7 +1,6 @@
 import { Clock, Headphones, FileSignature, Wallet, ChevronRight } from "lucide-react";
 import ScribbleUnderline from "@/components/decorative/ScribbleUnderline";
 import certificateImg from "@/assets/certificate-inpi.png";
-import Seal48h from "@/components/decorative/Seal48h";
 
 const benefits = [
   {
@@ -64,11 +63,6 @@ const BenefitsSection = () => {
               height={1024}
               loading="lazy"
               className="relative w-full drop-shadow-[0_30px_60px_rgba(15,40,90,0.18)]"
-            />
-            {/* Selo 48h animado sobreposto no canto superior direito */}
-            <Seal48h
-              size={140}
-              className="absolute -top-4 -right-4 sm:-top-6 sm:-right-6 z-10 md:w-[170px] md:h-[170px]"
             />
           </div>
 
