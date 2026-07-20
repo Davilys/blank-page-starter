@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Helmet } from "react-helmet-async";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 
@@ -7,6 +8,12 @@ const PoliticaPrivacidade = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Política de Privacidade | WebMarcas</title>
+        <meta name="description" content="Política de Privacidade da WebMarcas Intelligence PI: como coletamos, usamos e protegemos seus dados pessoais conforme a LGPD." />
+        <link rel="canonical" href="https://webmarcas.net/politica-de-privacidade" />
+        <meta name="robots" content="index, follow" />
+      </Helmet>
       <Header />
       <main className="container mx-auto px-4 py-16 md:py-24">
         <article className="prose prose-neutral dark:prose-invert max-w-3xl mx-auto">

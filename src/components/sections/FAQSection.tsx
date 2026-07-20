@@ -5,6 +5,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { Helmet } from "react-helmet-async";
 import { MessageCircle } from "lucide-react";
 
 const FAQSection = () => {
@@ -21,8 +22,21 @@ const FAQSection = () => {
     { question: t("faq.q8"), answer: t("faq.a8") },
   ];
 
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faqs.map((f) => ({
+      "@type": "Question",
+      "name": String(f.question || ""),
+      "acceptedAnswer": { "@type": "Answer", "text": String(f.answer || "") },
+    })),
+  };
+
   return (
     <section id="faq" className="section-padding relative overflow-hidden">
+      <Helmet>
+        <script type="application/ld+json">{JSON.stringify(faqJsonLd)}</script>
+      </Helmet>
       {/* Background */}
       <div className="absolute top-0 left-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
 

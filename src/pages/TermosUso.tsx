@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Helmet } from "react-helmet-async";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 
@@ -7,6 +8,12 @@ const TermosUso = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Termos de Uso | WebMarcas</title>
+        <meta name="description" content="Termos de Uso da plataforma WebMarcas Intelligence PI: regras, direitos e responsabilidades no uso dos nossos serviços de registro de marca." />
+        <link rel="canonical" href="https://webmarcas.net/termos-de-uso" />
+        <meta name="robots" content="index, follow" />
+      </Helmet>
       <Header />
       <main className="container mx-auto px-4 py-16 md:py-24">
         <article className="prose prose-neutral dark:prose-invert max-w-3xl mx-auto">
