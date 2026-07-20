@@ -19,15 +19,22 @@ const staticEntries: Entry[] = [
 ];
 
 async function loadBlogEntries(): Promise<Entry[]> {
+  // Regex parse (blogPosts.ts uses @/ image imports that tsx can't resolve).
   try {
-    const mod = await import("../src/data/blogPosts");
-    const posts = (mod as any).blogPosts as Array<{ slug: string; date?: string }>;
-    return posts.map((p) => ({
-      path: `/blog/${p.slug}`,
-      changefreq: "monthly",
-      priority: "0.7",
-      lastmod: p.date,
-    }));
+    const { readFileSync } = await import("fs");
+    const src = readFileSync(resolve("src/data/blogPosts.ts"), "utf8");
+    const entries: Entry[] = [];
+    const re = /slug:\s*["'`]([^"'`]+)["'`][\s\S]*?date:\s*["'`]([^"'`]+)["'`]/g;
+    let m;
+    while ((m = re.exec(src)) !== null) {
+      entries.push({
+        path: `/blog/${m[1]}`,
+        changefreq: "monthly",
+        priority: "0.7",
+        lastmod: m[2],
+      });
+    }
+    return entries;
   } catch {
     return [];
   }
