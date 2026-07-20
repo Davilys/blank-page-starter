@@ -26,7 +26,7 @@ const StatsBandSection = () => {
         </div>
 
         {/* Stats grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-10 md:gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 md:gap-6">
           {items.map((s, i) => (
             <motion.div
               key={i}
@@ -34,11 +34,11 @@ const StatsBandSection = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.3 }}
               transition={{ duration: 0.5, delay: i * 0.1 }}
-              className="text-center md:text-left"
+              className="text-center md:text-left min-w-0"
             >
               <div
-                className="font-display font-black leading-none text-primary"
-                style={{ fontSize: "clamp(3rem, 6vw, 5rem)", letterSpacing: "-0.03em" }}
+                className="font-display font-black leading-none text-primary whitespace-nowrap"
+                style={{ fontSize: "clamp(2.25rem, 4vw, 3.75rem)", letterSpacing: "-0.03em" }}
               >
                 {s.value}
               </div>
