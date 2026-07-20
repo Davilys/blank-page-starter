@@ -1,5 +1,6 @@
 import { useParams, Link, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { Helmet } from "react-helmet-async";
 import { ArrowLeft, ArrowRight, Clock, Calendar, Share2, Sparkles } from "lucide-react";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -33,6 +34,32 @@ const BlogPost = () => {
 
   return (
     <>
+      <Helmet>
+        <title>{post.title} | Blog WebMarcas</title>
+        <meta name="description" content={post.description} />
+        <link rel="canonical" href={`https://webmarcas.net/blog/${post.slug}`} />
+        <meta property="og:type" content="article" />
+        <meta property="og:url" content={`https://webmarcas.net/blog/${post.slug}`} />
+        <meta property="og:title" content={post.title} />
+        <meta property="og:description" content={post.description} />
+        <meta property="article:published_time" content={post.date} />
+        <meta property="article:section" content={post.category} />
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Article",
+          "headline": post.title,
+          "description": post.description,
+          "datePublished": post.date,
+          "articleSection": post.category,
+          "author": { "@type": "Organization", "name": "WebMarcas" },
+          "publisher": {
+            "@type": "Organization",
+            "name": "WebMarcas",
+            "logo": { "@type": "ImageObject", "url": "https://webmarcas.net/favicon.png" }
+          },
+          "mainEntityOfPage": `https://webmarcas.net/blog/${post.slug}`
+        })}</script>
+      </Helmet>
       <Header />
       <main className="min-h-screen pt-20 md:pt-24">
         {/* Hero Image */}
