@@ -3,13 +3,15 @@ import { cn } from "@/lib/utils";
 interface Seal48hProps {
   className?: string;
   size?: number;
+  mainText?: string;
+  subText?: string;
 }
 
 /**
  * Selo circular animado "48h · WEBMARCAS · INPI · REGISTRO".
  * SVG puro, fundo transparente, texto circular girando lentamente.
  */
-const Seal48h = ({ className, size = 160 }: Seal48hProps) => {
+const Seal48h = ({ className, size = 160, mainText = "48h", subText = "NO INPI" }: Seal48hProps) => {
   return (
     <div
       className={cn("relative pointer-events-none select-none", className)}
@@ -84,7 +86,7 @@ const Seal48h = ({ className, size = 160 }: Seal48hProps) => {
             letterSpacing: "-1px",
           }}
         >
-          48h
+          {mainText}
         </text>
 
         {/* NO INPI */}
@@ -100,7 +102,7 @@ const Seal48h = ({ className, size = 160 }: Seal48hProps) => {
             letterSpacing: "3px",
           }}
         >
-          NO INPI
+          {subText}
         </text>
       </svg>
     </div>
