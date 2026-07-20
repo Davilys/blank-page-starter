@@ -46,6 +46,9 @@ const LogoCard = ({ src, alt }: { src: string; alt: string }) => (
     <img
       src={src}
       alt={alt}
+      width={200}
+      height={130}
+      decoding="async"
       className="max-w-full max-h-full object-contain grayscale opacity-70 hover:grayscale-0 hover:opacity-100 transition-all duration-500"
       loading="lazy"
     />
