@@ -16,94 +16,91 @@ const Seal48h = ({ className, size = 160 }: Seal48hProps) => {
       style={{ width: size, height: size }}
       aria-label="Registro no INPI em 48 horas"
     >
-      {/* Anel externo com texto circular girando */}
+      {/* Base: disco branco + borda azul-claro + sombra suave */}
+      <svg viewBox="0 0 200 200" className="absolute inset-0 w-full h-full">
+        <defs>
+          <filter id="seal-shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="4" stdDeviation="5" floodColor="#0b163c" floodOpacity="0.22" />
+          </filter>
+        </defs>
+        <circle cx="100" cy="100" r="94" fill="#ffffff" filter="url(#seal-shadow)" />
+        <circle cx="100" cy="100" r="94" fill="none" stroke="#005fe6" strokeOpacity="0.18" strokeWidth="1.5" />
+        <circle cx="100" cy="100" r="72" fill="none" stroke="#005fe6" strokeOpacity="0.12" strokeWidth="1" />
+      </svg>
+
+      {/* Anel externo APENAS com texto circular girando */}
       <svg
         viewBox="0 0 200 200"
         className="absolute inset-0 w-full h-full animate-[spin_22s_linear_infinite]"
+        style={{ transformOrigin: "50% 50%" }}
       >
         <defs>
           <path
-            id="seal-circle"
-            d="M 100,100 m -78,0 a 78,78 0 1,1 156,0 a 78,78 0 1,1 -156,0"
+            id="seal-ring-path"
+            d="M 100,100 m -82,0 a 82,82 0 1,1 164,0 a 82,82 0 1,1 -164,0"
           />
         </defs>
         <text
-          fill="#ffffff"
+          fill="#005fe6"
           style={{
             fontFamily: "'Public Sans', system-ui, sans-serif",
             fontWeight: 800,
-            fontSize: "15px",
-            letterSpacing: "3.4px",
+            fontSize: "12.5px",
+            letterSpacing: "3.2px",
+            textTransform: "uppercase",
           }}
         >
-          <textPath href="#seal-circle" startOffset="0">
-            WEBMARCAS · INPI · REGISTRO ·  WEBMARCAS · INPI · REGISTRO ·
+          <textPath href="#seal-ring-path" startOffset="0">
+            PROTOCOLO EM 48H • REGISTRO NO INPI • PROTOCOLO EM 48H • REGISTRO NO INPI •
           </textPath>
         </text>
       </svg>
 
-      {/* Disco central laranja com check e 48h */}
-      <svg
-        viewBox="0 0 200 200"
-        className="absolute inset-0 w-full h-full"
-      >
-        <defs>
-          <radialGradient id="seal-orange" cx="35%" cy="30%" r="80%">
-            <stop offset="0%" stopColor="#ff9a4d" />
-            <stop offset="60%" stopColor="#ed8534" />
-            <stop offset="100%" stopColor="#d96a1c" />
-          </radialGradient>
-          <filter id="seal-shadow" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="4" stdDeviation="5" floodColor="#0b163c" floodOpacity="0.28" />
-          </filter>
-        </defs>
+      {/* Centro ESTÁTICO: ícone laranja + 48h + NO INPI */}
+      <svg viewBox="0 0 200 200" className="absolute inset-0 w-full h-full">
+        {/* raio laranja (check) no topo */}
+        <g transform="translate(100 62)">
+          <circle r="14" fill="#ed8534" />
+          <path
+            d="M -6 0 L -1 6 L 7 -5"
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </g>
 
-        {/* corpo do selo */}
-        <circle
-          cx="100"
-          cy="100"
-          r="62"
-          fill="url(#seal-orange)"
-          filter="url(#seal-shadow)"
-        />
-
-        {/* borda pontilhada interna */}
-        <circle
-          cx="100"
-          cy="100"
-          r="55"
-          fill="none"
-          stroke="#ffffff"
-          strokeOpacity="0.55"
-          strokeWidth="1"
-          strokeDasharray="1.5 4"
-        />
-
-        {/* check */}
-        <path
-          d="M 78 88 L 94 104 L 122 74"
-          fill="none"
-          stroke="#ffffff"
-          strokeWidth="7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity="0.95"
-        />
-
-        {/* 48h */}
+        {/* 48h em azul */}
         <text
           x="100"
-          y="132"
+          y="120"
           textAnchor="middle"
-          fill="#ffffff"
+          fill="#005fe6"
           style={{
             fontFamily: "'Public Sans', system-ui, sans-serif",
             fontWeight: 900,
-            fontSize: "26px",
-            letterSpacing: "-0.5px",
+            fontSize: "38px",
+            letterSpacing: "-1px",
           }}
         >
           48h
+        </text>
+
+        {/* NO INPI */}
+        <text
+          x="100"
+          y="140"
+          textAnchor="middle"
+          fill="#005fe6"
+          style={{
+            fontFamily: "'Public Sans', system-ui, sans-serif",
+            fontWeight: 700,
+            fontSize: "11px",
+            letterSpacing: "3px",
+          }}
+        >
+          NO INPI
         </text>
       </svg>
     </div>
