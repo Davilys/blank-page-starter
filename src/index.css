@@ -73,38 +73,38 @@
      Does NOT affect /admin or /cliente routes.
      ===================================================== */
   .brand-public {
-    /* Primary — vibrant saturated blue */
-    --primary: 222 92% 54%;
+    /* Primary — reference royal blue #005fe6 */
+    --primary: 214 100% 45%;
     --primary-foreground: 0 0% 100%;
-    --ring: 222 92% 54%;
+    --ring: 214 100% 45%;
 
-    /* Accent — vibrant orange for CTAs */
-    --accent: 20 100% 55%;
+    /* Accent — reference orange #ed8534 */
+    --accent: 24 83% 57%;
     --accent-foreground: 0 0% 100%;
 
-    /* Brand-specific tokens */
-    --brand-orange: 20 100% 55%;
-    --brand-orange-glow: 24 100% 62%;
-    --hero-blue: 222 92% 50%;
-    --hero-blue-deep: 226 95% 42%;
+    /* Brand-specific tokens (match reference palette) */
+    --brand-orange: 24 83% 57%;
+    --brand-orange-glow: 27 83% 62%;
+    --hero-blue: 214 100% 45%;
+    --hero-blue-deep: 217 100% 36%;
 
-    --gradient-primary: linear-gradient(135deg, hsl(222 92% 54%) 0%, hsl(226 95% 46%) 100%);
-    --gradient-hero-blue: linear-gradient(180deg, hsl(222 92% 52%) 0%, hsl(226 95% 44%) 100%);
-    --gradient-accent-orange: linear-gradient(135deg, hsl(20 100% 55%) 0%, hsl(14 100% 50%) 100%);
+    --gradient-primary: linear-gradient(135deg, #005fe6 0%, #004ab8 100%);
+    --gradient-hero-blue: linear-gradient(180deg, #005fe6 0%, #004ab8 100%);
+    --gradient-accent-orange: linear-gradient(135deg, #ed8534 0%, #d96f1e 100%);
 
-    --shadow-card-hero: 0 24px 60px -12px hsla(226, 95%, 20%, 0.35);
-    --shadow-button: 0 8px 20px hsla(20, 100%, 55%, 0.35);
+    --shadow-card-hero: 0 24px 60px -12px rgba(0, 74, 184, 0.35);
+    --shadow-button: 0 8px 20px rgba(237, 133, 52, 0.35);
   }
 
   .brand-public h1,
   .brand-public h2,
   .brand-public .font-display {
-    font-family: 'Fraunces', 'Space Grotesk', Georgia, serif;
-    font-optical-sizing: auto;
-    letter-spacing: -0.02em;
+    font-family: 'Public Sans', system-ui, -apple-system, sans-serif;
+    font-weight: 900;
+    letter-spacing: -0.03em;
   }
 
-  /* ── Single-font rebrand: Fraunces across the entire public site ── */
+  /* ── Single-font rebrand: Public Sans across the entire public site ── */
   .brand-public,
   .brand-public *,
   .brand-public h1,
@@ -129,8 +129,7 @@
   .brand-public .btn-solid-orange,
   .brand-public .btn-outline-blue,
   .brand-public .hero-pill-badge {
-    font-family: 'Fraunces', Georgia, serif !important;
-    font-optical-sizing: auto;
+    font-family: 'Public Sans', system-ui, -apple-system, sans-serif !important;
   }
   /* Body copy stays regular weight to keep legibility */
   .brand-public p,
@@ -139,8 +138,8 @@
   .brand-public input,
   .brand-public textarea,
   .brand-public select {
-    font-weight: 500;
-    letter-spacing: -0.005em;
+    font-weight: 400;
+    letter-spacing: 0;
   }
 
   /* Rebrand the public social-proof notification pill */
@@ -168,14 +167,14 @@
     flex-shrink: 0;
   }
   .brand-public .social-proof-pill .sp-title {
-    font-family: 'Fraunces', Georgia, serif;
+    font-family: 'Public Sans', system-ui, sans-serif;
     font-weight: 700;
     color: hsl(222 47% 11%);
     font-size: 0.85rem;
     line-height: 1.2;
   }
   .brand-public .social-proof-pill .sp-meta {
-    font-family: 'Fraunces', Georgia, serif;
+    font-family: 'Public Sans', system-ui, sans-serif;
     font-weight: 600;
     color: hsl(20 90% 42%);
     font-size: 0.7rem;
