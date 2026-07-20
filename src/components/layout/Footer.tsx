@@ -1,4 +1,4 @@
-import { Mail, Phone, MapPin } from "lucide-react";
+import { Mail, Phone, MapPin, Instagram } from "lucide-react";
 import webmarcasLogoMark from "@/assets/webmarcas-logo-mark.png";
 import { Link } from "react-router-dom";
 
@@ -119,6 +119,17 @@ const Footer = () => {
               <li className="flex items-start gap-3 text-sm text-white/70">
                 <Mail className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>ola@webmarcas.net</span>
+              </li>
+              <li>
+                <a
+                  href="https://www.instagram.com/webpatentes"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-start gap-3 text-sm text-white/70 hover:text-[hsl(var(--brand-orange))] transition-colors"
+                >
+                  <Instagram className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <span>@webpatentes</span>
+                </a>
               </li>
             </ul>
           </div>
