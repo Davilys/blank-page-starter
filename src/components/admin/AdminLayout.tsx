@@ -655,7 +655,15 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
             )}
 
             <div className="flex-1" />
-            {/* Dark mode removed site-wide — new brand identity is light-only. */}
+            {/* Toggle tema — disponível apenas no CRM (admin/cliente). */}
+            <button
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'}
+              title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
+              className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-border/60 text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-all duration-150 touch-target"
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
           </header>
           
           {/* Main content */}

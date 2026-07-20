@@ -20,9 +20,11 @@ import {
   Shield,
   BarChart3,
 } from 'lucide-react';
+import { Moon, Sun } from 'lucide-react';
 import logo from '@/assets/webmarcas-logo.png';
 import { cn } from '@/lib/utils';
 import { usePresence } from '@/hooks/usePresence';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface ClientLayoutProps {
   children: ReactNode;
@@ -155,6 +157,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   }, [navigate]);
 
   usePresence(userId);
+  const { theme, toggleTheme } = useTheme();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -217,6 +220,19 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       </div>
 
       <div className="p-3 border-t border-border/50 space-y-1.5">
+        <Button
+          variant="ghost"
+          className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-xl"
+          onClick={toggleTheme}
+        >
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-amber-100 dark:bg-slate-800">
+            {theme === 'dark' ? <Sun className="h-5 w-5 text-amber-500" /> : <Moon className="h-5 w-5 text-slate-600" />}
+          </div>
+          <div className="flex-1 text-left">
+            <span className="block text-sm font-medium">{theme === 'dark' ? 'Modo claro' : 'Modo escuro'}</span>
+            <span className="block text-xs text-muted-foreground">Alternar tema</span>
+          </div>
+        </Button>
         {isAdminMaster && (
           <Link
             to="/admin/dashboard"
