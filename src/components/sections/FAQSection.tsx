@@ -5,6 +5,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { MessageCircle } from "lucide-react";
 
 const FAQSection = () => {
   const { t } = useLanguage();
@@ -56,6 +57,35 @@ const FAQSection = () => {
               </AccordionItem>
             ))}
           </Accordion>
+
+          {/* CTA WhatsApp */}
+          <a
+            href="https://api.whatsapp.com/send/?phone=5511911120225&text=Ol%C3%A1%21+Estava+no+site+da+WebMarcas+e+quero+registrar+minha+marca.&type=phone_number&app_absent=0"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-8 block relative overflow-hidden rounded-2xl p-8 md:p-10 group"
+            style={{
+              background:
+                "radial-gradient(120% 140% at 30% 40%, #22c55e 0%, #16a34a 45%, #052e16 100%)",
+            }}
+          >
+            <MessageCircle
+              className="absolute top-6 right-6 md:top-8 md:right-10 w-24 h-24 md:w-32 md:h-32 text-white/25"
+              strokeWidth={1.5}
+            />
+            <div className="relative z-10 max-w-md">
+              <h3 className="font-display text-2xl md:text-3xl font-bold text-white leading-tight">
+                Ainda ficou com<br />alguma dúvida?
+              </h3>
+              <p className="text-white/90 mt-3 text-base md:text-lg">
+                Entre em contato com nosso time de especialistas pelo WhatsApp.
+              </p>
+              <span className="inline-flex items-center gap-2 mt-6 bg-white text-green-600 font-semibold px-6 py-3 rounded-full shadow-lg group-hover:scale-[1.02] transition-transform">
+                Falar com especialista
+                <MessageCircle className="w-5 h-5" strokeWidth={2} />
+              </span>
+            </div>
+          </a>
         </div>
       </div>
     </section>
