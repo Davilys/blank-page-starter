@@ -1,0 +1,23 @@
+# WebMarcas Intelligence PI
+
+> Registro de marca no INPI 100% online. Protocolo em 48h, contrato digital, acompanhamento completo e garantia. A partir de R$699.
+
+WebMarcas é uma plataforma brasileira especializada em propriedade industrial: registro de marcas no INPI, verificação de viabilidade, monitoramento e registro complementar em blockchain.
+
+## Pages
+
+- [Home](/): Visão geral do serviço, viabilidade da marca e diferenciais.
+- [Registrar Marca](/registrar): Formulário completo para iniciar o registro no INPI.
+- [Registro](/registro): Página de entrada rápida do registro de marca.
+- [Registro em Blockchain](/registro-blockchain): Registro complementar da marca em blockchain.
+- [Verificar Contrato](/verificar-contrato): Verificação pública de autenticidade de contratos assinados.
+- [Status do Pedido](/status-pedido): Consulta pública do status de um pedido.
+- [Blog](/blog): Artigos sobre INPI, marcas, propriedade industrial e boas práticas.
+- [Política de Privacidade](/politica-de-privacidade): Política de privacidade e LGPD.
+- [Termos de Uso](/termos-de-uso): Termos de uso do serviço.
+
+## Optional
+
+- [Como consultar marca no INPI 2026](/blog/como-fazer-consulta-marca-inpi-2026)
+- [Pesquisa de anterioridade — guia completo](/blog/pesquisa-anterioridade-guia-completo)
+- [Custos do registro de marca](/blog/custos-registro-marca-valores)
