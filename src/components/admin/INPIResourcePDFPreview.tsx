@@ -8,7 +8,7 @@ import { ptBR } from 'date-fns/locale';
 import logoWebmarcas from '@/assets/webmarcas-logo-new.png';
 import signatureImage from '@/assets/davilys-signature.png';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import autoTable from 'jspdf-autotable';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ResourceEvidence {
@@ -365,6 +365,410 @@ const estimateCanvasDataUrlLength = (canvas: HTMLCanvasElement) => {
   }
 };
 
+// =============================================================================
+// Native PDF renderer (hybrid: selectable text + embedded raster images)
+// =============================================================================
+
+type NativeEvidence = {
+  id: string;
+  docNumber?: number;
+  caption: string | null;
+  source_file_name: string | null;
+  dataUrl?: string;
+  width?: number;
+  height?: number;
+};
+
+interface NativePDFOptions {
+  pdfFileName: string;
+  bodyContent: string;
+  evidences: NativeEvidence[];
+  evidenceByNum: (n: number) => NativeEvidence | undefined;
+  findEvidenceBySlug: (slug: string) => NativeEvidence | undefined;
+  uncitedEvidences: NativeEvidence[];
+  documentTitleUpper: string;
+  resource: ResourceData;
+  approvalDate: string;
+  isExtrajudicialDoc: boolean;
+  isProcuradorPetition: boolean;
+}
+
+const A4_W_MM = 210;
+const A4_H_MM = 297;
+const MARGIN_L = 20;
+const MARGIN_R = 20;
+const MARGIN_TOP = 20;
+const MARGIN_BOTTOM = 22; // reserves footer
+const CONTENT_W_MM = A4_W_MM - MARGIN_L - MARGIN_R;
+
+const stripInlineMd = (t: string) =>
+  t.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*\n]+)\*/g, '$1').replace(/`([^`]+)`/g, '$1');
+
+async function generateNativePDF(opts: NativePDFOptions): Promise<void> {
+  const {
+    pdfFileName, bodyContent, evidences, evidenceByNum, findEvidenceBySlug,
+    uncitedEvidences, documentTitleUpper, resource, approvalDate,
+    isExtrajudicialDoc, isProcuradorPetition,
+  } = opts;
+
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  // Preload logo + signature
+  const [logoDataUrl, sigDataUrl] = await Promise.all([
+    imageToBase64(logoWebmarcas).catch(() => null),
+    imageToBase64(signatureImage).catch(() => null),
+  ]);
+
+  let y = MARGIN_TOP;
+  let pageNum = 1;
+  const pageNums: { n: number }[] = [];
+
+  const drawHeaderBars = () => {
+    pdf.setFillColor(30, 58, 95);
+    pdf.rect(0, 0, A4_W_MM, 3, 'F');
+    pdf.setFillColor(200, 175, 55);
+    pdf.rect(0, 3, A4_W_MM, 1, 'F');
+  };
+
+  const drawFooter = (n: number, total: number) => {
+    const lineY = A4_H_MM - MARGIN_BOTTOM + 6;
+    pdf.setDrawColor(30, 58, 95);
+    pdf.setLineWidth(0.6);
+    pdf.line(MARGIN_L, lineY, A4_W_MM - MARGIN_R, lineY);
+    pdf.setDrawColor(200, 175, 55);
+    pdf.setLineWidth(0.25);
+    pdf.line(MARGIN_L, lineY + 1, A4_W_MM - MARGIN_R, lineY + 1);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(110, 110, 110);
+    pdf.text('Av. Brigadeiro Luiz Antônio, 2696, Centro — São Paulo/SP — CEP 01402-000', A4_W_MM / 2, lineY + 5, { align: 'center' });
+    pdf.text('Tel: (11) 9 1112-0225  |  juridico@webmarcas.net  |  www.webmarcas.net', A4_W_MM / 2, lineY + 8.5, { align: 'center' });
+    pdf.setTextColor(90, 90, 90);
+    pdf.text(`${n}/${total}`, A4_W_MM - MARGIN_R, lineY + 5, { align: 'right' });
+  };
+
+  const addPage = () => {
+    pdf.addPage();
+    pageNum++;
+    pageNums.push({ n: pageNum });
+    drawHeaderBars();
+    y = MARGIN_TOP;
+  };
+
+  const ensureSpace = (needed: number) => {
+    if (y + needed > A4_H_MM - MARGIN_BOTTOM) {
+      addPage();
+    }
+  };
+
+  // ============ HEADER (page 1) ============
+  drawHeaderBars();
+  pageNums.push({ n: 1 });
+
+  y = 12;
+  // Logo
+  if (logoDataUrl) {
+    try { pdf.addImage(logoDataUrl, 'PNG', MARGIN_L, y, 18, 18); } catch { /* ignore */ }
+  }
+  // Company name
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(13);
+  pdf.setTextColor(30, 58, 95);
+  pdf.text('WEBMARCAS INTELLIGENCE PI', MARGIN_L + 22, y + 8);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8.5);
+  pdf.setTextColor(100, 100, 100);
+  pdf.text('Propriedade Intelectual e Registro de Marcas', MARGIN_L + 22, y + 13);
+
+  // Right-side company info
+  pdf.setFontSize(7.5);
+  pdf.setTextColor(30, 58, 95);
+  pdf.text('CNPJ: 39.528.012/0001-29', A4_W_MM - MARGIN_R, y + 2, { align: 'right' });
+  pdf.setTextColor(140, 140, 140);
+  pdf.text('Av. Brigadeiro Luiz Antônio, 2696', A4_W_MM - MARGIN_R, y + 6, { align: 'right' });
+  pdf.text('Centro — São Paulo/SP', A4_W_MM - MARGIN_R, y + 9.5, { align: 'right' });
+  pdf.text('juridico@webmarcas.net', A4_W_MM - MARGIN_R, y + 13, { align: 'right' });
+
+  y += 22;
+  // Double separator
+  pdf.setDrawColor(30, 58, 95);
+  pdf.setLineWidth(0.6);
+  pdf.line(MARGIN_L, y, A4_W_MM - MARGIN_R, y);
+  pdf.setDrawColor(200, 175, 55);
+  pdf.setLineWidth(0.25);
+  pdf.line(MARGIN_L, y + 1.2, A4_W_MM - MARGIN_R, y + 1.2);
+  y += 8;
+
+  // Title badge
+  {
+    const title = documentTitleUpper;
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(11);
+    const tw = pdf.getTextWidth(title) + 12;
+    const bx = (A4_W_MM - tw) / 2;
+    pdf.setFillColor(30, 58, 95);
+    pdf.roundedRect(bx, y, tw, 8.5, 1.5, 1.5, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.text(title, A4_W_MM / 2, y + 5.8, { align: 'center' });
+    y += 12;
+  }
+  if (resource.brand_name) {
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(11);
+    pdf.setTextColor(30, 58, 95);
+    pdf.text(`Marca: ${resource.brand_name}`, A4_W_MM / 2, y, { align: 'center' });
+    y += 5;
+  }
+  if (resource.process_number) {
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.setTextColor(90, 90, 90);
+    pdf.text(`Processo INPI nº ${resource.process_number}`, A4_W_MM / 2, y, { align: 'center' });
+    y += 5;
+  }
+  y += 4;
+
+  // ============ Helpers ============
+  const MARKER_RE = /\[(DOC:(\d{1,3})|IMG:([a-z0-9_\-]+))\]/gi;
+
+  const substituteMarkers = (text: string): { inline: string; figs: NativeEvidence[] } => {
+    const figs: NativeEvidence[] = [];
+    const seen = new Set<string>();
+    const inline = text.replace(MARKER_RE, (_m, _all, num, slug) => {
+      let ev: NativeEvidence | undefined;
+      let label = '';
+      if (num) {
+        const n = parseInt(num, 10);
+        ev = evidenceByNum(n);
+        label = `(Doc. ${String(n).padStart(2, '0')})`;
+      } else if (slug) {
+        ev = findEvidenceBySlug(slug);
+        label = '(Imagem)';
+      }
+      if (ev) {
+        const key = ev.id;
+        if (!seen.has(key)) { seen.add(key); figs.push(ev); }
+      }
+      return label;
+    });
+    return { inline, figs };
+  };
+
+  const drawParagraph = (raw: string, opts?: { size?: number; color?: [number, number, number]; bold?: boolean; align?: 'left' | 'center' | 'justify'; indent?: number; lineHeight?: number }) => {
+    const size = opts?.size ?? 10.5;
+    const [r, g, b] = opts?.color ?? [26, 26, 26];
+    const bold = opts?.bold ?? false;
+    const indent = opts?.indent ?? 0;
+    const lineH = opts?.lineHeight ?? 5.2;
+    pdf.setFont('helvetica', bold ? 'bold' : 'normal');
+    pdf.setFontSize(size);
+    pdf.setTextColor(r, g, b);
+    const lines = pdf.splitTextToSize(raw, CONTENT_W_MM - indent) as string[];
+    for (const line of lines) {
+      ensureSpace(lineH);
+      pdf.text(line, MARGIN_L + indent, y);
+      y += lineH;
+    }
+  };
+
+  const drawFigure = (ev: NativeEvidence) => {
+    if (!ev.dataUrl) return;
+    const maxW = CONTENT_W_MM * 0.75;
+    const maxH = 90; // mm
+    const iw = ev.width || 800;
+    const ih = ev.height || 600;
+    const ratio = Math.min(maxW / iw, maxH / ih, 1);
+    // Fallback if intrinsic wasn't set: fit to max width
+    let drawW = ratio > 0 ? iw * ratio : maxW;
+    let drawH = ratio > 0 ? ih * ratio : (drawW * ih) / iw;
+    if (drawW > maxW) { drawH = (drawH * maxW) / drawW; drawW = maxW; }
+    if (drawH > maxH) { drawW = (drawW * maxH) / drawH; drawH = maxH; }
+    const captionLines = pdf.splitTextToSize(
+      `Doc. ${String(ev.docNumber || 0).padStart(2, '0')} — ${ev.caption || ev.source_file_name || ''}`,
+      CONTENT_W_MM,
+    ) as string[];
+    const totalNeeded = drawH + 3 + captionLines.length * 4 + 4;
+    ensureSpace(totalNeeded);
+    const x = MARGIN_L + (CONTENT_W_MM - drawW) / 2;
+    try {
+      pdf.addImage(ev.dataUrl, 'JPEG', x, y, drawW, drawH, undefined, 'FAST');
+    } catch (err) {
+      console.warn('Falha ao inserir imagem no PDF:', err);
+    }
+    // subtle border
+    pdf.setDrawColor(210, 210, 210);
+    pdf.setLineWidth(0.2);
+    pdf.rect(x, y, drawW, drawH);
+    y += drawH + 2.5;
+    pdf.setFont('helvetica', 'italic');
+    pdf.setFontSize(8);
+    pdf.setTextColor(90, 90, 90);
+    for (const line of captionLines) {
+      ensureSpace(4);
+      pdf.text(line, A4_W_MM / 2, y, { align: 'center' });
+      y += 4;
+    }
+    y += 3;
+  };
+
+  // ============ CONTENT ============
+  const paragraphs = bodyContent.split('\n\n').map((p) => p.trim()).filter(Boolean);
+
+  for (const para of paragraphs) {
+    if (/^(Av\.\s*Brigadeiro|Tel:\s*\(11\))/.test(para)) continue;
+
+    const metaLines = para.split('\n').filter((l) => l.trim());
+    const hasMetadata = metaLines.some((l) => isMetadataLine(l));
+
+    // Metadata block
+    if (hasMetadata && metaLines.length > 1) {
+      y += 1;
+      for (const ml of metaLines) {
+        drawParagraph(stripInlineMd(ml.trim()), { size: 9.5, color: [70, 70, 70], lineHeight: 4.6 });
+      }
+      y += 2;
+      continue;
+    }
+
+    // Heading
+    if (isHeadingLine(para)) {
+      y += 4;
+      ensureSpace(10);
+      drawParagraph(stripInlineMd(para), { size: 11, color: [30, 58, 95], bold: true, lineHeight: 5.5 });
+      // gold underline
+      pdf.setDrawColor(200, 175, 55);
+      pdf.setLineWidth(0.4);
+      pdf.line(MARGIN_L, y - 3, A4_W_MM - MARGIN_R, y - 3);
+      y += 3;
+      continue;
+    }
+
+    // Markdown table
+    if (isMarkdownTable(para)) {
+      const tbl = parseMarkdownTable(para);
+      if (tbl) {
+        const cellSubs: NativeEvidence[] = [];
+        const seen = new Set<string>();
+        const substCell = (c: string) => {
+          const r = substituteMarkers(c);
+          for (const f of r.figs) {
+            if (!seen.has(f.id)) { seen.add(f.id); cellSubs.push(f); }
+          }
+          return stripInlineMd(r.inline);
+        };
+        const head = [tbl.headers.map(substCell)];
+        const body = tbl.rows.map((r) => r.map(substCell));
+        ensureSpace(20);
+        autoTable(pdf, {
+          head, body,
+          startY: y,
+          margin: { left: MARGIN_L, right: MARGIN_R, bottom: MARGIN_BOTTOM },
+          styles: { font: 'helvetica', fontSize: 9, cellPadding: 2, textColor: [26, 26, 26], lineColor: [210, 210, 210], lineWidth: 0.15, overflow: 'linebreak' },
+          headStyles: { fillColor: [30, 58, 95], textColor: [255, 255, 255], fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [247, 249, 252] },
+          didDrawPage: () => { drawHeaderBars(); },
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const finalY = (pdf as any).lastAutoTable?.finalY;
+        if (typeof finalY === 'number') y = finalY + 3;
+        // Figures referenced inside the table go directly below it
+        for (const ev of cellSubs) drawFigure(ev);
+        continue;
+      }
+    }
+
+    // Bullet list line
+    const BULLET_RE = /^\s{0,4}[-–—•*·][\s\u00a0\t]+/;
+    if (BULLET_RE.test(para)) {
+      const text = para.replace(BULLET_RE, '');
+      const { inline, figs } = substituteMarkers(text);
+      const clean = stripInlineMd(inline);
+      // draw bullet + text with hanging indent
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10.5);
+      pdf.setTextColor(26, 26, 26);
+      const lines = pdf.splitTextToSize(clean, CONTENT_W_MM - 6) as string[];
+      for (let i = 0; i < lines.length; i++) {
+        ensureSpace(5.2);
+        if (i === 0) pdf.text('•', MARGIN_L + 1, y);
+        pdf.text(lines[i], MARGIN_L + 6, y);
+        y += 5.2;
+      }
+      y += 1;
+      for (const ev of figs) drawFigure(ev);
+      continue;
+    }
+
+    // Regular paragraph (may contain markers)
+    const { inline, figs } = substituteMarkers(para);
+    const clean = stripInlineMd(inline);
+    drawParagraph(clean, { size: 10.5, color: [26, 26, 26], lineHeight: 5.2 });
+    y += 1.5;
+    for (const ev of figs) drawFigure(ev);
+  }
+
+  // Uncited evidences at the end (inline, no separate annex section)
+  if (uncitedEvidences.length > 0) {
+    y += 4;
+    drawParagraph(
+      'Para complementação probatória, seguem, ainda, os seguintes documentos comprobatórios incorporados ao corpo desta peça:',
+      { size: 10, color: [55, 65, 81], lineHeight: 5 },
+    );
+    y += 2;
+    for (const ev of uncitedEvidences) drawFigure(ev);
+  }
+
+  // ============ SIGNATURE ============
+  y += 10;
+  ensureSpace(50);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(10.5);
+  pdf.setTextColor(55, 65, 81);
+  if (!isExtrajudicialDoc) {
+    pdf.text('Termos em que,', A4_W_MM / 2, y, { align: 'center' });
+    y += 6;
+    pdf.text('Pede deferimento.', A4_W_MM / 2, y, { align: 'center' });
+    y += 6;
+  }
+  pdf.text(`São Paulo, ${approvalDate}`, A4_W_MM / 2, y, { align: 'center' });
+  y += 12;
+
+  if (sigDataUrl) {
+    try {
+      const sw = 40;
+      const sh = 16;
+      pdf.addImage(sigDataUrl, 'PNG', (A4_W_MM - sw) / 2, y, sw, sh);
+      y += sh + 1;
+    } catch { /* ignore */ }
+  }
+  pdf.setDrawColor(30, 58, 95);
+  pdf.setLineWidth(0.5);
+  pdf.line((A4_W_MM - 55) / 2, y, (A4_W_MM + 55) / 2, y);
+  y += 5;
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(10.5);
+  pdf.setTextColor(30, 58, 95);
+  pdf.text('Davilys Danques de Oliveira Cunha', A4_W_MM / 2, y, { align: 'center' });
+  y += 4.5;
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(9);
+  pdf.setTextColor(85, 85, 85);
+  pdf.text('Procurador', A4_W_MM / 2, y, { align: 'center' });
+  if (!isExtrajudicialDoc && !isProcuradorPetition) {
+    y += 4;
+    pdf.text('OAB/SP nº 000.000 — Agente da Propriedade Industrial', A4_W_MM / 2, y, { align: 'center' });
+  }
+
+  // ============ FOOTERS on every page ============
+  const totalPages = pdf.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    pdf.setPage(i);
+    drawFooter(i, totalPages);
+  }
+
+  pdf.save(pdfFileName);
+}
+
 export function INPIResourcePDFPreview({ resource, content, resourceType, debugEvidenceOverride }: INPIResourcePDFPreviewProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -624,247 +1028,20 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
       return;
     }
     setIsGeneratingPDF(true);
-
-    const originalSrcs: Array<{ el: HTMLImageElement; src: string }> = [];
-    let exportHostForCleanup: HTMLDivElement | null = null;
     try {
-      const root = printRef.current;
-      if (!root) throw new Error('Preview não disponível.');
-
-      // A4 full page — pixel-perfect capture of the preview (210mm wide).
-      const A4_W = 210;
-      const A4_H = 297;
-      const CONTENT_W = A4_W;
-      const CONTENT_H = A4_H;
-      const NATIVE_WIDTH_PX = 794; // 210mm at 96dpi — matches the preview's native A4 width
-
-      // 1) Embed logo + signature as base64 to avoid html2canvas losing them.
-      let logoDataUrl: string | null = null;
-      let sigDataUrl: string | null = null;
-      try {
-        const [logoData, sigData] = await Promise.all([
-          imageToBase64(logoWebmarcas).catch(() => null),
-          imageToBase64(signatureImage).catch(() => null),
-        ]);
-        logoDataUrl = logoData;
-        sigDataUrl = sigData;
-        const imgs = Array.from(root.querySelectorAll('img')) as HTMLImageElement[];
-        for (const el of imgs) {
-          const src = el.getAttribute('src') || '';
-          if (logoData && src === logoWebmarcas) {
-            originalSrcs.push({ el, src });
-            el.src = logoData;
-          } else if (sigData && src === signatureImage) {
-            originalSrcs.push({ el, src });
-            el.src = sigData;
-          }
-        }
-      } catch { /* keep originals */ }
-
-      // 2) Wait until every image in the preview is fully decoded.
-      const imgs = Array.from(root.querySelectorAll('img')) as HTMLImageElement[];
-      await Promise.all(imgs.map((img) => waitForImageReady(img, 5000)));
-
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-      const applyHtml2CanvasCloneFixes = (clonedDoc: Document) => {
-        // Re-apply base64 images inside the clone (the clone may still hold original srcs)
-        const cloneImgs = Array.from(clonedDoc.querySelectorAll('img')) as HTMLImageElement[];
-        for (const el of cloneImgs) {
-          const src = el.getAttribute('src') || '';
-          if (logoDataUrl && (src === logoWebmarcas || src.includes('webmarcas-logo'))) {
-            el.src = logoDataUrl;
-          } else if (sigDataUrl && src === signatureImage) {
-            el.src = sigDataUrl;
-          }
-        }
-        // html2canvas fails to render a block-level <p> inside an inline-block
-        // container (badge boxes come out empty). Rebuild each badge as an
-        // inline-block <span> carrying the box styles + text directly.
-        const cloneWin = clonedDoc.defaultView || window;
-        const badgePs = Array.from(clonedDoc.querySelectorAll('.print-target p')) as HTMLElement[];
-        for (const p of badgePs) {
-          const parent = p.parentElement;
-          if (!parent) continue;
-          const parentStyle = cloneWin.getComputedStyle(parent);
-          if (parentStyle.display !== 'inline-block') continue;
-          const pStyle = cloneWin.getComputedStyle(p);
-          const span = clonedDoc.createElement('span');
-          span.textContent = (p.textContent || '').trim().toUpperCase();
-          span.style.display = 'inline-block';
-          span.style.background = parentStyle.backgroundColor || '#1e3a5f';
-          span.style.borderRadius = parentStyle.borderRadius;
-          span.style.padding = `${parentStyle.paddingTop} ${parentStyle.paddingRight} ${parentStyle.paddingBottom} ${parentStyle.paddingLeft}`;
-          span.style.color = pStyle.color || '#ffffff';
-          span.style.fontFamily = pStyle.fontFamily;
-          span.style.fontSize = pStyle.fontSize;
-          span.style.fontWeight = pStyle.fontWeight || '700';
-          span.style.letterSpacing = pStyle.letterSpacing;
-          span.style.lineHeight = pStyle.lineHeight;
-          parent.replaceWith(span);
-        }
-      };
-
-      // 3) Render page-by-page at the preview's native width (=210mm ~ 794px).
-      // This avoids one huge html2canvas bitmap, which was the main cause of
-      // slow downloads, browser memory spikes and intermittent failures.
-      const captureWidth = NATIVE_WIDTH_PX;
-
-      const exportHost = document.createElement('div');
-      exportHost.style.position = 'fixed';
-      exportHost.style.left = '-10000px';
-      exportHost.style.top = '0';
-      exportHost.style.width = `${captureWidth}px`;
-      exportHost.style.background = '#ffffff';
-      exportHost.style.zIndex = '-1';
-      exportHostForCleanup = exportHost;
-      const exportRoot = root.cloneNode(true) as HTMLElement;
-      exportRoot.style.width = '210mm';
-      exportRoot.style.minHeight = '297mm';
-      exportRoot.style.boxShadow = 'none';
-      exportRoot.style.borderRadius = '0';
-      exportRoot.style.overflow = 'visible';
-      exportRoot.querySelector('[data-pdf-final-footer]')?.remove();
-      exportHost.appendChild(exportRoot);
-      document.body.appendChild(exportHost);
-
-      await Promise.all((Array.from(exportRoot.querySelectorAll('img')) as HTMLImageElement[]).map((img) => waitForImageReady(img, 3000)));
-
-      const fullHeightCssPx = Math.ceil(exportRoot.scrollHeight);
-      const cssPxPerMM = captureWidth / CONTENT_W;
-
-      // Reserve room at the bottom of every page for the footer bar.
-      const FOOTER_H_MM = 17;
-      const usablePageCssPx = Math.floor((A4_H - FOOTER_H_MM) * cssPxPerMM);
-
-      // Collect safe break boundaries (tops of block elements) so pages never
-      // cut through a line of text. Coordinates are kept in CSS pixels.
-      const rootRect = exportRoot.getBoundingClientRect();
-      const boundarySet = new Set<number>();
-      const blockEls = Array.from(
-        exportRoot.querySelectorAll('[data-pdf-section], .legal-p, .legal-p-short, .legal-list, .legal-heading, .legal-table-wrap, .legal-figure, figure, h1, h2, h3, img'),
-      ) as HTMLElement[];
-      for (const el of blockEls) {
-        const top = el.getBoundingClientRect().top - rootRect.top;
-        if (top > 0) boundarySet.add(Math.floor(top));
-      }
-      const boundaries = Array.from(boundarySet).sort((a, b) => a - b);
-
-      // First pass: compute cut points snapped to element boundaries.
-      const cuts: Array<{ start: number; height: number }> = [];
-      let offsetPx = 0;
-      while (offsetPx < fullHeightCssPx) {
-        const target = offsetPx + usablePageCssPx;
-        let end = Math.min(target, fullHeightCssPx);
-        if (target < fullHeightCssPx) {
-          // Snap to the last element boundary within the page (but keep at
-          // least 40% of the page filled to avoid degenerate tiny pages).
-          const minEnd = offsetPx + Math.floor(usablePageCssPx * 0.4);
-          for (let i = boundaries.length - 1; i >= 0; i--) {
-            const b = boundaries[i];
-            if (b <= target && b > minEnd) { end = b - 2; break; }
-            if (b <= minEnd) break;
-          }
-        }
-        cuts.push({ start: offsetPx, height: Math.max(1, end - offsetPx) });
-        offsetPx = end;
-      }
-
-      const totalPages = cuts.length;
-      const drawFooter = (pageNum: number) => {
-        const lineY = A4_H - FOOTER_H_MM + 3;
-        pdf.setDrawColor(30, 58, 95);
-        pdf.setLineWidth(0.7);
-        pdf.line(15, lineY, A4_W - 15, lineY);
-        pdf.setDrawColor(200, 175, 55);
-        pdf.setLineWidth(0.25);
-        pdf.line(15, lineY + 1, A4_W - 15, lineY + 1);
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(7.5);
-        pdf.setTextColor(110, 110, 110);
-        pdf.text('Av. Brigadeiro Luiz Antônio, 2696, Centro — São Paulo/SP — CEP 01402-000', A4_W / 2, lineY + 5.2, { align: 'center' });
-        pdf.text('Tel: (11) 9 1112-0225  |  juridico@webmarcas.net  |  www.webmarcas.net', A4_W / 2, lineY + 8.8, { align: 'center' });
-        pdf.setTextColor(90, 90, 90);
-        pdf.text(`${pageNum}/${totalPages}`, A4_W - 15, lineY + 5.2, { align: 'right' });
-      };
-
-      // Second pass: capture in safe chunks and then slice those chunks by the
-      // already-computed boundaries. Capturing the whole document as one bitmap
-      // still fails on very long resources because Chrome allows tall canvases
-      // to be created, but `toDataURL()` returns only "data:," once the canvas
-      // exceeds browser limits — jsPDF then throws during `addImage`.
-      const captureScale = 1.08;
-      const maxChunkCssHeight = Math.floor(24000 / captureScale);
-      const makeCanvas = async (offsetCssPx: number, heightCssPx: number) => {
-        const canvas = await withTimeout(
-          html2canvas(exportRoot, {
-            scale: captureScale,
-            useCORS: true,
-            allowTaint: false,
-            backgroundColor: '#ffffff',
-            logging: false,
-            width: captureWidth,
-            height: heightCssPx,
-            windowWidth: captureWidth,
-            windowHeight: Math.max(900, Math.min(heightCssPx, 4000)),
-            scrollX: 0,
-            scrollY: -offsetCssPx,
-            y: offsetCssPx,
-            onclone: applyHtml2CanvasCloneFixes,
-          }),
-          Math.min(90000, 30000 + Math.ceil(heightCssPx / usablePageCssPx) * 2500),
-          'Tempo excedido ao renderizar uma parte do PDF.',
-        );
-        if (estimateCanvasDataUrlLength(canvas) <= 6) {
-          throw new Error('O navegador recusou a imagem do PDF por limite de tamanho. O documento precisa ser dividido em partes menores.');
-        }
-        return canvas;
-      };
-
-      let chunkStartCssPx = -1;
-      let chunkCanvas: HTMLCanvasElement | null = null;
-      let scaleY = captureScale;
-      for (let pageIndex = 0; pageIndex < cuts.length; pageIndex++) {
-        const cut = cuts[pageIndex];
-        const needsNewChunk =
-          !chunkCanvas ||
-          cut.start < chunkStartCssPx ||
-          cut.start + cut.height > chunkStartCssPx + Math.floor(chunkCanvas.height / scaleY) - 2;
-        if (needsNewChunk) {
-          chunkStartCssPx = cut.start;
-          let chunkEndCssPx = Math.min(fullHeightCssPx, chunkStartCssPx + maxChunkCssHeight);
-          const minChunkEnd = Math.min(fullHeightCssPx, chunkStartCssPx + cut.height + 1);
-          for (let i = cuts.length - 1; i >= pageIndex; i--) {
-            const candidateEnd = cuts[i].start + cuts[i].height;
-            if (candidateEnd <= chunkEndCssPx) { chunkEndCssPx = Math.max(candidateEnd, minChunkEnd); break; }
-          }
-          chunkCanvas = await makeCanvas(chunkStartCssPx, Math.max(1, Math.ceil(chunkEndCssPx - chunkStartCssPx)));
-          scaleY = chunkCanvas.height / Math.max(chunkEndCssPx - chunkStartCssPx, 1);
-        }
-
-        const sy = Math.max(0, Math.floor((cut.start - chunkStartCssPx) * scaleY));
-        const sh = Math.max(1, Math.min(chunkCanvas.height - sy, Math.ceil(cut.height * scaleY)));
-        const pageCanvas = document.createElement('canvas');
-        pageCanvas.width = chunkCanvas.width;
-        pageCanvas.height = sh;
-        const ctx = pageCanvas.getContext('2d');
-        if (!ctx) throw new Error('Canvas indisponível ao fatiar PDF.');
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-        ctx.drawImage(chunkCanvas, 0, sy, chunkCanvas.width, sh, 0, 0, chunkCanvas.width, sh);
-
-        const sliceHeightMM = (pageCanvas.height * CONTENT_W) / pageCanvas.width;
-        if (pageIndex > 0) pdf.addPage();
-        const pageDataUrl = pageCanvas.toDataURL('image/jpeg', 0.82);
-        if (pageDataUrl.length <= 6) throw new Error('Falha ao converter uma página do PDF em imagem.');
-        pdf.addImage(pageDataUrl, 'JPEG', 0, 0, CONTENT_W, sliceHeightMM, undefined, 'FAST');
-        drawFooter(pageIndex + 1);
-      }
-
-      exportHost.remove();
-      exportHostForCleanup = null;
-
-      pdf.save(pdfFileName);
+      await generateNativePDF({
+        pdfFileName,
+        bodyContent,
+        evidences,
+        evidenceByNum,
+        findEvidenceBySlug,
+        uncitedEvidences,
+        documentTitleUpper,
+        resource,
+        approvalDate,
+        isExtrajudicialDoc,
+        isProcuradorPetition,
+      });
     } catch (error) {
       console.error('Error generating PDF:', error);
       toast({
@@ -873,11 +1050,6 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
         variant: 'destructive',
       });
     } finally {
-      // Restore original <img> src values
-      for (const { el, src } of originalSrcs) {
-        try { el.src = src; } catch { /* ignore */ }
-      }
-      try { exportHostForCleanup?.remove(); } catch { /* ignore */ }
       setIsGeneratingPDF(false);
     }
   };
