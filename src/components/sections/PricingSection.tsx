@@ -119,7 +119,7 @@ const PricingSection = () => {
                   <span className="text-lg text-muted-foreground line-through">R$1.194</span>
                   <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-0.5 rounded-full">-43%</span>
                 </div>
-                <div className="text-4xl md:text-5xl font-display font-bold bg-gradient-to-r from-primary to-blue-500 bg-clip-text text-transparent mb-1">
+                <div className="text-7xl md:text-8xl font-display font-bold bg-gradient-to-r from-primary to-blue-500 bg-clip-text text-transparent mb-1">
                   R$699
                 </div>
                 <span className="text-muted-foreground text-sm">à vista no PIX</span>
@@ -198,7 +198,7 @@ const PricingSection = () => {
               <p className="text-muted-foreground text-sm mb-6">Proteção total até o certificado</p>
 
               <div className="text-center mb-6">
-                <div className="text-4xl md:text-5xl font-display font-bold bg-gradient-to-r from-primary via-blue-500 to-primary bg-clip-text text-transparent mb-1">
+                <div className="text-7xl md:text-8xl font-display font-bold bg-gradient-to-r from-primary via-blue-500 to-primary bg-clip-text text-transparent mb-1">
                   R$398<span className="text-lg">/mês</span>
                 </div>
                 <span className="text-muted-foreground text-sm">assinatura mensal · tudo incluso</span>
@@ -253,7 +253,7 @@ const PricingSection = () => {
               <p className="text-muted-foreground text-sm mb-6">Marcas ilimitadas para sua empresa</p>
 
               <div className="text-center mb-6">
-                <div className="text-4xl md:text-5xl font-display font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent mb-1">
+                <div className="text-7xl md:text-8xl font-display font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent mb-1">
                   R$1.621<span className="text-lg">/mês</span>
                 </div>
                 <span className="text-muted-foreground text-sm">assinatura mensal · marcas ilimitadas</span>
