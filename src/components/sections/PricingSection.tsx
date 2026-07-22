@@ -154,6 +154,13 @@ const PricingSection = () => {
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
 
+              <div className="mt-3 bg-destructive/10 border border-destructive/20 rounded-xl p-2 flex items-center justify-center gap-2">
+                <Flame className="w-4 h-4 text-destructive animate-pulse" />
+                <p className="text-xs font-semibold text-destructive">
+                  Oferta válida até <span className="font-bold">{getNextFridayFormatted()}</span>
+                </p>
+              </div>
+
               <p className="text-xs text-muted-foreground text-center mt-3 leading-relaxed">
                 * Valor referente aos honorários. Taxas oficiais do INPI não incluídas,
                 pagas à parte pelo cliente diretamente ao órgão.
@@ -213,13 +220,6 @@ const PricingSection = () => {
                 Começar Plano Premium
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
-
-              <div className="mt-3 bg-destructive/10 border border-destructive/20 rounded-xl p-2 flex items-center justify-center gap-2">
-                <Flame className="w-4 h-4 text-destructive animate-pulse" />
-                <p className="text-xs font-semibold text-destructive">
-                  Oferta válida até <span className="font-bold">{getNextFridayFormatted()}</span>
-                </p>
-              </div>
             </div>
           </motion.div>
 
