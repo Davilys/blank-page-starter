@@ -664,7 +664,7 @@ const ViabilitySearchSection = ({ compact = false }: { compact?: boolean }) => {
                   Imprimir
                 </Button>
                 <Button variant="outline" size="sm" className="flex-1" asChild>
-                  <a href="https://wa.me/5511999999999" target="_blank" rel="noopener noreferrer">
+                  <a href="https://wa.me/5511911120225" target="_blank" rel="noopener noreferrer">
                     <MessageCircle className="w-3.5 h-3.5 mr-1" />
                     Falar com especialista
                   </a>
