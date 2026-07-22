@@ -1,6 +1,6 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import webmarcasLogo from '@/assets/webmarcas-logo-mark.png';
+import webmarcasLogo from '@/assets/webmarcas-logo-mark.webp';
 import davilysSignature from '@/assets/davilys-signature.png';
 import { ContractRenderer } from '@/components/contracts/ContractRenderer';
 import { buildContractVerificationUrl, getContractVerificationBaseUrl, getContractVerificationHost } from '@/lib/contractVerification';

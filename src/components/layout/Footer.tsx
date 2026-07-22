@@ -1,5 +1,5 @@
 import { Mail, Phone, MapPin, Instagram } from "lucide-react";
-import webmarcasLogoMark from "@/assets/webmarcas-logo-mark.png";
+import webmarcasLogoMark from "@/assets/webmarcas-logo-mark.webp";
 import { Link } from "react-router-dom";
 
 import { useLanguage } from "@/contexts/LanguageContext";

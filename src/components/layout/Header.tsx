@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import webmarcasLogoMark from "@/assets/webmarcas-logo-mark.png";
+import webmarcasLogoMark from "@/assets/webmarcas-logo-mark.webp";
 import { Menu, X, Phone, User, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";

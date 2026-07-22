@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { checkViability, type ViabilityResult } from "@/lib/api/viability";
 import { supabase } from "@/integrations/supabase/client";
-import webmarcasIcon from "@/assets/webmarcas-icon.png";
+import webmarcasIcon from "@/assets/webmarcas-icon.webp";
 
 type ViabilityLevel = "high" | "medium" | "low" | "blocked" | null;
 
