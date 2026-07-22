@@ -20,7 +20,7 @@ const Privacidade = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[hsl(220_33%_98%)]">
+    <div className="brand-public min-h-screen bg-[hsl(220_33%_98%)]">
       <Helmet>
         <title>Política de Privacidade | WebMarcas</title>
         <meta name="description" content="Política de Privacidade da WebMarcas Intelligence PI: dados coletados no formulário do site, finalidade, base legal (LGPD) e direitos do titular." />
