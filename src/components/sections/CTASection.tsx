@@ -51,9 +51,22 @@ const CTASection = () => {
             <div className="mt-3 text-sm text-white/80">à vista no PIX (ou parcelado no cartão)</div>
           </div>
 
-          <p className="mt-5 text-white/70 text-xs md:text-sm">
-            Taxas oficiais do INPI cobradas à parte, conforme tabela vigente.
+          <p className="mt-5 text-white/85 text-xs md:text-sm max-w-2xl mx-auto leading-relaxed">
+            * Valor referente aos honorários. Taxas oficiais do INPI não incluídas,
+            pagas à parte pelo cliente diretamente ao órgão.
           </p>
+
+          <div className="mt-6 mx-auto max-w-3xl rounded-2xl border border-white/20 bg-white/5 backdrop-blur px-5 py-4 text-left">
+            <p className="text-white/90 text-xs md:text-sm leading-relaxed">
+              <span className="font-bold text-white">Garantia de registro:</span> nossos
+              honorários cobrem todo o acompanhamento do processo, do protocolo à
+              decisão final do INPI. Se surgir qualquer exigência técnica ou
+              intercorrência, nossa equipe atua sem cobrar honorários adicionais.
+              As taxas oficiais do INPI (obrigatórias por lei, recolhidas diretamente
+              ao órgão) não estão incluídas nos honorários e são de responsabilidade
+              do cliente.
+            </p>
+          </div>
 
           {/* CTAs */}
           <div className="mt-10 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
