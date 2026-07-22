@@ -1,4 +1,4 @@
-import { Mail, Phone, MapPin, Instagram } from "lucide-react";
+import { Mail, Phone, MapPin, Instagram, Linkedin, Facebook, Youtube, MapPinned } from "lucide-react";
 import webmarcasLogoMark from "@/assets/webmarcas-logo-mark.webp";
 import { Link } from "react-router-dom";
 
@@ -48,15 +48,62 @@ const Footer = () => {
                 href="https://api.whatsapp.com/send/?phone=5511911120225&text=Ol%C3%A1%21+Estava+no+site+da+WebMarcas+e+quero+registrar+minha+marca.&type=phone_number&app_absent=0"
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label="WhatsApp WebMarcas"
                 className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-[hsl(var(--brand-orange))] transition-all"
               >
                 <Phone className="w-5 h-5" />
               </a>
               <a
                 href="mailto:ola@webmarcas.net"
+                aria-label="E-mail WebMarcas"
                 className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-[hsl(var(--brand-orange))] transition-all"
               >
                 <Mail className="w-5 h-5" />
+              </a>
+              <a
+                href="https://www.instagram.com/webpatentes"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram WebMarcas"
+                className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-[hsl(var(--brand-orange))] transition-all"
+              >
+                <Instagram className="w-5 h-5" />
+              </a>
+              <a
+                href="https://www.linkedin.com/in/web-marcas-5248a819b"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="LinkedIn WebMarcas"
+                className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-[hsl(var(--brand-orange))] transition-all"
+              >
+                <Linkedin className="w-5 h-5" />
+              </a>
+              <a
+                href="https://www.facebook.com/share/1HXVYGsfQc/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Facebook WebMarcas"
+                className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-[hsl(var(--brand-orange))] transition-all"
+              >
+                <Facebook className="w-5 h-5" />
+              </a>
+              <a
+                href="https://youtube.com/@webmarcas1282"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="YouTube WebMarcas"
+                className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-[hsl(var(--brand-orange))] transition-all"
+              >
+                <Youtube className="w-5 h-5" />
+              </a>
+              <a
+                href="https://share.google/zkMBxa8NWw67Vobty"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Google Meu Negócio WebMarcas"
+                className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-[hsl(var(--brand-orange))] transition-all"
+              >
+                <MapPinned className="w-5 h-5" />
               </a>
             </div>
           </div>
@@ -119,17 +166,6 @@ const Footer = () => {
               <li className="flex items-start gap-3 text-sm text-white/70">
                 <Mail className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>ola@webmarcas.net</span>
-              </li>
-              <li>
-                <a
-                  href="https://www.instagram.com/webpatentes"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-start gap-3 text-sm text-white/70 hover:text-[hsl(var(--brand-orange))] transition-colors"
-                >
-                  <Instagram className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  <span>@webpatentes</span>
-                </a>
               </li>
             </ul>
           </div>
