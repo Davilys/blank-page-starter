@@ -295,7 +295,7 @@ const PricingSection = () => {
               <h4 className="font-display font-bold text-sm text-foreground">Taxas Governamentais do INPI (2026)</h4>
             </div>
             <p className="text-xs text-muted-foreground mb-4">
-              Além dos honorários, o INPI cobra taxas oficiais para o pedido de registro.
+              Além dos honorários da WebMarcas, o INPI cobra taxas oficiais obrigatórias para o processo de registro, pagas diretamente ao órgão pelo cliente.
             </p>
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-card rounded-xl p-4 border border-border/50 text-center">
@@ -303,7 +303,7 @@ const PricingSection = () => {
                 <p className="font-display font-bold text-lg text-foreground">R$ 840,00</p>
               </div>
               <div className="bg-card rounded-xl p-4 border border-border/50 text-center">
-                <p className="text-xs text-muted-foreground mb-1">PF / MEI / Simples Nacional</p>
+                <p className="text-xs text-muted-foreground mb-1">Pessoa Física, MEI e Simples Nacional</p>
                 <p className="font-display font-bold text-lg text-foreground">R$ 440,00</p>
               </div>
             </div>
