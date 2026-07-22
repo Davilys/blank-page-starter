@@ -99,6 +99,14 @@ const PricingSection = () => {
             variants={cardVariants}
             whileHover={{ y: -3, transition: { duration: 0.2 } }}
           >
+            {/* Badge */}
+            <div className="absolute top-0 right-0">
+              <div className="bg-gradient-to-r from-emerald-500 to-green-600 text-white text-xs font-bold px-4 py-2 rounded-bl-2xl flex items-center gap-1.5 shadow-lg">
+                <Flame className="w-3.5 h-3.5 fill-current" />
+                Mais Contratado
+              </div>
+            </div>
+
             <div className="p-6 md:p-8 flex flex-col flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <Shield className="w-5 h-5 text-primary" />
