@@ -118,19 +118,19 @@ const PricingSection = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-2 mb-6">
-                <div className="bg-muted/50 rounded-xl p-3 text-center border border-border/50">
+                <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-3 text-center border border-blue-400/50 shadow-md shadow-blue-500/20">
                   <div className="flex items-center justify-center gap-1 mb-0.5">
-                    <CreditCard className="w-3.5 h-3.5 text-primary" />
-                    <span className="font-semibold text-foreground text-sm">{getCartaoParcelaText()}</span>
+                    <CreditCard className="w-3.5 h-3.5 text-white" />
+                    <span className="font-bold text-white text-sm">{getCartaoParcelaText()}</span>
                   </div>
-                  <span className="text-xs text-muted-foreground">no cartão</span>
+                  <span className="text-xs text-white/85">no cartão</span>
                 </div>
-                <div className="bg-muted/50 rounded-xl p-3 text-center border border-border/50">
+                <div className="bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl p-3 text-center border border-orange-400/50 shadow-md shadow-orange-500/20">
                   <div className="flex items-center justify-center gap-1 mb-0.5">
-                    <FileText className="w-3.5 h-3.5 text-primary" />
-                    <span className="font-semibold text-foreground text-sm">{getBoletoParcelaText()}</span>
+                    <FileText className="w-3.5 h-3.5 text-white" />
+                    <span className="font-bold text-white text-sm">{getBoletoParcelaText()}</span>
                   </div>
-                  <span className="text-xs text-muted-foreground">no boleto</span>
+                  <span className="text-xs text-white/85">no boleto</span>
                 </div>
               </div>
 
@@ -146,9 +146,8 @@ const PricingSection = () => {
               </ul>
 
               <Button
-                variant="outline"
                 size="lg"
-                className="w-full rounded-2xl"
+                className="w-full rounded-2xl text-white font-bold bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600 hover:from-emerald-600 hover:via-green-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/40 hover:shadow-emerald-500/60 ring-2 ring-emerald-400/30 hover:ring-emerald-400/60 transition-all duration-300"
                 onClick={scrollToForm}
               >
                 Registrar por R$699
