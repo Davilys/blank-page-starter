@@ -110,7 +110,7 @@ const Footer = () => {
             <ul className="space-y-3">
               <li className="flex items-start gap-3 text-sm text-white/70">
                 <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span>São Paulo - SP, Brasil</span>
+                <span>Av. Brigadeiro Luís Antônio, 2696<br />Jardim Paulista — São Paulo/SP<br />CEP 01402-000</span>
               </li>
               <li className="flex items-start gap-3 text-sm text-white/70">
                 <Phone className="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -139,7 +139,7 @@ const Footer = () => {
         <div className="mt-12 pt-8 border-t border-white/10">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-white/60 text-center md:text-left">
-              © {new Date().getFullYear()} WebMarcas Intelligence PI. {t("footer.rights")}
+              © {new Date().getFullYear()} WebMarcas Intelligence PI · CNPJ 39.528.012/0001-29. {t("footer.rights")}
             </p>
             <div className="flex items-center gap-6">
               <Link to="/politica-de-privacidade" className="text-sm text-white/60 hover:text-white transition-colors">
