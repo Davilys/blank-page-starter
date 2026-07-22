@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { checkViability, type ViabilityResult } from "@/lib/api/viability";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import webmarcasIcon from "@/assets/webmarcas-icon.png";
+import webmarcasIcon from "@/assets/webmarcas-icon.webp";
 import { cn } from "@/lib/utils";
 
 interface ViabilityStepProps {

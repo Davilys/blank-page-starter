@@ -20,7 +20,7 @@ import { ptBR } from 'date-fns/locale';
 import avatar1 from '@/assets/avatars/avatar-1.jpg';
 import avatar2 from '@/assets/avatars/avatar-2.jpg';
 import avatar3 from '@/assets/avatars/avatar-3.jpg';
-import webmarcasIcon from '@/assets/webmarcas-icon.png';
+import webmarcasIcon from '@/assets/webmarcas-icon.webp';
 
 interface Message {
   id: string;

@@ -32,7 +32,7 @@ import {
   BarChart3,
 } from 'lucide-react';
 import logo from '@/assets/webmarcas-logo.png';
-import logoIcon from '@/assets/webmarcas-icon.png';
+import logoIcon from '@/assets/webmarcas-icon.webp';
 import {
   Sidebar,
   SidebarProvider,

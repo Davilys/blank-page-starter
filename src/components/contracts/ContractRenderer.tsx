@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import webmarcasLogo from '@/assets/webmarcas-logo-mark.png';
+import webmarcasLogo from '@/assets/webmarcas-logo-mark.webp';
 import { CheckCircle } from 'lucide-react';
 import { buildContractVerificationUrl, getContractVerificationBaseUrl } from '@/lib/contractVerification';
 

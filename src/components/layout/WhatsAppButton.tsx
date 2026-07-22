@@ -1,4 +1,4 @@
-import atendenteImg from "@/assets/atendente-webmarcas.png";
+import atendenteImg from "@/assets/atendente-webmarcas.webp";
 
 const WhatsAppButton = () => {
   const whatsappUrl =

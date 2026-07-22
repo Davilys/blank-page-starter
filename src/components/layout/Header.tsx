@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import webmarcasLogoMark from "@/assets/webmarcas-logo-mark.png";
+import webmarcasLogoMark from "@/assets/webmarcas-logo-mark.webp";
 import { Menu, X, Phone, User, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -61,6 +61,10 @@ const Header = () => {
             <img
               src={webmarcasLogoMark}
               alt="WebMarcas"
+              width={48}
+              height={48}
+              fetchPriority="high"
+              decoding="async"
               className={`h-10 md:h-12 w-auto shrink-0 ${!isScrolled && isHomePage ? "brightness-0 invert" : ""}`}
             />
             <div className="leading-tight">
