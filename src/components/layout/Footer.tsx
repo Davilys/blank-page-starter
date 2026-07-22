@@ -142,7 +142,7 @@ const Footer = () => {
               © {new Date().getFullYear()} WebMarcas Intelligence PI · CNPJ 39.528.012/0001-29. {t("footer.rights")}
             </p>
             <div className="flex items-center gap-6">
-              <Link to="/politica-de-privacidade" className="text-sm text-white/60 hover:text-white transition-colors">
+              <Link to="/privacidade" className="text-sm text-white/60 hover:text-white transition-colors">
                 {t("footer.privacy")}
               </Link>
               <Link to="/termos-de-uso" className="text-sm text-white/60 hover:text-white transition-colors">

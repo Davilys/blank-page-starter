@@ -81,6 +81,7 @@ const VerificarContrato = lazyWithRetry(() => import("./pages/VerificarContrato"
 const AssinarDocumento = lazyWithRetry(() => import("./pages/AssinarDocumento"));
 const RegistroBlockchain = lazyWithRetry(() => import("./pages/RegistroBlockchain"));
 const PoliticaPrivacidade = lazyWithRetry(() => import("./pages/PoliticaPrivacidade"));
+const Privacidade = lazyWithRetry(() => import("./pages/Privacidade"));
 const TermosUso = lazyWithRetry(() => import("./pages/TermosUso"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 const Blog = lazyWithRetry(() => import("./pages/Blog"));
@@ -178,6 +179,7 @@ const App = () => (
               <Route path="/assinar/:token" element={<AssinarDocumento />} />
               <Route path="/registro-blockchain" element={<RegistroBlockchain />} />
               <Route path="/politica-de-privacidade" element={<PoliticaPrivacidade />} />
+              <Route path="/privacidade" element={<Privacidade />} />
               <Route path="/blog" element={<Blog />} />
               <Route path="/blog/:slug" element={<BlogPost />} />
               <Route path="/termos-de-uso" element={<TermosUso />} />

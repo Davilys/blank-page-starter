@@ -155,8 +155,9 @@ const PricingSection = () => {
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
 
-              <p className="text-[10px] text-muted-foreground text-center mt-3">
-                Taxas do INPI não incluídas. Recursos cobrados separadamente.
+              <p className="text-xs text-muted-foreground text-center mt-3 leading-relaxed">
+                * Valor referente aos honorários. Taxas oficiais do INPI não incluídas,
+                pagas à parte pelo cliente diretamente ao órgão.
               </p>
             </div>
           </motion.div>
