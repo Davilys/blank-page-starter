@@ -12,7 +12,7 @@ const Header = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const isHomePage = location.pathname === '/';
+  const isHomePage = location.pathname === '/' || location.pathname === '/registrar';
 
   useEffect(() => {
     const handleScroll = () => {

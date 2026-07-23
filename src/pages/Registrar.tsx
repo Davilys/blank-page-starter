@@ -20,6 +20,7 @@ import type { PlanType } from "@/hooks/useContractTemplate";
 import Header from "@/components/layout/Header";
 import ScribbleUnderline from "@/components/decorative/ScribbleUnderline";
 import WhatsAppButton from "@/components/layout/WhatsAppButton";
+import Footer from "@/components/layout/Footer";
 
 // Dynamic text options for typing effect
 const dynamicTexts = [
@@ -434,6 +435,7 @@ export default function Registrar() {
 
       {/* WhatsApp Floating Button */}
       <WhatsAppButton />
+      <Footer />
     </div>
   );
 }
