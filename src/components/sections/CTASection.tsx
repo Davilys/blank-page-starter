@@ -58,9 +58,7 @@ const CTASection = () => {
 
           <div className="mt-6 mx-auto max-w-3xl rounded-2xl border border-white/20 bg-white/5 backdrop-blur px-5 py-4 text-left">
             <p className="text-white/90 text-xs md:text-sm leading-relaxed">
-              <span className="font-bold text-white">Garantia WebMarcas:</span> Se, por qualquer motivo, o processo de registro da marca for definitivamente arquivado pelo INPI, a WebMarcas realizará um novo pedido de registro de outra marca, sem cobrar novos honorários pelo serviço.
-              {" "}O cliente será responsável apenas pelo pagamento das novas taxas oficiais do INPI, quando exigidas pela legislação vigente.
-              {" "}Essa garantia refere-se exclusivamente aos honorários da WebMarcas e demonstra nosso compromisso em acompanhar o cliente até uma nova tentativa de registro, sem custo adicional de honorários.
+              <span className="font-bold text-white">Garantia WebMarcas:</span> Se o registro for definitivamente arquivado pelo INPI, refazemos o pedido de outra marca sem cobrar novos honorários — o cliente paga apenas as novas taxas oficiais do INPI, quando exigidas.
             </p>
           </div>
 
