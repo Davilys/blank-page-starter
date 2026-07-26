@@ -1424,22 +1424,10 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
     const sourceFilesForUpload: Array<{ base64: string; type: string; name?: string }> = [];
     if (multiFiles && multiFiles.length > 0) {
       for (const file of multiFiles) {
-        if (file.type === 'application/pdf') {
-          fileParts.push({ type: 'file', file: { filename: file.name || 'doc.pdf', file_data: `data:application/pdf;base64,${file.base64}` } });
-          sourceFilesForUpload.push({ base64: file.base64, type: 'application/pdf', name: file.name || 'doc.pdf' });
-        } else {
-          fileParts.push({ type: 'image_url', image_url: { url: `data:${file.type};base64,${file.base64}` } });
-          sourceFilesForUpload.push({ base64: file.base64, type: file.type, name: file.name || 'image' });
-        }
+        appendUploadOnlyFilePart(fileParts, sourceFilesForUpload, file, file?.type === 'application/pdf' ? 'doc.pdf' : 'image');
       }
     } else if (fileBase64 && fileType) {
-      if (fileType === 'application/pdf') {
-        fileParts.push({ type: 'file', file: { filename: 'documento_inpi.pdf', file_data: `data:application/pdf;base64,${fileBase64}` } });
-        sourceFilesForUpload.push({ base64: fileBase64, type: 'application/pdf', name: 'documento_inpi.pdf' });
-      } else {
-        fileParts.push({ type: 'image_url', image_url: { url: `data:${fileType};base64,${fileBase64}` } });
-        sourceFilesForUpload.push({ base64: fileBase64, type: fileType, name: 'image' });
-      }
+      appendUploadOnlyFilePart(fileParts, sourceFilesForUpload, { base64: fileBase64, type: fileType, name: fileType === 'application/pdf' ? 'documento_inpi.pdf' : 'image' }, fileType === 'application/pdf' ? 'documento_inpi.pdf' : 'image');
     } else if (requestedPass !== 'pass2') {
       return new Response(JSON.stringify({ error: 'Nenhum arquivo fornecido' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -1448,7 +1436,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
     // the file_id across extraction + pass1 + pass2. Cuts total payload
     // by ~66% and slashes generation latency.
     console.time('file_upload_dedupe');
-    await maybeReplaceFilePartsWithFileIds(OPENAI_API_KEY, fileParts, sourceFilesForUpload);
+    const failedUploads = await maybeReplaceFilePartsWithFileIds(OPENAI_API_KEY, fileParts, sourceFilesForUpload);
     console.timeEnd('file_upload_dedupe');
     // Drop every base64 reference now that OpenAI has the files. Keeping these
     // strings alive during the 3 parallel model calls below is what triggers
@@ -1458,6 +1446,9 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
       for (const f of multiFiles) { if (f) f.base64 = ''; }
     }
     if (body) { body.fileBase64 = ''; body.files = undefined; }
+    if (failedUploads.length > 0) {
+      return new Response(JSON.stringify({ error: `Não foi possível preparar estes anexos para a IA: ${failedUploads.join(', ')}` }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     const fileResponseParts = convertToResponsesFormat(fileParts);
 
     // ─────────────────────────────────────────────────────
