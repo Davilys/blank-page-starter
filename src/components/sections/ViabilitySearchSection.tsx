@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, AlertCircle, CheckCircle, AlertTriangle, ArrowRight, MessageCircle, ShieldX, Printer, Shield, Zap, TrendingUp, Globe, Building2, Brain, Clock, Target, BarChart3, Database, Cpu, ScanLine, FileSearch, Lock } from "lucide-react";
+import { Search, AlertCircle, CheckCircle, AlertTriangle, ArrowRight, ShieldX, Printer, Shield, Zap, TrendingUp, Globe, Building2, Brain, Clock, Target, BarChart3, Database, Cpu, ScanLine, FileSearch, Lock, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -524,14 +524,153 @@ const ViabilitySearchSection = ({ compact = false }: { compact?: boolean }) => {
     navigate('/registrar');
   };
 
-  const getResultStyles = (level: ViabilityLevel) => {
+  const getRegistrarResultConfig = (level: ViabilityResult["level"]) => {
     switch (level) {
-      case "high": return { icon: CheckCircle, bgClass: "bg-accent/10 border-accent/30", iconClass: "text-accent", textClass: "text-accent" };
-      case "medium": return { icon: AlertTriangle, bgClass: "bg-yellow-500/10 border-yellow-500/30", iconClass: "text-yellow-500", textClass: "text-yellow-500" };
-      case "low": return { icon: AlertCircle, bgClass: "bg-destructive/10 border-destructive/30", iconClass: "text-destructive", textClass: "text-destructive" };
-      case "blocked": return { icon: ShieldX, bgClass: "bg-destructive/20 border-destructive/50", iconClass: "text-destructive", textClass: "text-destructive" };
-      default: return { icon: Search, bgClass: "", iconClass: "", textClass: "" };
+      case "high": return { icon: CheckCircle, gradient: "from-emerald-500/10 to-emerald-600/5", border: "border-emerald-500/30", iconColor: "text-emerald-500", badgeBg: "bg-emerald-500/10", badgeText: "text-emerald-600 dark:text-emerald-400", badgeLabel: "ALTA VIABILIDADE", glow: "shadow-emerald-500/10" };
+      case "medium": return { icon: AlertTriangle, gradient: "from-amber-500/10 to-amber-600/5", border: "border-amber-500/30", iconColor: "text-amber-500", badgeBg: "bg-amber-500/10", badgeText: "text-amber-600 dark:text-amber-400", badgeLabel: "VIABILIDADE MÉDIA", glow: "shadow-amber-500/10" };
+      case "low": return { icon: AlertCircle, gradient: "from-red-500/10 to-red-600/5", border: "border-red-500/30", iconColor: "text-red-500", badgeBg: "bg-red-500/10", badgeText: "text-red-600 dark:text-red-400", badgeLabel: "BAIXA VIABILIDADE", glow: "shadow-red-500/10" };
+      case "blocked": return { icon: ShieldX, gradient: "from-red-600/15 to-red-700/10", border: "border-red-600/40", iconColor: "text-red-600", badgeBg: "bg-red-600/10", badgeText: "text-red-700 dark:text-red-300", badgeLabel: "MARCA BLOQUEADA", glow: "shadow-red-600/10" };
+      default: return { icon: Search, gradient: "", border: "", iconColor: "", badgeBg: "", badgeText: "", badgeLabel: "", glow: "" };
     }
+  };
+
+  const renderRegistrarStyleResult = (resultData: ViabilityResult) => {
+    const config = getRegistrarResultConfig(resultData.level);
+    const Icon = config.icon;
+
+    return (
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 text-foreground">
+        <div className="text-center">
+          <motion.span
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className={cn("inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold tracking-wider border", config.badgeBg, config.badgeText, config.border)}
+          >
+            <Icon className="w-3.5 h-3.5" />
+            {config.badgeLabel}
+          </motion.span>
+        </div>
+
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.1 }}
+          className={cn("relative overflow-hidden rounded-2xl border p-6 bg-gradient-to-br shadow-lg", config.gradient, config.border, config.glow)}
+        >
+          <div className="flex items-start gap-4">
+            <div className={cn("p-3 rounded-xl bg-background/80 shadow-sm", config.border, "border")}>
+              <Icon className={cn("w-8 h-8", config.iconColor)} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-xl font-bold mb-2">{resultData.title}</h3>
+              <p className="text-muted-foreground text-sm leading-relaxed">{resultData.description}</p>
+            </div>
+          </div>
+          <div className="mt-4 pt-4 border-t border-border/30 grid grid-cols-2 gap-3">
+            <div className="text-xs"><span className="text-muted-foreground block">Marca consultada</span><span className="font-semibold">{brandName}</span></div>
+            <div className="text-xs"><span className="text-muted-foreground block">Ramo de atividade</span><span className="font-semibold">{businessArea}</span></div>
+          </div>
+        </motion.div>
+
+        {resultData.level !== 'blocked' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}>
+            <Button
+              size="lg"
+              onClick={handleRegisterClick}
+              className="w-full h-14 text-base font-bold rounded-xl text-white bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600 hover:from-emerald-600 hover:via-green-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/40 hover:shadow-emerald-500/60 transition-all duration-300 hover:-translate-y-0.5 ring-2 ring-emerald-400/30 hover:ring-emerald-400/60 animate-pulse"
+            >
+              <Sparkles className="w-5 h-5 mr-2" />
+              REGISTRE AGORA SUA MARCA
+              <ArrowRight className="w-5 h-5 ml-2" />
+            </Button>
+          </motion.div>
+        )}
+
+        {resultData.inpiData && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="rounded-xl border border-border/40 p-4">
+            <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
+              <Search className="w-4 h-4 text-primary" />
+              Resultado INPI ({resultData.inpiData.totalResultados})
+            </h4>
+            {resultData.inpiData.totalResultados > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/50"><tr><th className="px-2 py-1.5 text-left">Marca</th><th className="px-2 py-1.5 text-left">Processo</th><th className="px-2 py-1.5 text-left">Situação</th></tr></thead>
+                  <tbody>{resultData.inpiData.resultados.map((r, i) => (
+                    <tr key={i} className="border-t border-border/30"><td className="px-2 py-1.5 font-medium">{r.marca}</td><td className="px-2 py-1.5 text-muted-foreground">{r.processo || '-'}</td><td className="px-2 py-1.5">{r.situacao}</td></tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">✅ Nenhuma marca idêntica encontrada.</p>
+            )}
+          </motion.div>
+        )}
+
+        {(resultData.cnpjData || resultData.internetData) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {resultData.cnpjData && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="rounded-xl border border-border/40 p-4">
+                <h4 className="font-semibold text-xs mb-2 flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5 text-primary" />Colidência CNPJ</h4>
+                {resultData.cnpjData.total > 0 ? resultData.cnpjData.matches.map((m, i) => (
+                  <div key={i} className="text-xs bg-muted/30 rounded p-2 mb-1"><p className="font-medium">{m.nome}</p>{m.cnpj && <p className="text-muted-foreground">{m.cnpj}</p>}</div>
+                )) : <p className="text-xs text-muted-foreground">✅ Nenhuma empresa encontrada</p>}
+              </motion.div>
+            )}
+            {resultData.internetData && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }} className="rounded-xl border border-border/40 p-4">
+                <h4 className="font-semibold text-xs mb-2 flex items-center gap-1.5"><Globe className="w-3.5 h-3.5 text-primary" />Presença Internet</h4>
+                <div className="space-y-1">{resultData.internetData.socialMatches.map((s, i) => (
+                  <div key={i} className="flex items-center justify-between text-xs"><span>{s.plataforma}</span><span className={s.encontrado ? 'text-yellow-600' : 'text-emerald-600'}>{s.encontrado ? '⚠️ Encontrado' : '✅ Livre'}</span></div>
+                ))}</div>
+              </motion.div>
+            )}
+          </div>
+        )}
+
+        {resultData.laudo && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-sm flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" />Laudo Técnico Completo</h4>
+              <Button variant="ghost" size="sm" onClick={printLaudo} className="h-8 text-xs"><Printer className="w-3.5 h-3.5 mr-1.5" />Imprimir</Button>
+            </div>
+            <div className="bg-muted/40 border border-border rounded-xl p-4 max-h-52 overflow-y-auto">
+              <pre className="whitespace-pre-wrap text-xs text-muted-foreground font-sans leading-relaxed">{resultData.laudo}</pre>
+            </div>
+          </motion.div>
+        )}
+
+        {resultData.level !== 'blocked' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }} className="flex items-start gap-3 p-4 rounded-xl bg-warning/10 border border-warning/20">
+            <AlertTriangle className="w-4 h-4 text-yellow-500 mt-0.5 shrink-0" />
+            <p className="text-xs text-muted-foreground leading-relaxed"><strong className="text-foreground">Aja rápido!</strong> O dono da marca é quem registra primeiro.</p>
+          </motion.div>
+        )}
+
+        {resultData.level !== 'blocked' && (
+          <CommercialIntelligenceModule
+            inpiTotal={resultData.inpiData?.totalResultados || 0}
+            cnpjMatches={resultData.cnpjData?.matches || []}
+            socialMatches={resultData.internetData?.socialMatches || []}
+            classes={resultData.classes}
+            businessArea={businessArea}
+          />
+        )}
+
+        <div className="space-y-3">
+          {resultData.level !== 'blocked' && (
+            <Button
+              size="lg"
+              onClick={handleRegisterClick}
+              className="w-full h-14 text-base font-bold rounded-xl text-white bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600 hover:from-emerald-600 hover:via-green-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/40 hover:shadow-emerald-500/60 transition-all duration-300 hover:-translate-y-0.5 ring-2 ring-emerald-400/30 hover:ring-emerald-400/60 animate-pulse"
+            >
+              <Sparkles className="w-5 h-5 mr-2" />REGISTRE AGORA SUA MARCA<ArrowRight className="w-5 h-5 ml-2" />
+            </Button>
+          )}
+          <Button variant="outline" className="w-full h-11 rounded-xl" onClick={resetSearch}>Fazer nova consulta</Button>
+        </div>
+      </motion.div>
+    );
   };
 
   if (compact) {
@@ -612,72 +751,7 @@ const ViabilitySearchSection = ({ compact = false }: { compact?: boolean }) => {
             animate={{ opacity: 1, y: 0 }}
             className="p-6 md:p-8 max-h-[70vh] overflow-y-auto"
           >
-            {/* Result Header */}
-            {(() => {
-              const styles = getResultStyles(result.level);
-              const Icon = styles.icon;
-              return (
-                <div className={`rounded-xl border p-4 mb-4 ${styles.bgClass}`}>
-                  <div className="flex items-center gap-3 mb-2">
-                    <Icon className={`w-5 h-5 ${styles.iconClass}`} />
-                    <h3 className={`font-display text-lg font-bold ${styles.textClass}`}>{result.title}</h3>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{result.description}</p>
-                </div>
-              );
-            })()}
-
-            {/* Commercial Intelligence */}
-            <CommercialIntelligenceModule
-              classes={result.classes}
-              businessArea={businessArea}
-              inpiTotal={result.inpiData?.totalResultados}
-              cnpjMatches={result.cnpjData?.matches}
-              socialMatches={result.internetData?.socialMatches}
-            />
-
-            {/* Laudo Completo - Mobile */}
-            {result.laudo && (
-              <div className="mb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-display font-semibold text-base">Laudo Técnico de Viabilidade</h4>
-                  <Button variant="ghost" size="sm" onClick={printLaudo} className="text-muted-foreground hover:text-foreground">
-                    <Printer className="w-4 h-4 mr-1" />
-                    Salvar
-                  </Button>
-                </div>
-                <div className="bg-muted/40 rounded-xl p-4 max-h-60 overflow-y-auto border border-border/40">
-                  <pre className="whitespace-pre-wrap text-sm text-muted-foreground font-sans leading-relaxed">{result.laudo}</pre>
-                </div>
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="space-y-2 mt-4">
-              <Button className="w-full" size="lg" onClick={handleRegisterClick}>
-                <ArrowRight className="w-4 h-4 mr-2" />
-                Registrar minha marca agora
-              </Button>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1" onClick={printLaudo}>
-                  <Printer className="w-3.5 h-3.5 mr-1" />
-                  Imprimir
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1" asChild>
-                  <a href="https://wa.me/5511911120225" target="_blank" rel="noopener noreferrer">
-                    <MessageCircle className="w-3.5 h-3.5 mr-1" />
-                    Falar com especialista
-                  </a>
-                </Button>
-              </div>
-              <button
-                onClick={() => { setResult(null); setBrandName(""); setBusinessArea(""); }}
-                className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5 py-2"
-              >
-                <Search className="w-3.5 h-3.5" />
-                Nova consulta
-              </button>
-            </div>
+            {renderRegistrarStyleResult(result)}
           </motion.div>
         )}
         </AnimatePresence>
@@ -802,177 +876,7 @@ const ViabilitySearchSection = ({ compact = false }: { compact?: boolean }) => {
               animate={{ opacity: 1, y: 0 }}
               className="rounded-2xl border border-border/60 bg-card/70 backdrop-blur-sm shadow-md p-8"
             >
-              {/* Official Badge */}
-              <div className="flex justify-center mb-5">
-                <span className="bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium border border-primary/20">
-                  📋 Resultado da pesquisa real no INPI
-                </span>
-              </div>
-
-              {/* Result Header */}
-              {(() => {
-                const styles = getResultStyles(result.level);
-                const Icon = styles.icon;
-                return (
-                  <div className={`rounded-xl border p-6 mb-6 ${styles.bgClass}`}>
-                    <div className="flex items-center gap-3 mb-3">
-                      <Icon className={`w-6 h-6 ${styles.iconClass}`} />
-                      <h3 className={`font-display text-xl font-bold ${styles.textClass}`}>{result.title}</h3>
-                    </div>
-                    <p className="text-muted-foreground">{result.description}</p>
-                  </div>
-                );
-              })()}
-
-              {/* INPI Results Section */}
-              {result.inpiData && (
-                <div className="mb-6">
-                  <h4 className="font-display font-semibold text-base mb-3 flex items-center gap-2">
-                    <Search className="w-4 h-4 text-primary" />
-                    Resultado INPI ({result.inpiData.totalResultados} encontrado{result.inpiData.totalResultados !== 1 ? 's' : ''})
-                  </h4>
-                  {result.inpiData.totalResultados > 0 ? (
-                    <div className="overflow-x-auto rounded-lg border border-border/40">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted/50">
-                          <tr>
-                            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Marca</th>
-                            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Processo</th>
-                            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Situação</th>
-                            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Classe</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {result.inpiData.resultados.map((r, i) => (
-                            <tr key={i} className="border-t border-border/30">
-                              <td className="px-3 py-2 font-medium">{r.marca}</td>
-                              <td className="px-3 py-2 text-muted-foreground">{r.processo || '-'}</td>
-                              <td className="px-3 py-2">{r.situacao}</td>
-                              <td className="px-3 py-2 text-muted-foreground">{r.classe}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
-                      ✅ Nenhuma marca idêntica encontrada na base do INPI.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* CNPJ + Internet Summary */}
-              {(result.cnpjData || result.internetData) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  {result.cnpjData && (
-                    <div className="rounded-lg border border-border/40 p-4">
-                      <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-primary" />
-                        Colidência Empresarial
-                      </h4>
-                      {result.cnpjData.total > 0 ? (
-                        <div className="space-y-2">
-                          {result.cnpjData.matches.map((m, i) => (
-                            <div key={i} className="text-xs bg-muted/30 rounded p-2">
-                              <p className="font-medium">{m.nome}</p>
-                              {m.cnpj && <p className="text-muted-foreground">{m.cnpj} • {m.situacao}</p>}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">✅ Nenhuma empresa encontrada</p>
-                      )}
-                    </div>
-                  )}
-
-                  {result.internetData && (
-                    <div className="rounded-lg border border-border/40 p-4">
-                      <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                        <Globe className="w-4 h-4 text-primary" />
-                        Presença na Internet
-                      </h4>
-                      <div className="space-y-1.5">
-                        {result.internetData.socialMatches.map((s, i) => (
-                          <div key={i} className="flex items-center justify-between text-xs">
-                            <span className="font-medium">{s.plataforma}</span>
-                            <span className={s.encontrado ? 'text-yellow-600' : 'text-accent'}>
-                              {s.encontrado ? '⚠️ Encontrado' : '✅ Livre'}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Laudo Completo */}
-              {result.laudo && (
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-display font-semibold text-lg">Laudo Técnico de Viabilidade</h4>
-                    <Button variant="ghost" size="sm" onClick={printLaudo} className="text-muted-foreground hover:text-foreground">
-                      <Printer className="w-4 h-4 mr-1" />
-                      Imprimir / Salvar Laudo
-                    </Button>
-                  </div>
-                  <div className="bg-muted/40 rounded-xl p-4 max-h-80 overflow-y-auto border border-border/40">
-                    <pre className="whitespace-pre-wrap text-sm text-muted-foreground font-sans leading-relaxed">{result.laudo}</pre>
-                  </div>
-                </div>
-              )}
-
-              {/* Warning */}
-              {result.level !== 'blocked' && (
-                <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 mb-6">
-                  <p className="text-sm text-muted-foreground">
-                    <strong className="text-primary">⚠️ Importante:</strong> O dono da marca é quem
-                    registra primeiro. Mesmo com alta viabilidade, a situação pode mudar a qualquer
-                    momento se outra pessoa protocolar antes de você.
-                  </p>
-                </div>
-              )}
-
-              {/* Análise Inteligente Comercial */}
-              {result.level !== 'blocked' && (
-                <CommercialIntelligenceModule
-                  classes={result.classes}
-                  businessArea={businessArea}
-                  inpiTotal={result.inpiData?.totalResultados ?? 0}
-                  cnpjMatches={result.cnpjData?.matches ?? []}
-                  socialMatches={result.internetData?.socialMatches ?? []}
-                />
-              )}
-
-              {/* CTAs */}
-              <div className="space-y-3">
-                {result.level !== 'blocked' && (
-                  <button
-                    className="w-full h-14 rounded-xl bg-primary text-primary-foreground font-semibold text-base flex items-center justify-center gap-2 hover:bg-primary/90 active:scale-[0.98] transition-all shadow-sm group"
-                    onClick={handleRegisterClick}
-                  >
-                    🚀 Registrar minha marca agora
-                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                  </button>
-                )}
-                <a
-                  href={`https://wa.me/5511911120225?text=${encodeURIComponent(`Olá, estava no site da Webmarcas, quero registrar uma marca!`)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full h-14 rounded-xl border border-primary/40 text-primary font-semibold text-base flex items-center justify-center gap-2 hover:bg-primary/5 active:scale-[0.98] transition-all"
-                >
-                  <MessageCircle className="w-5 h-5" />
-                  Falar com especialista
-                </a>
-                <button
-                  onClick={resetSearch}
-                  className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors py-2 flex items-center justify-center gap-1.5"
-                >
-                  <Search className="w-3.5 h-3.5" />
-                  Fazer nova consulta
-                </button>
-              </div>
+              {renderRegistrarStyleResult(result)}
             </motion.div>
           )}
           </AnimatePresence>
