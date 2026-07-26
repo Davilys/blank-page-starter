@@ -80,10 +80,10 @@ const StatusPedido = () => {
       try {
         setOrderData(JSON.parse(data));
       } catch {
-        navigate("/registro");
+        navigate("/registrar");
       }
     } else {
-      navigate("/registro");
+      navigate("/registrar");
     }
   }, [navigate]);
 
