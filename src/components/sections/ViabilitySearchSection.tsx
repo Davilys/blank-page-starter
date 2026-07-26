@@ -761,72 +761,7 @@ const ViabilitySearchSection = ({ compact = false }: { compact?: boolean }) => {
             animate={{ opacity: 1, y: 0 }}
             className="p-6 md:p-8 max-h-[70vh] overflow-y-auto"
           >
-            {/* Result Header */}
-            {(() => {
-              const styles = getResultStyles(result.level);
-              const Icon = styles.icon;
-              return (
-                <div className={`rounded-xl border p-4 mb-4 ${styles.bgClass}`}>
-                  <div className="flex items-center gap-3 mb-2">
-                    <Icon className={`w-5 h-5 ${styles.iconClass}`} />
-                    <h3 className={`font-display text-lg font-bold ${styles.textClass}`}>{result.title}</h3>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{result.description}</p>
-                </div>
-              );
-            })()}
-
-            {/* Commercial Intelligence */}
-            <CommercialIntelligenceModule
-              classes={result.classes}
-              businessArea={businessArea}
-              inpiTotal={result.inpiData?.totalResultados}
-              cnpjMatches={result.cnpjData?.matches}
-              socialMatches={result.internetData?.socialMatches}
-            />
-
-            {/* Laudo Completo - Mobile */}
-            {result.laudo && (
-              <div className="mb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-display font-semibold text-base">Laudo Técnico de Viabilidade</h4>
-                  <Button variant="ghost" size="sm" onClick={printLaudo} className="text-muted-foreground hover:text-foreground">
-                    <Printer className="w-4 h-4 mr-1" />
-                    Salvar
-                  </Button>
-                </div>
-                <div className="bg-muted/40 rounded-xl p-4 max-h-60 overflow-y-auto border border-border/40">
-                  <pre className="whitespace-pre-wrap text-sm text-muted-foreground font-sans leading-relaxed">{result.laudo}</pre>
-                </div>
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="space-y-2 mt-4">
-              <Button className="w-full" size="lg" onClick={handleRegisterClick}>
-                <ArrowRight className="w-4 h-4 mr-2" />
-                Registrar minha marca agora
-              </Button>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1" onClick={printLaudo}>
-                  <Printer className="w-3.5 h-3.5 mr-1" />
-                  Imprimir
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1" asChild>
-                  <a href="https://wa.me/5511911120225" target="_blank" rel="noopener noreferrer">
-                    <MessageCircle className="w-3.5 h-3.5 mr-1" />
-                    Falar com especialista
-                  </a>
-                </Button>
-              </div>
-              <button
-                onClick={() => { setResult(null); setBrandName(""); setBusinessArea(""); }}
-                className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5 py-2"
-              >
-                <Search className="w-3.5 h-3.5" />
-                Nova consulta
-              </button>
-            </div>
+            {renderRegistrarStyleResult(result)}
           </motion.div>
         )}
         </AnimatePresence>
