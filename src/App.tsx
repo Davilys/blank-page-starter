@@ -73,7 +73,6 @@ import { ChatModeProvider } from "@/contexts/ChatModeContext";
 import Index from "./pages/Index";
 
 // All other pages are lazy-loaded for code splitting
-const Registro = lazyWithRetry(() => import("./pages/Registro"));
 const Registrar = lazyWithRetry(() => import("./pages/Registrar"));
 const StatusPedido = lazyWithRetry(() => import("./pages/StatusPedido"));
 const Obrigado = lazyWithRetry(() => import("./pages/Obrigado"));
@@ -171,7 +170,7 @@ const App = () => (
               {import.meta.env.DEV && (
                 <Route path="/__pdf-test" element={<PDFTestHarness />} />
               )}
-              <Route path="/registro" element={<Registro />} />
+              <Route path="/registro" element={<Navigate to="/registrar" replace />} />
               <Route path="/registrar" element={<Registrar />} />
               <Route path="/status-pedido" element={<StatusPedido />} />
               <Route path="/obrigado" element={<Obrigado />} />
