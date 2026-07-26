@@ -229,6 +229,10 @@ async function maybeReplaceFilePartsWithFileIds(
         } else if (part.type === 'image_url') {
           part.image_url = { file_id: fileId };
         }
+        // Free the base64 payload as soon as OpenAI has the file — otherwise
+        // the raw string stays pinned in memory across the 3 parallel calls
+        // below and blows the edge-function memory budget (WORKER_RESOURCE_LIMIT).
+        src.base64 = '';
       } catch (e) {
         console.warn('file_id swap failed:', (e as Error).message);
       }
