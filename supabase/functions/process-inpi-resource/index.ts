@@ -229,6 +229,10 @@ async function maybeReplaceFilePartsWithFileIds(
         } else if (part.type === 'image_url') {
           part.image_url = { file_id: fileId };
         }
+        // Free the base64 payload as soon as OpenAI has the file — otherwise
+        // the raw string stays pinned in memory across the 3 parallel calls
+        // below and blows the edge-function memory budget (WORKER_RESOURCE_LIMIT).
+        src.base64 = '';
       } catch (e) {
         console.warn('file_id swap failed:', (e as Error).message);
       }
@@ -1407,6 +1411,14 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
     console.time('file_upload_dedupe');
     await maybeReplaceFilePartsWithFileIds(OPENAI_API_KEY, fileParts, sourceFilesForUpload);
     console.timeEnd('file_upload_dedupe');
+    // Drop every base64 reference now that OpenAI has the files. Keeping these
+    // strings alive during the 3 parallel model calls below is what triggers
+    // WORKER_RESOURCE_LIMIT on multi-file requests.
+    for (const s of sourceFilesForUpload) s.base64 = '';
+    if (Array.isArray(multiFiles)) {
+      for (const f of multiFiles) { if (f) f.base64 = ''; }
+    }
+    if (body) { body.fileBase64 = ''; body.files = undefined; }
     const fileResponseParts = convertToResponsesFormat(fileParts);
 
     // ─────────────────────────────────────────────────────
