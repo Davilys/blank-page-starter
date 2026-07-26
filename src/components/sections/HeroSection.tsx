@@ -25,9 +25,9 @@ const HeroSection = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16 relative z-10 max-w-7xl">
         {/* Two-column hero */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-          
+
           {/* Left — Text */}
-          <div className="text-center lg:text-left">
+          <div className="text-center lg:text-left order-1 lg:order-none">
             {/* Orange badge */}
             <div className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[hsl(20_100%_55%)] to-[hsl(14_100%_48%)] px-5 py-2.5 text-white shadow-[0_10px_24px_-8px_hsla(20,100%,45%,0.55)] mb-6 mx-auto lg:mx-0">
               <Zap className="w-4 h-4 fill-white" />
@@ -77,8 +77,8 @@ const HeroSection = () => {
               </div>
             </div>
 
-            {/* Trust pills */}
-            <div className="flex flex-wrap gap-2.5 justify-center lg:justify-start">
+            {/* Trust pills — desktop only (mobile version below search) */}
+            <div className="hidden lg:flex flex-wrap gap-2.5 justify-center lg:justify-start">
               {trustPills.map((p, i) => (
                 <span
                   key={i}
@@ -94,7 +94,7 @@ const HeroSection = () => {
           </div>
 
           {/* Right — Viability Search */}
-          <div className="relative w-full max-w-md mx-auto lg:max-w-none">
+          <div className="relative w-full max-w-md mx-auto lg:max-w-none order-2 lg:order-none">
             {/* 48h floating seal */}
             <Seal48h
               size={144}
@@ -103,6 +103,21 @@ const HeroSection = () => {
             <div className="relative rounded-[2rem] bg-white p-6 md:p-8 shadow-[0_28px_70px_-16px_rgba(11,22,60,0.4)]">
               <ViabilitySearchSection compact />
             </div>
+          </div>
+
+          {/* Trust pills — mobile only, below viability search */}
+          <div className="flex lg:hidden flex-wrap gap-2.5 justify-center order-3">
+            {trustPills.map((p, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur border border-white/25 px-4 py-2 text-white text-xs font-semibold"
+              >
+                <span className="w-5 h-5 rounded-full bg-[hsl(20_100%_55%)] flex items-center justify-center">
+                  <p.icon className="w-3 h-3 text-white" strokeWidth={2.5} />
+                </span>
+                {p.label}
+              </span>
+            ))}
           </div>
         </div>
 
