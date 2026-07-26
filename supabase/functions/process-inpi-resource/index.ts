@@ -1568,7 +1568,9 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     const [extractionResult, pass1Result, pass2Result] = await Promise.all([
       callOpenAI(OPENAI_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, 800, 0.1, 60000),
       callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 9000, 0.25),
-      shouldRunPass2Now ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25) : Promise.resolve({ content: '' }),
+      shouldRunPass2Now
+        ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25)
+        : Promise.resolve({ content: '', error: undefined as string | undefined, status: undefined as number | undefined }),
     ]);
     console.timeEnd('ai_generation');
 
