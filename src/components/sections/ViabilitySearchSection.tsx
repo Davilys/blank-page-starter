@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, AlertCircle, CheckCircle, AlertTriangle, ArrowRight, MessageCircle, ShieldX, Printer, Shield, Zap, TrendingUp, Globe, Building2, Brain, Clock, Target, BarChart3, Database, Cpu, ScanLine, FileSearch, Lock, Sparkles } from "lucide-react";
+import { Search, AlertCircle, CheckCircle, AlertTriangle, ArrowRight, ShieldX, Printer, Shield, Zap, TrendingUp, Globe, Building2, Brain, Clock, Target, BarChart3, Database, Cpu, ScanLine, FileSearch, Lock, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -524,16 +524,6 @@ const ViabilitySearchSection = ({ compact = false }: { compact?: boolean }) => {
     navigate('/registrar');
   };
 
-  const getResultStyles = (level: ViabilityLevel) => {
-    switch (level) {
-      case "high": return { icon: CheckCircle, bgClass: "bg-accent/10 border-accent/30", iconClass: "text-accent", textClass: "text-accent" };
-      case "medium": return { icon: AlertTriangle, bgClass: "bg-yellow-500/10 border-yellow-500/30", iconClass: "text-yellow-500", textClass: "text-yellow-500" };
-      case "low": return { icon: AlertCircle, bgClass: "bg-destructive/10 border-destructive/30", iconClass: "text-destructive", textClass: "text-destructive" };
-      case "blocked": return { icon: ShieldX, bgClass: "bg-destructive/20 border-destructive/50", iconClass: "text-destructive", textClass: "text-destructive" };
-      default: return { icon: Search, bgClass: "", iconClass: "", textClass: "" };
-    }
-  };
-
   const getRegistrarResultConfig = (level: ViabilityResult["level"]) => {
     switch (level) {
       case "high": return { icon: CheckCircle, gradient: "from-emerald-500/10 to-emerald-600/5", border: "border-emerald-500/30", iconColor: "text-emerald-500", badgeBg: "bg-emerald-500/10", badgeText: "text-emerald-600 dark:text-emerald-400", badgeLabel: "ALTA VIABILIDADE", glow: "shadow-emerald-500/10" };
@@ -549,7 +539,7 @@ const ViabilitySearchSection = ({ compact = false }: { compact?: boolean }) => {
     const Icon = config.icon;
 
     return (
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 text-foreground">
         <div className="text-center">
           <motion.span
             initial={{ scale: 0.8, opacity: 0 }}
