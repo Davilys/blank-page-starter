@@ -113,15 +113,69 @@ export function EvidenceGallery({ open, onOpenChange, resourceId, onChanged, onR
     }
     setUploading(true);
     try {
-      const filesB64 = await Promise.all(
-        arr.map(async (f) => ({ name: f.name, type: f.type, base64: await fileToBase64(f) })),
-      );
-      const { data, error } = await supabase.functions.invoke('extract-resource-evidences', {
-        body: { resource_id: resourceId, files: filesB64, ocr: true, party },
-      });
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'Falha ao extrair evidências');
-      toast.success(`${data.count} evidência(s) extraída(s)`);
+      const images = arr.filter((f) => f.type.startsWith('image/'));
+      const pdfs = arr.filter((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
+      let total = 0;
+
+      // Imagens: upload direto ao Storage + insert (evita OOM na edge function).
+      if (images.length > 0) {
+        const { data: existing } = await supabase
+          .from('inpi_resource_evidences' as any)
+          .select('display_order')
+          .eq('resource_id', resourceId)
+          .order('display_order', { ascending: false })
+          .limit(1);
+        let order = (existing && (existing[0] as any)?.display_order)
+          ? (existing[0] as any).display_order + 1
+          : 1;
+
+        for (const f of images) {
+          const ext = (f.type.split('/')[1] || 'png').toLowerCase();
+          const path = `${resourceId}/${crypto.randomUUID()}.${ext}`;
+          const { error: upErr } = await supabase.storage
+            .from('inpi-resource-evidence')
+            .upload(path, f, { contentType: f.type, upsert: false });
+          if (upErr) {
+            console.warn('upload img err:', upErr.message);
+            continue;
+          }
+          const { error: insErr } = await supabase.from('inpi_resource_evidences' as any).insert({
+            resource_id: resourceId,
+            storage_path: path,
+            page_number: null,
+            source_file_name: f.name,
+            mime_type: f.type,
+            caption: f.name,
+            ocr_text: '',
+            placement: 'inline',
+            display_order: order++,
+            included: true,
+            party,
+          });
+          if (!insErr) total++;
+        }
+      }
+
+      // PDFs: continuam via edge function (extrai imagens embutidas), 1 por vez.
+      for (const f of pdfs) {
+        const base64 = await fileToBase64(f);
+        const { data, error } = await supabase.functions.invoke('extract-resource-evidences', {
+          body: {
+            resource_id: resourceId,
+            files: [{ name: f.name, type: f.type, base64 }],
+            ocr: true,
+            party,
+          },
+        });
+        if (error) {
+          console.error(error);
+          toast.error(`Falha ao processar ${f.name}`);
+          continue;
+        }
+        if (data?.success) total += data.count || 0;
+      }
+
+      toast.success(`${total} evidência(s) adicionada(s)`);
       await fetchRows();
     } catch (e) {
       console.error(e);
