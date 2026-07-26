@@ -217,7 +217,7 @@ async function maybeReplaceFilePartsWithFileIds(
   sourceFiles: Array<{ base64: string; type: string; name?: string }>,
 ): Promise<string[]> {
   const failedFiles: string[] = [];
-  if (fileParts.length === 0 || sourceFiles.length !== fileParts.length) return;
+  if (fileParts.length === 0 || sourceFiles.length !== fileParts.length) return failedFiles;
 
   for (let i = 0; i < fileParts.length; i++) {
     const part = fileParts[i];
@@ -252,6 +252,42 @@ async function maybeReplaceFilePartsWithFileIds(
   }
 
   return failedFiles;
+}
+
+function appendUploadOnlyFilePart(
+  fileParts: any[],
+  sourceFiles: Array<{ base64: string; type: string; name?: string }>,
+  file: { base64?: string; type?: string; name?: string },
+  fallbackName: string,
+) {
+  if (!file?.base64 || !file?.type) return;
+  const filename = file.name || fallbackName;
+  if (file.type === 'application/pdf') {
+    fileParts.push({ type: 'file', file: { filename } });
+    sourceFiles.push({ base64: file.base64, type: 'application/pdf', name: filename });
+  } else if (file.type.startsWith('image/')) {
+    fileParts.push({ type: 'image_url', image_url: { filename } });
+    sourceFiles.push({ base64: file.base64, type: file.type, name: filename });
+  }
+}
+
+async function uploadAndPrepareFileParts(
+  apiKey: string,
+  fileParts: any[],
+  sourceFiles: Array<{ base64: string; type: string; name?: string }>,
+  originalFiles?: any[],
+): Promise<any[]> {
+  const failedFiles = await maybeReplaceFilePartsWithFileIds(apiKey, fileParts, sourceFiles);
+  for (const src of sourceFiles) src.base64 = '';
+  if (Array.isArray(originalFiles)) {
+    for (const file of originalFiles) {
+      if (file) file.base64 = '';
+    }
+  }
+  if (failedFiles.length > 0) {
+    throw new Error(`Não foi possível preparar estes anexos para a IA: ${failedFiles.join(', ')}`);
+  }
+  return convertToResponsesFormat(fileParts);
 }
 
 // ═══════════════════════════════════════════════════════════
