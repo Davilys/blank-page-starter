@@ -1176,18 +1176,17 @@ serve(async (req) => {
       const { notificanteData, notificadoData, userInstructions, files } = body;
       const systemPrompt = buildNotificacaoPrompt(currentDate, notificanteData || {}, notificadoData || {}, userInstructions || '', agentStrategy, agentName);
       
-      const userContent: any[] = [{ type: 'text', text: 'Elabore a NOTIFICAÇÃO EXTRAJUDICIAL COMPLETA com no mínimo 4.000 palavras (10+ páginas).' }];
+      const fileParts: any[] = [];
+      const sourceFilesForUpload: Array<{ base64: string; type: string; name?: string }> = [];
       if (files && Array.isArray(files)) {
-        for (const file of files) {
-          if (file.type === 'application/pdf') {
-            userContent.push({ type: 'file', file: { filename: file.name || 'doc.pdf', file_data: `data:application/pdf;base64,${file.base64}` } });
-          } else if (file.type?.startsWith('image/')) {
-            userContent.push({ type: 'image_url', image_url: { url: `data:${file.type};base64,${file.base64}` } });
-          }
-        }
+        for (const file of files) appendUploadOnlyFilePart(fileParts, sourceFilesForUpload, file, file?.type === 'application/pdf' ? 'doc.pdf' : 'image');
       }
 
-      const parts = convertToResponsesFormat(userContent);
+      const parts = [
+        { type: 'input_text', text: 'Elabore a NOTIFICAÇÃO EXTRAJUDICIAL COMPLETA com no mínimo 4.000 palavras (10+ páginas).' },
+        ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
+      ];
+      if (body) body.files = undefined;
       const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25);
       if (result.error) {
         return new Response(JSON.stringify({ error: `Erro IA: ${result.status}` }), { status: result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -1291,27 +1290,18 @@ ${userInstructions ? '#instrucoes_adicionais_do_usuario\n' + userInstructions : 
 Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000 palavras). SEM JSON. SEM explicações.`;
 
       // Build user content parts for OpenAI Responses API
-      const userContent: any[] = [
-        { type: 'text', text: 'Analise a NOTIFICAÇÃO EXTRAJUDICIAL anexada e elabore uma RESPOSTA/DEFESA JURÍDICA COMPLETA com no mínimo 4.000 palavras, refutando todas as alegações do notificante.' }
-      ];
+      const fileParts: any[] = [];
+      const sourceFilesForUpload: Array<{ base64: string; type: string; name?: string }> = [];
 
       if (files && Array.isArray(files)) {
-        for (const file of files) {
-          if (file.type === 'application/pdf') {
-            userContent.push({
-              type: 'file',
-              file: { filename: file.name || 'notificacao.pdf', file_data: `data:application/pdf;base64,${file.base64}` }
-            });
-          } else if (file.type?.startsWith('image/')) {
-            userContent.push({
-              type: 'image_url',
-              image_url: { url: `data:${file.type};base64,${file.base64}` }
-            });
-          }
-        }
+        for (const file of files) appendUploadOnlyFilePart(fileParts, sourceFilesForUpload, file, file?.type === 'application/pdf' ? 'notificacao.pdf' : 'image');
       }
 
-      const parts = convertToResponsesFormat(userContent);
+      const parts = [
+        { type: 'input_text', text: 'Analise a NOTIFICAÇÃO EXTRAJUDICIAL anexada e elabore uma RESPOSTA/DEFESA JURÍDICA COMPLETA com no mínimo 4.000 palavras, refutando todas as alegações do notificante.' },
+        ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
+      ];
+      if (body) body.files = undefined;
       const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000);
       
       if (result.error) {
@@ -1345,18 +1335,17 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
       const pData = procuradorData || {};
       const systemPrompt = buildProcuradorPrompt(currentDate, pData, resourceType, agentStrategy, agentName);
       
-      const userContent: any[] = [{ type: 'text', text: 'Elabore a PETIÇÃO COMPLETA.' }];
+      const fileParts: any[] = [];
+      const sourceFilesForUpload: Array<{ base64: string; type: string; name?: string }> = [];
       if (files && Array.isArray(files)) {
-        for (const file of files) {
-          if (file.type === 'application/pdf') {
-            userContent.push({ type: 'file', file: { filename: file.name || 'doc.pdf', file_data: `data:application/pdf;base64,${file.base64}` } });
-          } else if (file.type?.startsWith('image/')) {
-            userContent.push({ type: 'image_url', image_url: { url: `data:${file.type};base64,${file.base64}` } });
-          }
-        }
+        for (const file of files) appendUploadOnlyFilePart(fileParts, sourceFilesForUpload, file, file?.type === 'application/pdf' ? 'doc.pdf' : 'image');
       }
 
-      const parts = convertToResponsesFormat(userContent);
+      const parts = [
+        { type: 'input_text', text: 'Elabore a PETIÇÃO COMPLETA.' },
+        ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
+      ];
+      if (body) body.files = undefined;
       const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25);
       if (result.error) {
         return new Response(JSON.stringify({ error: `Erro IA: ${result.status}` }), { status: result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
