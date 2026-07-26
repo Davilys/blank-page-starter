@@ -208,36 +208,86 @@ async function uploadFileToOpenAI(
 }
 
 // Upload each attached file once and convert fileParts to reference file_id.
-// Falls back to base64 embedding if upload fails (backwards compatible).
+// IMPORTANT: never fall back to embedding base64 in the Responses payload.
+// Base64 data URLs duplicate large strings in memory and are the root cause of
+// WORKER_RESOURCE_LIMIT for this function.
 async function maybeReplaceFilePartsWithFileIds(
   apiKey: string,
   fileParts: any[],
   sourceFiles: Array<{ base64: string; type: string; name?: string }>,
-): Promise<void> {
-  if (fileParts.length === 0 || sourceFiles.length !== fileParts.length) return;
-  await Promise.all(
-    fileParts.map(async (part, i) => {
-      const src = sourceFiles[i];
-      if (!src?.base64 || !src?.type) return;
-      try {
-        const bytes = base64ToUint8Array(src.base64);
-        const filename = src.name || (part.type === 'file' ? part.file.filename : 'image');
-        const fileId = await uploadFileToOpenAI(apiKey, bytes, filename, src.type);
-        if (!fileId) return;
-        if (part.type === 'file') {
-          part.file = { filename, file_id: fileId };
-        } else if (part.type === 'image_url') {
-          part.image_url = { file_id: fileId };
-        }
-        // Free the base64 payload as soon as OpenAI has the file — otherwise
-        // the raw string stays pinned in memory across the 3 parallel calls
-        // below and blows the edge-function memory budget (WORKER_RESOURCE_LIMIT).
-        src.base64 = '';
-      } catch (e) {
-        console.warn('file_id swap failed:', (e as Error).message);
+): Promise<string[]> {
+  const failedFiles: string[] = [];
+  if (fileParts.length === 0 || sourceFiles.length !== fileParts.length) return failedFiles;
+
+  for (let i = 0; i < fileParts.length; i++) {
+    const part = fileParts[i];
+    const src = sourceFiles[i];
+    const filename = src?.name || (part.type === 'file' ? part.file?.filename : 'image');
+    if (!src?.base64 || !src?.type) {
+      failedFiles.push(filename || `arquivo-${i + 1}`);
+      continue;
+    }
+
+    try {
+      const bytes = base64ToUint8Array(src.base64);
+      // Drop the request's base64 string before the network request starts;
+      // the Uint8Array is the only large buffer alive for this file now.
+      src.base64 = '';
+
+      const fileId = await uploadFileToOpenAI(apiKey, bytes, filename || `arquivo-${i + 1}`, src.type);
+      if (!fileId) {
+        failedFiles.push(filename || `arquivo-${i + 1}`);
+        continue;
       }
-    }),
-  );
+
+      if (part.type === 'file') {
+        part.file = { filename, file_id: fileId };
+      } else if (part.type === 'image_url') {
+        part.image_url = { file_id: fileId };
+      }
+    } catch (e) {
+      console.warn('file_id swap failed:', (e as Error).message);
+      failedFiles.push(filename || `arquivo-${i + 1}`);
+    }
+  }
+
+  return failedFiles;
+}
+
+function appendUploadOnlyFilePart(
+  fileParts: any[],
+  sourceFiles: Array<{ base64: string; type: string; name?: string }>,
+  file: { base64?: string; type?: string; name?: string },
+  fallbackName: string,
+) {
+  if (!file?.base64 || !file?.type) return;
+  const filename = file.name || fallbackName;
+  if (file.type === 'application/pdf') {
+    fileParts.push({ type: 'file', file: { filename } });
+    sourceFiles.push({ base64: file.base64, type: 'application/pdf', name: filename });
+  } else if (file.type.startsWith('image/')) {
+    fileParts.push({ type: 'image_url', image_url: { filename } });
+    sourceFiles.push({ base64: file.base64, type: file.type, name: filename });
+  }
+}
+
+async function uploadAndPrepareFileParts(
+  apiKey: string,
+  fileParts: any[],
+  sourceFiles: Array<{ base64: string; type: string; name?: string }>,
+  originalFiles?: any[],
+): Promise<any[]> {
+  const failedFiles = await maybeReplaceFilePartsWithFileIds(apiKey, fileParts, sourceFiles);
+  for (const src of sourceFiles) src.base64 = '';
+  if (Array.isArray(originalFiles)) {
+    for (const file of originalFiles) {
+      if (file) file.base64 = '';
+    }
+  }
+  if (failedFiles.length > 0) {
+    throw new Error(`Não foi possível preparar estes anexos para a IA: ${failedFiles.join(', ')}`);
+  }
+  return convertToResponsesFormat(fileParts);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1126,18 +1176,17 @@ serve(async (req) => {
       const { notificanteData, notificadoData, userInstructions, files } = body;
       const systemPrompt = buildNotificacaoPrompt(currentDate, notificanteData || {}, notificadoData || {}, userInstructions || '', agentStrategy, agentName);
       
-      const userContent: any[] = [{ type: 'text', text: 'Elabore a NOTIFICAÇÃO EXTRAJUDICIAL COMPLETA com no mínimo 4.000 palavras (10+ páginas).' }];
+      const fileParts: any[] = [];
+      const sourceFilesForUpload: Array<{ base64: string; type: string; name?: string }> = [];
       if (files && Array.isArray(files)) {
-        for (const file of files) {
-          if (file.type === 'application/pdf') {
-            userContent.push({ type: 'file', file: { filename: file.name || 'doc.pdf', file_data: `data:application/pdf;base64,${file.base64}` } });
-          } else if (file.type?.startsWith('image/')) {
-            userContent.push({ type: 'image_url', image_url: { url: `data:${file.type};base64,${file.base64}` } });
-          }
-        }
+        for (const file of files) appendUploadOnlyFilePart(fileParts, sourceFilesForUpload, file, file?.type === 'application/pdf' ? 'doc.pdf' : 'image');
       }
 
-      const parts = convertToResponsesFormat(userContent);
+      const parts = [
+        { type: 'input_text', text: 'Elabore a NOTIFICAÇÃO EXTRAJUDICIAL COMPLETA com no mínimo 4.000 palavras (10+ páginas).' },
+        ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
+      ];
+      if (body) body.files = undefined;
       const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25);
       if (result.error) {
         return new Response(JSON.stringify({ error: `Erro IA: ${result.status}` }), { status: result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -1241,27 +1290,18 @@ ${userInstructions ? '#instrucoes_adicionais_do_usuario\n' + userInstructions : 
 Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000 palavras). SEM JSON. SEM explicações.`;
 
       // Build user content parts for OpenAI Responses API
-      const userContent: any[] = [
-        { type: 'text', text: 'Analise a NOTIFICAÇÃO EXTRAJUDICIAL anexada e elabore uma RESPOSTA/DEFESA JURÍDICA COMPLETA com no mínimo 4.000 palavras, refutando todas as alegações do notificante.' }
-      ];
+      const fileParts: any[] = [];
+      const sourceFilesForUpload: Array<{ base64: string; type: string; name?: string }> = [];
 
       if (files && Array.isArray(files)) {
-        for (const file of files) {
-          if (file.type === 'application/pdf') {
-            userContent.push({
-              type: 'file',
-              file: { filename: file.name || 'notificacao.pdf', file_data: `data:application/pdf;base64,${file.base64}` }
-            });
-          } else if (file.type?.startsWith('image/')) {
-            userContent.push({
-              type: 'image_url',
-              image_url: { url: `data:${file.type};base64,${file.base64}` }
-            });
-          }
-        }
+        for (const file of files) appendUploadOnlyFilePart(fileParts, sourceFilesForUpload, file, file?.type === 'application/pdf' ? 'notificacao.pdf' : 'image');
       }
 
-      const parts = convertToResponsesFormat(userContent);
+      const parts = [
+        { type: 'input_text', text: 'Analise a NOTIFICAÇÃO EXTRAJUDICIAL anexada e elabore uma RESPOSTA/DEFESA JURÍDICA COMPLETA com no mínimo 4.000 palavras, refutando todas as alegações do notificante.' },
+        ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
+      ];
+      if (body) body.files = undefined;
       const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000);
       
       if (result.error) {
@@ -1295,18 +1335,17 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
       const pData = procuradorData || {};
       const systemPrompt = buildProcuradorPrompt(currentDate, pData, resourceType, agentStrategy, agentName);
       
-      const userContent: any[] = [{ type: 'text', text: 'Elabore a PETIÇÃO COMPLETA.' }];
+      const fileParts: any[] = [];
+      const sourceFilesForUpload: Array<{ base64: string; type: string; name?: string }> = [];
       if (files && Array.isArray(files)) {
-        for (const file of files) {
-          if (file.type === 'application/pdf') {
-            userContent.push({ type: 'file', file: { filename: file.name || 'doc.pdf', file_data: `data:application/pdf;base64,${file.base64}` } });
-          } else if (file.type?.startsWith('image/')) {
-            userContent.push({ type: 'image_url', image_url: { url: `data:${file.type};base64,${file.base64}` } });
-          }
-        }
+        for (const file of files) appendUploadOnlyFilePart(fileParts, sourceFilesForUpload, file, file?.type === 'application/pdf' ? 'doc.pdf' : 'image');
       }
 
-      const parts = convertToResponsesFormat(userContent);
+      const parts = [
+        { type: 'input_text', text: 'Elabore a PETIÇÃO COMPLETA.' },
+        ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
+      ];
+      if (body) body.files = undefined;
       const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25);
       if (result.error) {
         return new Response(JSON.stringify({ error: `Erro IA: ${result.status}` }), { status: result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -1385,22 +1424,10 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
     const sourceFilesForUpload: Array<{ base64: string; type: string; name?: string }> = [];
     if (multiFiles && multiFiles.length > 0) {
       for (const file of multiFiles) {
-        if (file.type === 'application/pdf') {
-          fileParts.push({ type: 'file', file: { filename: file.name || 'doc.pdf', file_data: `data:application/pdf;base64,${file.base64}` } });
-          sourceFilesForUpload.push({ base64: file.base64, type: 'application/pdf', name: file.name || 'doc.pdf' });
-        } else {
-          fileParts.push({ type: 'image_url', image_url: { url: `data:${file.type};base64,${file.base64}` } });
-          sourceFilesForUpload.push({ base64: file.base64, type: file.type, name: file.name || 'image' });
-        }
+        appendUploadOnlyFilePart(fileParts, sourceFilesForUpload, file, file?.type === 'application/pdf' ? 'doc.pdf' : 'image');
       }
     } else if (fileBase64 && fileType) {
-      if (fileType === 'application/pdf') {
-        fileParts.push({ type: 'file', file: { filename: 'documento_inpi.pdf', file_data: `data:application/pdf;base64,${fileBase64}` } });
-        sourceFilesForUpload.push({ base64: fileBase64, type: 'application/pdf', name: 'documento_inpi.pdf' });
-      } else {
-        fileParts.push({ type: 'image_url', image_url: { url: `data:${fileType};base64,${fileBase64}` } });
-        sourceFilesForUpload.push({ base64: fileBase64, type: fileType, name: 'image' });
-      }
+      appendUploadOnlyFilePart(fileParts, sourceFilesForUpload, { base64: fileBase64, type: fileType, name: fileType === 'application/pdf' ? 'documento_inpi.pdf' : 'image' }, fileType === 'application/pdf' ? 'documento_inpi.pdf' : 'image');
     } else if (requestedPass !== 'pass2') {
       return new Response(JSON.stringify({ error: 'Nenhum arquivo fornecido' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -1409,7 +1436,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
     // the file_id across extraction + pass1 + pass2. Cuts total payload
     // by ~66% and slashes generation latency.
     console.time('file_upload_dedupe');
-    await maybeReplaceFilePartsWithFileIds(OPENAI_API_KEY, fileParts, sourceFilesForUpload);
+    const failedUploads = await maybeReplaceFilePartsWithFileIds(OPENAI_API_KEY, fileParts, sourceFilesForUpload);
     console.timeEnd('file_upload_dedupe');
     // Drop every base64 reference now that OpenAI has the files. Keeping these
     // strings alive during the 3 parallel model calls below is what triggers
@@ -1419,6 +1446,9 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
       for (const f of multiFiles) { if (f) f.base64 = ''; }
     }
     if (body) { body.fileBase64 = ''; body.files = undefined; }
+    if (failedUploads.length > 0) {
+      return new Response(JSON.stringify({ error: `Não foi possível preparar estes anexos para a IA: ${failedUploads.join(', ')}` }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     const fileResponseParts = convertToResponsesFormat(fileParts);
 
     // ─────────────────────────────────────────────────────
@@ -1538,7 +1568,9 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     const [extractionResult, pass1Result, pass2Result] = await Promise.all([
       callOpenAI(OPENAI_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, 800, 0.1, 60000),
       callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 9000, 0.25),
-      shouldRunPass2Now ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25) : Promise.resolve({ content: '' }),
+      shouldRunPass2Now
+        ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25)
+        : Promise.resolve({ content: '', error: undefined as string | undefined, status: undefined as number | undefined }),
     ]);
     console.timeEnd('ai_generation');
 
