@@ -886,6 +886,9 @@ const ViabilitySearchSection = ({ compact = false }: { compact?: boolean }) => {
               animate={{ opacity: 1, y: 0 }}
               className="rounded-2xl border border-border/60 bg-card/70 backdrop-blur-sm shadow-md p-8"
             >
+              {renderRegistrarStyleResult(result)}
+              {false && (
+                <>
               {/* Official Badge */}
               <div className="flex justify-center mb-5">
                 <span className="bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium border border-primary/20">
@@ -1057,6 +1060,8 @@ const ViabilitySearchSection = ({ compact = false }: { compact?: boolean }) => {
                   Fazer nova consulta
                 </button>
               </div>
+                </>
+              )}
             </motion.div>
           )}
           </AnimatePresence>
