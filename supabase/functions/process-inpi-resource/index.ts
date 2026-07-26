@@ -215,31 +215,25 @@ async function maybeReplaceFilePartsWithFileIds(
   sourceFiles: Array<{ base64: string; type: string; name?: string }>,
 ): Promise<void> {
   if (fileParts.length === 0 || sourceFiles.length !== fileParts.length) return;
-  // Serialize uploads to avoid holding N decoded byte arrays in memory
-  // simultaneously (edge-runtime has a strict 256MB cap). Free the
-  // source base64 string as soon as the file_id swap succeeds so the
-  // duplicated data URL inside fileParts can also be dropped.
-  for (let i = 0; i < fileParts.length; i++) {
-    const part = fileParts[i];
-    const src = sourceFiles[i];
-    if (!src?.base64 || !src?.type) continue;
-    try {
-      const bytes = base64ToUint8Array(src.base64);
-      const filename = src.name || (part.type === 'file' ? part.file.filename : 'image');
-      const fileId = await uploadFileToOpenAI(apiKey, bytes, filename, src.type);
-      if (!fileId) continue;
-      if (part.type === 'file') {
-        part.file = { filename, file_id: fileId };
-      } else if (part.type === 'image_url') {
-        part.image_url = { file_id: fileId };
+  await Promise.all(
+    fileParts.map(async (part, i) => {
+      const src = sourceFiles[i];
+      if (!src?.base64 || !src?.type) return;
+      try {
+        const bytes = base64ToUint8Array(src.base64);
+        const filename = src.name || (part.type === 'file' ? part.file.filename : 'image');
+        const fileId = await uploadFileToOpenAI(apiKey, bytes, filename, src.type);
+        if (!fileId) return;
+        if (part.type === 'file') {
+          part.file = { filename, file_id: fileId };
+        } else if (part.type === 'image_url') {
+          part.image_url = { file_id: fileId };
+        }
+      } catch (e) {
+        console.warn('file_id swap failed:', (e as Error).message);
       }
-      // Release memory: drop the base64 copy in sourceFiles now that
-      // OpenAI holds the bytes and fileParts references the file_id.
-      src.base64 = '';
-    } catch (e) {
-      console.warn('file_id swap failed:', (e as Error).message);
-    }
-  }
+    }),
+  );
 }
 
 // ═══════════════════════════════════════════════════════════
