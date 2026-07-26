@@ -208,36 +208,50 @@ async function uploadFileToOpenAI(
 }
 
 // Upload each attached file once and convert fileParts to reference file_id.
-// Falls back to base64 embedding if upload fails (backwards compatible).
+// IMPORTANT: never fall back to embedding base64 in the Responses payload.
+// Base64 data URLs duplicate large strings in memory and are the root cause of
+// WORKER_RESOURCE_LIMIT for this function.
 async function maybeReplaceFilePartsWithFileIds(
   apiKey: string,
   fileParts: any[],
   sourceFiles: Array<{ base64: string; type: string; name?: string }>,
-): Promise<void> {
+): Promise<string[]> {
+  const failedFiles: string[] = [];
   if (fileParts.length === 0 || sourceFiles.length !== fileParts.length) return;
-  await Promise.all(
-    fileParts.map(async (part, i) => {
-      const src = sourceFiles[i];
-      if (!src?.base64 || !src?.type) return;
-      try {
-        const bytes = base64ToUint8Array(src.base64);
-        const filename = src.name || (part.type === 'file' ? part.file.filename : 'image');
-        const fileId = await uploadFileToOpenAI(apiKey, bytes, filename, src.type);
-        if (!fileId) return;
-        if (part.type === 'file') {
-          part.file = { filename, file_id: fileId };
-        } else if (part.type === 'image_url') {
-          part.image_url = { file_id: fileId };
-        }
-        // Free the base64 payload as soon as OpenAI has the file — otherwise
-        // the raw string stays pinned in memory across the 3 parallel calls
-        // below and blows the edge-function memory budget (WORKER_RESOURCE_LIMIT).
-        src.base64 = '';
-      } catch (e) {
-        console.warn('file_id swap failed:', (e as Error).message);
+
+  for (let i = 0; i < fileParts.length; i++) {
+    const part = fileParts[i];
+    const src = sourceFiles[i];
+    const filename = src?.name || (part.type === 'file' ? part.file?.filename : 'image');
+    if (!src?.base64 || !src?.type) {
+      failedFiles.push(filename || `arquivo-${i + 1}`);
+      continue;
+    }
+
+    try {
+      const bytes = base64ToUint8Array(src.base64);
+      // Drop the request's base64 string before the network request starts;
+      // the Uint8Array is the only large buffer alive for this file now.
+      src.base64 = '';
+
+      const fileId = await uploadFileToOpenAI(apiKey, bytes, filename || `arquivo-${i + 1}`, src.type);
+      if (!fileId) {
+        failedFiles.push(filename || `arquivo-${i + 1}`);
+        continue;
       }
-    }),
-  );
+
+      if (part.type === 'file') {
+        part.file = { filename, file_id: fileId };
+      } else if (part.type === 'image_url') {
+        part.image_url = { file_id: fileId };
+      }
+    } catch (e) {
+      console.warn('file_id swap failed:', (e as Error).message);
+      failedFiles.push(filename || `arquivo-${i + 1}`);
+    }
+  }
+
+  return failedFiles;
 }
 
 // ═══════════════════════════════════════════════════════════
