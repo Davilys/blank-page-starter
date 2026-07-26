@@ -1411,6 +1411,14 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
     console.time('file_upload_dedupe');
     await maybeReplaceFilePartsWithFileIds(OPENAI_API_KEY, fileParts, sourceFilesForUpload);
     console.timeEnd('file_upload_dedupe');
+    // Drop every base64 reference now that OpenAI has the files. Keeping these
+    // strings alive during the 3 parallel model calls below is what triggers
+    // WORKER_RESOURCE_LIMIT on multi-file requests.
+    for (const s of sourceFilesForUpload) s.base64 = '';
+    if (Array.isArray(multiFiles)) {
+      for (const f of multiFiles) { if (f) f.base64 = ''; }
+    }
+    if (body) { body.fileBase64 = ''; body.files = undefined; }
     const fileResponseParts = convertToResponsesFormat(fileParts);
 
     // ─────────────────────────────────────────────────────
