@@ -83,9 +83,9 @@ const BenefitsSection = () => {
                   Certificado de Registro
                 </p>
                 <h3 className="mt-1 font-display text-2xl font-black tracking-tight text-foreground md:text-[26px]">
-                  VITALUX Comércio LTDA.
+                  WebMarcas INTELLIGENCE PI · Ldta.
                 </h3>
-                <p className="mt-0.5 text-xs text-muted-foreground">Classe 25 · Vestuário e calçados</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Classe 45; Serviços jurídicos</p>
               </div>
 
               {/* progress */}
