@@ -130,7 +130,7 @@ const BenefitsSection = () => {
               size={140}
               mainText="10"
               subText="ANOS"
-              className="absolute -top-16 -right-4 z-10 sm:-top-20 sm:-right-6 md:-top-24 md:w-[160px] md:h-[160px] scale-80 md:scale-100 origin-top-right"
+              className="absolute -top-16 -right-4 z-10 sm:-top-20 sm:-right-6 md:-top-24 md:w-[160px] md:h-[160px] scale-[0.8] md:scale-100 origin-top-right"
             />
           </div>
 
