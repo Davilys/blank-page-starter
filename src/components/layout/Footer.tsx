@@ -1,5 +1,6 @@
 import { Mail, Phone, MapPin, Instagram, Linkedin, Facebook, Youtube, MapPinned } from "lucide-react";
 import webmarcasLogoMark from "@/assets/webmarcas-logo-mark.webp";
+import reclameAquiBadge from "@/assets/reclame-aqui-badge.webp";
 import { Link } from "react-router-dom";
 
 import { useLanguage } from "@/contexts/LanguageContext";
