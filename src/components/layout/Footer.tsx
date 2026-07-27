@@ -1,5 +1,6 @@
 import { Mail, Phone, MapPin, Instagram, Linkedin, Facebook, Youtube, MapPinned } from "lucide-react";
 import webmarcasLogoMark from "@/assets/webmarcas-logo-mark.webp";
+import reclameAquiBadge from "@/assets/reclame-aqui-badge.webp";
 import { Link } from "react-router-dom";
 
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -106,6 +107,22 @@ const Footer = () => {
                 <MapPinned className="w-5 h-5" />
               </a>
             </div>
+
+            <a
+              href="https://www.reclameaqui.com.br"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="WebMarcas no Reclame Aqui"
+              className="inline-block mt-5 rounded-lg bg-white p-1.5 shadow-md hover:shadow-lg transition-shadow"
+            >
+              <img
+                src={reclameAquiBadge}
+                alt="Verificada por Reclame AQUI"
+                className="h-14 w-auto rounded-md"
+                width="60"
+                height="60"
+              />
+            </a>
           </div>
 
           {/* Links */}
