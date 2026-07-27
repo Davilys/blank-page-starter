@@ -98,7 +98,7 @@ const HeroSection = () => {
             {/* 48h floating seal */}
             <Seal48h
               size={144}
-              className="absolute -top-20 -right-4 sm:-top-24 sm:-right-6 md:-top-28 md:-right-10 z-20"
+              className="absolute -top-20 -right-4 sm:-top-24 sm:-right-6 md:-top-28 md:-right-10 z-20 scale-80 lg:scale-100 origin-top-right"
             />
             <div className="relative rounded-[2rem] bg-white p-6 md:p-8 shadow-[0_28px_70px_-16px_rgba(11,22,60,0.4)]">
               <ViabilitySearchSection compact />
