@@ -76,25 +76,16 @@ WhatsApp: (11) 91112-0225`;
 
 function generateWhatsAppTemplate(client: ServiceActionPanelProps['client'], _stage: ServiceActionPanelProps['stage'], valor: number): string {
   const nome = client.full_name || 'Cliente';
-  const marca = client.brand_name || 'sua marca';
   const primeiroNome = nome.split(' ')[0];
-  const numero = client.process_number?.trim();
-  const trechoNumero = numero ? `, sob o número ${numero}` : '';
   return `Olá, ${primeiroNome}, tudo bem?
 
-Preciso te passar uma atualização importante sobre o seu processo no INPI…
+Estou entrando em contato porque houve uma atualização importante no seu processo de registro da marca junto ao INPI hoje.
 
-Informamos que foi publicada uma exigência referente ao processo da marca ${marca}${trechoNumero}, na data de hoje!
+Essa atualização exige uma análise e providências dentro do prazo legal, por isso precisamos conversar com certa urgência para explicar o que aconteceu e quais serão os próximos passos.
 
-Ressaltamos que toda publicação do INPI possui um prazo de 60 (sessenta) dias corridos para cumprimento, contados a partir da data de publicação na Revista da Propriedade Industrial (RPI).
+Qual o melhor dia e horário para agendarmos uma reunião rápida com nossa equipe jurídica?
 
-Para dar continuidade ao processo, solicitamos o pagamento da taxa de serviço no valor de R$ ${fmtValor(valor)}. Vencimento em 10 dias. Segue link da cobrança conforme consta em contrato: [LINK_BOLETO]
-
-Para que eu possa explicar os detalhes da publicação e orientá-lo(a) sobre os próximos passos, preciso agendar uma breve reunião.
-
-Por gentileza, qual o melhor dia e horário para conversarmos?
-
-Fico no aguardo.`;
+Assim poderemos explicar a situação, esclarecer todas as dúvidas e orientar sobre os próximos passos necessários para o seu processo.`;
 }
 
 function generateEmailTemplateSemCobranca(client: ServiceActionPanelProps['client'], stage: ServiceActionPanelProps['stage']): string {
