@@ -74,7 +74,7 @@ www.webmarcas.net
 WhatsApp: (11) 91112-0225`;
 }
 
-function generateWhatsAppTemplate(client: ServiceActionPanelProps['client'], _stage: ServiceActionPanelProps['stage'], valor: number): string {
+function generateWhatsAppTemplate(client: ServiceActionPanelProps['client'], _stage: ServiceActionPanelProps['stage'], _valor: number): string {
   const nome = client.full_name || 'Cliente';
   const primeiroNome = nome.split(' ')[0];
   return `Olá, ${primeiroNome}, tudo bem?
