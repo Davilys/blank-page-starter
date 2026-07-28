@@ -74,9 +74,74 @@ www.webmarcas.net
 WhatsApp: (11) 91112-0225`;
 }
 
-function generateWhatsAppTemplate(client: ServiceActionPanelProps['client'], _stage: ServiceActionPanelProps['stage'], _valor: number): string {
+function generateWhatsAppTemplate(client: ServiceActionPanelProps['client'], stage: ServiceActionPanelProps['stage'], _valor: number): string {
   const nome = client.full_name || 'Cliente';
   const primeiroNome = nome.split(' ')[0];
+
+  switch (stage.id) {
+    case 'exigencia_merito':
+    case 'exigencia_de_mrito':
+      return `Olá, ${primeiroNome}.
+
+*O INPI publicou uma exigência técnica referente ao seu processo.*
+
+Essa etapa exige análise jurídica especializada e pode influenciar diretamente no andamento do registro.
+
+Precisamos conversar dentro do prazo legal, com urgência.
+
+Preciso agendar um reunião urgente, Informe um horário para nossa equipe jurídica entrar em contato.`;
+
+    case 'oposicao':
+      return `Olá, ${primeiroNome}.
+
+Houve uma manifestação de terceiro envolvendo o pedido de registro da sua marca.
+
+Ainda existe possibilidade de defesa, porém o prazo para manifestação é limitado.
+
+Nossa equipe jurídica precisa explicar quais são as alternativas e alinhar a estratégia.
+
+Qual horário fica melhor para conversarmos?`;
+
+    case 'indeferimento':
+    case 'indeferido':
+      return `⚠️ ${primeiroNome}, precisamos falar com urgência.
+
+O INPI publicou uma decisão referente ao seu pedido de registro da marca.
+
+Ainda existe possibilidade de análise das medidas cabíveis, porém os prazos legais começam a contar após a publicação.
+
+Nossa equipe jurídica precisa explicar as opções disponíveis.
+
+Preciso que reponda urgente qual o melhor horário para uma reunião?`;
+
+    case 'deferimento':
+    case 'deferido':
+      return `🎉 ${primeiroNome}, temos uma excelente notícia!
+
+O INPI deferiu o pedido de registro da sua marca.
+
+Agora existe uma nova etapa obrigatória para conclusão do processo.
+
+Vamos agendar uma conversa rápida para explicar os próximos passos?`;
+
+    case 'certificado':
+    case 'certificados':
+      return `Parabéns, ${primeiroNome}!
+
+Sua marca foi registrada pelo INPI.
+
+Gostaríamos de agendar uma reunião rápida para apresentar o certificado, explicar seus direitos e orientar sobre a proteção da marca nos próximos anos.`;
+
+    case 'renovacao':
+      return `Olá, ${primeiroNome}.
+
+Seu registro está se aproximando da etapa de renovação.
+
+Para evitar perda de direitos sobre a marca, nossa equipe precisa orientar você sobre os próximos procedimentos.
+
+Podemos agendar uma conversa?`;
+  }
+
   return `Olá, ${primeiroNome}, tudo bem?
 
 Estou entrando em contato porque houve uma atualização importante no seu processo de registro da marca junto ao INPI hoje.
@@ -156,21 +221,19 @@ WhatsApp: (11) 91112-0225`;
 }
 
 function generateArquivadoWhatsApp(client: ServiceActionPanelProps['client']): string {
-  const marca = client.brand_name?.trim();
-  const numero = client.process_number?.trim();
-  const refs: string[] = [];
-  if (marca) refs.push(`marca "${marca}"`);
-  if (numero) refs.push(`processo nº ${numero}`);
-  const ref = refs.length ? ` (${refs.join(' — ')})` : '';
-  return `Olá, tudo bem?
+  const nome = client.full_name || 'Cliente';
+  const primeiroNome = nome.split(' ')[0];
+  return `Olá, ${primeiroNome}.
 
-Verificamos que o INPI publicou o arquivamento do processo da sua marca${ref}. Precisamos agendar um breve alinhamento com o nosso jurídico para analisar a aplicação da cláusula de garantia contratual e verificar a possibilidade de abertura de um novo processo sem cobrança de novos honorários.
+Identificamos uma atualização importante no seu processo de registro da marca junto ao INPI.
 
-Importante: a garantia é válida para casos de arquivamento por decisão do INPI, não se aplicando quando ocorre perda de prazo para cumprimento de exigência/publicação.
+O processo foi publicado como arquivado, porém isso não significa, necessariamente, o encerramento definitivo do caso.
 
-Qual o melhor horário para conversarmos? 🙏
+Conforme a garantia prevista em seu contrato, nossa equipe jurídica irá analisar a publicação para verificar as medidas cabíveis e, quando aplicável, dar continuidade à garantia contratual.
 
-Equipe WebMarcas`;
+Para isso, precisamos conversar com você o quanto antes.
+
+Responda esta mensagem urgente para agendarmos uma reunião rápida com nossa equipe jurídica e explicar os próximos passos.`;
 }
 
 const DISTRATO_LINK_PLACEHOLDER = '[INSERIR LINK]';
