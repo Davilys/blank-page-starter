@@ -130,13 +130,17 @@ export function EvidenceGallery({ open, onOpenChange, resourceId, onChanged, onR
           : 1;
 
         for (const f of images) {
-          const ext = (f.type.split('/')[1] || 'png').toLowerCase();
+          // Normaliza extensão (evita "jpeg", "svg+xml" quebrarem o path/preview).
+          const rawExt = (f.name.split('.').pop() || f.type.split('/')[1] || 'png').toLowerCase();
+          const ext = rawExt.replace(/[^a-z0-9]/g, '').slice(0, 5) || 'png';
+          const mime = f.type || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
           const path = `${resourceId}/${crypto.randomUUID()}.${ext}`;
           const { error: upErr } = await supabase.storage
             .from('inpi-resource-evidence')
-            .upload(path, f, { contentType: f.type, upsert: false });
+            .upload(path, f, { contentType: mime, upsert: false });
           if (upErr) {
-            console.warn('upload img err:', upErr.message);
+            console.error('upload img err:', upErr);
+            toast.error(`Falha ao enviar ${f.name}: ${upErr.message}`);
             continue;
           }
           const { error: insErr } = await supabase.from('inpi_resource_evidences' as any).insert({
@@ -144,7 +148,7 @@ export function EvidenceGallery({ open, onOpenChange, resourceId, onChanged, onR
             storage_path: path,
             page_number: null,
             source_file_name: f.name,
-            mime_type: f.type,
+            mime_type: mime,
             caption: f.name,
             ocr_text: '',
             placement: 'inline',
@@ -152,7 +156,14 @@ export function EvidenceGallery({ open, onOpenChange, resourceId, onChanged, onR
             included: true,
             party,
           });
-          if (!insErr) total++;
+          if (insErr) {
+            console.error('insert evidence err:', insErr);
+            toast.error(`Falha ao registrar ${f.name}: ${insErr.message}`);
+            // limpa arquivo órfão no storage
+            await supabase.storage.from('inpi-resource-evidence').remove([path]).catch(() => {});
+            continue;
+          }
+          total++;
         }
       }
 
