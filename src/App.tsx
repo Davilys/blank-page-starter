@@ -127,6 +127,13 @@ const ReasoningCoverage = lazyWithRetry(() => import("./pages/intelligence/admin
 const ReasoningSuggestions = lazyWithRetry(() => import("./pages/intelligence/admin/reasoning/ReasoningSuggestions"));
 const ReasoningAudit = lazyWithRetry(() => import("./pages/intelligence/admin/reasoning/ReasoningAudit"));
 
+const PublishingLayout = lazyWithRetry(() => import("./pages/intelligence/admin/publishing/PublishingLayout"));
+const PublishingDashboard = lazyWithRetry(() => import("./pages/intelligence/admin/publishing/PublishingDashboard"));
+const PublishingPipeline = lazyWithRetry(() => import("./pages/intelligence/admin/publishing/PublishingPipeline"));
+const PublishingDetail = lazyWithRetry(() => import("./pages/intelligence/admin/publishing/PublishingDetail"));
+const PublishingPublished = lazyWithRetry(() => import("./pages/intelligence/admin/publishing/PublishingPublished"));
+const PublishingAudit = lazyWithRetry(() => import("./pages/intelligence/admin/publishing/PublishingAudit"));
+
 // Cliente pages
 const ClienteLogin = lazyWithRetry(() => import("./pages/cliente/Login"));
 const ClienteDashboard = lazyWithRetry(() => import("./pages/cliente/Dashboard"));
@@ -290,6 +297,13 @@ const App = () => (
                   <Route path="cobertura" element={<ReasoningCoverage />} />
                   <Route path="sugestoes" element={<ReasoningSuggestions />} />
                   <Route path="auditoria" element={<ReasoningAudit />} />
+                </Route>
+                <Route path="publishing" element={<PublishingLayout />}>
+                  <Route index element={<PublishingDashboard />} />
+                  <Route path="pipeline" element={<PublishingPipeline />} />
+                  <Route path="pipeline/:id" element={<PublishingDetail />} />
+                  <Route path="publicados" element={<PublishingPublished />} />
+                  <Route path="auditoria" element={<PublishingAudit />} />
                 </Route>
                 <Route
                   path="learning"

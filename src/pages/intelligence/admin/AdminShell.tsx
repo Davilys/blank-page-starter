@@ -24,7 +24,9 @@ import {
   ScrollText,
   Radar,
   Radio,
+  Rocket,
   Search,
+  Send,
   ShieldCheck,
   Vault,
 } from "lucide-react";
@@ -57,6 +59,8 @@ const NAV_ITEMS: readonly NavItem[] = [
   { to: "reasoning", label: "Knowledge Reasoning", icon: BrainCircuit, fase: "Fase 10" },
   { to: "reasoning/impacto", label: "Impact & Cascade", icon: Radar, fase: "Fase 10" },
   { to: "reasoning/inconsistencias", label: "Broken Knowledge", icon: Gauge, fase: "Fase 10" },
+  { to: "publishing", label: "Knowledge Publishing", icon: Rocket, fase: "Fase 11" },
+  { to: "publishing/pipeline", label: "Pipeline de publicação", icon: Send, fase: "Fase 11" },
   { to: "learning", label: "Learning", icon: Activity, fase: "Fase 04" },
   { to: "analytics", label: "Analytics", icon: LineChart, fase: "Fase 02" },
   { to: "crawlers", label: "Crawler Center", icon: Bot, fase: "Fase 02" },
