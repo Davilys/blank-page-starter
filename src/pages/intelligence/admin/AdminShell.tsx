@@ -17,6 +17,7 @@ import {
   Gauge,
   Import,
   LineChart,
+  ScrollText,
   Radio,
   ShieldCheck,
 } from "lucide-react";
@@ -34,6 +35,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { to: "factory", label: "Knowledge Factory", icon: Factory, fase: "Fase 06" },
   { to: "factory/objetos", label: "Knowledge Objects", icon: Boxes, fase: "Fase 06" },
   { to: "ingestion", label: "Knowledge Ingestion", icon: Import, fase: "Fase 07" },
+  { to: "fatos", label: "Fact Ledger", icon: ScrollText, fase: "Fase 08" },
   { to: "entidades", label: "Entity Engine", icon: GitBranch, fase: "Fase 01" },
   { to: "autoridade", label: "Authority Engine", icon: ShieldCheck, fase: "Fase 02" },
   { to: "sinais", label: "Signals", icon: Radio, fase: "Fase 02" },
