@@ -26,6 +26,7 @@ import {
   Radio,
   Rocket,
   Search,
+  Send,
   ShieldCheck,
   Vault,
 } from "lucide-react";
