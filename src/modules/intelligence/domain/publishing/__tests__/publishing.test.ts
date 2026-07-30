@@ -91,7 +91,7 @@ describe("HTML e AI readiness", () => {
   it("renderiza HTML semântico com heading principal", () => {
     const html = renderSemanticHtml(draft());
     expect(html).toContain("<article");
-    expect(html).toContain("<h1>");
+    expect(html).toMatch(/<h1[ >]/);
   });
 
   it("pontua legibilidade para IA entre 0 e 100", () => {
