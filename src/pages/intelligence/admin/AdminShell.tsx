@@ -12,6 +12,7 @@ import {
   Boxes,
   BrainCircuit,
   Bot,
+  Factory,
   GitBranch,
   Gauge,
   LineChart,
@@ -29,7 +30,8 @@ interface NavItem {
 
 /** Each entry maps to an engine defined in the constitution. */
 const NAV_ITEMS: readonly NavItem[] = [
-  { to: "objetos", label: "Knowledge Objects", icon: Boxes, fase: "Fase 03" },
+  { to: "factory", label: "Knowledge Factory", icon: Factory, fase: "Fase 06" },
+  { to: "factory/objetos", label: "Knowledge Objects", icon: Boxes, fase: "Fase 06" },
   { to: "entidades", label: "Entity Engine", icon: GitBranch, fase: "Fase 01" },
   { to: "autoridade", label: "Authority Engine", icon: ShieldCheck, fase: "Fase 02" },
   { to: "sinais", label: "Signals", icon: Radio, fase: "Fase 02" },

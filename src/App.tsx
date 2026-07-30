@@ -93,6 +93,10 @@ const IntelligenceAdminHome = lazyWithRetry(() => import("./pages/intelligence/a
 const IntelligenceModulePlaceholder = lazyWithRetry(
   () => import("./pages/intelligence/admin/ModulePlaceholder"),
 );
+// FASE 06 — Knowledge Factory
+const FactoryDashboard = lazyWithRetry(() => import("./pages/intelligence/admin/factory/FactoryDashboard"));
+const FactoryList = lazyWithRetry(() => import("./pages/intelligence/admin/factory/FactoryList"));
+const FactoryEditor = lazyWithRetry(() => import("./pages/intelligence/admin/factory/FactoryEditor"));
 
 // Cliente pages
 const ClienteLogin = lazyWithRetry(() => import("./pages/cliente/Login"));
@@ -195,15 +199,13 @@ const App = () => (
               <Route path="/intelligence" element={<IntelligenceHome />} />
               <Route path="/intelligence/admin" element={<IntelligenceAdminShell />}>
                 <Route index element={<IntelligenceAdminHome />} />
+                <Route path="factory" element={<FactoryDashboard />} />
+                <Route path="factory/objetos" element={<FactoryList />} />
+                <Route path="factory/novo" element={<FactoryEditor />} />
+                <Route path="factory/objetos/:id" element={<FactoryEditor />} />
                 <Route
                   path="objetos"
-                  element={
-                    <IntelligenceModulePlaceholder
-                      titulo="Knowledge Objects"
-                      descricao="Criação, revisão e versionamento dos objetos de conhecimento."
-                      fase="Fase 06"
-                    />
-                  }
+                  element={<Navigate to="/intelligence/admin/factory/objetos" replace />}
                 />
                 <Route
                   path="entidades"
