@@ -106,6 +106,13 @@ const FactsDashboard = lazyWithRetry(() => import("./pages/intelligence/admin/fa
 const FactsList = lazyWithRetry(() => import("./pages/intelligence/admin/facts/FactsList"));
 const FactEditor = lazyWithRetry(() => import("./pages/intelligence/admin/facts/FactEditor"));
 
+const GraphDashboard = lazyWithRetry(() => import("./pages/intelligence/admin/graph/GraphDashboard"));
+const GraphExplorer = lazyWithRetry(() => import("./pages/intelligence/admin/graph/GraphExplorer"));
+const GraphRelations = lazyWithRetry(() => import("./pages/intelligence/admin/graph/GraphRelations"));
+const GraphImpact = lazyWithRetry(() => import("./pages/intelligence/admin/graph/GraphImpact"));
+const GraphNodes = lazyWithRetry(() => import("./pages/intelligence/admin/graph/GraphNodes"));
+const GraphAudit = lazyWithRetry(() => import("./pages/intelligence/admin/graph/GraphAudit"));
+
 // Cliente pages
 const ClienteLogin = lazyWithRetry(() => import("./pages/cliente/Login"));
 const ClienteDashboard = lazyWithRetry(() => import("./pages/cliente/Dashboard"));
@@ -217,6 +224,12 @@ const App = () => (
                 <Route path="fatos" element={<FactsDashboard />} />
                 <Route path="fatos/lista" element={<FactsList />} />
                 <Route path="fatos/:id" element={<FactEditor />} />
+                <Route path="graph" element={<GraphDashboard />} />
+                <Route path="graph/explorer" element={<GraphExplorer />} />
+                <Route path="graph/relacoes" element={<GraphRelations />} />
+                <Route path="graph/impacto" element={<GraphImpact />} />
+                <Route path="graph/nos" element={<GraphNodes />} />
+                <Route path="graph/auditoria" element={<GraphAudit />} />
                 <Route
                   path="objetos"
                   element={<Navigate to="/intelligence/admin/factory/objetos" replace />}
