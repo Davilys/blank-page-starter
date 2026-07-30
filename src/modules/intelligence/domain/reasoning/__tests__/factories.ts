@@ -1,9 +1,10 @@
 /** Fábricas de teste: snapshot mínimo e determinístico para os 7 motores. */
+import { asIsoDateTime } from "../../shared/primitives";
 import type { GraphEdge, EdgeType } from "../../graph/GraphEdge";
 import type { GraphNode, NodeKind } from "../../graph/GraphNode";
 import type { ReasoningSnapshot } from "../snapshot";
 
-const AGORA = "2026-01-15T12:00:00.000Z";
+const AGORA = asIsoDateTime("2026-01-15T12:00:00.000Z");
 
 export const node = (
   id: string,
