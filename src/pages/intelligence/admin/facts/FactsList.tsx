@@ -40,7 +40,7 @@ const FactsList = () => {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-foreground">Fatos verificáveis</h1>
         <Button asChild>
-          <Link to="../fatos/novo">
+          <Link to="/intelligence/admin/fatos/novo">
             <Plus className="mr-1.5 h-4 w-4" /> Novo fato
           </Link>
         </Button>
@@ -123,7 +123,7 @@ const FactsList = () => {
         )}
 
         {items.map(({ fato, confianca }) => (
-          <Link key={fato.id} to={`../fatos/${fato.id}`}>
+          <Link key={fato.id} to={`/intelligence/admin/fatos/${fato.id}`}>
             <Card className="p-4 transition-shadow hover:shadow-md">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="min-w-0 flex-1 truncate font-medium text-foreground">

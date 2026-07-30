@@ -23,10 +23,10 @@ const FactsDashboard = () => {
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline">
-            <Link to="../fatos">Ver fatos</Link>
+            <Link to="/intelligence/admin/fatos/lista">Ver fatos</Link>
           </Button>
           <Button asChild>
-            <Link to="../fatos/novo">
+            <Link to="/intelligence/admin/fatos/novo">
               <Plus className="mr-1.5 h-4 w-4" /> Novo fato
             </Link>
           </Button>
@@ -91,7 +91,7 @@ const FactsDashboard = () => {
               {data.validacoesVencidas.slice(0, 8).map((f) => (
                 <li key={f.id}>
                   <Link
-                    to={`../fatos/${f.id}`}
+                    to={`/intelligence/admin/fatos/${f.id}`}
                     className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm hover:bg-muted"
                   >
                     <span className="flex-1 truncate text-foreground">{f.enunciado}</span>
@@ -116,7 +116,7 @@ const FactsDashboard = () => {
               {data.contradicoes.map((f) => (
                 <li key={f.id}>
                   <Link
-                    to={`../fatos/${f.id}`}
+                    to={`/intelligence/admin/fatos/${f.id}`}
                     className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm hover:bg-muted"
                   >
                     <span className="flex-1 truncate text-foreground">{f.enunciado}</span>
