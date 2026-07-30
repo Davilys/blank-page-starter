@@ -10,14 +10,14 @@ import { activeVersion, healthBand, nextVersion, type PublishedVersion } from ".
 const draft = (over: Partial<KnowledgeDraft> = {}): KnowledgeDraft =>
   ({
     ...emptyDraft(),
-    id: "ko-1",
+    id: "ko-1" as KnowledgeDraft["id"],
     slug: "registro-de-marca",
     titulo: "Registro de marca no INPI",
     descricao: "Guia completo sobre como registrar uma marca junto ao INPI no Brasil.",
-    tipo: "processo",
+    tipo: "procedimento",
     estado: "aprovado",
     categoria: "propriedade-industrial",
-    entidadePrincipal: "ent-inpi",
+    entidadePrincipal: "ent-inpi" as KnowledgeDraft["entidadePrincipal"],
     palavrasChave: ["marca", "inpi", "registro"],
     resumoCurto: "O registro de marca é concedido pelo INPI após exame formal e de mérito.",
     resumoTecnico: "Procedimento administrativo regido pela Lei 9.279/96.",
@@ -38,8 +38,8 @@ const draft = (over: Partial<KnowledgeDraft> = {}): KnowledgeDraft =>
     autorId: "autor-1",
     revisorId: "revisor-1",
     dataRevisao: "2026-01-02T00:00:00.000Z",
-    criadoEm: "2026-01-01T00:00:00.000Z",
-    atualizadoEm: "2026-01-02T00:00:00.000Z",
+    criadoEm: "2026-01-01T00:00:00.000Z" as KnowledgeDraft["criadoEm"],
+    atualizadoEm: "2026-01-02T00:00:00.000Z" as KnowledgeDraft["atualizadoEm"],
     versao: 1,
     ...over,
   }) satisfies KnowledgeDraft;
