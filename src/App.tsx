@@ -117,6 +117,16 @@ const VaultDashboard = lazyWithRetry(() => import("./pages/intelligence/admin/va
 const VaultList = lazyWithRetry(() => import("./pages/intelligence/admin/vault/VaultList"));
 const VaultFactEditor = lazyWithRetry(() => import("./pages/intelligence/admin/vault/VaultFactEditor"));
 
+const ReasoningLayout = lazyWithRetry(() => import("./pages/intelligence/admin/reasoning/ReasoningLayout"));
+const ReasoningDashboard = lazyWithRetry(() => import("./pages/intelligence/admin/reasoning/ReasoningDashboard"));
+const ReasoningImpact = lazyWithRetry(() => import("./pages/intelligence/admin/reasoning/ReasoningImpact"));
+const ReasoningSimulation = lazyWithRetry(() => import("./pages/intelligence/admin/reasoning/ReasoningSimulation"));
+const ReasoningBroken = lazyWithRetry(() => import("./pages/intelligence/admin/reasoning/ReasoningBroken"));
+const ReasoningConfidence = lazyWithRetry(() => import("./pages/intelligence/admin/reasoning/ReasoningConfidence"));
+const ReasoningCoverage = lazyWithRetry(() => import("./pages/intelligence/admin/reasoning/ReasoningCoverage"));
+const ReasoningSuggestions = lazyWithRetry(() => import("./pages/intelligence/admin/reasoning/ReasoningSuggestions"));
+const ReasoningAudit = lazyWithRetry(() => import("./pages/intelligence/admin/reasoning/ReasoningAudit"));
+
 // Cliente pages
 const ClienteLogin = lazyWithRetry(() => import("./pages/cliente/Login"));
 const ClienteDashboard = lazyWithRetry(() => import("./pages/cliente/Dashboard"));
@@ -271,16 +281,16 @@ const App = () => (
                     />
                   }
                 />
-                <Route
-                  path="reasoning"
-                  element={
-                    <IntelligenceModulePlaceholder
-                      titulo="Reasoning"
-                      descricao="Detecção de contradições, lacunas, duplicidade e conteúdo sem fonte."
-                      fase="Fase 08"
-                    />
-                  }
-                />
+                <Route path="reasoning" element={<ReasoningLayout />}>
+                  <Route index element={<ReasoningDashboard />} />
+                  <Route path="impacto" element={<ReasoningImpact />} />
+                  <Route path="simulacao" element={<ReasoningSimulation />} />
+                  <Route path="inconsistencias" element={<ReasoningBroken />} />
+                  <Route path="confianca" element={<ReasoningConfidence />} />
+                  <Route path="cobertura" element={<ReasoningCoverage />} />
+                  <Route path="sugestoes" element={<ReasoningSuggestions />} />
+                  <Route path="auditoria" element={<ReasoningAudit />} />
+                </Route>
                 <Route
                   path="learning"
                   element={
