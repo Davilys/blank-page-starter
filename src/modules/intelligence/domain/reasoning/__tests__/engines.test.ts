@@ -22,8 +22,8 @@ const cadeia = () =>
     nodes: [
       node("raiz", "fact", { entidade: "INPI" }),
       node("meio", "knowledge-object", { entidade: "INPI" }),
-      node("folha", "faq", { entidade: "INPI" }),
-      node("solto", "conceito"),
+      node("folha", "question", { entidade: "INPI" }),
+      node("solto", "concept"),
     ],
     edges: [edge("e1", "meio", "raiz"), edge("e2", "folha", "meio")],
   });
@@ -152,7 +152,13 @@ describe("Engine 7 — Knowledge Suggestions", () => {
   it("gera sugestões estruturais sem IA e sem escrita", () => {
     const s = cadeia();
     const antes = JSON.stringify(s);
-    const sugestoes = generateSuggestions(s, buildIndex(s));
+    const ix = buildIndex(s);
+    const sugestoes = generateSuggestions(
+      s,
+      detectBrokenKnowledge(s, ix),
+      computeConfidence(s, ix),
+      analyzeCoverage(s, ix),
+    );
     expect(Array.isArray(sugestoes)).toBe(true);
     expect(JSON.stringify(s)).toBe(antes);
   });

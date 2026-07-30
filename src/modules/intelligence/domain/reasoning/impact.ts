@@ -43,12 +43,14 @@ export interface ImpactAnalysis {
   readonly severidade: Severity;
 }
 
+/** Buckets de leitura para o painel: material procedimental x conceitual. */
 const KIND_TO_BUCKET: Readonly<Record<string, "guia" | "artigo">> = {
-  guia: "guia",
-  procedimento: "guia",
-  checklist: "guia",
-  artigo: "artigo",
-  conceito: "artigo",
+  manual: "guia",
+  "inpi-act": "guia",
+  service: "guia",
+  concept: "artigo",
+  "glossary-term": "artigo",
+  category: "artigo",
 };
 
 const severity = (diretos: number, peso: number, profundidade: number): Severity => {
