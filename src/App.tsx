@@ -97,6 +97,10 @@ const IntelligenceModulePlaceholder = lazyWithRetry(
 const FactoryDashboard = lazyWithRetry(() => import("./pages/intelligence/admin/factory/FactoryDashboard"));
 const FactoryList = lazyWithRetry(() => import("./pages/intelligence/admin/factory/FactoryList"));
 const FactoryEditor = lazyWithRetry(() => import("./pages/intelligence/admin/factory/FactoryEditor"));
+// FASE 07 — Knowledge Ingestion
+const IngestionDashboard = lazyWithRetry(() => import("./pages/intelligence/admin/ingestion/IngestionDashboard"));
+const IngestionCandidateList = lazyWithRetry(() => import("./pages/intelligence/admin/ingestion/CandidateList"));
+const IngestionCandidateDetail = lazyWithRetry(() => import("./pages/intelligence/admin/ingestion/CandidateDetail"));
 
 // Cliente pages
 const ClienteLogin = lazyWithRetry(() => import("./pages/cliente/Login"));
@@ -203,6 +207,9 @@ const App = () => (
                 <Route path="factory/objetos" element={<FactoryList />} />
                 <Route path="factory/novo" element={<FactoryEditor />} />
                 <Route path="factory/objetos/:id" element={<FactoryEditor />} />
+                <Route path="ingestion" element={<IngestionDashboard />} />
+                <Route path="ingestion/candidatos" element={<IngestionCandidateList />} />
+                <Route path="ingestion/candidatos/:id" element={<IngestionCandidateDetail />} />
                 <Route
                   path="objetos"
                   element={<Navigate to="/intelligence/admin/factory/objetos" replace />}
