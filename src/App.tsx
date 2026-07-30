@@ -113,6 +113,10 @@ const GraphImpact = lazyWithRetry(() => import("./pages/intelligence/admin/graph
 const GraphNodes = lazyWithRetry(() => import("./pages/intelligence/admin/graph/GraphNodes"));
 const GraphAudit = lazyWithRetry(() => import("./pages/intelligence/admin/graph/GraphAudit"));
 
+const VaultDashboard = lazyWithRetry(() => import("./pages/intelligence/admin/vault/VaultDashboard"));
+const VaultList = lazyWithRetry(() => import("./pages/intelligence/admin/vault/VaultList"));
+const VaultFactEditor = lazyWithRetry(() => import("./pages/intelligence/admin/vault/VaultFactEditor"));
+
 // Cliente pages
 const ClienteLogin = lazyWithRetry(() => import("./pages/cliente/Login"));
 const ClienteDashboard = lazyWithRetry(() => import("./pages/cliente/Dashboard"));
@@ -230,6 +234,9 @@ const App = () => (
                 <Route path="graph/impacto" element={<GraphImpact />} />
                 <Route path="graph/nos" element={<GraphNodes />} />
                 <Route path="graph/auditoria" element={<GraphAudit />} />
+                <Route path="vault" element={<VaultDashboard />} />
+                <Route path="vault/fatos" element={<VaultList />} />
+                <Route path="vault/fatos/:id" element={<VaultFactEditor />} />
                 <Route
                   path="objetos"
                   element={<Navigate to="/intelligence/admin/factory/objetos" replace />}

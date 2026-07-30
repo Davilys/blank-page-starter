@@ -26,6 +26,7 @@ import {
   Radio,
   Search,
   ShieldCheck,
+  Vault,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +43,8 @@ const NAV_ITEMS: readonly NavItem[] = [
   { to: "factory/objetos", label: "Knowledge Objects", icon: Boxes, fase: "Fase 06" },
   { to: "ingestion", label: "Knowledge Ingestion", icon: Import, fase: "Fase 07" },
   { to: "fatos", label: "Fact Ledger", icon: ScrollText, fase: "Fase 08" },
+  { to: "vault", label: "Knowledge Vault", icon: Vault, fase: "Fase 08" },
+  { to: "vault/fatos", label: "Busca de fatos", icon: Search, fase: "Fase 08" },
   { to: "graph", label: "Knowledge Graph", icon: Network, fase: "Fase 09" },
   { to: "graph/explorer", label: "Graph Explorer", icon: Search, fase: "Fase 09" },
   { to: "graph/relacoes", label: "Relações", icon: Link2, fase: "Fase 09" },
