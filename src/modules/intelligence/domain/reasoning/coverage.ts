@@ -56,6 +56,8 @@ export const analyzeCoverage = (
   }
   for (const n of snapshot.nodes) {
     if (n.kind === "entity" && n.rotulo?.trim()) nomes.add(n.rotulo.trim());
+    // Qualquer nó marcado com entidade também define uma área de cobertura.
+    if (n.entidade?.trim()) nomes.add(n.entidade.trim());
   }
 
   const entidades: EntityCoverage[] = [...nomes].map((entidade) => {
