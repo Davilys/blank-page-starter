@@ -86,6 +86,14 @@ const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 const Blog = lazyWithRetry(() => import("./pages/Blog"));
 const BlogPost = lazyWithRetry(() => import("./pages/BlogPost"));
 
+// WebMarcas Knowledge OS — isolated Intelligence module (FASE 05)
+const IntelligenceHome = lazyWithRetry(() => import("./pages/intelligence/Home"));
+const IntelligenceAdminShell = lazyWithRetry(() => import("./pages/intelligence/admin/AdminShell"));
+const IntelligenceAdminHome = lazyWithRetry(() => import("./pages/intelligence/admin/AdminHome"));
+const IntelligenceModulePlaceholder = lazyWithRetry(
+  () => import("./pages/intelligence/admin/ModulePlaceholder"),
+);
+
 // Cliente pages
 const ClienteLogin = lazyWithRetry(() => import("./pages/cliente/Login"));
 const ClienteDashboard = lazyWithRetry(() => import("./pages/cliente/Dashboard"));
@@ -182,6 +190,102 @@ const App = () => (
               <Route path="/blog" element={<Blog />} />
               <Route path="/blog/:slug" element={<BlogPost />} />
               <Route path="/termos-de-uso" element={<TermosUso />} />
+
+              {/* ── WebMarcas Knowledge OS (isolado, não afeta rotas existentes) ── */}
+              <Route path="/intelligence" element={<IntelligenceHome />} />
+              <Route path="/intelligence/admin" element={<IntelligenceAdminShell />}>
+                <Route index element={<IntelligenceAdminHome />} />
+                <Route
+                  path="objetos"
+                  element={
+                    <IntelligenceModulePlaceholder
+                      titulo="Knowledge Objects"
+                      descricao="Criação, revisão e versionamento dos objetos de conhecimento."
+                      fase="Fase 06"
+                    />
+                  }
+                />
+                <Route
+                  path="entidades"
+                  element={
+                    <IntelligenceModulePlaceholder
+                      titulo="Entity Engine"
+                      descricao="Entidades canônicas, relações e ancoragem externa (sameAs)."
+                      fase="Fase 06"
+                    />
+                  }
+                />
+                <Route
+                  path="autoridade"
+                  element={
+                    <IntelligenceModulePlaceholder
+                      titulo="Authority Engine"
+                      descricao="Trust Score, Knowledge Authority Score e evolução da autoridade."
+                      fase="Fase 07"
+                    />
+                  }
+                />
+                <Route
+                  path="sinais"
+                  element={
+                    <IntelligenceModulePlaceholder
+                      titulo="Signals Engine"
+                      descricao="Propagação de mudanças a partir de fontes oficiais monitoradas."
+                      fase="Fase 07"
+                    />
+                  }
+                />
+                <Route
+                  path="reasoning"
+                  element={
+                    <IntelligenceModulePlaceholder
+                      titulo="Reasoning"
+                      descricao="Detecção de contradições, lacunas, duplicidade e conteúdo sem fonte."
+                      fase="Fase 08"
+                    />
+                  }
+                />
+                <Route
+                  path="learning"
+                  element={
+                    <IntelligenceModulePlaceholder
+                      titulo="Learning Engine"
+                      descricao="Candidatos gerados por demanda real — sempre com revisão humana."
+                      fase="Fase 08"
+                    />
+                  }
+                />
+                <Route
+                  path="analytics"
+                  element={
+                    <IntelligenceModulePlaceholder
+                      titulo="Analytics"
+                      descricao="Cobertura, frescor e distribuição de confiança das respostas."
+                      fase="Fase 07"
+                    />
+                  }
+                />
+                <Route
+                  path="crawlers"
+                  element={
+                    <IntelligenceModulePlaceholder
+                      titulo="AI Crawler Center"
+                      descricao="Visitas de Googlebot, GPTBot, ClaudeBot e demais agentes."
+                      fase="Fase 07"
+                    />
+                  }
+                />
+                <Route
+                  path="health"
+                  element={
+                    <IntelligenceModulePlaceholder
+                      titulo="AI Health Center"
+                      descricao="AI Readiness e indicadores de saúde do conhecimento."
+                      fase="Fase 07"
+                    />
+                  }
+                />
+              </Route>
               
               {/* Section redirects - handle URLs without # */}
               <Route path="/beneficios" element={<SectionRedirect section="beneficios" />} />
