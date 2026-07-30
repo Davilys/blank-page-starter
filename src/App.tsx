@@ -271,16 +271,16 @@ const App = () => (
                     />
                   }
                 />
-                <Route
-                  path="reasoning"
-                  element={
-                    <IntelligenceModulePlaceholder
-                      titulo="Reasoning"
-                      descricao="Detecção de contradições, lacunas, duplicidade e conteúdo sem fonte."
-                      fase="Fase 08"
-                    />
-                  }
-                />
+                <Route path="reasoning" element={<ReasoningLayout />}>
+                  <Route index element={<ReasoningDashboard />} />
+                  <Route path="impacto" element={<ReasoningImpact />} />
+                  <Route path="simulacao" element={<ReasoningSimulation />} />
+                  <Route path="inconsistencias" element={<ReasoningBroken />} />
+                  <Route path="confianca" element={<ReasoningConfidence />} />
+                  <Route path="cobertura" element={<ReasoningCoverage />} />
+                  <Route path="sugestoes" element={<ReasoningSuggestions />} />
+                  <Route path="auditoria" element={<ReasoningAudit />} />
+                </Route>
                 <Route
                   path="learning"
                   element={
