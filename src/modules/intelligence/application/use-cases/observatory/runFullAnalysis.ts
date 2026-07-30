@@ -2,7 +2,7 @@
  * Caso de uso: executar a análise completa do Observatory e selar a auditoria.
  * Somente leitura sobre o conhecimento; a única escrita é o append do registro.
  */
-import { ok, type Result } from "../../../domain/shared/primitives";
+import { err, ok, type Result } from "../../../domain/shared/primitives";
 import {
   auditRecordFor,
   runObservatory,
@@ -23,7 +23,7 @@ export const runFullAnalysis = async (
   autorId: string,
 ): Promise<Result<ObservatoryResult>> => {
   const snapshot = await deps.reader.load();
-  if (!snapshot.ok) return snapshot;
+  if (!snapshot.ok) return err<ObservatoryResult>(snapshot.error);
 
   const resultado = runObservatory(snapshot.value);
   await deps.audit.append(auditRecordFor(resultado, autorId));
