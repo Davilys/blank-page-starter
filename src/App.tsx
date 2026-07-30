@@ -205,13 +205,7 @@ const App = () => (
                 <Route path="factory/objetos/:id" element={<FactoryEditor />} />
                 <Route
                   path="objetos"
-                  element={
-                    <IntelligenceModulePlaceholder
-                      titulo="Knowledge Objects"
-                      descricao="Criação, revisão e versionamento dos objetos de conhecimento."
-                      fase="Fase 06"
-                    />
-                  }
+                  element={<Navigate to="/intelligence/admin/factory/objetos" replace />}
                 />
                 <Route
                   path="entidades"
