@@ -50,8 +50,8 @@ export const diffDrafts = (
   const keys = Object.keys(depois).filter((k) => !IGNORED.includes(k));
 
   for (const key of keys) {
-    const a = antes ? stringify((antes as Record<string, unknown>)[key]) : null;
-    const b = stringify((depois as Record<string, unknown>)[key]);
+    const a = antes ? stringify((antes as unknown as Record<string, unknown>)[key]) : null;
+    const b = stringify((depois as unknown as Record<string, unknown>)[key]);
     if (a !== b) diffs.push({ campo: key, antes: a, depois: b });
   }
   return diffs;
