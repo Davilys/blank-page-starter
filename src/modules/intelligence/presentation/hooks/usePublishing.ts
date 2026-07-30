@@ -1,8 +1,6 @@
 /** FASE 11 — Hooks de publicação. A UI nunca fala com repositórios. */
 import { useCallback, useEffect, useState } from "react";
-import type {
-  PublishingMetrics,
-} from "../../application/use-cases/getPublishingMetricsAlias";
+import type { PublishingMetrics } from "../../application/use-cases/publishing/getPublishingMetrics";
 import type { ChecklistResult } from "../../application/use-cases/publishing/publishObject";
 import type { KnowledgeDraft } from "../../domain/factory/KnowledgeDraft";
 import type {
