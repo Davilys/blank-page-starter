@@ -101,6 +101,10 @@ const FactoryEditor = lazyWithRetry(() => import("./pages/intelligence/admin/fac
 const IngestionDashboard = lazyWithRetry(() => import("./pages/intelligence/admin/ingestion/IngestionDashboard"));
 const IngestionCandidateList = lazyWithRetry(() => import("./pages/intelligence/admin/ingestion/CandidateList"));
 const IngestionCandidateDetail = lazyWithRetry(() => import("./pages/intelligence/admin/ingestion/CandidateDetail"));
+// FASE 08 — Fact Ledger
+const FactsDashboard = lazyWithRetry(() => import("./pages/intelligence/admin/facts/FactsDashboard"));
+const FactsList = lazyWithRetry(() => import("./pages/intelligence/admin/facts/FactsList"));
+const FactEditor = lazyWithRetry(() => import("./pages/intelligence/admin/facts/FactEditor"));
 
 // Cliente pages
 const ClienteLogin = lazyWithRetry(() => import("./pages/cliente/Login"));
@@ -210,6 +214,9 @@ const App = () => (
                 <Route path="ingestion" element={<IngestionDashboard />} />
                 <Route path="ingestion/candidatos" element={<IngestionCandidateList />} />
                 <Route path="ingestion/candidatos/:id" element={<IngestionCandidateDetail />} />
+                <Route path="fatos" element={<FactsDashboard />} />
+                <Route path="fatos/lista" element={<FactsList />} />
+                <Route path="fatos/:id" element={<FactEditor />} />
                 <Route
                   path="objetos"
                   element={<Navigate to="/intelligence/admin/factory/objetos" replace />}
