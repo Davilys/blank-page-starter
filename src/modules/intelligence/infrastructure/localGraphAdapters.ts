@@ -45,7 +45,7 @@ export const createLocalEdgeRepository = (): GraphEdgeRepository => ({
   },
   async findById(id) {
     const found = read<GraphEdge>(EDGES_KEY).find((e) => e.id === id);
-    return found ? ok(found) : err<GraphEdge>("Relação не encontrada.".replace("не", "não"));
+    return found ? ok(found) : err<GraphEdge>("Relação não encontrada.");
   },
   async save(edge) {
     const items = read<GraphEdge>(EDGES_KEY);
