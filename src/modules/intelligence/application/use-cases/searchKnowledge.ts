@@ -6,7 +6,7 @@
  * canônica" — never a fabricated answer.
  */
 import type { KnowledgeObject } from "../../domain/knowledge-object/KnowledgeObject";
-import { emptyPage, ok, type Page, type Result } from "../../domain/shared/primitives";
+import { emptyPage, err, ok, type Page, type Result } from "../../domain/shared/primitives";
 import type { Intent } from "../../domain/shared/taxonomy";
 import type { IntelligencePort, KnowledgeObjectRepository } from "../ports/repositories";
 
@@ -45,7 +45,7 @@ export const makeSearchKnowledge =
       intent: intent ?? undefined,
       limite: input.limite ?? 10,
     });
-    if (!busca.ok) return busca;
+    if (!busca.ok) return err(busca.error);
 
     return ok({
       resultados: busca.value,
