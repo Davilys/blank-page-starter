@@ -147,7 +147,7 @@ export const makePublishingUseCases = (
       if (!c.draft) return err(c.erro as string);
       const versoes = await publications.listByObject(id);
       const proxima = nextVersion(
-        ((versoes.value?.items ?? []) as readonly PublishedVersion[]) ?? [],
+        (versoes.value?.items ?? []) as readonly PublishedVersion[],
       );
       return ok({ draft: c.draft, preview: buildPreview(c.draft, proxima) });
     },
@@ -197,7 +197,7 @@ export const makePublishingUseCases = (
         duracaoMs: Date.now() - inicio,
         mensagem: gravada.ok
           ? `Versão ${numero} publicada.`
-          : (gravada.error as string) ?? "Falha ao publicar.",
+          : ((gravada.error as string | undefined) ?? "Falha ao publicar."),
         itensBloqueantes: [],
       });
 
@@ -223,7 +223,7 @@ export const makePublishingUseCases = (
         duracaoMs: Date.now() - inicio,
         mensagem: aplicada.ok
           ? `Rollback para a versão ${versao}.`
-          : (aplicada.error as string) ?? "Falha no rollback.",
+          : ((aplicada.error as string | undefined) ?? "Falha no rollback."),
         itensBloqueantes: [],
       });
       return aplicada;
