@@ -36,13 +36,19 @@ export const asScore = (v: number) =>
 /**
  * Result type. The domain never throws for expected failures — callers must
  * handle both branches explicitly (FASE 04: "não inventar, declarar o que não se sabe").
+ *
+ * Modelled as a single shape rather than a discriminated union because this
+ * project compiles with `strictNullChecks: false`, under which TypeScript
+ * cannot narrow unions by a literal boolean discriminant.
  */
-export type Result<T, E = string> =
-  | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly error: E };
+export interface Result<T, E = string> {
+  readonly ok: boolean;
+  readonly value?: T;
+  readonly error?: E;
+}
 
-export const ok = <T>(value: T): Result<T, never> => ({ ok: true, value });
-export const err = <E>(error: E): Result<never, E> => ({ ok: false, error });
+export const ok = <T, E = string>(value: T): Result<T, E> => ({ ok: true, value });
+export const err = <T = never, E = string>(error: E): Result<T, E> => ({ ok: false, error });
 
 /** Read-only paginated envelope used by every query port. */
 export interface Page<T> {
