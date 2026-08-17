@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { MessageCircle, Mail, Loader2, RefreshCw, Search, CheckCircle2, Calendar, Trash2 } from "lucide-react";
+import { MessageCircle, Mail, Loader2, RefreshCw, Search, CheckCircle2, Calendar, Trash2, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { startOfDay, startOfWeek, startOfMonth, subDays } from "date-fns";
 import { loadClientForSheet } from "@/lib/clientSheet";
@@ -13,6 +13,7 @@ import { PaginationBar, type PageSize } from "@/components/admin/financeiro/Pagi
 import { EditableAmountCell } from "@/components/admin/financeiro/EditableAmountCell";
 import { ResponsavelChip } from "@/components/admin/shared/ResponsavelChip";
 import { useResponsaveis, atribuirResponsavel } from "@/hooks/useResponsaveis";
+import { LinkClientToInvoiceDialog } from "@/components/admin/financeiro/aguardando/LinkClientToInvoiceDialog";
 
 const ClientDetailSheet = lazy(() =>
   import("@/components/admin/clients/ClientDetailSheet").then((m) => ({ default: m.ClientDetailSheet }))
@@ -64,6 +65,7 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [openClient, setOpenClient] = useState<ClientWithProcess | null>(null);
   const [loadingClient, setLoadingClient] = useState<string | null>(null);
+  const [linkDialog, setLinkDialog] = useState<{ asaas_payment_id: string | null; asaas_customer_id: string | null; invoice_id: string | null; nome: string | null } | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSize>(10);
   const invoiceIds = useMemo(() => invoices.map(i => i.id), [invoices]);
@@ -288,13 +290,30 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
                     <button
                       type="button"
                       onClick={() => openClientFile(inv.user_id)}
-                      disabled={!inv.user_id || loadingClient === inv.user_id}
+                      disabled={loadingClient === inv.user_id}
                       className="text-sm font-medium text-left hover:underline text-primary disabled:opacity-60"
                     >
                       {loadingClient === inv.user_id ? <Loader2 className="h-3 w-3 animate-spin inline mr-1" /> : null}
                       {inv.profiles?.full_name || inv.profiles?.email || "—"}
                     </button>
                     <div className="text-xs text-muted-foreground">{inv.profiles?.phone || "sem telefone"}</div>
+                    {!inv.user_id && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLinkDialog({
+                            asaas_payment_id: inv.asaas_invoice_id || null,
+                            asaas_customer_id: null,
+                            invoice_id: inv.id,
+                            nome: inv.profiles?.full_name || null,
+                          });
+                        }}
+                        className="mt-1 flex items-center gap-1 text-[10px] font-medium text-amber-600 hover:underline"
+                      >
+                        <Link2 className="h-3 w-3" /> Cliente órfão — vincular
+                      </button>
+                    )}
                   </TableCell>
                   <TableCell className="max-w-[220px]"><div className="text-sm line-clamp-1">{inv.description || "—"}</div></TableCell>
                   <TableCell className="font-semibold text-sm">
@@ -430,6 +449,18 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {linkDialog && (
+        <LinkClientToInvoiceDialog
+          open={!!linkDialog}
+          onOpenChange={(v) => { if (!v) setLinkDialog(null); }}
+          asaasCustomerId={linkDialog.asaas_customer_id}
+          asaasPaymentId={linkDialog.asaas_payment_id}
+          invoiceId={linkDialog.invoice_id}
+          suggestedName={linkDialog.nome}
+          onLinked={() => { setLinkDialog(null); load(); }}
+        />
       )}
 
       {openClient && (
