@@ -1,31 +1,31 @@
-# Mensagens de WhatsApp por fase (Painel de Serviços)
+# Orientações para o Agente em todos os recursos + rodapé sem OAB
 
-Alterar **apenas** a mensagem de WhatsApp gerada no `ServiceActionPanel` (aba Serviços do ficheiro do cliente). E-mails, cobranças e demais fluxos permanecem inalterados.
+## 1. Campo "Orientações para o Agente" para todos os tipos
 
-## Escopo
-Arquivo único: `src/components/admin/clients/ServiceActionPanel.tsx`
+A implementação já existe e é usada hoje só na Exigência de Mérito:
 
-## Mudanças
+- Estado: `userOrientation` em `src/pages/admin/RecursosINPI.tsx` (linha 312).
+- UI: bloco âmbar com `Brain` + `Textarea` (limite 4000, contador) na etapa "Anexar Documentos", hoje envolto por `{resourceType === 'exigencia_merito' && (...)}`.
+- Envio: `userOrientation` no body das chamadas pass1/pass2 de `process-inpi-resource`.
+- Uso pela IA: `userOrientationBlock` na edge function (linha 1418) — hoje anexado apenas nos prompts do ramo `exigencia_merito`.
 
-1. Modificar `generateWhatsAppTemplate(client, stage, _valor)` para escolher a mensagem com base em `stage.id`, cobrindo:
-   - `exigencia_merito` (e alias `exigencia_de_mrito`) → texto "Exigência de Mérito"
-   - `oposicao` → texto "Oposição"
-   - `indeferimento` / `indeferido` → texto "Indeferimento"
-   - `deferimento` / `deferido` → texto "Deferimento"
-   - `certificado` / `certificados` → texto "Certificado"
-   - `renovacao` → texto "Renovação"
-   - Fallback (demais fases não citadas): mantém a mensagem atual (a genérica "houve uma atualização importante…").
+Alterações mínimas:
 
-2. Substituir a mensagem de WhatsApp para **Arquivado** dentro de `generateArquivadoWhatsApp` pelo novo texto fornecido (fase 7 – ARQUIVADO). O e-mail de arquivado (`generateArquivadoEmail`) permanece igual.
+- Remover apenas a condição `resourceType === 'exigencia_merito'` que envolve o bloco, mantendo markup, estilo, limite e comportamento idênticos. O mesmo bloco passa a aparecer na etapa de anexos de todos os tipos.
+- Passar `userOrientation` também nos fluxos que hoje não o enviam: `processNotificacao`, `processRespostaNotificacao` e `processProcurador` (mesmo campo `userOrientation` no body).
+- Na edge function `process-inpi-resource`, acrescentar `${userOrientationBlock}` aos prompts que ainda não o têm: ramo genérico do pass1 e do pass2 (recurso contra indeferimento, manifestação à oposição etc.), notificação extrajudicial, resposta a notificação e petições de procurador.
 
-3. Cada template usa `${primeiroNome}` (primeiro nome do cliente) no lugar de `{{nome do cliente}}`, mantendo o padrão já existente no arquivo.
+Nada muda no fluxo da Exigência de Mérito: mesmos prompts, mesma ordem, mesmo bloco de orientações.
 
-4. Nenhuma alteração em:
-   - E-mails (`generateEmailTemplate`, `generateEmailTemplateSemCobranca`, `generateArquivadoEmail`)
-   - Fluxo "Sem Cobrança" (Cliente Especial) — continuará usando `generateWhatsAppTemplateSemCobranca` como hoje
-   - Distrato, cobrança, faturas, logs
+## 2. Rodapé do papel timbrado
 
-## Detalhes técnicos
-- Um `switch (stage.id)` dentro de `generateWhatsAppTemplate` retornando a string apropriada.
-- Textos copiados exatamente conforme enviados pelo usuário (com emojis ⚠️/🎉 onde solicitado).
-- Sem alteração de tipos ou props.
+Em `src/components/admin/INPIResourcePDFPreview.tsx`, remover a linha
+`OAB/SP nº 000.000 — Agente da Propriedade Industrial` do bloco de assinatura do PDF (linhas 757-760), que hoje é impressa em todos os tipos exceto extrajudicial/procurador.
+
+Resultado em todos os tipos: assinatura + "Davilys Danques de Oliveira Cunha" + "Procurador". Nada mais é alterado (CPF, traço, cores, layout e rodapés de página permanecem).
+
+Verificação: busca por "OAB" e "Agente da Propriedade Industrial" em `src/` e `supabase/` para garantir que não resta nenhuma variação no documento final.
+
+## Fora de escopo
+
+Seleção de tipo, upload, geração, prompts existentes (além do acréscimo do bloco de orientações), banco, permissões e layout geral permanecem intocados.
