@@ -2375,7 +2375,7 @@ export default function RecursosINPI() {
                   )}
 
                   {/* Agent badge */}
-                  {resourceType === 'exigencia_merito' && (
+                  {(
                     <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-3">
                       <div className="flex items-start gap-3">
                         <Brain className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
