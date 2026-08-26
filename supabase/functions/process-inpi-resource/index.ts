@@ -1169,6 +1169,12 @@ serve(async (req) => {
       day: 'numeric', month: 'long', year: 'numeric'
     });
 
+    // Orientacoes opcionais do usuario - aplicaveis a TODOS os tipos de recurso.
+    const rawUserOrientation = typeof body.userOrientation === 'string' ? body.userOrientation.trim() : '';
+    const sharedUserOrientationBlock = rawUserOrientation
+      ? `\n\n⚠️⚠️⚠️ ORIENTAÇÕES OBRIGATÓRIAS DO USUÁRIO (PRIORIDADE MÁXIMA — SIGA À RISCA, sobrepõem-se a qualquer instrução genérica de extensão/estrutura/tom):\n"""\n${rawUserOrientation.slice(0, 4000)}\n"""\nIMPORTANTE: Estas orientações são a diretriz principal desta peça. Se conflitarem com tamanhos mínimos/seções sugeridos, PRIORIZE as orientações do usuário.\n`
+      : '';
+
     // ═════════════════════════════════════════════════════
     // NOTIFICAÇÃO EXTRAJUDICIAL FLOW (single pass)
     // ═════════════════════════════════════════════════════
@@ -1183,7 +1189,7 @@ serve(async (req) => {
       }
 
       const parts = [
-        { type: 'input_text', text: 'Elabore a NOTIFICAÇÃO EXTRAJUDICIAL COMPLETA com no mínimo 4.000 palavras (10+ páginas).' },
+        { type: 'input_text', text: `Elabore a NOTIFICAÇÃO EXTRAJUDICIAL COMPLETA com no mínimo 4.000 palavras (10+ páginas).${sharedUserOrientationBlock}` },
         ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
       ];
       if (body) body.files = undefined;
@@ -1298,7 +1304,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
       }
 
       const parts = [
-        { type: 'input_text', text: 'Analise a NOTIFICAÇÃO EXTRAJUDICIAL anexada e elabore uma RESPOSTA/DEFESA JURÍDICA COMPLETA com no mínimo 4.000 palavras, refutando todas as alegações do notificante.' },
+        { type: 'input_text', text: `Analise a NOTIFICAÇÃO EXTRAJUDICIAL anexada e elabore uma RESPOSTA/DEFESA JURÍDICA COMPLETA com no mínimo 4.000 palavras, refutando todas as alegações do notificante.${sharedUserOrientationBlock}` },
         ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
       ];
       if (body) body.files = undefined;
@@ -1342,7 +1348,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
       }
 
       const parts = [
-        { type: 'input_text', text: 'Elabore a PETIÇÃO COMPLETA.' },
+        { type: 'input_text', text: `Elabore a PETIÇÃO COMPLETA.${sharedUserOrientationBlock}` },
         ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
       ];
       if (body) body.files = undefined;
@@ -1546,7 +1552,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     const pass1User = [
       { type: 'input_text', text: resourceType === 'exigencia_merito'
         ? `Analise o(s) documento(s) do INPI anexado(s) e elabore APENAS o miolo (Parte 1) do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. PASSO 1 (obrigatório, mental): classifique a exigência como TIPO A (especificação/classificação), TIPO B (prova de atividade/titularidade) ou TIPO C (oposição). Se TIPO A: gere no MÁXIMO 450-700 palavras (Síntese curta + Cumprimento com nova especificação); NÃO crie seções de boa-fé, conclusão extensa, não cite jurisprudência, doutrina nem examinador, não amplie escopo. Se TIPO B/C: siga estrutura I–IV mais densa, mas sem doutrina/jurisprudência. 🛑 PROIBIDO nesta Parte 1: escrever "Termos em que", "Pede deferimento", "São Paulo, ${currentDate}", linha de assinatura, "Davilys Danques", "CPF:" ou lista "(Doc. 01) – …". Isso será emitido APENAS na Parte 2. Termine após a última seção, sem fechamento. 🔒 Nunca invente produtos, serviços, documentos ou atividades que não estejam expressamente no processo/anexos.${userOrientationBlock}${evidenceBlock}`
-        : `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do recurso administrativo. CADA seção deve ter a extensão MÍNIMA especificada. O texto total desta parte deve ter NO MÍNIMO 3.800 palavras. Desenvolva CADA argumento com máxima profundidade, como um escritório de PI de elite faria.${evidenceBlock}` },
+        : `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do recurso administrativo. CADA seção deve ter a extensão MÍNIMA especificada. O texto total desta parte deve ter NO MÍNIMO 3.800 palavras. Desenvolva CADA argumento com máxima profundidade, como um escritório de PI de elite faria.${userOrientationBlock}${evidenceBlock}` },
       ...fileResponseParts,
     ];
 
@@ -1554,7 +1560,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     const pass2User = [
       { type: 'input_text', text: resourceType === 'exigencia_merito'
         ? `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS o fechamento (Parte 2) do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Reclassifique a exigência: TIPO A (especificação), TIPO B (prova de atividade) ou TIPO C (oposição). Se TIPO A: produza SOMENTE uma seção curta "DOS PEDIDOS" (60-120 palavras) + encerramento único ("Termos em que / Pede deferimento / São Paulo, ${currentDate} / assinatura / CPF"); total 150-300 palavras; NÃO escreva Seções V/VI/VII; NÃO cite jurisprudência, doutrina ou examinador; NÃO amplie escopo. Se TIPO B/C: siga V–VIII + encerramento, sem doutrina/jurisprudência. 🔒 Nunca invente produtos, serviços, documentos ou atividades que não estejam no processo/anexos. O encerramento aparece UMA ÚNICA VEZ, ao final.${userOrientationBlock}${evidenceBlock}`
-        : `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do recurso administrativo. Mantenha tom técnico, fundamentação robusta e conclusões objetivas. O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.${evidenceBlock}` },
+        : `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do recurso administrativo. Mantenha tom técnico, fundamentação robusta e conclusões objetivas. O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.${userOrientationBlock}${evidenceBlock}` },
       ...fileResponseParts,
     ];
 
