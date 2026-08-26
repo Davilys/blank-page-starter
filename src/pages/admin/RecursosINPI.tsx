@@ -685,6 +685,7 @@ export default function RecursosINPI() {
           notificanteData,
           notificadoData,
           userInstructions,
+          userOrientation: userOrientation.trim() || undefined,
           files: filesBase64,
         }
       });
@@ -754,6 +755,7 @@ export default function RecursosINPI() {
           agentName: agent.name,
           files: filesBase64,
           userInstructions,
+          userOrientation: userOrientation.trim() || undefined,
         }
       });
 
@@ -821,6 +823,7 @@ export default function RecursosINPI() {
           agentStrategy: agent.promptExtra,
           agentName: agent.name,
           procuradorData,
+          userOrientation: userOrientation.trim() || undefined,
           files: filesBase64,
         }
       });
