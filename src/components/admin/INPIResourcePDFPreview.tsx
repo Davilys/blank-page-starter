@@ -754,10 +754,6 @@ async function generateNativePDF(opts: NativePDFOptions): Promise<void> {
   pdf.setFontSize(9);
   pdf.setTextColor(85, 85, 85);
   pdf.text('Procurador', A4_W_MM / 2, y, { align: 'center' });
-  if (!isExtrajudicialDoc && !isProcuradorPetition) {
-    y += 4;
-    pdf.text('OAB/SP nº 000.000 — Agente da Propriedade Industrial', A4_W_MM / 2, y, { align: 'center' });
-  }
 
   // ============ FOOTERS on every page ============
   const totalPages = pdf.getNumberOfPages();
