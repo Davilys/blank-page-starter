@@ -9,11 +9,38 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const ASAAS_API_KEY = Deno.env.get("ASAAS_API_KEY") || "";
+const ASAAS_ENV = (Deno.env.get("ASAAS_ENV") || "production").toLowerCase();
+const ASAAS_BASE = ASAAS_ENV === "sandbox"
+  ? "https://api-sandbox.asaas.com/v3"
+  : "https://api.asaas.com/v3";
+
+const PAID_STATUSES = ["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"];
+
+/** Busca a fatura no Asaas para obter o link oficial de pagamento e o status atual. */
+async function fetchAsaasPayment(paymentId: string) {
+  if (!ASAAS_API_KEY) return null;
+  try {
+    const res = await fetch(`${ASAAS_BASE}/payments/${paymentId}`, {
+      headers: { access_token: ASAAS_API_KEY, "Content-Type": "application/json" },
+    });
+    const text = await res.text();
+    if (!res.ok) {
+      console.error(`Asaas ${res.status} /payments/${paymentId}: ${text.slice(0, 400)}`);
+      return null;
+    }
+    return text ? JSON.parse(text) : null;
+  } catch (e) {
+    console.error("fetchAsaasPayment failed", e);
+    return null;
+  }
+}
 
 // Webhook BotConversa DEDICADO às cobranças do Financeiro (Devedores ≤30 / +30 / +60).
 // As demais notificações WhatsApp do CRM continuam usando o webhook padrão em system_settings.botconversa.
 const FINANCEIRO_WEBHOOK =
   "https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/17504/Z6cCNjvBc9uv/";
+
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—";
