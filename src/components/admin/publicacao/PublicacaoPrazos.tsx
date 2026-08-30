@@ -450,19 +450,19 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
 
       <Card>
         <CardContent className="p-0">
-          <ScrollArea className="h-[calc(100vh-500px)]">
-            <Table>
+          <div className="overflow-auto h-[calc(100vh-500px)]">
+            <Table className="min-w-[1150px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-xs">Cliente</TableHead>
-                  <TableHead className="text-xs">Marca / Processo</TableHead>
-                  <TableHead className="text-xs">Publicação RPI</TableHead>
-                  <TableHead className="text-xs">Prazo Final</TableHead>
-                  <TableHead className="text-xs">{active === 'cumpridos' ? 'Cumprido em' : 'Dias Restantes'}</TableHead>
-                  <TableHead className="text-xs">Status</TableHead>
-                  <TableHead className="text-xs">Cobrança</TableHead>
-                  <TableHead className="text-xs">Responsável</TableHead>
-                  <TableHead className="text-xs text-right">Ações</TableHead>
+                  <TableHead className="text-xs sticky top-0 z-10 bg-background whitespace-nowrap">Cliente</TableHead>
+                  <TableHead className="text-xs sticky top-0 z-10 bg-background whitespace-nowrap">Marca / Processo</TableHead>
+                  <TableHead className="text-xs sticky top-0 z-10 bg-background whitespace-nowrap">Publicação RPI</TableHead>
+                  <TableHead className="text-xs sticky top-0 z-10 bg-background whitespace-nowrap">Prazo Final</TableHead>
+                  <TableHead className="text-xs sticky top-0 z-10 bg-background whitespace-nowrap">{active === 'cumpridos' ? 'Cumprido em' : 'Dias Restantes'}</TableHead>
+                  <TableHead className="text-xs sticky top-0 z-10 bg-background whitespace-nowrap">Status</TableHead>
+                  <TableHead className="text-xs sticky top-0 z-10 bg-background whitespace-nowrap">Cobrança</TableHead>
+                  <TableHead className="text-xs sticky top-0 z-10 bg-background whitespace-nowrap">Responsável</TableHead>
+                  <TableHead className="text-xs sticky top-0 z-10 bg-background text-right whitespace-nowrap">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
