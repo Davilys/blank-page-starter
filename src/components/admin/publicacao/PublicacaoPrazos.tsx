@@ -126,19 +126,27 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
   const [filtroResp, setFiltroResp] = useState<string>('all'); // 'all' | userId | 'none'
   const [respPopoverOpen, setRespPopoverOpen] = useState(false);
 
-  useEffect(() => {
+  const loadSchedules = useCallback(async () => {
     const ids = publicacoes.map(p => p.id);
     if (ids.length === 0) { setSchedules({}); return; }
-    supabase
-      .from('publicacao_cobranca_schedule')
-      .select('*')
-      .in('publicacao_id', ids)
-      .then(({ data }) => {
-        const map: Record<string, any> = {};
-        (data || []).forEach((s: any) => { map[s.publicacao_id] = s; });
-        setSchedules(map);
-      });
+    const map: Record<string, any> = {};
+    // Consulta em lotes: uma única chamada com centenas de IDs estoura o tamanho da URL
+    const CHUNK = 100;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const slice = ids.slice(i, i + CHUNK);
+      const { data, error } = await supabase
+        .from('publicacao_cobranca_schedule')
+        .select('*')
+        .in('publicacao_id', slice)
+        .limit(1000);
+      if (error) { console.error('[PublicacaoPrazos] schedules', error); continue; }
+      (data || []).forEach((s: any) => { map[s.publicacao_id] = s; });
+    }
+    setSchedules(map);
   }, [publicacoes]);
+
+  useEffect(() => { loadSchedules(); }, [loadSchedules]);
+
 
   // Atribuição automática por bucket de prazo (Caroline 60d → João 30d → Camila 7d)
   useEffect(() => {
