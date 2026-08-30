@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { MessageCircle, Mail, Loader2, RefreshCw, Search, CheckCircle2, Calendar, Trash2, Link2 } from "lucide-react";
+import { MessageCircle, Mail, Loader2, RefreshCw, Search, CheckCircle2, Calendar, Trash2, Link2, Ban } from "lucide-react";
 import { toast } from "sonner";
 import { startOfDay, startOfWeek, startOfMonth, subDays } from "date-fns";
 import { loadClientForSheet } from "@/lib/clientSheet";
@@ -14,6 +14,9 @@ import { EditableAmountCell } from "@/components/admin/financeiro/EditableAmount
 import { ResponsavelChip } from "@/components/admin/shared/ResponsavelChip";
 import { useResponsaveis, atribuirResponsavel } from "@/hooks/useResponsaveis";
 import { LinkClientToInvoiceDialog } from "@/components/admin/financeiro/aguardando/LinkClientToInvoiceDialog";
+import { SituacaoCobrancaBadge, derivarSituacao } from "@/components/admin/financeiro/SituacaoCobrancaBadge";
+import { ConfirmarPagamentoDialog, type ConfirmarPagamentoTarget } from "@/components/admin/financeiro/ConfirmarPagamentoDialog";
+import { NegativarClienteDialog, type NegativarTarget } from "@/components/admin/financeiro/NegativarClienteDialog";
 
 const ClientDetailSheet = lazy(() =>
   import("@/components/admin/clients/ClientDetailSheet").then((m) => ({ default: m.ClientDetailSheet }))
@@ -42,6 +45,9 @@ interface CobrancaHist {
   status: string;
   cliente_nome: string | null;
   proxima_acao_em: string | null;
+  situacao: string | null;
+  pago_em: string | null;
+  pago_manual: boolean | null;
 }
 
 const PAID = ["paid", "confirmed", "received", "RECEIVED", "CONFIRMED"];
@@ -57,6 +63,9 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
   const [invoices, setInvoices] = useState<OverdueInvoice[]>([]);
   const [history, setHistory] = useState<CobrancaHist[]>([]);
   const [negotiatedPaymentIds, setNegotiatedPaymentIds] = useState<Set<string>>(new Set());
+  const [negativados, setNegativados] = useState<Record<string, boolean>>({});
+  const [confirmTarget, setConfirmTarget] = useState<ConfirmarPagamentoTarget | null>(null);
+  const [negativarTarget, setNegativarTarget] = useState<NegativarTarget | null>(null);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [period, setPeriod] = useState<Period>("30d");
@@ -127,10 +136,23 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
 
       const { data: hist } = await supabase
         .from("cobranca_historico")
-        .select("id, invoice_id, user_id, enviada_em, canais, status, cliente_nome, proxima_acao_em")
+        .select("id, invoice_id, user_id, enviada_em, canais, status, cliente_nome, proxima_acao_em, situacao, pago_em, pago_manual")
         .order("enviada_em", { ascending: false })
         .limit(200);
       setHistory((hist as any) || []);
+
+      const histUserIds = Array.from(new Set(((hist as any[]) || []).map((h) => h.user_id).filter(Boolean))) as string[];
+      if (histUserIds.length) {
+        const { data: negProfiles } = await supabase
+          .from("profiles")
+          .select("id, negativado")
+          .in("id", histUserIds);
+        const map: Record<string, boolean> = {};
+        for (const p of (negProfiles as any[]) || []) map[p.id] = !!p.negativado;
+        setNegativados(map);
+      } else {
+        setNegativados({});
+      }
     } catch (e: any) {
       toast.error("Erro ao carregar vencidos: " + (e.message || e));
     } finally {
@@ -405,14 +427,17 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
                 <TableHead>Cliente</TableHead>
                 <TableHead>Canais</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Próx. ação</TableHead>
+                <TableHead>Situação da cobrança</TableHead>
                 <TableHead>Responsável</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {history.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-10 text-muted-foreground">Sem cobranças registradas</TableCell></TableRow>
-              ) : history.map((h) => (
+                <TableRow><TableCell colSpan={7} className="text-center py-10 text-muted-foreground">Sem cobranças registradas</TableCell></TableRow>
+              ) : history.map((h) => {
+                const situacao = derivarSituacao({ ...h, negativado: h.user_id ? negativados[h.user_id] : false });
+                return (
                 <TableRow key={h.id} className="hover:bg-muted/40">
                   <TableCell className="text-sm">{new Date(h.enviada_em).toLocaleString("pt-BR")}</TableCell>
                   <TableCell className="text-sm">
@@ -434,8 +459,16 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
                       "text-blue-500 border-blue-500/40"
                     }>{h.status}</Badge>
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {h.proxima_acao_em ? new Date(h.proxima_acao_em).toLocaleDateString("pt-BR") : "—"}
+                  <TableCell>
+                    <div className="flex flex-col gap-0.5">
+                      <SituacaoCobrancaBadge situacao={situacao} />
+                      {h.pago_em && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {h.pago_manual ? "Baixa manual em " : "Pago em "}
+                          {new Date(h.pago_em).toLocaleDateString("pt-BR")}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <ResponsavelChip
@@ -444,8 +477,37 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
                       responsavel={responsaveisMap[h.invoice_id]}
                     />
                   </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      {situacao !== "recebida" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-[11px] text-emerald-600 border-emerald-500/40 hover:bg-emerald-500/10"
+                          onClick={() => setConfirmTarget({
+                            historico_id: h.id,
+                            invoice_id: h.invoice_id,
+                            cliente_nome: h.cliente_nome,
+                          })}
+                        >
+                          <CheckCircle2 className="h-3 w-3 mr-1" /> Confirmar pgto
+                        </Button>
+                      )}
+                      {situacao === "vencida" && h.user_id && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-[11px] text-red-600 border-red-500/40 hover:bg-red-500/10"
+                          onClick={() => setNegativarTarget({ user_id: h.user_id, nome: h.cliente_nome })}
+                        >
+                          <Ban className="h-3 w-3 mr-1" /> Negativar
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </div>
@@ -462,6 +524,20 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
           onLinked={() => { setLinkDialog(null); load(); }}
         />
       )}
+
+      <ConfirmarPagamentoDialog
+        open={!!confirmTarget}
+        onOpenChange={(v) => { if (!v) setConfirmTarget(null); }}
+        target={confirmTarget}
+        onConfirmed={() => { setConfirmTarget(null); load(); }}
+      />
+
+      <NegativarClienteDialog
+        open={!!negativarTarget}
+        onOpenChange={(v) => { if (!v) setNegativarTarget(null); }}
+        target={negativarTarget}
+        onDone={() => { setNegativarTarget(null); load(); }}
+      />
 
       {openClient && (
         <Suspense fallback={null}>
