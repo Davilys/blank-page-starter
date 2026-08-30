@@ -110,7 +110,7 @@ serve(async (req) => {
 
     const { data: invoice, error: invErr } = await admin
       .from("invoices")
-      .select("id, user_id, contract_id, amount, due_date, status, invoice_url, description, profiles:user_id(full_name,email,phone)")
+      .select("id, user_id, contract_id, amount, due_date, status, invoice_url, asaas_invoice_id, description, profiles:user_id(full_name,email,phone)")
       .eq("id", invoice_id)
       .maybeSingle();
 
