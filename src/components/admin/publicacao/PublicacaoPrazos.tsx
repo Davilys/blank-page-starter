@@ -488,6 +488,17 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                   const andamento = (pub.cumprimento_status || null) as AndamentoStatus;
                   const andCfg = andamento ? ANDAMENTO_CFG[andamento] : null;
                   const AndIcon = andCfg?.icon;
+                  // Cor do botão Notificar conforme a notificação mais avançada já enviada:
+                  // nenhuma → azul (atual) | 1ª (15d) → verde | 2ª (30d) → amarelo | 3ª (última semana) → vermelho
+                  const notifyColor = !sch
+                    ? 'border-primary/40 text-primary hover:bg-primary/10'
+                    : sch.notif_3_at
+                    ? 'border-red-500/60 bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50'
+                    : sch.notif_2_at
+                    ? 'border-amber-500/60 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50'
+                    : sch.notif_1_at
+                    ? 'border-emerald-500/60 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/50'
+                    : 'border-primary/40 text-primary hover:bg-primary/10';
                   return (
                     <TableRow key={pub.id}>
                       <TableCell className="text-sm">
