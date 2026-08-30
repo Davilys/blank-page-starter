@@ -613,7 +613,11 @@ export type Database = {
           message_email_subject: string | null
           message_whatsapp: string | null
           metadata: Json | null
+          pago_em: string | null
+          pago_manual: boolean
+          pago_obs: string | null
           proxima_acao_em: string | null
+          situacao: string
           status: string
           tipo: string
           updated_at: string
@@ -632,7 +636,11 @@ export type Database = {
           message_email_subject?: string | null
           message_whatsapp?: string | null
           metadata?: Json | null
+          pago_em?: string | null
+          pago_manual?: boolean
+          pago_obs?: string | null
           proxima_acao_em?: string | null
+          situacao?: string
           status?: string
           tipo?: string
           updated_at?: string
@@ -651,7 +659,11 @@ export type Database = {
           message_email_subject?: string | null
           message_whatsapp?: string | null
           metadata?: Json | null
+          pago_em?: string | null
+          pago_manual?: boolean
+          pago_obs?: string | null
           proxima_acao_em?: string | null
+          situacao?: string
           status?: string
           tipo?: string
           updated_at?: string
@@ -3547,6 +3559,9 @@ export type Database = {
           id: string
           is_special_client: boolean
           last_contact: string | null
+          negativado: boolean
+          negativado_em: string | null
+          negativado_total: number | null
           neighborhood: string | null
           origin: string | null
           phone: string | null
@@ -3573,6 +3588,9 @@ export type Database = {
           id: string
           is_special_client?: boolean
           last_contact?: string | null
+          negativado?: boolean
+          negativado_em?: string | null
+          negativado_total?: number | null
           neighborhood?: string | null
           origin?: string | null
           phone?: string | null
@@ -3599,6 +3617,9 @@ export type Database = {
           id?: string
           is_special_client?: boolean
           last_contact?: string | null
+          negativado?: boolean
+          negativado_em?: string | null
+          negativado_total?: number | null
           neighborhood?: string | null
           origin?: string | null
           phone?: string | null

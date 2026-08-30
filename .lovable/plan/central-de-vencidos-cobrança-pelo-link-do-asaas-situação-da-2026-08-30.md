@@ -45,8 +45,8 @@ Quando uma cobrança fica vencida há mais de 30 dias após o envio/acordo, a li
 ## Detalhes técnicos
 
 - **Banco**: adicionar em `cobranca_historico` os campos `situacao` (recebida | aguardando | vencida), `pago_em`, `pago_manual`, `pago_obs`. Adicionar em `profiles` os campos `negativado` (bool), `negativado_em`, `negativado_total`. Migração com grants/RLS conforme padrão do projeto.
-- **Edge function `cobrar-fatura-vencida`**: nova etapa que chama `GET /payments/{id}` no Asaas (via `ASAAS_API_KEY`) para obter `invoiceUrl` / `bankSlipUrl` / status atualizado; persiste em `invoices.invoice_url` e usa no WhatsApp/e-mail.
-- **Nova edge function `confirmar-pagamento-manual`**: valida entrada (Zod), chama `POST /payments/{id}/receiveInCash` no Asaas, atualiza `invoices`, `cobranca_historico`, `parcelas_devedor` / `parcelas_renegociadas`.
-- **Nova edge function `negativar-cliente`**: agrega débitos abertos por `user_id` e por CPF/CNPJ normalizado, grava a marcação no perfil e registra em `client_activities`.
+- **Edge function `cobrar-fatura-vencida**`: nova etapa que chama `GET /payments/{id}` no Asaas (via `ASAAS_API_KEY`) para obter `invoiceUrl` / `bankSlipUrl` / status atualizado; persiste em `invoices.invoice_url` e usa no WhatsApp/e-mail.
+- **Nova edge function `confirmar-pagamento-manual**`: valida entrada (Zod), chama `POST /payments/{id}/receiveInCash` no Asaas, atualiza `invoices`, `cobranca_historico`, `parcelas_devedor` / `parcelas_renegociadas`.
+- **Nova edge function `negativar-cliente**`: agrega débitos abertos por `user_id` e por CPF/CNPJ normalizado, grava a marcação no perfil e registra em `client_activities`.
 - **Front**: `src/components/admin/financeiro/vencidos/Vencidos30DiasTab.tsx` (coluna + ações no histórico) e `src/pages/admin/Devedores.tsx` (coluna nos dois históricos). Novo diálogo compartilhado `ConfirmarPagamentoDialog.tsx` e `NegativarClienteDialog.tsx` em `src/components/admin/financeiro/`.
-- Nada muda nas listas de +30/+60 dias, nos fluxos de negociação/renegociação nem no webhook do Asaas existente (que continua marcando pagamentos automáticos).
+- Nada muda nas listas de +30/+60 dias, nos fluxos de negociação/renegociação nem no webhook do Asaas existente (que continua marcando pagamentos automáticos). 

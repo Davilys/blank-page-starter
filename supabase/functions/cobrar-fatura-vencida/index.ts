@@ -9,11 +9,38 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const ASAAS_API_KEY = Deno.env.get("ASAAS_API_KEY") || "";
+const ASAAS_ENV = (Deno.env.get("ASAAS_ENV") || "production").toLowerCase();
+const ASAAS_BASE = ASAAS_ENV === "sandbox"
+  ? "https://api-sandbox.asaas.com/v3"
+  : "https://api.asaas.com/v3";
+
+const PAID_STATUSES = ["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"];
+
+/** Busca a fatura no Asaas para obter o link oficial de pagamento e o status atual. */
+async function fetchAsaasPayment(paymentId: string) {
+  if (!ASAAS_API_KEY) return null;
+  try {
+    const res = await fetch(`${ASAAS_BASE}/payments/${paymentId}`, {
+      headers: { access_token: ASAAS_API_KEY, "Content-Type": "application/json" },
+    });
+    const text = await res.text();
+    if (!res.ok) {
+      console.error(`Asaas ${res.status} /payments/${paymentId}: ${text.slice(0, 400)}`);
+      return null;
+    }
+    return text ? JSON.parse(text) : null;
+  } catch (e) {
+    console.error("fetchAsaasPayment failed", e);
+    return null;
+  }
+}
 
 // Webhook BotConversa DEDICADO às cobranças do Financeiro (Devedores ≤30 / +30 / +60).
 // As demais notificações WhatsApp do CRM continuam usando o webhook padrão em system_settings.botconversa.
 const FINANCEIRO_WEBHOOK =
   "https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/17504/Z6cCNjvBc9uv/";
+
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—";
@@ -83,7 +110,7 @@ serve(async (req) => {
 
     const { data: invoice, error: invErr } = await admin
       .from("invoices")
-      .select("id, user_id, contract_id, amount, due_date, status, invoice_url, description, profiles:user_id(full_name,email,phone)")
+      .select("id, user_id, contract_id, amount, due_date, status, invoice_url, asaas_invoice_id, description, profiles:user_id(full_name,email,phone)")
       .eq("id", invoice_id)
       .maybeSingle();
 
@@ -146,7 +173,44 @@ serve(async (req) => {
     if (!nome) nome = "Cliente";
     const data = fmtDate(invoice.due_date);
     const valor = fmtBRL(Number(invoice.amount || 0));
-    const link = invoice.invoice_url || "";
+
+    // Link oficial da fatura em atraso direto do Asaas (não gera nova fatura).
+    let link = invoice.invoice_url || "";
+    let asaasUnavailable = false;
+    const asaasId = (invoice as any).asaas_invoice_id as string | null;
+    if (asaasId) {
+      const payment = await fetchAsaasPayment(asaasId);
+      if (payment) {
+        if (PAID_STATUSES.includes(String(payment.status || "").toUpperCase())) {
+          // Já paga no Asaas → não cobra, apenas sincroniza.
+          await admin.from("invoices").update({
+            status: "paid",
+            payment_date: payment.paymentDate || payment.clientPaymentDate || new Date().toISOString().slice(0, 10),
+          }).eq("id", invoice_id);
+          await admin.from("cobranca_historico")
+            .update({ status: "confirmada_paga", situacao: "recebida", pago_em: new Date().toISOString() })
+            .eq("invoice_id", invoice_id)
+            .neq("status", "confirmada_paga");
+          return new Response(JSON.stringify({
+            skipped: true,
+            reason: "Fatura já consta como paga no Asaas — cobrança não enviada",
+            paid: true,
+          }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        const freshLink = payment.invoiceUrl || payment.bankSlipUrl || payment.transactionReceiptUrl || "";
+        if (freshLink) {
+          link = freshLink;
+          if (freshLink !== invoice.invoice_url) {
+            await admin.from("invoices").update({ invoice_url: freshLink }).eq("id", invoice_id);
+          }
+        }
+      } else {
+        asaasUnavailable = true;
+      }
+    } else {
+      asaasUnavailable = true;
+    }
+
 
     const waMsg = buildWhatsApp(nome, data, link, valor);
     const emailHtml = buildEmailHtml(nome, data, link, valor);
@@ -189,17 +253,20 @@ serve(async (req) => {
       cliente_phone: phone,
       canais: finalChannels,
       status: "enviada",
+      situacao: "aguardando",
       proxima_acao_em: proximaAcao,
       message_whatsapp: waMsg,
       message_email_html: emailHtml,
       message_email_subject: subject,
-      metadata: { notif: notifResult ?? null, error: notifErr?.message ?? null },
+      metadata: { notif: notifResult ?? null, error: notifErr?.message ?? null, asaas_link: link || null, asaas_unavailable: asaasUnavailable },
     });
 
     return new Response(JSON.stringify({
       success: true,
       channels: finalChannels,
       proxima_acao_em: proximaAcao,
+      link,
+      asaas_unavailable: asaasUnavailable,
       result: notifResult ?? null,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
