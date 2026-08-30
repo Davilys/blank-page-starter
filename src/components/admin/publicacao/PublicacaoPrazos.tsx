@@ -779,7 +779,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
 
       <NotificarClienteDialog
         open={!!notifyPub}
-        onOpenChange={(o) => { if (!o) setNotifyPub(null); }}
+        onOpenChange={(o) => { if (!o) { setNotifyPub(null); loadSchedules(); } }}
         publicacao={notifyPub}
         client={notifyPub?.client_id ? clientMap.get(notifyPub.client_id) : null}
         marca={(notifyPub?.process_id && processMap.get(notifyPub.process_id)?.brand_name) || notifyPub?.brand_name_rpi || 'sua marca'}
