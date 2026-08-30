@@ -1493,6 +1493,13 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
         </DialogContent>
       </Dialog>
 
+      <NegativarClienteDialog
+        open={!!negativarTarget}
+        onOpenChange={(v) => { if (!v) setNegativarTarget(null); }}
+        target={negativarTarget}
+        onDone={() => setNegativarTarget(null)}
+      />
+
       {openClient && (
         <Suspense fallback={null}>
           <ClientDetailSheet
