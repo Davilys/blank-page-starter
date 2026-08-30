@@ -173,7 +173,44 @@ serve(async (req) => {
     if (!nome) nome = "Cliente";
     const data = fmtDate(invoice.due_date);
     const valor = fmtBRL(Number(invoice.amount || 0));
-    const link = invoice.invoice_url || "";
+
+    // Link oficial da fatura em atraso direto do Asaas (não gera nova fatura).
+    let link = invoice.invoice_url || "";
+    let asaasUnavailable = false;
+    const asaasId = (invoice as any).asaas_invoice_id as string | null;
+    if (asaasId) {
+      const payment = await fetchAsaasPayment(asaasId);
+      if (payment) {
+        if (PAID_STATUSES.includes(String(payment.status || "").toUpperCase())) {
+          // Já paga no Asaas → não cobra, apenas sincroniza.
+          await admin.from("invoices").update({
+            status: "paid",
+            payment_date: payment.paymentDate || payment.clientPaymentDate || new Date().toISOString().slice(0, 10),
+          }).eq("id", invoice_id);
+          await admin.from("cobranca_historico")
+            .update({ status: "confirmada_paga", situacao: "recebida", pago_em: new Date().toISOString() })
+            .eq("invoice_id", invoice_id)
+            .neq("status", "confirmada_paga");
+          return new Response(JSON.stringify({
+            skipped: true,
+            reason: "Fatura já consta como paga no Asaas — cobrança não enviada",
+            paid: true,
+          }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        const freshLink = payment.invoiceUrl || payment.bankSlipUrl || payment.transactionReceiptUrl || "";
+        if (freshLink) {
+          link = freshLink;
+          if (freshLink !== invoice.invoice_url) {
+            await admin.from("invoices").update({ invoice_url: freshLink }).eq("id", invoice_id);
+          }
+        }
+      } else {
+        asaasUnavailable = true;
+      }
+    } else {
+      asaasUnavailable = true;
+    }
+
 
     const waMsg = buildWhatsApp(nome, data, link, valor);
     const emailHtml = buildEmailHtml(nome, data, link, valor);
