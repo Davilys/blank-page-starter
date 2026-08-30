@@ -676,13 +676,23 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-7 px-2 text-xs gap-1 border-primary/40 text-primary hover:bg-primary/10"
+                              className={cn('h-7 px-2 text-xs gap-1', notifyColor)}
                               onClick={() => {
                                 setNotifyPub(pub);
                                 atribuirResponsavel('publicacao', pub.id, { acao: 'cobrou', somenteSeVazio: true }).catch(() => {});
                               }}
                               disabled={!pub.client_id}
-                              title={pub.client_id ? 'Enviar notificação' : 'Vincule um cliente primeiro'}
+                              title={
+                                !pub.client_id
+                                  ? 'Vincule um cliente primeiro'
+                                  : sch?.notif_3_at
+                                  ? '3ª notificação (última semana) já enviada'
+                                  : sch?.notif_2_at
+                                  ? '2ª notificação (30 dias) já enviada'
+                                  : sch?.notif_1_at
+                                  ? '1ª notificação (15 dias) já enviada'
+                                  : 'Enviar notificação'
+                              }
                             >
                               <Bell className="w-3.5 h-3.5" /> Notificar
                             </Button>
