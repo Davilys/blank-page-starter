@@ -501,7 +501,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                     : 'border-primary/40 text-primary hover:bg-primary/10';
                   return (
                     <TableRow key={pub.id}>
-                      <TableCell className="text-sm">
+                      <TableCell className="text-sm whitespace-nowrap">
                         {client ? (
                           <button
                             type="button"
@@ -521,7 +521,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                           </Button>
                         )}
                       </TableCell>
-                      <TableCell className="text-sm">
+                      <TableCell className="text-sm min-w-[220px]">
                         <button
                           type="button"
                           onClick={() => onOpenDetail?.(pub.id)}
@@ -562,13 +562,13 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                           );
                         })()}
                       </TableCell>
-                      <TableCell className="text-xs">
+                      <TableCell className="text-xs whitespace-nowrap">
                         {pub.data_publicacao_rpi ? format(parseISO(pub.data_publicacao_rpi), 'dd/MM/yyyy', { locale: ptBR }) : '—'}
                       </TableCell>
-                      <TableCell className="text-xs">
+                      <TableCell className="text-xs whitespace-nowrap">
                         {pub._deadline ? format(parseISO(pub._deadline), 'dd/MM/yyyy', { locale: ptBR }) : '—'}
                       </TableCell>
-                      <TableCell className={cn('text-sm', daysColor)}>
+                      <TableCell className={cn('text-sm whitespace-nowrap', daysColor)}>
                         {active === 'cumpridos' ? (
                           <div className="flex items-center gap-1.5 text-teal-700 dark:text-teal-400">
                             <CheckCircle2 className="w-3.5 h-3.5" />
@@ -624,10 +624,10 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                           </Popover>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', stCfg.bg, stCfg.color)}>{stCfg.label}</span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         {!sch ? (
                           <span className="text-xs text-muted-foreground">não iniciado</span>
                         ) : sch.status === 'pausado_resposta' ? (
@@ -649,14 +649,14 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                           </div>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         <ResponsavelChip
                           entidade="publicacao"
                           entidadeId={pub.id}
                           responsavel={responsaveisMap[pub.id]}
                         />
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
                           {(pub._bucket === 'desistiu' || pub.cumprimento_status === 'desistiu') ? (
                             <Button
