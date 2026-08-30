@@ -128,7 +128,7 @@ serve(async (req) => {
 
     if (parcela_id && parcela_tipo) {
       const table = parcela_tipo === "devedor" ? "parcelas_devedor" : "parcelas_renegociadas";
-      await admin.from(table).update({ status: "paga", pago_em: pagamentoEm }).eq("id", parcela_id);
+      await admin.from(table).update({ status: "paga" }).eq("id", parcela_id);
     }
 
     return json({
