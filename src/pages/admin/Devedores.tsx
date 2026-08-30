@@ -17,6 +17,8 @@ import { DatePeriodFilter, type DateFilterType } from "@/components/admin/client
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import { PaginationBar, type PageSize } from "@/components/admin/financeiro/PaginationBar";
 import { EditableAmountCell } from "@/components/admin/financeiro/EditableAmountCell";
+import { SituacaoCobrancaBadge, type SituacaoCobranca } from "@/components/admin/financeiro/SituacaoCobrancaBadge";
+import { NegativarClienteDialog, type NegativarTarget } from "@/components/admin/financeiro/NegativarClienteDialog";
 import { ResponsavelChip } from "@/components/admin/shared/ResponsavelChip";
 import { useResponsaveis, atribuirResponsavel } from "@/hooks/useResponsaveis";
 import { CobrarParcelaAcordoDialog } from "@/components/admin/financeiro/CobrarParcelaAcordoDialog";
@@ -67,6 +69,13 @@ interface NegociacaoDevedor {
 }
 
 const fmtBRL = (n: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n || 0);
+
+/** Situação consolidada das cobranças de uma negociação/renegociação. */
+function situacaoDeParcelas(sum: { pagas: number; aVencer: number; vencidas: number }): SituacaoCobranca {
+  if (sum.vencidas > 0) return "vencida";
+  if (sum.pagas > 0 && sum.aVencer === 0) return "recebida";
+  return "aguardando";
+}
 const fmtDate = (s: string) => {
   const [y, m, d] = s.split("-");
   return `${d}/${m}/${y}`;
@@ -280,6 +289,7 @@ export default function Devedores({ embedded = false, forceTab }: DevedoresProps
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState<DateFilterType>("all");
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  const [negativarTarget, setNegativarTarget] = useState<NegativarTarget | null>(null);
   const [resending, setResending] = useState<string | null>(null);
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
   const [page60, setPage60] = useState(1);
@@ -1106,12 +1116,13 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                     <TableHead className="text-right">Acréscimo</TableHead>
                     <TableHead className="text-right">Renegociado</TableHead>
                     <TableHead className="text-center">Parcelas</TableHead>
+                    <TableHead>Situação da cobrança</TableHead>
                     <TableHead>Responsável</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredHistory.length === 0 && (
-                    <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Nenhuma renegociação ainda.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Nenhuma renegociação ainda.</TableCell></TableRow>
                   )}
                   {filteredHistory.map((h) => {
                     const parcelas = (h.parcelas_renegociadas || []).slice().sort((a: any, b: any) => (a.numero_parcela || 0) - (b.numero_parcela || 0));
@@ -1183,6 +1194,21 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                         </div>
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
+                        <div className="flex flex-col items-start gap-1">
+                          <SituacaoCobrancaBadge situacao={situacaoDeParcelas(sum)} />
+                          {sum.vencidas > 0 && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 px-2 text-[10px] text-red-600 border-red-500/40 hover:bg-red-500/10"
+                              onClick={(e) => { e.stopPropagation(); setNegativarTarget({ cpf_cnpj: h.cliente_cpf_cnpj, nome: h.cliente_nome }); }}
+                            >
+                              Negativar
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         {h.asaas_customer_id ? (
                           <ResponsavelChip
                             entidade="devedor"
@@ -1196,7 +1222,7 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                     </TableRow>
                     {isOpen && (
                       <TableRow key={h.id + "-detail"} className="bg-muted/30">
-                        <TableCell colSpan={8} className="py-3">
+                        <TableCell colSpan={9} className="py-3">
                           <ParcelasPanel
                             parcelas={parcelas}
                             totalVencido={sum.totalVencido}
@@ -1229,12 +1255,13 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                     <TableHead className="text-right">Acréscimo</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead className="text-center">Parcelas</TableHead>
+                    <TableHead>Situação da cobrança</TableHead>
                     <TableHead>Responsável</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredHistory30.length === 0 && (
-                    <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Nenhuma negociação ainda.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">Nenhuma negociação ainda.</TableCell></TableRow>
                   )}
                   {filteredHistory30.map((h) => {
                     const parcelas = (h.parcelas_devedor || []).slice().sort((a: any, b: any) => (a.numero_parcela || 0) - (b.numero_parcela || 0));
@@ -1302,6 +1329,21 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                         </div>
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
+                        <div className="flex flex-col items-start gap-1">
+                          <SituacaoCobrancaBadge situacao={situacaoDeParcelas(sum)} />
+                          {sum.vencidas > 0 && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 px-2 text-[10px] text-red-600 border-red-500/40 hover:bg-red-500/10"
+                              onClick={(e) => { e.stopPropagation(); setNegativarTarget({ cpf_cnpj: h.cliente_cpf_cnpj, nome: h.cliente_nome }); }}
+                            >
+                              Negativar
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         {h.asaas_customer_id ? (
                           <ResponsavelChip
                             entidade="devedor"
@@ -1315,7 +1357,7 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
                     </TableRow>
                     {isOpen && (
                       <TableRow key={h.id + "-detail"} className="bg-muted/30">
-                        <TableCell colSpan={9} className="py-3">
+                        <TableCell colSpan={10} className="py-3">
                           <ParcelasPanel
                             parcelas={parcelas}
                             totalVencido={sum.totalVencido}
