@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CheckCircle2, Clock, AlertTriangle, Archive, Search, Eye, Bell, ChevronDown, CalendarCheck, Wallet, UserPlus, X, Ban, Pencil, PhoneOff, FileSignature } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -450,19 +450,19 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
 
       <Card>
         <CardContent className="p-0">
-          <ScrollArea className="h-[calc(100vh-500px)]">
-            <Table>
+          <div className="overflow-auto h-[calc(100vh-500px)]">
+            <Table className="min-w-[1150px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-xs">Cliente</TableHead>
-                  <TableHead className="text-xs">Marca / Processo</TableHead>
-                  <TableHead className="text-xs">Publicação RPI</TableHead>
-                  <TableHead className="text-xs">Prazo Final</TableHead>
-                  <TableHead className="text-xs">{active === 'cumpridos' ? 'Cumprido em' : 'Dias Restantes'}</TableHead>
-                  <TableHead className="text-xs">Status</TableHead>
-                  <TableHead className="text-xs">Cobrança</TableHead>
-                  <TableHead className="text-xs">Responsável</TableHead>
-                  <TableHead className="text-xs text-right">Ações</TableHead>
+                  <TableHead className="text-xs sticky top-0 z-10 bg-background whitespace-nowrap">Cliente</TableHead>
+                  <TableHead className="text-xs sticky top-0 z-10 bg-background whitespace-nowrap">Marca / Processo</TableHead>
+                  <TableHead className="text-xs sticky top-0 z-10 bg-background whitespace-nowrap">Publicação RPI</TableHead>
+                  <TableHead className="text-xs sticky top-0 z-10 bg-background whitespace-nowrap">Prazo Final</TableHead>
+                  <TableHead className="text-xs sticky top-0 z-10 bg-background whitespace-nowrap">{active === 'cumpridos' ? 'Cumprido em' : 'Dias Restantes'}</TableHead>
+                  <TableHead className="text-xs sticky top-0 z-10 bg-background whitespace-nowrap">Status</TableHead>
+                  <TableHead className="text-xs sticky top-0 z-10 bg-background whitespace-nowrap">Cobrança</TableHead>
+                  <TableHead className="text-xs sticky top-0 z-10 bg-background whitespace-nowrap">Responsável</TableHead>
+                  <TableHead className="text-xs sticky top-0 z-10 bg-background text-right whitespace-nowrap">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -488,9 +488,20 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                   const andamento = (pub.cumprimento_status || null) as AndamentoStatus;
                   const andCfg = andamento ? ANDAMENTO_CFG[andamento] : null;
                   const AndIcon = andCfg?.icon;
+                  // Cor do botão Notificar conforme a notificação mais avançada já enviada:
+                  // nenhuma → azul (atual) | 1ª (15d) → verde | 2ª (30d) → amarelo | 3ª (última semana) → vermelho
+                  const notifyColor = !sch
+                    ? 'border-primary/40 text-primary hover:bg-primary/10'
+                    : sch.notif_3_at
+                    ? 'border-red-500/60 bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50'
+                    : sch.notif_2_at
+                    ? 'border-amber-500/60 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50'
+                    : sch.notif_1_at
+                    ? 'border-emerald-500/60 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/50'
+                    : 'border-primary/40 text-primary hover:bg-primary/10';
                   return (
                     <TableRow key={pub.id}>
-                      <TableCell className="text-sm">
+                      <TableCell className="text-sm whitespace-nowrap">
                         {client ? (
                           <button
                             type="button"
@@ -510,7 +521,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                           </Button>
                         )}
                       </TableCell>
-                      <TableCell className="text-sm">
+                      <TableCell className="text-sm min-w-[220px]">
                         <button
                           type="button"
                           onClick={() => onOpenDetail?.(pub.id)}
@@ -551,13 +562,13 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                           );
                         })()}
                       </TableCell>
-                      <TableCell className="text-xs">
+                      <TableCell className="text-xs whitespace-nowrap">
                         {pub.data_publicacao_rpi ? format(parseISO(pub.data_publicacao_rpi), 'dd/MM/yyyy', { locale: ptBR }) : '—'}
                       </TableCell>
-                      <TableCell className="text-xs">
+                      <TableCell className="text-xs whitespace-nowrap">
                         {pub._deadline ? format(parseISO(pub._deadline), 'dd/MM/yyyy', { locale: ptBR }) : '—'}
                       </TableCell>
-                      <TableCell className={cn('text-sm', daysColor)}>
+                      <TableCell className={cn('text-sm whitespace-nowrap', daysColor)}>
                         {active === 'cumpridos' ? (
                           <div className="flex items-center gap-1.5 text-teal-700 dark:text-teal-400">
                             <CheckCircle2 className="w-3.5 h-3.5" />
@@ -613,10 +624,10 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                           </Popover>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', stCfg.bg, stCfg.color)}>{stCfg.label}</span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         {!sch ? (
                           <span className="text-xs text-muted-foreground">não iniciado</span>
                         ) : sch.status === 'pausado_resposta' ? (
@@ -638,14 +649,14 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                           </div>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         <ResponsavelChip
                           entidade="publicacao"
                           entidadeId={pub.id}
                           responsavel={responsaveisMap[pub.id]}
                         />
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
                           {(pub._bucket === 'desistiu' || pub.cumprimento_status === 'desistiu') ? (
                             <Button
@@ -665,13 +676,23 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-7 px-2 text-xs gap-1 border-primary/40 text-primary hover:bg-primary/10"
+                              className={cn('h-7 px-2 text-xs gap-1', notifyColor)}
                               onClick={() => {
                                 setNotifyPub(pub);
                                 atribuirResponsavel('publicacao', pub.id, { acao: 'cobrou', somenteSeVazio: true }).catch(() => {});
                               }}
                               disabled={!pub.client_id}
-                              title={pub.client_id ? 'Enviar notificação' : 'Vincule um cliente primeiro'}
+                              title={
+                                !pub.client_id
+                                  ? 'Vincule um cliente primeiro'
+                                  : sch?.notif_3_at
+                                  ? '3ª notificação (última semana) já enviada'
+                                  : sch?.notif_2_at
+                                  ? '2ª notificação (30 dias) já enviada'
+                                  : sch?.notif_1_at
+                                  ? '1ª notificação (15 dias) já enviada'
+                                  : 'Enviar notificação'
+                              }
                             >
                               <Bell className="w-3.5 h-3.5" /> Notificar
                             </Button>
@@ -744,7 +765,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                 })}
               </TableBody>
             </Table>
-          </ScrollArea>
+          </div>
         </CardContent>
       </Card>
 
