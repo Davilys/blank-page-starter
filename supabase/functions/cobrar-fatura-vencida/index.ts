@@ -253,17 +253,20 @@ serve(async (req) => {
       cliente_phone: phone,
       canais: finalChannels,
       status: "enviada",
+      situacao: "aguardando",
       proxima_acao_em: proximaAcao,
       message_whatsapp: waMsg,
       message_email_html: emailHtml,
       message_email_subject: subject,
-      metadata: { notif: notifResult ?? null, error: notifErr?.message ?? null },
+      metadata: { notif: notifResult ?? null, error: notifErr?.message ?? null, asaas_link: link || null, asaas_unavailable: asaasUnavailable },
     });
 
     return new Response(JSON.stringify({
       success: true,
       channels: finalChannels,
       proxima_acao_em: proximaAcao,
+      link,
+      asaas_unavailable: asaasUnavailable,
       result: notifResult ?? null,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
