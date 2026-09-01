@@ -101,20 +101,30 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
       const today = new Date().toISOString().split("T")[0];
       // Filtro no banco: cobranças originadas pelo CRM (parcelas de negociação/
       // acordo) e dívidas já vinculadas a uma negociação nunca aparecem na fila.
-      const { data, error } = await supabase
-        .from("invoices")
-        .select("id, description, amount, due_date, status, invoice_url, user_id, asaas_invoice_id, profiles:user_id(full_name,email,phone)")
-        .eq("originado_pelo_crm", false)
-        .is("negociacao_id", null)
-        .is("renegociacao_id", null)
-        .gte("due_date", since)
-        .lte("due_date", today)
-        .order("due_date", { ascending: false })
-        .limit(500);
-      if (error) throw error;
+      // Paginado — a fila não depende do limite de 1.000 linhas do PostgREST.
+      const PAGE = 1000;
+      const brutas: any[] = [];
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase
+          .from("invoices")
+          .select("id, description, amount, due_date, status, invoice_url, user_id, asaas_invoice_id, profiles:user_id(full_name,email,phone)")
+          .eq("originado_pelo_crm", false)
+          .is("negociacao_id", null)
+          .is("renegociacao_id", null)
+          .gte("due_date", since)
+          .lte("due_date", today)
+          .order("due_date", { ascending: false })
+          .order("id", { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        const rows = data || [];
+        brutas.push(...rows);
+        if (rows.length < PAGE) break;
+      }
+
       // Só consideramos vencido se a data de vencimento já passou.
       // Status 'overdue' isolado não basta — o Asaas pode ter reagendado a fatura para o futuro.
-      const candidatas = (data || []).filter((i: any) => {
+      const candidatas = brutas.filter((i: any) => {
         const s = i.status || "";
         if (PAID.includes(s)) return false;
         if (s === "cancelled" || s === "CANCELLED" || s === "canceled") return false;
@@ -124,8 +134,8 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
       });
 
       // Dívidas já tratadas pelo CRM (cobrança/negociação/acordo) pertencem ao
-      // Histórico. Consulta feita por lotes do próprio resultado — não depende
-      // do limite de 1.000 linhas do Supabase.
+      // Histórico. Todas as verificações são feitas no banco, em lotes derivados
+      // do próprio resultado — nunca dependem de carga parcial no navegador.
       const tratadas = new Set<string>();
       const payIds = candidatas.map((i: any) => i.asaas_invoice_id).filter(Boolean) as string[];
       const invIds = candidatas.map((i: any) => i.id) as string[];
@@ -133,14 +143,25 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
         for (let k = 0; k < Math.max(payIds.length, invIds.length); k += 200) {
           const payChunk = payIds.slice(k, k + 200);
           const invChunk = invIds.slice(k, k + 200);
-          const [byPay, byNova, byInv] = await Promise.all([
-            payChunk.length ? supabase.from("cobranca_tratamentos").select("asaas_payment_id_original").in("asaas_payment_id_original", payChunk) : Promise.resolve({ data: [] as any[] }),
-            payChunk.length ? supabase.from("cobranca_tratamentos").select("nova_cobranca_asaas_id").in("nova_cobranca_asaas_id", payChunk) : Promise.resolve({ data: [] as any[] }),
-            invChunk.length ? supabase.from("cobranca_tratamentos").select("invoice_original_id").in("invoice_original_id", invChunk) : Promise.resolve({ data: [] as any[] }),
+          const empty = Promise.resolve({ data: [] as any[] });
+          const [byPay, byNova, byLista, byInv, byHist, byParcD, byParcR] = await Promise.all([
+            payChunk.length ? supabase.from("cobranca_tratamentos").select("asaas_payment_id_original").in("asaas_payment_id_original", payChunk) : empty,
+            payChunk.length ? supabase.from("cobranca_tratamentos").select("nova_cobranca_asaas_id").in("nova_cobranca_asaas_id", payChunk) : empty,
+            payChunk.length ? supabase.from("cobranca_tratamentos").select("novos_boletos_asaas_ids").overlaps("novos_boletos_asaas_ids", payChunk) : empty,
+            invChunk.length ? supabase.from("cobranca_tratamentos").select("invoice_original_id").in("invoice_original_id", invChunk) : empty,
+            // cobrança já enviada por este CRM → sai da fila (consulta no banco, sem limite local)
+            invChunk.length ? supabase.from("cobranca_historico").select("invoice_id").in("invoice_id", invChunk).in("status", ["enviada", "reentrada_fila", "confirmada_paga"]) : empty,
+            payChunk.length ? supabase.from("parcelas_devedor").select("asaas_payment_id").in("asaas_payment_id", payChunk) : empty,
+            payChunk.length ? supabase.from("parcelas_renegociadas").select("asaas_payment_id").in("asaas_payment_id", payChunk) : empty,
           ]);
+          const payChunkSet = new Set(payChunk);
           for (const r of (byPay.data as any[]) || []) tratadas.add(r.asaas_payment_id_original);
           for (const r of (byNova.data as any[]) || []) tratadas.add(r.nova_cobranca_asaas_id);
+          for (const r of (byLista.data as any[]) || []) for (const id of r.novos_boletos_asaas_ids || []) if (payChunkSet.has(id)) tratadas.add(id);
           for (const r of (byInv.data as any[]) || []) tratadas.add(r.invoice_original_id);
+          for (const r of (byHist.data as any[]) || []) tratadas.add(r.invoice_id);
+          for (const r of (byParcD.data as any[]) || []) tratadas.add(r.asaas_payment_id);
+          for (const r of (byParcR.data as any[]) || []) tratadas.add(r.asaas_payment_id);
         }
       } catch (e) { console.warn("consulta de tratamentos falhou", e); }
 
@@ -242,13 +263,9 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
       period === "month" ? startOfMonth(now) :
       subDays(now, 30);
     const q = search.trim().toLowerCase();
-    const charged = new Set(
-      history
-        .filter((h) => h.status === "enviada" || h.status === "reentrada_fila" || h.status === "confirmada_paga")
-        .map((h) => h.invoice_id)
-    );
+    // A exclusão de dívidas já cobradas/tratadas é feita no banco em load().
+    // Aqui só há apresentação: período e busca.
     return invoices.filter((i) => {
-      if (charged.has(i.id)) return false;
       const d = new Date(i.due_date + "T00:00:00");
       if (d < start) return false;
       if (!q) return true;

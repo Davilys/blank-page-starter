@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { cancelarCobrancaAsaas, getCrmOriginSet, registrarTratamento, MOTIVOS } from "../_shared/crmCobranca.ts";
+import { cancelarCobrancaAsaas, getCrmOriginSet, registrarTratamento, reservarParcelas, liberarParcelas, MOTIVOS } from "../_shared/crmCobranca.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -210,11 +210,28 @@ async function tratarCobrancasOriginais(admin: any, opts: {
   const nova = opts.novasCobrancas[0] || null;
   const agora = new Date().toISOString();
   const resultados: any[] = [];
+  const novosIds = opts.novasCobrancas.map((c: any) => c?.id).filter(Boolean);
+
+  // Resolve o cliente do CRM para que o histórico fique vinculado ao perfil.
+  let clienteUserId: string | null = null;
+  const cpfCnpj = opts.parcelas.find((p) => p.cliente_cpf_cnpj)?.cliente_cpf_cnpj || null;
+  if (cpfCnpj) {
+    const { data: prof } = await admin
+      .from("profiles").select("id").eq("cpf_cnpj", cpfCnpj).maybeSingle();
+    clienteUserId = prof?.id || null;
+  }
 
   for (const p of opts.parcelas) {
     let cancel: any = { status: "nao_aplicavel", asaas_status: null, http_status: null, response: null, message: "Sem asaas_payment_id" };
     if (p.asaas_payment_id) {
       cancel = await cancelarCobrancaAsaas(ASAAS_BASE, ASAAS_API_KEY, p.asaas_payment_id);
+    }
+
+    let invoiceOriginalId: string | null = null;
+    if (p.asaas_payment_id) {
+      const { data: invOrig } = await admin
+        .from("invoices").select("id").eq("asaas_invoice_id", p.asaas_payment_id).maybeSingle();
+      invoiceOriginalId = invOrig?.id || null;
     }
 
     await registrarTratamento(admin, {
@@ -223,8 +240,10 @@ async function tratarCobrancasOriginais(admin: any, opts: {
       motivo: opts.motivo,
       cliente_nome: p.cliente_nome || null,
       cliente_cpf_cnpj: p.cliente_cpf_cnpj || null,
+      cliente_user_id: clienteUserId,
       asaas_customer_id: p.asaas_customer_id || null,
       cobranca_original_id: p.id || null,
+      invoice_original_id: invoiceOriginalId,
       asaas_payment_id_original: p.asaas_payment_id || null,
       valor_original: p.valor ?? null,
       vencimento_original: p.data_vencimento || null,
@@ -240,6 +259,7 @@ async function tratarCobrancasOriginais(admin: any, opts: {
       status_negociacao: opts.novasCobrancas.length > 0 ? "ativa" : "sem_boleto",
       responsavel_id: opts.userId,
       observacao: opts.observacao || null,
+      novos_boletos_asaas_ids: novosIds,
       updated_at: agora,
     });
 
@@ -268,6 +288,34 @@ async function tratarCobrancasOriginais(admin: any, opts: {
   }
 
   return resultados;
+}
+
+/**
+ * Carrega TODA a fila de um bucket, paginando de 1.000 em 1.000.
+ * Sem isso o PostgREST devolve no máximo 1.000 linhas e devedores somem da tela.
+ */
+async function fetchFilaCompleta(admin: any, bucket: "d30" | "d60") {
+  const PAGE = 1000;
+  const all: any[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await admin
+      .from("cobrancas_vencidas")
+      .select("*")
+      .eq("status", "pendente_renegociacao")
+      .eq("bucket", bucket)
+      .eq("originado_pelo_crm", false)
+      .is("negociacao_id", null)
+      .is("renegociacao_id", null)
+      .is("tratada_em", null)
+      .order("cliente_nome", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    const rows = data || [];
+    all.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return all;
 }
 
 /** Remove do lote as dívidas que já possuem tratamento registrado (idempotência). */
@@ -582,17 +630,7 @@ Deno.serve(async (req) => {
 
     // ────────────── LIST GROUPED ──────────────
     if (action === "list-debtors-grouped") {
-      const { data, error } = await admin
-        .from("cobrancas_vencidas")
-        .select("*")
-        .eq("status", "pendente_renegociacao")
-        .eq("bucket", "d60")
-        .eq("originado_pelo_crm", false)
-        .is("negociacao_id", null)
-        .is("renegociacao_id", null)
-        .is("tratada_em", null)
-        .order("cliente_nome", { ascending: true });
-      if (error) throw error;
+      const data = await fetchFilaCompleta(admin, "d60");
 
       const groups = new Map<string, any>();
       for (const row of data || []) {
@@ -637,17 +675,7 @@ Deno.serve(async (req) => {
 
     // ────────────── LIST GROUPED 30 (≤30 dias) ──────────────
     if (action === "list-debtors-30-grouped") {
-      const { data, error } = await admin
-        .from("cobrancas_vencidas")
-        .select("*")
-        .eq("status", "pendente_renegociacao")
-        .eq("bucket", "d30")
-        .eq("originado_pelo_crm", false)
-        .is("negociacao_id", null)
-        .is("renegociacao_id", null)
-        .is("tratada_em", null)
-        .order("cliente_nome", { ascending: true });
-      if (error) throw error;
+      const data = await fetchFilaCompleta(admin, "d30");
 
       const groups = new Map<string, any>();
       for (const row of data || []) {
@@ -743,6 +771,12 @@ Deno.serve(async (req) => {
       }).select().single();
       if (nErr) throw nErr;
 
+      // Reserva atômica das dívidas (anti-concorrência) antes de tocar no Asaas
+      const reservadas = await reservarParcelas(admin, parcelas, neg.id, userId);
+      if (reservadas.length === 0) {
+        return json({ error: "Estas dívidas já estão sendo tratadas por outra ação em andamento" }, 409);
+      }
+
       const created: any[] = [];
       for (let i = 0; i < numParcelas; i++) {
         try {
@@ -787,6 +821,7 @@ Deno.serve(async (req) => {
       }
 
       if (created.length === 0) {
+        await liberarParcelas(admin, reservadas, neg.id);
         return json({
           error: "Nenhum boleto pôde ser criado no Asaas — nada foi cancelado e as dívidas seguem na fila",
           negociacao_id: neg.id,
@@ -805,7 +840,7 @@ Deno.serve(async (req) => {
 
       // Cancela os boletos originais no Asaas e registra o tratamento auditável
       const cancelamentos = await tratarCobrancasOriginais(admin, {
-        parcelas,
+        parcelas: reservadas,
         crmActionId: neg.id,
         tipoAcao: isNegociar ? "negociacao" : "cobranca",
         motivo: isNegociar ? MOTIVOS.negociacao : MOTIVOS.cobranca,
@@ -910,6 +945,12 @@ Deno.serve(async (req) => {
       }).select().single();
       if (rErr) throw rErr;
 
+      // Reserva atômica das dívidas (anti-concorrência) antes de tocar no Asaas
+      const reservadas = await reservarParcelas(admin, parcelas, reneg.id, userId);
+      if (reservadas.length === 0) {
+        return json({ error: "Estas dívidas já estão sendo tratadas por outra ação em andamento" }, 409);
+      }
+
       // gera 5 boletos no Asaas
       const created: any[] = [];
       for (let i = 0; i < 5; i++) {
@@ -954,6 +995,7 @@ Deno.serve(async (req) => {
       }
 
       if (created.length === 0) {
+        await liberarParcelas(admin, reservadas, reneg.id);
         return json({
           error: "Nenhum boleto pôde ser criado no Asaas — nada foi cancelado e as dívidas seguem na fila",
           renegociacao_id: reneg.id,
@@ -970,7 +1012,7 @@ Deno.serve(async (req) => {
       }
 
       const cancelamentos = await tratarCobrancasOriginais(admin, {
-        parcelas,
+        parcelas: reservadas,
         crmActionId: reneg.id,
         tipoAcao: "renegociacao",
         motivo: MOTIVOS.acordo,
