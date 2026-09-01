@@ -1691,13 +1691,16 @@ export type Database = {
       }
       email_logs: {
         Row: {
+          attachments: Json
           bcc_emails: string[] | null
           body: string
           cc_emails: string[] | null
+          client_id: string | null
           error_message: string | null
           from_email: string
           html_body: string | null
           id: string
+          provider_message_id: string | null
           related_lead_id: string | null
           sent_at: string | null
           sent_by: string | null
@@ -1708,13 +1711,16 @@ export type Database = {
           trigger_type: string | null
         }
         Insert: {
+          attachments?: Json
           bcc_emails?: string[] | null
           body: string
           cc_emails?: string[] | null
+          client_id?: string | null
           error_message?: string | null
           from_email: string
           html_body?: string | null
           id?: string
+          provider_message_id?: string | null
           related_lead_id?: string | null
           sent_at?: string | null
           sent_by?: string | null
@@ -1725,13 +1731,16 @@ export type Database = {
           trigger_type?: string | null
         }
         Update: {
+          attachments?: Json
           bcc_emails?: string[] | null
           body?: string
           cc_emails?: string[] | null
+          client_id?: string | null
           error_message?: string | null
           from_email?: string
           html_body?: string | null
           id?: string
+          provider_message_id?: string | null
           related_lead_id?: string | null
           sent_at?: string | null
           sent_by?: string | null
@@ -1742,6 +1751,13 @@ export type Database = {
           trigger_type?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "email_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "email_logs_related_lead_id_fkey"
             columns: ["related_lead_id"]
