@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { cancelarCobrancaAsaas, getCrmOriginSet, registrarTratamento, MOTIVOS } from "../_shared/crmCobranca.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -189,6 +190,101 @@ async function _cleanupBucketImpl(admin: any, bucket: "d30" | "d60", minDays: nu
   }
 }
 
+/**
+ * Trata as dívidas originais de uma cobrança/negociação/renegociação:
+ * cancela o boleto original no Asaas, registra o resultado real no histórico
+ * (cobranca_tratamentos) e retira a dívida da fila ativa.
+ */
+async function tratarCobrancasOriginais(admin: any, opts: {
+  parcelas: any[];
+  crmActionId: string;
+  tipoAcao: string;
+  motivo: string;
+  negociacaoId?: string | null;
+  renegociacaoId?: string | null;
+  userId: string;
+  novoStatusFila: string;
+  novasCobrancas: any[];
+  observacao?: string | null;
+}) {
+  const nova = opts.novasCobrancas[0] || null;
+  const agora = new Date().toISOString();
+  const resultados: any[] = [];
+
+  for (const p of opts.parcelas) {
+    let cancel: any = { status: "nao_aplicavel", asaas_status: null, http_status: null, response: null, message: "Sem asaas_payment_id" };
+    if (p.asaas_payment_id) {
+      cancel = await cancelarCobrancaAsaas(ASAAS_BASE, ASAAS_API_KEY, p.asaas_payment_id);
+    }
+
+    await registrarTratamento(admin, {
+      crm_action_id: opts.crmActionId,
+      tipo_acao: opts.tipoAcao,
+      motivo: opts.motivo,
+      cliente_nome: p.cliente_nome || null,
+      cliente_cpf_cnpj: p.cliente_cpf_cnpj || null,
+      asaas_customer_id: p.asaas_customer_id || null,
+      cobranca_original_id: p.id || null,
+      asaas_payment_id_original: p.asaas_payment_id || null,
+      valor_original: p.valor ?? null,
+      vencimento_original: p.data_vencimento || null,
+      negociacao_id: opts.negociacaoId ?? null,
+      renegociacao_id: opts.renegociacaoId ?? null,
+      nova_cobranca_asaas_id: nova?.id || null,
+      novo_boleto_url: nova?.invoiceUrl || nova?.bankSlipUrl || null,
+      novo_vencimento: nova?.dueDate || null,
+      novo_valor: nova?.value ?? null,
+      cancelamento_status: cancel.status,
+      cancelamento_resposta: { message: cancel.message, asaas_status: cancel.asaas_status, http_status: cancel.http_status, response: cancel.response },
+      cancelamento_em: agora,
+      status_negociacao: opts.novasCobrancas.length > 0 ? "ativa" : "sem_boleto",
+      responsavel_id: opts.userId,
+      observacao: opts.observacao || null,
+      updated_at: agora,
+    });
+
+    await admin.from("cobrancas_vencidas").update({
+      status: opts.novoStatusFila,
+      tratada_em: agora,
+      tratada_por: opts.userId,
+      negociacao_id: opts.negociacaoId ?? null,
+      renegociacao_id: opts.renegociacaoId ?? null,
+      crm_action_id: opts.crmActionId,
+      updated_at: agora,
+    }).eq("id", p.id);
+
+    if (p.asaas_payment_id) {
+      const invUpdate: Record<string, unknown> = {
+        negociacao_id: opts.negociacaoId ?? null,
+        renegociacao_id: opts.renegociacaoId ?? null,
+        crm_action_id: opts.crmActionId,
+        updated_at: agora,
+      };
+      if (cancel.status === "cancelado" || cancel.status === "ja_cancelado") invUpdate.status = "cancelled";
+      await admin.from("invoices").update(invUpdate).eq("asaas_invoice_id", p.asaas_payment_id);
+    }
+
+    resultados.push({ asaas_payment_id: p.asaas_payment_id, ...cancel });
+  }
+
+  return resultados;
+}
+
+/** Remove do lote as dívidas que já possuem tratamento registrado (idempotência). */
+async function filtrarNaoTratadas(admin: any, parcelas: any[]) {
+  const ids = parcelas.map((p) => p.asaas_payment_id).filter(Boolean);
+  if (ids.length === 0) return parcelas;
+  const tratadas = new Set<string>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data } = await admin
+      .from("cobranca_tratamentos")
+      .select("asaas_payment_id_original")
+      .in("asaas_payment_id_original", ids.slice(i, i + 200));
+    for (const r of data || []) tratadas.add(r.asaas_payment_id_original);
+  }
+  return parcelas.filter((p) => !p.asaas_payment_id || !tratadas.has(p.asaas_payment_id));
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -235,7 +331,7 @@ Deno.serve(async (req) => {
       let skipped_in_history = 0;
       const customerCache = new Map<string, any>();
       const minOverdueDays = 60;
-      const negotiatedSet = await getNegotiatedPaymentIds(admin);
+      const crmSkipped: string[] = [];
 
       while (true) {
         const page = await asaas(`/payments?status=OVERDUE&limit=${limit}&offset=${offset}`);
@@ -257,6 +353,7 @@ Deno.serve(async (req) => {
 
         // Pagamentos com histórico de cobrança não devem ser ressincronizados
         const inHistorySet = await getPaymentsWithHistory(admin, ids);
+        const crmSet = await getCrmOriginSet(admin, ids);
 
         for (const p of items) {
           const due = p.dueDate as string;
@@ -264,8 +361,9 @@ Deno.serve(async (req) => {
           const dias = daysBetween(due);
           if (dias <= minOverdueDays) continue;
 
-          if (negotiatedSet.has(p.id)) {
-            // parcela criada por negociação/renegociação — pertence ao Histórico
+          if (crmSet.has(p.id)) {
+            // originada pelo CRM ou dívida já tratada — pertence exclusivamente ao Histórico
+            crmSkipped.push(p.id);
             skipped_finalized++;
             continue;
           }
@@ -318,11 +416,12 @@ Deno.serve(async (req) => {
       // reagendadas/quitadas no Asaas. Re-checa cada uma e remove se já não estiver vencida >60d.
       await cleanupBucket(admin, "d60", 60);
       // Limpa linhas residuais cujo asaas_payment_id virou parcela de negociação
-      if (negotiatedSet.size > 0) {
-        const ids = Array.from(negotiatedSet);
-        for (let i = 0; i < ids.length; i += 500) {
-          const chunk = ids.slice(i, i + 500);
-          await admin.from("cobrancas_vencidas").delete().in("asaas_payment_id", chunk);
+      if (crmSkipped.length > 0) {
+        for (let i = 0; i < crmSkipped.length; i += 200) {
+          const chunk = crmSkipped.slice(i, i + 200);
+          await admin.from("cobrancas_vencidas").delete()
+            .in("asaas_payment_id", chunk)
+            .eq("status", "pendente_renegociacao");
         }
       }
       return json({ success: true, total_overdue: total, kept_over_60d: kept, skipped_finalized, skipped_in_history });
@@ -337,7 +436,7 @@ Deno.serve(async (req) => {
       let skipped_finalized = 0;
       let skipped_in_history = 0;
       const customerCache = new Map<string, any>();
-      const negotiatedSet = await getNegotiatedPaymentIds(admin);
+      const crmSkipped: string[] = [];
 
       while (true) {
         const page = await asaas(`/payments?status=OVERDUE&limit=${limit}&offset=${offset}`);
@@ -356,6 +455,7 @@ Deno.serve(async (req) => {
         }
 
         const inHistorySet = await getPaymentsWithHistory(admin, ids);
+        const crmSet = await getCrmOriginSet(admin, ids);
 
         for (const p of items) {
           const due = p.dueDate as string;
@@ -364,7 +464,9 @@ Deno.serve(async (req) => {
           // Bucket d30 = entre 31 e 59 dias de atraso (0–30 fica em Financeiro/Vencido, ≥60 vai para d60)
           if (dias < 31 || dias > 59) continue;
 
-          if (negotiatedSet.has(p.id)) {
+          if (crmSet.has(p.id)) {
+            // originada pelo CRM ou dívida já tratada — pertence exclusivamente ao Histórico
+            crmSkipped.push(p.id);
             skipped_finalized++;
             continue;
           }
@@ -410,11 +512,12 @@ Deno.serve(async (req) => {
       }
 
       await cleanupBucket(admin, "d30", 31, 59);
-      if (negotiatedSet.size > 0) {
-        const ids = Array.from(negotiatedSet);
-        for (let i = 0; i < ids.length; i += 500) {
-          const chunk = ids.slice(i, i + 500);
-          await admin.from("cobrancas_vencidas").delete().in("asaas_payment_id", chunk);
+      if (crmSkipped.length > 0) {
+        for (let i = 0; i < crmSkipped.length; i += 200) {
+          const chunk = crmSkipped.slice(i, i + 200);
+          await admin.from("cobrancas_vencidas").delete()
+            .in("asaas_payment_id", chunk)
+            .eq("status", "pendente_renegociacao");
         }
       }
       return json({ success: true, total_overdue: total, kept_under_30d: kept, skipped_finalized, skipped_in_history });
@@ -484,13 +587,15 @@ Deno.serve(async (req) => {
         .select("*")
         .eq("status", "pendente_renegociacao")
         .eq("bucket", "d60")
+        .eq("originado_pelo_crm", false)
+        .is("negociacao_id", null)
+        .is("renegociacao_id", null)
+        .is("tratada_em", null)
         .order("cliente_nome", { ascending: true });
       if (error) throw error;
 
-      const negotiatedSet = await getNegotiatedPaymentIds(admin);
       const groups = new Map<string, any>();
       for (const row of data || []) {
-        if (row.asaas_payment_id && negotiatedSet.has(row.asaas_payment_id)) continue;
         const key = (row.cliente_cpf_cnpj || row.asaas_customer_id || row.cliente_nome || "sem-id") as string;
         if (!groups.has(key)) {
           groups.set(key, {
@@ -537,13 +642,15 @@ Deno.serve(async (req) => {
         .select("*")
         .eq("status", "pendente_renegociacao")
         .eq("bucket", "d30")
+        .eq("originado_pelo_crm", false)
+        .is("negociacao_id", null)
+        .is("renegociacao_id", null)
+        .is("tratada_em", null)
         .order("cliente_nome", { ascending: true });
       if (error) throw error;
 
-      const negotiatedSet = await getNegotiatedPaymentIds(admin);
       const groups = new Map<string, any>();
       for (const row of data || []) {
-        if (row.asaas_payment_id && negotiatedSet.has(row.asaas_payment_id)) continue;
         const key = (row.cliente_cpf_cnpj || row.asaas_customer_id || row.cliente_nome || "sem-id") as string;
         if (!groups.has(key)) {
           groups.set(key, {
@@ -593,9 +700,15 @@ Deno.serve(async (req) => {
         .eq("status", "pendente_renegociacao").eq("bucket", "d30");
       if (cliente_cpf_cnpj) q = q.eq("cliente_cpf_cnpj", cliente_cpf_cnpj);
       else q = q.eq("asaas_customer_id", asaas_customer_id);
-      const { data: parcelas, error: pErr } = await q;
+      const { data: parcelasRaw, error: pErr } = await q;
       if (pErr) throw pErr;
-      if (!parcelas || parcelas.length === 0) return json({ error: "Nenhuma parcela pendente" }, 400);
+      if (!parcelasRaw || parcelasRaw.length === 0) return json({ error: "Nenhuma parcela pendente" }, 400);
+
+      // Idempotência: descarta dívidas que já foram tratadas pelo CRM
+      const parcelas = await filtrarNaoTratadas(admin, parcelasRaw);
+      if (parcelas.length === 0) {
+        return json({ error: "Todas as parcelas deste cliente já foram tratadas pelo CRM (veja o Histórico)" }, 409);
+      }
 
       const cliente = parcelas[0];
       const totalOriginal = round2(parcelas.reduce((s, p) => s + (Number(p.valor) || 0), 0));
@@ -648,6 +761,8 @@ Deno.serve(async (req) => {
           });
           await admin.from("parcelas_devedor").insert({
             negociacao_id: neg.id,
+            crm_action_id: neg.id,
+            originado_pelo_crm: true,
             numero_parcela: i + 1,
             asaas_payment_id: payment.id,
             valor: valores[i],
@@ -671,10 +786,36 @@ Deno.serve(async (req) => {
         }
       }
 
-      await admin
-        .from("cobrancas_vencidas")
-        .update({ status: isNegociar ? "renegociada" : "cobrada", updated_at: new Date().toISOString() })
-        .in("id", parcelas.map((p) => p.id));
+      if (created.length === 0) {
+        return json({
+          error: "Nenhum boleto pôde ser criado no Asaas — nada foi cancelado e as dívidas seguem na fila",
+          negociacao_id: neg.id,
+        }, 502);
+      }
+
+      // Marca as novas cobranças como originadas pelo CRM (anti-loop)
+      for (const pay of created) {
+        await admin.from("invoices").update({
+          originado_pelo_crm: true,
+          negociacao_id: neg.id,
+          crm_action_id: neg.id,
+          cobranca_origem_id: parcelas[0]?.asaas_payment_id || null,
+        }).eq("asaas_invoice_id", pay.id);
+      }
+
+      // Cancela os boletos originais no Asaas e registra o tratamento auditável
+      const cancelamentos = await tratarCobrancasOriginais(admin, {
+        parcelas,
+        crmActionId: neg.id,
+        tipoAcao: isNegociar ? "negociacao" : "cobranca",
+        motivo: isNegociar ? MOTIVOS.negociacao : MOTIVOS.cobranca,
+        negociacaoId: neg.id,
+        userId,
+        novoStatusFila: isNegociar ? "renegociada" : "cobrada",
+        novasCobrancas: created,
+        observacao: observacao || null,
+      });
+      const cancelamentosPendentes = cancelamentos.filter((c) => c.status === "falhou" || c.status === "nao_aplicavel");
 
       const primeiraFaturaUrl = created[0]?.invoiceUrl || created[0]?.bankSlipUrl || null;
       let clienteEmail: string | null = cliente.cliente_email || null;
@@ -697,6 +838,13 @@ Deno.serve(async (req) => {
       return json({
         success: true,
         negociacao_id: neg.id,
+        crm_action_id: neg.id,
+        cancelamentos,
+        cancelamento_ok: cancelamentosPendentes.length === 0,
+        cancelamentos_pendentes: cancelamentosPendentes,
+        aviso: cancelamentosPendentes.length > 0
+          ? `${cancelamentosPendentes.length} boleto(s) original(is) NÃO foram cancelados no Asaas — verifique manualmente.`
+          : null,
         tipo: isNegociar ? "negociar" : "cobrar",
         parcelas_criadas: created.length,
         primeira_fatura_url: primeiraFaturaUrl,
@@ -721,9 +869,14 @@ Deno.serve(async (req) => {
         .eq("bucket", "d60");
       if (cliente_cpf_cnpj) q = q.eq("cliente_cpf_cnpj", cliente_cpf_cnpj);
       else q = q.eq("asaas_customer_id", asaas_customer_id);
-      const { data: parcelas, error: pErr } = await q;
+      const { data: parcelasRaw, error: pErr } = await q;
       if (pErr) throw pErr;
-      if (!parcelas || parcelas.length === 0) return json({ error: "Nenhuma parcela pendente" }, 400);
+      if (!parcelasRaw || parcelasRaw.length === 0) return json({ error: "Nenhuma parcela pendente" }, 400);
+
+      const parcelas = await filtrarNaoTratadas(admin, parcelasRaw);
+      if (parcelas.length === 0) {
+        return json({ error: "Todas as parcelas deste cliente já foram tratadas pelo CRM (veja o Histórico)" }, 409);
+      }
 
       const totalOriginal = round2(parcelas.reduce((s, p) => s + (Number(p.valor) || 0), 0));
       const acrescimo = round2(totalOriginal * 0.10);
@@ -775,6 +928,8 @@ Deno.serve(async (req) => {
           });
           await admin.from("parcelas_renegociadas").insert({
             renegociacao_id: reneg.id,
+            crm_action_id: reneg.id,
+            originado_pelo_crm: true,
             numero_parcela: i + 1,
             asaas_payment_id: payment.id,
             valor: valores[i],
@@ -798,11 +953,34 @@ Deno.serve(async (req) => {
         }
       }
 
-      // marca parcelas originais como renegociadas
-      await admin
-        .from("cobrancas_vencidas")
-        .update({ status: "renegociada", updated_at: new Date().toISOString() })
-        .in("id", parcelas.map((p) => p.id));
+      if (created.length === 0) {
+        return json({
+          error: "Nenhum boleto pôde ser criado no Asaas — nada foi cancelado e as dívidas seguem na fila",
+          renegociacao_id: reneg.id,
+        }, 502);
+      }
+
+      for (const pay of created) {
+        await admin.from("invoices").update({
+          originado_pelo_crm: true,
+          renegociacao_id: reneg.id,
+          crm_action_id: reneg.id,
+          cobranca_origem_id: parcelas[0]?.asaas_payment_id || null,
+        }).eq("asaas_invoice_id", pay.id);
+      }
+
+      const cancelamentos = await tratarCobrancasOriginais(admin, {
+        parcelas,
+        crmActionId: reneg.id,
+        tipoAcao: "renegociacao",
+        motivo: MOTIVOS.acordo,
+        renegociacaoId: reneg.id,
+        userId,
+        novoStatusFila: "renegociada",
+        novasCobrancas: created,
+        observacao: observacao || null,
+      });
+      const cancelamentosPendentes = cancelamentos.filter((c) => c.status === "falhou" || c.status === "nao_aplicavel");
 
       // ── extra info para o front disparar notificação ──
       const primeiraFaturaUrl = created[0]?.invoiceUrl || created[0]?.bankSlipUrl || null;
@@ -841,6 +1019,13 @@ Deno.serve(async (req) => {
       return json({
         success: true,
         renegociacao_id: reneg.id,
+        crm_action_id: reneg.id,
+        cancelamentos,
+        cancelamento_ok: cancelamentosPendentes.length === 0,
+        cancelamentos_pendentes: cancelamentosPendentes,
+        aviso: cancelamentosPendentes.length > 0
+          ? `${cancelamentosPendentes.length} boleto(s) original(is) NÃO foram cancelados no Asaas — verifique manualmente.`
+          : null,
         parcelas_criadas: created.length,
         primeira_fatura_url: primeiraFaturaUrl,
         valor_debito_original: totalOriginal,

@@ -679,6 +679,96 @@ export type Database = {
           },
         ]
       }
+      cobranca_tratamentos: {
+        Row: {
+          asaas_customer_id: string | null
+          asaas_payment_id_original: string | null
+          cancelamento_em: string | null
+          cancelamento_resposta: Json | null
+          cancelamento_status: string
+          cliente_cpf_cnpj: string | null
+          cliente_nome: string | null
+          cliente_user_id: string | null
+          cobranca_original_id: string | null
+          created_at: string
+          crm_action_id: string
+          id: string
+          invoice_original_id: string | null
+          motivo: string
+          negociacao_id: string | null
+          nova_cobranca_asaas_id: string | null
+          novo_boleto_url: string | null
+          novo_valor: number | null
+          novo_vencimento: string | null
+          observacao: string | null
+          renegociacao_id: string | null
+          responsavel_id: string | null
+          status_negociacao: string
+          tipo_acao: string
+          updated_at: string
+          valor_original: number | null
+          vencimento_original: string | null
+        }
+        Insert: {
+          asaas_customer_id?: string | null
+          asaas_payment_id_original?: string | null
+          cancelamento_em?: string | null
+          cancelamento_resposta?: Json | null
+          cancelamento_status?: string
+          cliente_cpf_cnpj?: string | null
+          cliente_nome?: string | null
+          cliente_user_id?: string | null
+          cobranca_original_id?: string | null
+          created_at?: string
+          crm_action_id: string
+          id?: string
+          invoice_original_id?: string | null
+          motivo: string
+          negociacao_id?: string | null
+          nova_cobranca_asaas_id?: string | null
+          novo_boleto_url?: string | null
+          novo_valor?: number | null
+          novo_vencimento?: string | null
+          observacao?: string | null
+          renegociacao_id?: string | null
+          responsavel_id?: string | null
+          status_negociacao?: string
+          tipo_acao: string
+          updated_at?: string
+          valor_original?: number | null
+          vencimento_original?: string | null
+        }
+        Update: {
+          asaas_customer_id?: string | null
+          asaas_payment_id_original?: string | null
+          cancelamento_em?: string | null
+          cancelamento_resposta?: Json | null
+          cancelamento_status?: string
+          cliente_cpf_cnpj?: string | null
+          cliente_nome?: string | null
+          cliente_user_id?: string | null
+          cobranca_original_id?: string | null
+          created_at?: string
+          crm_action_id?: string
+          id?: string
+          invoice_original_id?: string | null
+          motivo?: string
+          negociacao_id?: string | null
+          nova_cobranca_asaas_id?: string | null
+          novo_boleto_url?: string | null
+          novo_valor?: number | null
+          novo_vencimento?: string | null
+          observacao?: string | null
+          renegociacao_id?: string | null
+          responsavel_id?: string | null
+          status_negociacao?: string
+          tipo_acao?: string
+          updated_at?: string
+          valor_original?: number | null
+          vencimento_original?: string | null
+        }
+        Relationships: []
+      }
       cobrancas_vencidas: {
         Row: {
           asaas_customer_id: string | null
@@ -687,12 +777,19 @@ export type Database = {
           cliente_cpf_cnpj: string | null
           cliente_email: string | null
           cliente_nome: string | null
+          cobranca_origem_id: string | null
           created_at: string
+          crm_action_id: string | null
           data_vencimento: string | null
           descricao: string | null
           dias_atraso: number | null
           id: string
+          negociacao_id: string | null
+          originado_pelo_crm: boolean
+          renegociacao_id: string | null
           status: string
+          tratada_em: string | null
+          tratada_por: string | null
           updated_at: string
           valor: number
         }
@@ -703,12 +800,19 @@ export type Database = {
           cliente_cpf_cnpj?: string | null
           cliente_email?: string | null
           cliente_nome?: string | null
+          cobranca_origem_id?: string | null
           created_at?: string
+          crm_action_id?: string | null
           data_vencimento?: string | null
           descricao?: string | null
           dias_atraso?: number | null
           id?: string
+          negociacao_id?: string | null
+          originado_pelo_crm?: boolean
+          renegociacao_id?: string | null
           status?: string
+          tratada_em?: string | null
+          tratada_por?: string | null
           updated_at?: string
           valor?: number
         }
@@ -719,12 +823,19 @@ export type Database = {
           cliente_cpf_cnpj?: string | null
           cliente_email?: string | null
           cliente_nome?: string | null
+          cobranca_origem_id?: string | null
           created_at?: string
+          crm_action_id?: string | null
           data_vencimento?: string | null
           descricao?: string | null
           dias_atraso?: number | null
           id?: string
+          negociacao_id?: string | null
+          originado_pelo_crm?: boolean
+          renegociacao_id?: string | null
           status?: string
+          tratada_em?: string | null
+          tratada_por?: string | null
           updated_at?: string
           valor?: number
         }
@@ -2068,12 +2179,16 @@ export type Database = {
           asaas_customer_id: string | null
           asaas_invoice_id: string | null
           boleto_code: string | null
+          cobranca_origem_id: string | null
           contract_id: string | null
           created_at: string | null
+          crm_action_id: string | null
           description: string
           due_date: string
           id: string
           invoice_url: string | null
+          negociacao_id: string | null
+          originado_pelo_crm: boolean
           payment_date: string | null
           payment_link: string | null
           payment_method: string | null
@@ -2081,6 +2196,7 @@ export type Database = {
           pix_payload: string | null
           pix_qr_code: string | null
           process_id: string | null
+          renegociacao_id: string | null
           status: string | null
           updated_at: string | null
           user_id: string | null
@@ -2090,12 +2206,16 @@ export type Database = {
           asaas_customer_id?: string | null
           asaas_invoice_id?: string | null
           boleto_code?: string | null
+          cobranca_origem_id?: string | null
           contract_id?: string | null
           created_at?: string | null
+          crm_action_id?: string | null
           description: string
           due_date: string
           id?: string
           invoice_url?: string | null
+          negociacao_id?: string | null
+          originado_pelo_crm?: boolean
           payment_date?: string | null
           payment_link?: string | null
           payment_method?: string | null
@@ -2103,6 +2223,7 @@ export type Database = {
           pix_payload?: string | null
           pix_qr_code?: string | null
           process_id?: string | null
+          renegociacao_id?: string | null
           status?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -2112,12 +2233,16 @@ export type Database = {
           asaas_customer_id?: string | null
           asaas_invoice_id?: string | null
           boleto_code?: string | null
+          cobranca_origem_id?: string | null
           contract_id?: string | null
           created_at?: string | null
+          crm_action_id?: string | null
           description?: string
           due_date?: string
           id?: string
           invoice_url?: string | null
+          negociacao_id?: string | null
+          originado_pelo_crm?: boolean
           payment_date?: string | null
           payment_link?: string | null
           payment_method?: string | null
@@ -2125,6 +2250,7 @@ export type Database = {
           pix_payload?: string | null
           pix_qr_code?: string | null
           process_id?: string | null
+          renegociacao_id?: string | null
           status?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -3397,6 +3523,7 @@ export type Database = {
         Row: {
           asaas_payment_id: string | null
           created_at: string
+          crm_action_id: string | null
           data_vencimento: string
           id: string
           invoice_url: string | null
@@ -3404,6 +3531,7 @@ export type Database = {
           motivo_cobranca: string | null
           negociacao_id: string
           numero_parcela: number
+          originado_pelo_crm: boolean
           status: string | null
           updated_at: string
           valor: number
@@ -3411,6 +3539,7 @@ export type Database = {
         Insert: {
           asaas_payment_id?: string | null
           created_at?: string
+          crm_action_id?: string | null
           data_vencimento: string
           id?: string
           invoice_url?: string | null
@@ -3418,6 +3547,7 @@ export type Database = {
           motivo_cobranca?: string | null
           negociacao_id: string
           numero_parcela: number
+          originado_pelo_crm?: boolean
           status?: string | null
           updated_at?: string
           valor: number
@@ -3425,6 +3555,7 @@ export type Database = {
         Update: {
           asaas_payment_id?: string | null
           created_at?: string
+          crm_action_id?: string | null
           data_vencimento?: string
           id?: string
           invoice_url?: string | null
@@ -3432,6 +3563,7 @@ export type Database = {
           motivo_cobranca?: string | null
           negociacao_id?: string
           numero_parcela?: number
+          originado_pelo_crm?: boolean
           status?: string | null
           updated_at?: string
           valor?: number
@@ -3450,12 +3582,14 @@ export type Database = {
         Row: {
           asaas_payment_id: string | null
           created_at: string
+          crm_action_id: string | null
           data_vencimento: string
           id: string
           invoice_url: string | null
           link_boleto: string | null
           motivo_cobranca: string
           numero_parcela: number
+          originado_pelo_crm: boolean
           renegociacao_id: string
           status: string
           updated_at: string
@@ -3464,12 +3598,14 @@ export type Database = {
         Insert: {
           asaas_payment_id?: string | null
           created_at?: string
+          crm_action_id?: string | null
           data_vencimento: string
           id?: string
           invoice_url?: string | null
           link_boleto?: string | null
           motivo_cobranca: string
           numero_parcela: number
+          originado_pelo_crm?: boolean
           renegociacao_id: string
           status?: string
           updated_at?: string
@@ -3478,12 +3614,14 @@ export type Database = {
         Update: {
           asaas_payment_id?: string | null
           created_at?: string
+          crm_action_id?: string | null
           data_vencimento?: string
           id?: string
           invoice_url?: string | null
           link_boleto?: string | null
           motivo_cobranca?: string
           numero_parcela?: number
+          originado_pelo_crm?: boolean
           renegociacao_id?: string
           status?: string
           updated_at?: string
