@@ -173,7 +173,7 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
         .from("cobranca_historico")
         .select("id, invoice_id, user_id, enviada_em, canais, status, cliente_nome, proxima_acao_em, situacao, pago_em, pago_manual")
         .order("enviada_em", { ascending: false })
-        .limit(200);
+        .limit(1000);
       setHistory((hist as any) || []);
 
       const histUserIds = Array.from(new Set(((hist as any[]) || []).map((h) => h.user_id).filter(Boolean))) as string[];
