@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { registrarTratamento, MOTIVOS } from "../_shared/crmCobranca.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -110,7 +111,7 @@ serve(async (req) => {
 
     const { data: invoice, error: invErr } = await admin
       .from("invoices")
-      .select("id, user_id, contract_id, amount, due_date, status, invoice_url, asaas_invoice_id, description, profiles:user_id(full_name,email,phone)")
+      .select("id, user_id, contract_id, amount, due_date, status, invoice_url, asaas_invoice_id, description, originado_pelo_crm, negociacao_id, renegociacao_id, profiles:user_id(full_name,email,phone)")
       .eq("id", invoice_id)
       .maybeSingle();
 
@@ -245,7 +246,7 @@ serve(async (req) => {
 
     const proximaAcao = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    await admin.from("cobranca_historico").insert({
+    const { data: histRow } = await admin.from("cobranca_historico").insert({
       invoice_id,
       user_id: invoice.user_id,
       cliente_nome: nome,
@@ -259,7 +260,31 @@ serve(async (req) => {
       message_email_html: emailHtml,
       message_email_subject: subject,
       metadata: { notif: notifResult ?? null, error: notifErr?.message ?? null, asaas_link: link || null, asaas_unavailable: asaasUnavailable },
-    });
+    }).select("id").maybeSingle();
+
+    // Registro auditável do tratamento: a dívida sai da fila ativa no momento da
+    // cobrança (não espera o pagamento). Cobrança pelo link original não gera
+    // novo boleto, portanto não há cancelamento no Asaas.
+    if (!(invoice as any).originado_pelo_crm) {
+      await registrarTratamento(admin, {
+        crm_action_id: histRow?.id || crypto.randomUUID(),
+        tipo_acao: "cobranca",
+        motivo: MOTIVOS.cobranca,
+        cliente_nome: nome,
+        cliente_user_id: invoice.user_id,
+        invoice_original_id: invoice.id,
+        asaas_payment_id_original: asaasId,
+        valor_original: Number(invoice.amount || 0),
+        vencimento_original: invoice.due_date,
+        nova_cobranca_asaas_id: null,
+        novo_boleto_url: link || null,
+        cancelamento_status: "nao_aplicavel",
+        cancelamento_resposta: { message: "Cobrança enviada pelo link original do Asaas — boleto mantido" },
+        cancelamento_em: new Date().toISOString(),
+        status_negociacao: "aguardando_pagamento",
+        responsavel_id: null,
+      });
+    }
 
     return new Response(JSON.stringify({
       success: true,
