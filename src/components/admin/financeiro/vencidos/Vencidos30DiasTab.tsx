@@ -97,24 +97,16 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
   const load = async () => {
     setLoading(true);
     try {
-      // Carrega asaas_payment_id de parcelas geradas por negociação/renegociação
-      // para excluí-las desta lista — pertencem apenas ao Histórico de Devedores.
-      const negSet = new Set<string>();
-      try {
-        const [{ data: pd }, { data: pr }] = await Promise.all([
-          supabase.from("parcelas_devedor").select("asaas_payment_id").not("asaas_payment_id", "is", null),
-          supabase.from("parcelas_renegociadas").select("asaas_payment_id").not("asaas_payment_id", "is", null),
-        ]);
-        for (const r of pd || []) if ((r as any).asaas_payment_id) negSet.add((r as any).asaas_payment_id);
-        for (const r of pr || []) if ((r as any).asaas_payment_id) negSet.add((r as any).asaas_payment_id);
-      } catch (e) { console.warn("negotiated payments fetch failed", e); }
-      setNegotiatedPaymentIds(negSet);
-
       const since = subDays(new Date(), 30).toISOString().split("T")[0];
       const today = new Date().toISOString().split("T")[0];
+      // Filtro no banco: cobranças originadas pelo CRM (parcelas de negociação/
+      // acordo) e dívidas já vinculadas a uma negociação nunca aparecem na fila.
       const { data, error } = await supabase
         .from("invoices")
         .select("id, description, amount, due_date, status, invoice_url, user_id, asaas_invoice_id, profiles:user_id(full_name,email,phone)")
+        .eq("originado_pelo_crm", false)
+        .is("negociacao_id", null)
+        .is("renegociacao_id", null)
         .gte("due_date", since)
         .lte("due_date", today)
         .order("due_date", { ascending: false })
@@ -122,16 +114,38 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
       if (error) throw error;
       // Só consideramos vencido se a data de vencimento já passou.
       // Status 'overdue' isolado não basta — o Asaas pode ter reagendado a fatura para o futuro.
-      const overdue = (data || []).filter((i: any) => {
+      const candidatas = (data || []).filter((i: any) => {
         const s = i.status || "";
         if (PAID.includes(s)) return false;
-        if (s === "cancelled" || s === "CANCELLED") return false;
+        if (s === "cancelled" || s === "CANCELLED" || s === "canceled") return false;
         if (!i.due_date) return false;
         if (daysAgo(i.due_date) <= 0) return false; // vence hoje ou no futuro → não vencido
-        // parcela criada por negociação/renegociação → não aparece em Vencidos
-        if (i.asaas_invoice_id && negSet.has(i.asaas_invoice_id)) return false;
         return s === "pending" || s === "overdue" || s === "OVERDUE";
       });
+
+      // Dívidas já tratadas pelo CRM (cobrança/negociação/acordo) pertencem ao
+      // Histórico. Consulta feita por lotes do próprio resultado — não depende
+      // do limite de 1.000 linhas do Supabase.
+      const tratadas = new Set<string>();
+      const payIds = candidatas.map((i: any) => i.asaas_invoice_id).filter(Boolean) as string[];
+      const invIds = candidatas.map((i: any) => i.id) as string[];
+      try {
+        for (let k = 0; k < Math.max(payIds.length, invIds.length); k += 200) {
+          const payChunk = payIds.slice(k, k + 200);
+          const invChunk = invIds.slice(k, k + 200);
+          const [byPay, byNova, byInv] = await Promise.all([
+            payChunk.length ? supabase.from("cobranca_tratamentos").select("asaas_payment_id_original").in("asaas_payment_id_original", payChunk) : Promise.resolve({ data: [] as any[] }),
+            payChunk.length ? supabase.from("cobranca_tratamentos").select("nova_cobranca_asaas_id").in("nova_cobranca_asaas_id", payChunk) : Promise.resolve({ data: [] as any[] }),
+            invChunk.length ? supabase.from("cobranca_tratamentos").select("invoice_original_id").in("invoice_original_id", invChunk) : Promise.resolve({ data: [] as any[] }),
+          ]);
+          for (const r of (byPay.data as any[]) || []) tratadas.add(r.asaas_payment_id_original);
+          for (const r of (byNova.data as any[]) || []) tratadas.add(r.nova_cobranca_asaas_id);
+          for (const r of (byInv.data as any[]) || []) tratadas.add(r.invoice_original_id);
+        }
+      } catch (e) { console.warn("consulta de tratamentos falhou", e); }
+
+      const overdue = candidatas.filter((i: any) => !tratadas.has(i.id) && !(i.asaas_invoice_id && tratadas.has(i.asaas_invoice_id)));
+      setNegotiatedPaymentIds(tratadas);
       setInvoices(overdue as any);
 
       const { data: hist } = await supabase
