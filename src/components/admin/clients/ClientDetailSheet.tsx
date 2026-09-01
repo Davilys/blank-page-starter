@@ -43,7 +43,7 @@ import {
 import { EmailCompose } from '@/components/admin/email/EmailCompose';
 import { CreateInvoiceDialog } from './CreateInvoiceDialog';
 import { Separator } from '@/components/ui/separator';
-import { Newspaper, Gavel, Award, BellRing, Activity as ActivityIcon } from 'lucide-react';
+import { Newspaper, Gavel, Award, BellRing, Activity as ActivityIcon, ChevronDown, History } from 'lucide-react';
 import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
 
 const MASTER_ADMIN_EMAIL = 'davillys@gmail.com';
