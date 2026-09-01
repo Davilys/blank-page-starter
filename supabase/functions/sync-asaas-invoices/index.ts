@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getCrmOriginSet } from "../_shared/crmCobranca.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -42,6 +43,28 @@ serve(async (req) => {
     }
 
     console.log(`Found ${pendingInvoices.length} pending invoices to sync`);
+
+    // Marca (idempotente) as faturas que correspondem a cobranças criadas pelo próprio CRM.
+    // Elas continuam sendo sincronizadas de status, mas nunca voltam para as filas de cobrança.
+    let marked_crm = 0;
+    try {
+      const allIds = pendingInvoices.map((i) => i.asaas_invoice_id).filter(Boolean) as string[];
+      for (let i = 0; i < allIds.length; i += 200) {
+        const chunk = allIds.slice(i, i + 200);
+        const crmSet = await getCrmOriginSet(supabase, chunk);
+        const toMark = chunk.filter((id) => crmSet.has(id));
+        if (toMark.length > 0) {
+          const { error } = await supabase
+            .from('invoices')
+            .update({ originado_pelo_crm: true })
+            .in('asaas_invoice_id', toMark)
+            .eq('originado_pelo_crm', false);
+          if (!error) marked_crm += toMark.length;
+        }
+      }
+    } catch (e) {
+      console.warn('marcação de origem CRM falhou', e);
+    }
 
     let synced = 0;
     let removed = 0;
@@ -174,6 +197,7 @@ serve(async (req) => {
         success: true,
         synced,
         removed,
+        marked_crm,
         total: pendingInvoices.length,
         errors: errors.length > 0 ? errors : undefined,
         message: synced > 0
