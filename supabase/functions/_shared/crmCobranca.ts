@@ -97,20 +97,25 @@ export async function getCrmOriginSet(admin: any, ids: string[]): Promise<Set<st
   const CHUNK = 200;
   for (let i = 0; i < clean.length; i += CHUNK) {
     const chunk = clean.slice(i, i + CHUNK);
-    const [pd, pr, inv, cv, tratNovo, tratOrig] = await Promise.all([
+    const [pd, pr, inv, cv, tratNovo, tratOrig, tratLista] = await Promise.all([
       admin.from("parcelas_devedor").select("asaas_payment_id").in("asaas_payment_id", chunk),
       admin.from("parcelas_renegociadas").select("asaas_payment_id").in("asaas_payment_id", chunk),
       admin.from("invoices").select("asaas_invoice_id").eq("originado_pelo_crm", true).in("asaas_invoice_id", chunk),
       admin.from("cobrancas_vencidas").select("asaas_payment_id").eq("originado_pelo_crm", true).in("asaas_payment_id", chunk),
       admin.from("cobranca_tratamentos").select("nova_cobranca_asaas_id").in("nova_cobranca_asaas_id", chunk),
       admin.from("cobranca_tratamentos").select("asaas_payment_id_original").in("asaas_payment_id_original", chunk),
+      admin.from("cobranca_tratamentos").select("novos_boletos_asaas_ids").overlaps("novos_boletos_asaas_ids", chunk),
     ]);
+    const chunkSet = new Set(chunk);
     for (const r of pd.data || []) out.add(r.asaas_payment_id);
     for (const r of pr.data || []) out.add(r.asaas_payment_id);
     for (const r of inv.data || []) out.add(r.asaas_invoice_id);
     for (const r of cv.data || []) out.add(r.asaas_payment_id);
     for (const r of tratNovo.data || []) out.add(r.nova_cobranca_asaas_id);
     for (const r of tratOrig.data || []) out.add(r.asaas_payment_id_original);
+    for (const r of tratLista.data || []) {
+      for (const id of r.novos_boletos_asaas_ids || []) if (chunkSet.has(id)) out.add(id);
+    }
   }
   return out;
 }
@@ -122,4 +127,34 @@ export async function registrarTratamento(admin: any, row: Record<string, unknow
     .upsert(row, { onConflict: "asaas_payment_id_original,crm_action_id", ignoreDuplicates: false });
   if (error) console.error("registrarTratamento falhou", error, row);
   return !error;
+}
+
+/**
+ * Reserva atômica: marca as dívidas como tratadas ANTES de criar qualquer boleto.
+ * Só devolve as linhas que este processo conseguiu reservar (tratada_em era NULL),
+ * então duas ações simultâneas sobre o mesmo cliente nunca geram dois acordos.
+ */
+export async function reservarParcelas(admin: any, parcelas: any[], crmActionId: string, userId: string) {
+  const ids = parcelas.map((p) => p.id).filter(Boolean);
+  if (ids.length === 0) return [] as any[];
+  const { data, error } = await admin
+    .from("cobrancas_vencidas")
+    .update({ tratada_em: new Date().toISOString(), tratada_por: userId, crm_action_id: crmActionId, updated_at: new Date().toISOString() })
+    .in("id", ids)
+    .is("tratada_em", null)
+    .select("id");
+  if (error) throw error;
+  const reservados = new Set((data || []).map((r: any) => r.id));
+  return parcelas.filter((p) => reservados.has(p.id));
+}
+
+/** Desfaz a reserva quando nenhum boleto pôde ser criado. */
+export async function liberarParcelas(admin: any, parcelas: any[], crmActionId: string) {
+  const ids = parcelas.map((p) => p.id).filter(Boolean);
+  if (ids.length === 0) return;
+  await admin
+    .from("cobrancas_vencidas")
+    .update({ tratada_em: null, tratada_por: null, crm_action_id: null, updated_at: new Date().toISOString() })
+    .in("id", ids)
+    .eq("crm_action_id", crmActionId);
 }

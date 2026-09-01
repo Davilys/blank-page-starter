@@ -1,7 +1,7 @@
 // Testes do módulo Financeiro — regras anti-loop e cancelamento no Asaas.
 // Não realizam chamadas reais ao Asaas nem criam cobranças: a API é simulada.
 import { assertEquals, assert } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { cancelarCobrancaAsaas, getCrmOriginSet } from "../_shared/crmCobranca.ts";
+import { cancelarCobrancaAsaas, getCrmOriginSet, reservarParcelas, liberarParcelas } from "../_shared/crmCobranca.ts";
 
 const BASE = "https://api.asaas.com/v3";
 const KEY = "test-key";
@@ -17,6 +17,10 @@ function fakeAdmin(tables: Record<string, Row[]>) {
         eq(col: string, val: unknown) { rows = rows.filter((r) => r[col] === val); return api; },
         in(col: string, vals: unknown[]) {
           rows = rows.filter((r) => vals.includes(r[col]));
+          return Promise.resolve({ data: rows, error: null });
+        },
+        overlaps(col: string, vals: unknown[]) {
+          rows = rows.filter((r) => (r[col] || []).some((v: unknown) => vals.includes(v)));
           return Promise.resolve({ data: rows, error: null });
         },
       };
@@ -174,4 +178,72 @@ Deno.test("Cenário 9 — sincronizações repetidas não alteram o resultado (i
     if (anterior) assertEquals(fila, anterior);
     anterior = fila;
   }
+});
+
+
+// ───────────────── Concorrência (reserva atômica) ─────────────────
+/** Banco simulado com UPDATE ... WHERE tratada_em IS NULL atômico. */
+function fakeFila(linhas: Row[]) {
+  const store = linhas.map((l) => ({ ...l }));
+  return {
+    store,
+    from(_t: string) {
+      let patch: Row = {};
+      let ids: unknown[] = [];
+      let exigeNulo = false;
+      let eqCol: string | null = null;
+      let eqVal: unknown = null;
+      const api: any = {
+        update(p: Row) { patch = p; return api; },
+        in(_c: string, v: unknown[]) { ids = v; return api; },
+        is(_c: string, _v: null) { exigeNulo = true; return api; },
+        eq(c: string, v: unknown) { eqCol = c; eqVal = v; return api; },
+        select(_c: string) {
+          const alvo = store.filter((r) =>
+            ids.includes(r.id) &&
+            (!exigeNulo || r.tratada_em == null) &&
+            (eqCol === null || r[eqCol] === eqVal));
+          for (const r of alvo) Object.assign(r, patch);
+          return Promise.resolve({ data: alvo.map((r) => ({ id: r.id })), error: null });
+        },
+        then(res: any) { return api.select("id").then(res); },
+      };
+      return api;
+    },
+  };
+}
+
+Deno.test("Cenário 18 — duas ações simultâneas não geram dois acordos", async () => {
+  const db = fakeFila([{ id: "c1", tratada_em: null }, { id: "c2", tratada_em: null }]);
+  const parcelas = [{ id: "c1" }, { id: "c2" }];
+  const [a, b] = await Promise.all([
+    reservarParcelas(db, parcelas, "acao_A", "user_1"),
+    reservarParcelas(db, parcelas, "acao_B", "user_2"),
+  ]);
+  assertEquals(a.length + b.length, 2, "cada dívida só pode ser reservada uma vez");
+  assert(a.length === 0 || b.length === 0, "a segunda ação simultânea deve receber zero dívidas");
+});
+
+Deno.test("Cenário 16 — falha total no Asaas libera a reserva e a dívida volta à fila", async () => {
+  const db = fakeFila([{ id: "c1", tratada_em: null }]);
+  const reservadas = await reservarParcelas(db, [{ id: "c1" }], "acao_A", "user_1");
+  assertEquals(reservadas.length, 1);
+  assert(db.store[0].tratada_em !== null);
+  await liberarParcelas(db, reservadas, "acao_A");
+  assertEquals(db.store[0].tratada_em, null);
+  assertEquals(db.store[0].crm_action_id, null);
+});
+
+Deno.test("Cenário 8b — todos os boletos da negociação (não só o 1º) ficam fora das filas", async () => {
+  const admin = fakeAdmin({
+    parcelas_devedor: [], parcelas_renegociadas: [], invoices: [], cobrancas_vencidas: [],
+    cobranca_tratamentos: [{
+      asaas_payment_id_original: "orig_1",
+      nova_cobranca_asaas_id: "novo_1",
+      novos_boletos_asaas_ids: ["novo_1", "novo_2", "novo_3", "novo_4", "novo_5"],
+    }],
+  });
+  const set = await getCrmOriginSet(admin, ["novo_1", "novo_2", "novo_3", "novo_4", "novo_5", "ext_1"]);
+  for (const id of ["novo_1", "novo_2", "novo_3", "novo_4", "novo_5"]) assert(set.has(id), id);
+  assert(!set.has("ext_1"));
 });

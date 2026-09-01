@@ -700,6 +700,7 @@ export type Database = {
           novo_boleto_url: string | null
           novo_valor: number | null
           novo_vencimento: string | null
+          novos_boletos_asaas_ids: string[]
           observacao: string | null
           renegociacao_id: string | null
           responsavel_id: string | null
@@ -729,6 +730,7 @@ export type Database = {
           novo_boleto_url?: string | null
           novo_valor?: number | null
           novo_vencimento?: string | null
+          novos_boletos_asaas_ids?: string[]
           observacao?: string | null
           renegociacao_id?: string | null
           responsavel_id?: string | null
@@ -758,6 +760,7 @@ export type Database = {
           novo_boleto_url?: string | null
           novo_valor?: number | null
           novo_vencimento?: string | null
+          novos_boletos_asaas_ids?: string[]
           observacao?: string | null
           renegociacao_id?: string | null
           responsavel_id?: string | null
