@@ -36,10 +36,14 @@ import { useJuridicoStages } from '@/hooks/useJuridicoStages';
 import { ServiceActionPanel } from './ServiceActionPanel';
 import { usePricing } from '@/hooks/usePricing';
 import { PLAN_CONFIG } from './ClientKanbanBoard';
+import { ClientEmailHistory } from './ClientEmailHistory';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { EmailCompose } from '@/components/admin/email/EmailCompose';
 import { CreateInvoiceDialog } from './CreateInvoiceDialog';
 import { Separator } from '@/components/ui/separator';
-import { Newspaper, Gavel, Award, BellRing, Activity as ActivityIcon } from 'lucide-react';
+import { Newspaper, Gavel, Award, BellRing, Activity as ActivityIcon, ChevronDown, History } from 'lucide-react';
 import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
 
 const MASTER_ADMIN_EMAIL = 'davillys@gmail.com';
@@ -212,6 +216,8 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
   const [deletingBrandId, setDeletingBrandId] = useState<string | null>(null);
   const [adminUsersList, setAdminUsersList] = useState<{ id: string; full_name: string | null; email: string }[]>([]);
   const [showEmailCompose, setShowEmailCompose] = useState(false);
+  const [showEmailHistory, setShowEmailHistory] = useState(false);
+  const [emailHistoryToken, setEmailHistoryToken] = useState(0);
   const [adminEmailAccount, setAdminEmailAccount] = useState<{ id: string; email_address: string } | null>(null);
 
   // Inline contact editor states
@@ -940,7 +946,8 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
 
   const _handleQuickActionImpl = async (actionId: string) => {
     // Auto-close other inline views when switching
-    if (actionId === 'email') { setShowProcessDetails(false); }
+    if (actionId === 'email') { setShowProcessDetails(false); setShowEmailHistory(false); }
+    if (actionId === 'processo') { setShowEmailHistory(false); }
     if (actionId === 'processo') { setShowEmailCompose(false); }
     if (['chat', 'move', 'notification', 'excluir', 'nova_fatura'].includes(actionId)) {
       setShowProcessDetails(false);
@@ -953,8 +960,14 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         break;
       case 'move': setShowMoveDialog(true); break;
       case 'email':
-        if (client?.email) setShowEmailCompose(true);
+        if (client?.email) { setShowEmailHistory(false); setShowEmailCompose(true); }
         else toast.error('Cliente sem e-mail cadastrado');
+        break;
+      case 'email_historico':
+        setShowProcessDetails(false);
+        setShowEmailCompose(false);
+        setEmailHistoryToken((v) => v + 1);
+        setShowEmailHistory(true);
         break;
       case 'notification':
         if (client) {
@@ -1439,6 +1452,31 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                 <div className="flex flex-wrap gap-2">
                   {QUICK_ACTIONS.map(action => {
                     const isSpecialActive = action.id === 'cliente_especial' && (client as any).is_special_client;
+                    if (action.id === 'email') {
+                      return (
+                        <DropdownMenu key={action.id}>
+                          <DropdownMenuTrigger asChild>
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              className={cn('px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors', action.cls)}
+                            >
+                              <action.icon className="h-3.5 w-3.5" />
+                              {action.label}
+                              <ChevronDown className="h-3 w-3 opacity-70" />
+                            </motion.button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="w-56">
+                            <DropdownMenuItem onSelect={() => handleQuickAction('email')}>
+                              <Mail className="h-3.5 w-3.5 mr-2" /> Escrever e-mail
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => handleQuickAction('email_historico')}>
+                              <History className="h-3.5 w-3.5 mr-2" /> Histórico de e-mails
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      );
+                    }
                     return (
                     <motion.button
                       key={action.id}
@@ -1816,6 +1854,32 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                 </div>
               </ScrollArea>
             </div>
+          ) : showEmailHistory ? (
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <div className="flex items-center gap-2 px-4 py-2 border-b border-border flex-shrink-0">
+                <Button variant="ghost" size="sm" onClick={() => setShowEmailHistory(false)} className="gap-1.5">
+                  <X className="h-4 w-4" /> Voltar ao ficheiro
+                </Button>
+                <span className="text-sm text-muted-foreground">Histórico de e-mails — <strong>{client.full_name}</strong></span>
+                {client?.email && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="ml-auto gap-1.5"
+                    onClick={() => { setShowEmailHistory(false); setShowEmailCompose(true); }}
+                  >
+                    <Mail className="h-3.5 w-3.5" /> Escrever e-mail
+                  </Button>
+                )}
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <ClientEmailHistory
+                  clientId={client.id}
+                  clientName={client.full_name || ''}
+                  refreshToken={emailHistoryToken}
+                />
+              </div>
+            </div>
           ) : showEmailCompose ? (
             <div className="flex-1 overflow-hidden flex flex-col">
               <div className="flex items-center gap-2 px-4 py-2 border-b border-border flex-shrink-0">
@@ -1826,7 +1890,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
               </div>
               <div className="flex-1 overflow-hidden">
                 <EmailCompose
-                  onClose={() => setShowEmailCompose(false)}
+                  onClose={() => { setShowEmailCompose(false); setEmailHistoryToken((v) => v + 1); }}
                   initialTo={client.email}
                   initialName={client.full_name || ''}
                   accountId={adminEmailAccount?.id || null}

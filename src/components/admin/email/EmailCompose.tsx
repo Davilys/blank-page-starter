@@ -365,21 +365,11 @@ export function EmailCompose({ onClose, replyTo, initialTo, initialName, initial
         .replace(/_(.*?)_/g, '<em>$1</em>')
         .replace(/\n/g, '<br/>');
 
-      const response = await supabase.functions.invoke('send-email', {
-        body: {
-          to: to.split(',').map(e => e.trim()),
-          cc: cc ? cc.split(',').map(e => e.trim()) : undefined,
-          bcc: bcc ? bcc.split(',').map(e => e.trim()) : undefined,
-          subject,
-          body,
-          html: `<div style="font-family: Georgia, serif; max-width: 640px; margin: 0 auto; padding: 32px; color: #1a1a1a; line-height: 1.7;">${htmlBody}</div>`,
-          attachments: attachments.map(a => ({ url: a.url, filename: a.name })),
-          account_id: accountId || undefined, // Send via user's SMTP when available
-        },
-      });
-      if (response.error) throw response.error;
+      // Vínculo com o cliente sempre pelo ID interno (nunca pelo endereço de e-mail)
+      const clientId = initialClientData?.id || selectedClient?.id || null;
+      const attachmentsMeta = attachments.map(a => ({ name: a.name, url: a.url, size: a.size, type: a.type }));
 
-      await supabase.from('email_logs').insert({
+      const baseLog = {
         from_email: fromEmail,
         to_email: to,
         cc_emails: cc ? cc.split(',').map(e => e.trim()) : null,
@@ -387,11 +377,53 @@ export function EmailCompose({ onClose, replyTo, initialTo, initialName, initial
         subject,
         body,
         html_body: htmlBody,
-        status: 'sent',
         trigger_type: isProcessualMode ? 'processual' : 'manual',
         sent_by: user.id,
-      });
-      return response.data;
+        client_id: clientId,
+        attachments: attachmentsMeta,
+      };
+
+      try {
+        const response = await supabase.functions.invoke('send-email', {
+          body: {
+            to: to.split(',').map(e => e.trim()),
+            cc: cc ? cc.split(',').map(e => e.trim()) : undefined,
+            bcc: bcc ? bcc.split(',').map(e => e.trim()) : undefined,
+            subject,
+            body,
+            html: `<div style="font-family: Georgia, serif; max-width: 640px; margin: 0 auto; padding: 32px; color: #1a1a1a; line-height: 1.7;">${htmlBody}</div>`,
+            attachments: attachments.map(a => ({ url: a.url, filename: a.name })),
+            account_id: accountId || undefined, // Send via user's SMTP when available
+          },
+        });
+        if (response.error) throw response.error;
+
+        const providerId =
+          (response.data as any)?.id ||
+          (response.data as any)?.messageId ||
+          (response.data as any)?.data?.id ||
+          null;
+
+        await supabase.from('email_logs').insert({
+          ...baseLog,
+          status: 'sent',
+          provider_message_id: providerId,
+        });
+        return response.data;
+      } catch (err: any) {
+        // Falhas também são registradas no histórico do cliente
+        const msg = err?.message || String(err) || 'Falha desconhecida ao enviar e-mail';
+        try {
+          await supabase.from('email_logs').insert({
+            ...baseLog,
+            status: 'failed',
+            error_message: msg.slice(0, 1000),
+          });
+        } catch (logErr) {
+          console.error('[EmailCompose] falha ao registrar erro de envio', logErr);
+        }
+        throw err;
+      }
     },
     onSuccess: () => {
       toast.success('✅ Email enviado com sucesso!');
@@ -400,6 +432,7 @@ export function EmailCompose({ onClose, replyTo, initialTo, initialName, initial
     },
     onError: () => toast.error('Erro ao enviar email. Verifique as configurações.'),
   });
+
 
   const handleSend = () => {
     if (!to.trim()) { toast.error('Informe pelo menos um destinatário'); return; }
