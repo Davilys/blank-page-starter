@@ -561,6 +561,8 @@ Combinado? 👍`;
         observacao: observacao || undefined,
       });
       toast.success(`Renegociação criada com ${r.parcelas_criadas} boleto(s) no Asaas.`);
+      if (r?.aviso) toast.warning(r.aviso, { duration: 12000 });
+      else toast.info("Boleto(s) original(is) cancelado(s) no Asaas.");
 
       // ── envia notificação automática (email + WhatsApp) ──
       try {
@@ -646,6 +648,8 @@ Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
         asaas_customer_id: target.asaas_customer_id,
       });
       toast.success(`${kind === 'negociar' ? 'Negociação' : 'Cobrança'} criada com ${r.parcelas_criadas} boleto(s).`);
+      if (r?.aviso) toast.warning(r.aviso, { duration: 12000 });
+      else toast.info("Boleto(s) original(is) cancelado(s) no Asaas.");
 
       try {
         const nome = r.cliente_nome || target.cliente_nome || "Cliente";
