@@ -2391,12 +2391,12 @@ export default function RecursosINPI() {
                       </div>
                       <Textarea
                         value={userOrientation}
-                        onChange={(e) => setUserOrientation(e.target.value.slice(0, 4000))}
+                        onChange={(e) => setUserOrientation(e.target.value)}
                         rows={6}
                         placeholder="Ex.: A exigência pede detalhamento da especificação na classe 35. Apresentar a redação: 'serviços de comércio varejista de vestuário e acessórios de moda...'. Manter peça enxuta (3 a 5 páginas), sem teses de oposição. Reforçar boa-fé e aderência ao Manual de Marcas."
                         className="resize-y text-sm"
                       />
-                      <p className="text-xs text-muted-foreground text-right">{userOrientation.length}/4000</p>
+                      <p className="text-xs text-muted-foreground text-right">{userOrientation.length} caracteres</p>
                     </div>
                   )}
 
