@@ -249,15 +249,16 @@ function KpiCard({
 // ─────────────────────────────────────────────────
 // Live status ticker — themed
 // ─────────────────────────────────────────────────
-function LiveTicker({ stats }: { stats: Stats }) {
+function LiveTicker({ stats, periodLabel }: { stats: Stats; periodLabel: string }) {
   const items = [
-    `⬡ Clientes: ${stats.totalClients}`,
-    `⬡ Leads: ${stats.totalLeads}`,
-    `⬡ Processos Ativos: ${stats.activeProcesses}`,
-    `⬡ Receita: R$ ${stats.totalRevenue.toLocaleString('pt-BR')}`,
+    `⬡ ${periodLabel} · Novos clientes: ${stats.newClients}`,
+    `⬡ Leads recebidos: ${stats.newLeads}`,
+    `⬡ Novos processos: ${stats.newProcesses}`,
+    `⬡ Receita: R$ ${stats.revenue.toLocaleString('pt-BR')}`,
     `⬡ Concluídos: ${stats.completedProcesses}`,
-    `⬡ Pendentes: ${stats.pendingInvoices}`,
+    `⬡ Pendentes agora: ${stats.pendingInvoices}`,
   ];
+
   const doubled = [...items, ...items];
 
   return (
