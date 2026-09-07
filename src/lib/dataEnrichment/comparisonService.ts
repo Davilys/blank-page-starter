@@ -87,7 +87,7 @@ const FIELD_SPECS: FieldSpec[] = [
     label: 'Capital social',
     group: 'empresa',
     found: 'share_capital',
-    compare: (a, b) => Number(a ?? -1) === Number(b ?? -2),
+    compare: (a, b) => a !== null && a !== undefined && b !== null && b !== undefined && Number(a) === Number(b),
     display: money,
   },
   { key: 'zip_code', column: 'zip_code', label: 'CEP', group: 'endereco', found: 'zip_code', compare: (a, b) => normalizeZip(a as string) === normalizeZip(b as string) },

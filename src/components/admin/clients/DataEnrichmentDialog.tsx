@@ -48,7 +48,7 @@ export function DataEnrichmentDialog({ open, onOpenChange, client, onUpdated, on
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const identifier = client ? resolveIdentifier(client) : null;
-  const docLabel = client?.cnpj || client?.cpf || client?.cpf_cnpj || '';
+  const docLabel = identifier?.value || '';
 
   const grouped = useMemo(() => {
     const map = new Map<ComparisonItem['group'], ComparisonItem[]>();
@@ -82,7 +82,7 @@ export function DataEnrichmentDialog({ open, onOpenChange, client, onUpdated, on
     try {
       const res = await enrichClient(client);
       setResult(res);
-      if (res.status === 'ok' && res.data) {
+      if (res.status === 'success' && res.data) {
         const comparison = buildComparison(client, res.data);
         setItems(comparison);
       }
@@ -100,7 +100,7 @@ export function DataEnrichmentDialog({ open, onOpenChange, client, onUpdated, on
   };
 
   const handleSave = async () => {
-    if (!client || selected.size === 0) return;
+    if (!client || selected.size === 0 || saving) return;
     setSaving(true);
     try {
       const { payload, updatedLabels } = buildMergePayload(client, items, selected);
@@ -113,20 +113,27 @@ export function DataEnrichmentDialog({ open, onOpenChange, client, onUpdated, on
       if (error) throw error;
 
       const { data: authData } = await supabase.auth.getUser();
-      await supabase.from('client_activities').insert({
+      const { error: activityError } = await supabase.from('client_activities').insert({
         user_id: client.id,
         admin_id: authData?.user?.id ?? null,
         activity_type: 'atualizacao_cadastral',
-        description: `Atualização cadastral realizada · Fonte: ${(result?.sources || []).join(', ') || 'BrasilAPI'}`,
+        description: `Atualização cadastral realizada · Fonte: ${result?.source || 'BrasilAPI'}`,
         metadata: {
-          fonte: result?.sources || [],
+          source: result?.source || null,
+          document_type: identifier?.type || null,
           documento: maskDoc(docLabel),
-          campos_encontrados: changeable.map(i => i.label),
-          campos_atualizados: updatedLabels,
-          executado_por: authData?.user?.email ?? null,
-          executado_em: new Date().toISOString(),
+          fields_found: changeable.map(i => i.label),
+          fields_updated: updatedLabels,
+          user_id: authData?.user?.id ?? null,
+          updated_at: new Date().toISOString(),
         },
       } as never);
+      if (activityError) {
+        toast.warning('Dados salvos, mas não foi possível registrar o histórico.');
+        await onUpdated();
+        handleClose(false);
+        return;
+      }
 
       toast.success('Dados atualizados com sucesso.');
       await onUpdated();
@@ -194,21 +201,19 @@ export function DataEnrichmentDialog({ open, onOpenChange, client, onUpdated, on
               </div>
             )}
 
-            {result && result.status !== 'ok' && (
+            {result && result.status !== 'success' && (
               <div className="rounded-2xl border border-border bg-muted/30 p-4 flex items-start gap-2">
-                <AlertCircle className={`h-4 w-4 mt-0.5 shrink-0 ${result.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`} />
-                <p className="text-sm">{result.message || 'Nenhuma atualização cadastral encontrada.'}</p>
+                <AlertCircle className={`h-4 w-4 mt-0.5 shrink-0 ${['provider_error', 'timeout'].includes(result.status) ? 'text-destructive' : 'text-muted-foreground'}`} />
+                <p className="text-sm whitespace-pre-line">{result.message || 'Nenhuma atualização cadastral encontrada.'}</p>
               </div>
             )}
 
-            {result?.status === 'ok' && (
+            {result?.status === 'success' && (
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                   <span className="text-sm font-semibold">Consulta concluída</span>
-                  {result.sources.map(s => (
-                    <Badge key={s} variant="secondary" className="text-[11px]">{s}</Badge>
-                  ))}
+                  {result.source && <Badge variant="secondary" className="text-[11px]">{result.source}</Badge>}
                 </div>
 
                 {changeable.length === 0 ? (

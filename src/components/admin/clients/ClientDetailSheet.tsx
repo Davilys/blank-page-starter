@@ -2342,7 +2342,13 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                               <InfoRow icon={Hash} label="CPF" value={profileData?.cpf || client.cpf_cnpj} mono copyable />
                               <InfoRow icon={Hash} label="CNPJ" value={profileData?.cnpj} mono copyable />
                               <InfoRow icon={Mail} label="E-mail" value={client.email} copyable onAction={() => { if (client.email) setShowEmailCompose(true); }} />
+                               {(profileData?.additional_emails || []).map((email: string, index: number) => (
+                                 <InfoRow key={`additional-email-${email}`} icon={Mail} label={`E-mail adicional ${index + 1}`} value={email} copyable onAction={() => { if (email) setShowEmailCompose(true); }} />
+                               ))}
                               <InfoRow icon={Phone} label="Telefone" value={client.phone} copyable link={`https://wa.me/55${client.phone?.replace(/\D/g,'')}`} />
+                               {(profileData?.additional_phones || []).map((phone: string, index: number) => (
+                                 <InfoRow key={`additional-phone-${phone}`} icon={Phone} label={`Telefone adicional ${index + 1}`} value={phone} copyable link={`https://wa.me/55${phone.replace(/\D/g, '')}`} />
+                               ))}
                               <InfoRow icon={Building2} label="Empresa" value={client.company_name || profileData?.company_name} />
                             </motion.div>
                           )}
@@ -2381,7 +2387,12 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                             </div>
                           ) : (
                             <>
-                              <InfoRow icon={MapPin} label="Logradouro" value={[profileData?.address, profileData?.neighborhood].filter(Boolean).join(' – ')} />
+                               <InfoRow icon={MapPin} label="Logradouro" value={[
+                                 profileData?.address,
+                                 profileData?.address_number,
+                                 profileData?.address_complement,
+                                 profileData?.neighborhood,
+                               ].filter(Boolean).join(' – ')} />
                               <InfoRow icon={Globe} label="Cidade / Estado" value={[profileData?.city, profileData?.state].filter(Boolean).join(' – ')} />
                               <InfoRow icon={Hash} label="CEP" value={profileData?.zip_code} mono copyable />
                             </>

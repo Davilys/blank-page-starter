@@ -1,5 +1,6 @@
 /** Provedor de complemento de endereço por CEP (ViaCEP), via Edge Function. */
 import { supabase } from '@/integrations/supabase/client';
+import { parseProviderResponse } from '../providerResponse';
 import type { EnrichmentProvider, EnrichmentResult } from '../types';
 
 export const viaCepProvider: EnrichmentProvider = {
@@ -13,17 +14,21 @@ export const viaCepProvider: EnrichmentProvider = {
       });
       if (error) {
         return {
-          status: 'error',
+          success: false,
+          status: 'provider_error',
           message: 'Não foi possível consultar os dados agora. Tente novamente.',
-          sources: ['ViaCEP'],
+          source: 'ViaCEP',
+          documentType: 'cep',
         };
       }
-      return data as EnrichmentResult;
+      return parseProviderResponse(data);
     } catch {
       return {
-        status: 'error',
+        success: false,
+        status: 'provider_error',
         message: 'Não foi possível consultar os dados agora. Tente novamente.',
-        sources: ['ViaCEP'],
+        source: 'ViaCEP',
+        documentType: 'cep',
       };
     }
   },

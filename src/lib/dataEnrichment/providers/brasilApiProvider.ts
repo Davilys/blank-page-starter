@@ -1,5 +1,6 @@
 /** Provedor de dados de CNPJ via Edge Function (BrasilAPI). */
 import { supabase } from '@/integrations/supabase/client';
+import { parseProviderResponse } from '../providerResponse';
 import type { EnrichmentProvider, EnrichmentResult } from '../types';
 
 export const brasilApiProvider: EnrichmentProvider = {
@@ -13,17 +14,21 @@ export const brasilApiProvider: EnrichmentProvider = {
       });
       if (error) {
         return {
-          status: 'error',
+          success: false,
+          status: 'provider_error',
           message: 'Não foi possível consultar os dados agora. Tente novamente.',
-          sources: ['BrasilAPI'],
+          source: 'BrasilAPI',
+          documentType: 'cnpj',
         };
       }
-      return data as EnrichmentResult;
+      return parseProviderResponse(data);
     } catch {
       return {
-        status: 'error',
+        success: false,
+        status: 'provider_error',
         message: 'Não foi possível consultar os dados agora. Tente novamente.',
-        sources: ['BrasilAPI'],
+        source: 'BrasilAPI',
+        documentType: 'cnpj',
       };
     }
   },
