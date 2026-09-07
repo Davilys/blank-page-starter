@@ -53,13 +53,14 @@ const primaryNavItems: NavItem[] = [
     activeGradient: 'from-blue-500/20 to-blue-600/10',
   },
   {
-    icon: MessageCircle,
-    label: 'Chat',
-    href: '/admin/chat-ao-vivo',
-    permissionKey: 'live_chat',
-    color: 'text-teal-500',
-    activeGradient: 'from-teal-500/20 to-teal-600/10',
+    icon: UserPlus,
+    label: 'Leads',
+    href: '/admin/leads',
+    permissionKey: 'leads',
+    color: 'text-green-500',
+    activeGradient: 'from-green-500/20 to-green-600/10',
   },
+
   {
     icon: Users,
     label: 'Clientes',
