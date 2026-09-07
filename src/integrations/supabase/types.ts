@@ -3706,6 +3706,7 @@ export type Database = {
           address_number: string | null
           asaas_customer_id: string | null
           assigned_to: string | null
+          birth_date: string | null
           city: string | null
           client_funnel_type: string | null
           cnae: string | null
@@ -3744,6 +3745,7 @@ export type Database = {
           address_number?: string | null
           asaas_customer_id?: string | null
           assigned_to?: string | null
+          birth_date?: string | null
           city?: string | null
           client_funnel_type?: string | null
           cnae?: string | null
@@ -3782,6 +3784,7 @@ export type Database = {
           address_number?: string | null
           asaas_customer_id?: string | null
           assigned_to?: string | null
+          birth_date?: string | null
           city?: string | null
           client_funnel_type?: string | null
           cnae?: string | null

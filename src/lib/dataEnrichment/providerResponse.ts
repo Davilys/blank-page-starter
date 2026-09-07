@@ -25,6 +25,7 @@ const responseSchema = z.object({
   status: z.enum([
     'success',
     'provider_unavailable',
+    'missing_birth_date',
     'invalid_document',
     'not_found',
     'rate_limited',
@@ -32,7 +33,7 @@ const responseSchema = z.object({
     'provider_error',
     'unauthorized',
   ]),
-  source: z.enum(['BrasilAPI', 'ViaCEP', 'CPF Provider']).nullable(),
+  source: z.enum(['BrasilAPI', 'ViaCEP', 'SERPRO']).nullable(),
   documentType: z.enum(['cnpj', 'cpf', 'cep']),
   data: enrichedDataSchema.optional(),
   message: z.string().optional(),

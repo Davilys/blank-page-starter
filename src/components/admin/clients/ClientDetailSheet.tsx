@@ -469,7 +469,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         supabase.from('client_appointments').select('*').eq('user_id', client.id).order('scheduled_at', { ascending: true }),
         supabase.from('documents').select('*').eq('user_id', client.id).order('created_at', { ascending: false }),
         supabase.from('invoices').select('*').eq('user_id', client.id).order('due_date', { ascending: false }),
-        supabase.from('profiles').select('cpf, cnpj, cpf_cnpj, company_name, address, address_number, address_complement, neighborhood, city, state, zip_code, assigned_to, contract_value, origin, client_funnel_type, full_name, email, phone, additional_phones, additional_emails, trade_name, registration_status, cnae, opening_date, share_capital').eq('id', client.id).maybeSingle(),
+        supabase.from('profiles').select('cpf, cnpj, cpf_cnpj, birth_date, company_name, address, address_number, address_complement, neighborhood, city, state, zip_code, assigned_to, contract_value, origin, client_funnel_type, full_name, email, phone, additional_phones, additional_emails, trade_name, registration_status, cnae, opening_date, share_capital').eq('id', client.id).maybeSingle(),
         supabase.from('contracts').select('contract_value, payment_method, signature_status').eq('user_id', client.id).order('created_at', { ascending: false }).limit(1),
         supabase.from('brand_processes').select('id, brand_name, business_area, process_number, pipeline_stage, status, created_at, updated_at, ncl_classes, inpi_protocol, deposit_date, grant_date, expiry_date, next_step, next_step_date, notes').eq('user_id', client.id).order('created_at', { ascending: false }),
         supabase.from('publicacoes_marcas').select('*').eq('client_id', client.id).order('proximo_prazo_critico', { ascending: true, nullsFirst: false }),
@@ -2280,6 +2280,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                                   email: client.email || profileData?.email || '',
                                   cpf: profileData?.cpf || '',
                                   cnpj: profileData?.cnpj || '',
+                                   birth_date: profileData?.birth_date || '',
                                   phone: client.phone || profileData?.phone || '',
                                   company_name: client.company_name || profileData?.company_name || '',
                                   address: profileData?.address || '',
@@ -2326,6 +2327,10 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                                   <Label className="text-xs text-muted-foreground">CNPJ</Label>
                                   <Input value={contactForm.cnpj} onChange={e => setContactForm((f: any) => ({ ...f, cnpj: e.target.value }))} placeholder="00.000.000/0000-00" className="h-9 mt-1 font-mono" />
                                 </div>
+                                 <div>
+                                   <Label className="text-xs text-muted-foreground">Data de nascimento</Label>
+                                   <Input type="date" value={contactForm.birth_date || ''} onChange={e => setContactForm((f: any) => ({ ...f, birth_date: e.target.value }))} className="h-9 mt-1" />
+                                 </div>
                                 <div>
                                   <Label className="text-xs text-muted-foreground">Telefone</Label>
                                   <Input value={contactForm.phone} onChange={e => setContactForm((f: any) => ({ ...f, phone: e.target.value }))} placeholder="(00) 00000-0000" className="h-9 mt-1" />
@@ -2464,6 +2469,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                                 phone: contactForm.phone,
                                 cpf: contactForm.cpf,
                                 cnpj: contactForm.cnpj,
+                                birth_date: contactForm.birth_date || null,
                                 cpf_cnpj: cpfCnpj,
                                 company_name: contactForm.company_name,
                                 address: contactForm.address,
@@ -3946,6 +3952,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
           cpf: profileData?.cpf ?? null,
           cnpj: profileData?.cnpj ?? null,
           cpf_cnpj: profileData?.cpf_cnpj ?? client.cpf_cnpj ?? null,
+          birth_date: profileData?.birth_date ?? null,
           company_name: client.company_name || profileData?.company_name || null,
           trade_name: profileData?.trade_name ?? null,
           registration_status: profileData?.registration_status ?? null,
