@@ -150,6 +150,8 @@ interface KpiCardProps {
   index: number;
   ringMax?: number;
   tag?: string;
+  sub?: string;
+
 }
 
 function KpiCard({
