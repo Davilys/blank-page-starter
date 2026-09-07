@@ -10,19 +10,19 @@ import { parseProviderResponse } from '../providerResponse';
 import type { CpfProvider, EnrichmentResult } from '../types';
 
 const failure = (message = 'Não foi possível consultar os dados agora. Tente novamente.'): EnrichmentResult => ({
-  success: false, status: 'provider_error', message, source: 'CPF Provider', documentType: 'cpf',
+  success: false, status: 'provider_error', message, source: 'SERPRO', documentType: 'cpf',
 });
 
 export const cpfProvider: CpfProvider = {
   id: 'serpro-cpf',
-  source: 'CPF Provider',
+  source: 'SERPRO',
   isAvailable: () => true,
   async lookupByCpf(cpf: string, birthDate?: string | null): Promise<EnrichmentResult> {
     if (!birthDate) return {
       success: false,
       status: 'missing_birth_date',
       message: 'Informe a data de nascimento no cadastro para consultar o CPF na fonte oficial.',
-      source: 'CPF Provider',
+      source: 'SERPRO',
       documentType: 'cpf',
     };
     try {

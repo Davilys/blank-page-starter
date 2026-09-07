@@ -1,5 +1,10 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -25,11 +30,15 @@ const isValidCNPJ = (raw: string): boolean => {
   return calc(12) === Number(c[12]) && calc(13) === Number(c[13]);
 };
 
-const fetchWithTimeout = async (url: string, ms = 12000) => {
+const fetchWithTimeout = async (url: string, ms = 12000, init: RequestInit = {}) => {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
   try {
-    return await fetch(url, { signal: ctrl.signal, headers: { Accept: 'application/json' } });
+    return await fetch(url, {
+      ...init,
+      signal: ctrl.signal,
+      headers: { Accept: 'application/json', ...(init.headers || {}) },
+    });
   } finally {
     clearTimeout(t);
   }
@@ -38,7 +47,7 @@ const fetchWithTimeout = async (url: string, ms = 12000) => {
 const GENERIC_ERROR = 'Não foi possível consultar os dados agora. Tente novamente.';
 
 type DocumentType = 'cnpj' | 'cpf' | 'cep';
-type Source = 'BrasilAPI' | 'ViaCEP' | 'CPF Provider' | null;
+type Source = 'BrasilAPI' | 'ViaCEP' | 'SERPRO' | null;
 
 let serproToken: { value: string; expiresAt: number } | null = null;
 
@@ -220,10 +229,57 @@ Deno.serve(async (req) => {
     }
 
     if (type === 'cpf') {
-      provider = 'CPF Provider';
-      logDiagnostic({ provider, documentType, result: 'provider_unavailable', durationMs: Date.now() - startedAt });
-      return json(result(false, 'provider_unavailable', 'cpf', provider, undefined,
-        'Para este cadastro, a consulta automática de CPF ainda não está configurada.\nVocê pode continuar usando a atualização automática para empresas com CNPJ.'));
+      provider = 'SERPRO';
+      const cpf = onlyDigits(value);
+      if (!isValidCPF(cpf)) {
+        return json(result(false, 'invalid_document', 'cpf', provider, undefined, 'O CPF informado não é válido.'), 400);
+      }
+      const birthDate = formatBirthDate(body?.birthDate);
+      if (!birthDate) {
+        return json(result(false, 'missing_birth_date', 'cpf', provider, undefined,
+          'Informe uma data de nascimento válida no cadastro para consultar o CPF.'), 400);
+      }
+
+      const token = await getSerproToken();
+      if (!token) {
+        logDiagnostic({ provider, documentType, result: 'provider_unavailable', durationMs: Date.now() - startedAt });
+        return json(result(false, 'provider_unavailable', 'cpf', provider, undefined,
+          'A consulta oficial de CPF ainda precisa ser ativada para esta conta.'), 503);
+      }
+
+      logDiagnostic({ provider, documentType, phase: 'start' });
+      const baseUrl = Deno.env.get('SERPRO_CPF_API_URL') || 'https://gateway.apiserpro.serpro.gov.br/consulta-cpf-df/v3';
+      const res = await fetchWithTimeout(`${baseUrl}/cpf/${cpf}/${birthDate}`, 12000, {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      });
+      if (res.status === 401 || res.status === 403) {
+        serproToken = null;
+        logDiagnostic({ provider, documentType, httpStatus: res.status, result: 'provider_unavailable', durationMs: Date.now() - startedAt });
+        return json(result(false, 'provider_unavailable', 'cpf', provider, undefined,
+          'A consulta oficial de CPF precisa ser reativada. Verifique as credenciais do serviço.'), 503);
+      }
+      if (res.status === 404) {
+        return json(result(false, 'not_found', 'cpf', provider, undefined,
+          'CPF não encontrado ou data de nascimento divergente.'), 404);
+      }
+      if (res.status === 429) {
+        return json(result(false, 'rate_limited', 'cpf', provider, undefined,
+          'Muitas consultas em sequência. Aguarde alguns instantes.'), 429);
+      }
+      if (!res.ok) {
+        logDiagnostic({ provider, documentType, httpStatus: res.status, result: 'provider_error', durationMs: Date.now() - startedAt });
+        return json(result(false, 'provider_error', 'cpf', provider, undefined, GENERIC_ERROR), 502);
+      }
+      const d = await res.json();
+      const data = {
+        full_name: typeof d?.nome === 'string' ? d.nome.trim() : null,
+        registration_status: typeof d?.situacao?.descricao === 'string' ? d.situacao.descricao.trim() : null,
+      };
+      if (!data.full_name) {
+        return json(result(false, 'provider_error', 'cpf', provider, undefined, GENERIC_ERROR), 502);
+      }
+      logDiagnostic({ provider, documentType, httpStatus: res.status, result: 'success', fieldCount: countFields(data), durationMs: Date.now() - startedAt });
+      return json(result(true, 'success', 'cpf', provider, data));
     }
 
     return json(result(false, 'invalid_document', documentType, provider, undefined, GENERIC_ERROR), 400);

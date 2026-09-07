@@ -1,6 +1,6 @@
 /** Tipos compartilhados da camada de enriquecimento cadastral. */
 
-export type EnrichmentSource = 'BrasilAPI' | 'ViaCEP' | 'CPF Provider';
+export type EnrichmentSource = 'BrasilAPI' | 'ViaCEP' | 'SERPRO';
 export type DocumentType = 'cnpj' | 'cpf' | 'cep';
 
 export interface EnrichedAddress {
