@@ -887,31 +887,33 @@ export default function AdminDashboard() {
               {/* Big ring */}
               <div className="flex items-center gap-4">
                 <div className="relative">
-                  <RingMetric value={stats.conversionRate} max={100} color="#6366f1" size={80} />
+                  <RingMetric value={stats.conversionRate ?? 0} max={100} color="#6366f1" size={80} />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-base font-black text-foreground">{stats.conversionRate}%</span>
+                    <span className="text-base font-black text-foreground">{formatRate(stats.conversionRate)}</span>
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground mb-0.5">Taxa de Conversão</p>
-                  <p className="text-lg font-bold text-foreground">{stats.newClients} / {stats.newLeads}</p>
-                  <p className="text-[10px] text-muted-foreground">leads → clientes no período</p>
+                  <InfoTip text="Clientes cadastrados no período dividido pelos leads recebidos no mesmo período.">
+                    <p className="text-xs text-muted-foreground mb-0.5 underline decoration-dotted underline-offset-2">Taxa de Conversão</p>
+                  </InfoTip>
+                  <p className="text-lg font-bold text-foreground">{formatInt(stats.newClients)} / {formatInt(stats.newLeads)}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {stats.newLeads === 0 ? 'Sem leads neste período' : 'leads → clientes no período'}
+                  </p>
                 </div>
               </div>
 
               {/* Performance bars */}
               <div className="space-y-2 pt-2 border-t border-border/40">
-                <PerformanceBar label="Processos concluídos no período"
-                  value={stats.newProcesses > 0 ? Math.min(Math.round((stats.completedProcesses / stats.newProcesses) * 100), 100) : 0}
-                  color="#10b981" delay={0.8} />
-                <PerformanceBar label="Faturas pagas"
-                  value={(stats.paidInvoicesCount + stats.pendingInvoices) > 0
-                    ? Math.round((stats.paidInvoicesCount / (stats.paidInvoicesCount + stats.pendingInvoices)) * 100)
-                    : 0}
-                  color="#6366f1" delay={0.95} />
-                <PerformanceBar label="Leads em aberto"
-                  value={stats.totalLeads > 0 ? Math.round((stats.openLeads / stats.totalLeads) * 100) : 0}
-                  color="#f59e0b" delay={1.1} />
+                <PerformanceBar label="Faturas pagas no período"
+                  value={rate(stats.paidInvoicesCount, stats.paidInvoicesCount + stats.pendingInvoices + stats.overdueInvoices) ?? 0}
+                  color="#6366f1" delay={0.8} />
+                <PerformanceBar label="Leads em aberto sobre a base"
+                  value={rate(stats.openLeads, stats.totalLeads) ?? 0}
+                  color="#f59e0b" delay={0.95} />
+                <PerformanceBar label="Processos ativos sobre a base"
+                  value={rate(stats.activeProcesses, stats.totalProcesses) ?? 0}
+                  color="#10b981" delay={1.1} />
               </div>
             </motion.div>
 
@@ -938,25 +940,37 @@ export default function AdminDashboard() {
                 transition={{ duration: 0.55, delay: 0.3 + i * 0.1 }}
                 className="rounded-2xl overflow-hidden border border-border/50 bg-card/60 backdrop-blur-xl"
               >
-                <Comp />
+                <Comp range={range} />
               </motion.div>
             ))}
           </div>
 
           {/* ── BOTTOM GRID ─────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {[ConversionFunnel, RecentActivity].map((Comp, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.55, delay: 0.5 + i * 0.1 }}
-                className="rounded-2xl overflow-hidden border border-border/50 bg-card/60 backdrop-blur-xl"
-              >
-                <Comp />
-              </motion.div>
-            ))}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.55, delay: 0.5 }}
+              className="rounded-2xl overflow-hidden border border-border/50 bg-card/60 backdrop-blur-xl"
+            >
+              <ConversionFunnel range={range} />
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.55, delay: 0.6 }}
+              className="rounded-2xl overflow-hidden border border-border/50 bg-card/60 backdrop-blur-xl"
+            >
+              <RecentActivity />
+            </motion.div>
           </div>
+
+          {/* ── QUALIDADE DOS DADOS + ATENÇÃO EXECUTIVA ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <DataQualityPanel onSummary={setDataQuality} />
+            <ExecutiveAlerts alerts={alerts} loading={loadingStats} />
+          </div>
+
 
           {/* ── INTELIGÊNCIA EXECUTIVA CEO ──────── */}
           <CEOIntelligenceSection />
