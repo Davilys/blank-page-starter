@@ -1,181 +1,134 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  PieChart, 
-  Pie, 
-  Cell, 
-  ResponsiveContainer,
-  Tooltip,
-  Legend
-} from 'recharts';
-import { Briefcase, TrendingUp } from 'lucide-react';
+import { Briefcase } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import type { DateRange } from './lib/period';
+import { formatRate, rate } from './lib/metrics';
+import { BlockEmpty, BlockError, BlockSkeleton, DataGapNote, type BlockStatus } from './DashboardStates';
 
-const COLORS = [
-  '#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444',
-  '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#6366f1'
-];
+const COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#84cc16', '#ec4899'];
 
-interface SectorData {
+interface SectorRow {
   name: string;
   value: number;
-  percentage: number;
+  share: number;
 }
 
-export function BusinessSectorChart() {
-  const [data, setData] = useState<SectorData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+export function BusinessSectorChart({ range }: { range: DateRange }) {
+  const [status, setStatus] = useState<BlockStatus>('loading');
+  const [rows, setRows] = useState<SectorRow[]>([]);
   const [total, setTotal] = useState(0);
+  const [missing, setMissing] = useState(0);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const fetchData = useCallback(async () => {
+    setStatus('loading');
+    try {
+      let q = supabase.from('brand_processes').select('business_area');
+      if (range.start) q = q.gte('created_at', range.start.toISOString());
+      if (range.end) q = q.lt('created_at', range.end.toISOString());
+      const { data, error } = await q.limit(5000);
+      if (error) throw error;
 
-  const fetchData = async () => {
-    setIsLoading(true);
-    
-    const { data: processes } = await supabase
-      .from('brand_processes')
-      .select('business_area');
+      const processes = data || [];
+      const counts: Record<string, number> = {};
+      let empty = 0;
 
-    const counts: Record<string, number> = {};
-    
-    processes?.forEach(item => {
-      const area = item.business_area || 'Não informado';
-      counts[area] = (counts[area] || 0) + 1;
-    });
+      processes.forEach((p) => {
+        const area = (p.business_area || '').trim();
+        if (!area) { empty += 1; return; }
+        counts[area] = (counts[area] || 0) + 1;
+      });
 
-    const totalCount = processes?.length || 0;
-    setTotal(totalCount);
+      const informed = processes.length - empty;
+      const list = Object.entries(counts)
+        .map(([name, value]) => ({ name, value, share: rate(value, informed) ?? 0 }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8);
 
-    const sortedData = Object.entries(counts)
-      .map(([name, value]) => ({
-        name: name.length > 20 ? name.substring(0, 20) + '...' : name,
-        fullName: name,
-        value,
-        percentage: totalCount > 0 ? (value / totalCount) * 100 : 0
-      }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 8);
+      setRows(list);
+      setTotal(processes.length);
+      setMissing(empty);
+      setStatus(processes.length === 0 ? 'empty' : 'ready');
+    } catch (err) {
+      console.warn('[Ramos de atividade] erro:', err);
+      setStatus('error');
+    }
+  }, [range.start, range.end]);
 
-    setData(sortedData);
-    setIsLoading(false);
-  };
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
-    const RADIAN = Math.PI / 180;
-    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-    if (percent < 0.05) return null;
-
-    return (
-      <text 
-        x={x} 
-        y={y} 
-        fill="white" 
-        textAnchor="middle" 
-        dominantBaseline="central"
-        fontSize={12}
-        fontWeight="bold"
-      >
-        {`${(percent * 100).toFixed(0)}%`}
-      </text>
-    );
-  };
+  const missingPct = rate(missing, total);
+  const informed = total - missing;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.4 }}
-    >
-      <Card className="border border-border/50 bg-card/80 backdrop-blur-sm shadow-xl h-full overflow-hidden">
-        <CardHeader className="pb-2">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-400 shadow-lg">
-              <Briefcase className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <CardTitle className="text-lg font-bold">Ramos de Atividade</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">Setores que mais fecham negócios</p>
-            </div>
+    <Card className="border-0 bg-transparent shadow-none h-full">
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-violet-500/15 border border-violet-500/25">
+            <Briefcase className="h-4 w-4 text-violet-500" aria-hidden="true" />
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[280px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={data}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={renderCustomizedLabel}
-                  outerRadius={100}
-                  innerRadius={40}
-                  fill="#8884d8"
-                  dataKey="value"
-                  animationDuration={1500}
-                  animationBegin={0}
-                >
-                  {data.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={COLORS[index % COLORS.length]}
-                      stroke="white"
-                      strokeWidth={2}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'white', 
-                    border: 'none', 
-                    borderRadius: '12px',
-                    boxShadow: '0 10px 40px rgba(0,0,0,0.1)'
-                  }}
-                  formatter={(value: number, name: string, props: any) => [
-                    `${value} processos (${props.payload.percentage.toFixed(1)}%)`,
-                    'Quantidade'
-                  ]}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+          <div>
+            <CardTitle className="text-base font-bold">Ramos de Atividade</CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {range.label} · {informed.toLocaleString('pt-BR')} processos com ramo informado
+            </p>
           </div>
+        </div>
+      </CardHeader>
 
-          {/* Top sectors list */}
-          <div className="mt-4 space-y-2">
-            {data.slice(0, 5).map((item, index) => (
-              <motion.div 
-                key={item.name}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.6 + index * 0.1 }}
-                className="flex items-center justify-between p-2 rounded-lg bg-muted/50"
-              >
-                <div className="flex items-center gap-2">
-                  <div 
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                  />
-                  <span className="text-sm font-medium truncate max-w-[150px]">
-                    {item.name}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold">{item.value}</span>
-                  <span className="text-xs text-muted-foreground">
-                    ({item.percentage.toFixed(1)}%)
-                  </span>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
+      <CardContent>
+        {status === 'loading' && <BlockSkeleton height={260} />}
+        {status === 'error' && <BlockError onRetry={fetchData} height={260} />}
+        {status === 'empty' && (
+          <BlockEmpty height={260} message="Nenhum processo neste período" hint="Selecione outro período para ver a distribuição por ramo." />
+        )}
+
+        {status === 'ready' && (
+          <>
+            {rows.length === 0 ? (
+              <BlockEmpty
+                height={200}
+                message="Nenhum ramo informado"
+                hint={`Os ${total.toLocaleString('pt-BR')} processos do período estão sem ramo de atividade cadastrado.`}
+              />
+            ) : (
+              <ul className="space-y-3" aria-label="Ranking de ramos de atividade">
+                {rows.map((row, index) => (
+                  <motion.li
+                    key={row.name}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium truncate" title={row.name}>{row.name}</span>
+                      <div className="flex items-baseline gap-2 shrink-0">
+                        <span className="text-sm font-bold tabular-nums">{row.value.toLocaleString('pt-BR')}</span>
+                        <span className="text-[10px] text-muted-foreground">{formatRate(row.share)}</span>
+                      </div>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted/60 overflow-hidden">
+                      <motion.div
+                        className="h-full rounded-full"
+                        style={{ background: COLORS[index % COLORS.length] }}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.max(row.share, 3)}%` }}
+                        transition={{ duration: 0.8, delay: 0.1 + index * 0.05 }}
+                      />
+                    </div>
+                  </motion.li>
+                ))}
+              </ul>
+            )}
+
+            {missingPct !== null && missingPct > 0 && (
+              <DataGapNote text={`${formatRate(missingPct)} dos processos do período não têm ramo informado (${missing.toLocaleString('pt-BR')} de ${total.toLocaleString('pt-BR')}). Isso é lacuna de cadastro, não um segmento.`} />
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }

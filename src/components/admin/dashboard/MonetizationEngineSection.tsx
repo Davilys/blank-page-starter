@@ -139,6 +139,16 @@ export function MonetizationEngineSection() {
         </div>
       </motion.div>
 
+      {stats.totalSugestoes === 0 && (
+        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3">
+          <p className="text-xs font-bold text-amber-700 dark:text-amber-300 uppercase tracking-wider">Motor em preparação</p>
+          <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+            Nenhuma sugestão foi registrada ainda. As taxas abaixo só ganham significado depois que o
+            motor acumular sugestões e respostas reais de clientes.
+          </p>
+        </div>
+      )}
+
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Total Sugestões */}
