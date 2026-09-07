@@ -792,14 +792,34 @@ export default function AdminDashboard() {
                   </motion.h1>
 
                   <motion.p
-                    className="text-muted-foreground mt-1.5 text-sm"
+                    className="text-muted-foreground mt-1.5 text-sm capitalize"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.4 }}
                   >
-                    Visão estratégica em tempo real · Inteligência para decisões
+                    {range.label} · Inteligência para decisões
                   </motion.p>
+
+                  {/* Seletor de período */}
+                  <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mr-1">Período:</span>
+                    {PERIODS.map(p => (
+                      <button
+                        key={p.key}
+                        onClick={() => setPeriod(p.key)}
+                        className={cn(
+                          'px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors',
+                          period === p.key
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-muted/40 text-muted-foreground border-border/50 hover:bg-muted',
+                        )}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
 
                 {/* Right — clock + date */}
                 <motion.div
