@@ -53,13 +53,14 @@ const primaryNavItems: NavItem[] = [
     activeGradient: 'from-blue-500/20 to-blue-600/10',
   },
   {
-    icon: MessageCircle,
-    label: 'Chat',
-    href: '/admin/chat-ao-vivo',
-    permissionKey: 'live_chat',
-    color: 'text-teal-500',
-    activeGradient: 'from-teal-500/20 to-teal-600/10',
+    icon: UserPlus,
+    label: 'Leads',
+    href: '/admin/leads',
+    permissionKey: 'leads',
+    color: 'text-green-500',
+    activeGradient: 'from-green-500/20 to-green-600/10',
   },
+
   {
     icon: Users,
     label: 'Clientes',
@@ -87,8 +88,9 @@ const primaryNavItems: NavItem[] = [
 ];
 
 const moreItems: MoreItem[] = [
-  { icon: UserPlus, label: 'Leads', href: '/admin/leads', color: 'text-green-500', permissionKey: 'leads' },
+  { icon: MessageCircle, label: 'Chat', href: '/admin/chat-ao-vivo', color: 'text-teal-500', permissionKey: 'live_chat' },
   { icon: FileStack, label: 'Modelos', href: '/admin/modelos-contrato', color: 'text-pink-500', permissionKey: 'contract_templates' },
+
   { icon: FolderOpen, label: 'Documentos', href: '/admin/documentos', color: 'text-amber-500', permissionKey: 'documents' },
   { icon: CreditCard, label: 'Financeiro', href: '/admin/financeiro', color: 'text-emerald-500', permissionKey: 'financial' },
   { icon: Bell, label: 'Notificações', href: '/admin/notificacoes', color: 'text-orange-500', permissionKey: 'notifications' },
