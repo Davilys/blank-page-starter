@@ -223,7 +223,9 @@ function KpiCard({
               {suffix}
             </p>
             <p className="text-[11px] font-medium text-muted-foreground mt-1">{title}</p>
+            {sub && <p className="text-[9px] text-muted-foreground/70 mt-0.5 truncate">{sub}</p>}
           </div>
+
 
           {/* Trend */}
           {trend !== undefined && (
