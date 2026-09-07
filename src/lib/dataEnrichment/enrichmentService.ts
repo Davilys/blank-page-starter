@@ -26,7 +26,6 @@ export const enrichClient = async (client: CrmClientSnapshot): Promise<Enrichmen
   const id = resolveIdentifier(client);
   if (!id) {
     return {
-      status: 'invalid',
       success: false,
       status: 'invalid_document',
       message: 'Não foi possível realizar a consulta porque falta CPF ou CNPJ no cadastro.',

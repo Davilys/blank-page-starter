@@ -40,7 +40,7 @@ const responseSchema = z.object({
 
 export const parseProviderResponse = (value: unknown): EnrichmentResult => {
   const parsed = responseSchema.safeParse(value);
-  if (parsed.success) return parsed.data;
+  if (parsed.success) return parsed.data as EnrichmentResult;
   return {
     success: false,
     status: 'provider_error',
