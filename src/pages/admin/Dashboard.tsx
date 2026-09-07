@@ -1,6 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { RevenueChart } from '@/components/admin/dashboard/RevenueChart';
+import { DataQualityPanel, type QualitySummary } from '@/components/admin/dashboard/DataQualityPanel';
+import { ExecutiveAlerts } from '@/components/admin/dashboard/ExecutiveAlerts';
+import {
+  PERIOD_OPTIONS, getRange, type PeriodKey, type DateRange,
+} from '@/components/admin/dashboard/lib/period';
+import {
+  variation, variationLabel, variationTone, rate, formatRate, formatBRL, formatInt,
+  buildAlerts, type Variation,
+} from '@/components/admin/dashboard/lib/metrics';
+import { InfoTip } from '@/components/admin/dashboard/DashboardStates';
 import { GeographicChart } from '@/components/admin/dashboard/GeographicChart';
 import { BusinessSectorChart } from '@/components/admin/dashboard/BusinessSectorChart';
 import { ConversionFunnel } from '@/components/admin/dashboard/ConversionFunnel';
@@ -145,22 +155,24 @@ interface KpiCardProps {
   color: string;
   gradient: string;
   accentColor: string;
-  trend?: number;
+  trend?: Variation;
   trendLabel?: string;
   index: number;
   ringMax?: number;
   tag?: string;
   sub?: string;
-
+  tooltip?: string;
 }
 
 function KpiCard({
   title, value, prefix = '', suffix = '', icon: Icon,
   color, gradient, accentColor, trend, trendLabel,
-  index, ringMax, tag, sub,
+  index, ringMax, tag, sub, tooltip,
 }: KpiCardProps) {
-  const isPos = (trend ?? 0) > 0;
-  const isNeg = (trend ?? 0) < 0;
+  const tone = trend ? variationTone(trend) : 'flat';
+  const isPos = tone === 'up';
+  const isNeg = tone === 'down';
+
 
   return (
     <motion.div
@@ -222,7 +234,15 @@ function KpiCard({
               <AnimCount to={value} prefix={prefix} decimals={prefix === 'R$ ' ? 0 : 0} />
               {suffix}
             </p>
-            <p className="text-[11px] font-medium text-muted-foreground mt-1">{title}</p>
+            {tooltip ? (
+              <InfoTip text={tooltip}>
+                <p className="text-[11px] font-medium text-muted-foreground mt-1 underline decoration-dotted decoration-muted-foreground/40 underline-offset-2">
+                  {title}
+                </p>
+              </InfoTip>
+            ) : (
+              <p className="text-[11px] font-medium text-muted-foreground mt-1">{title}</p>
+            )}
             {sub && <p className="text-[9px] text-muted-foreground/70 mt-0.5 truncate">{sub}</p>}
           </div>
 
@@ -230,14 +250,16 @@ function KpiCard({
           {/* Trend */}
           {trend !== undefined && (
             <div className="flex items-center gap-1.5 pt-2 border-t border-border/40">
-              {isPos && <ArrowUpRight className="h-3 w-3 text-emerald-500" />}
-              {isNeg && <ArrowDownRight className="h-3 w-3 text-rose-500" />}
+              {isPos && <ArrowUpRight className="h-3 w-3 text-emerald-500" aria-hidden="true" />}
+              {isNeg && <ArrowDownRight className="h-3 w-3 text-rose-500" aria-hidden="true" />}
               <span className={cn('text-[11px] font-bold',
                 isPos ? 'text-emerald-500' : isNeg ? 'text-rose-500' : 'text-muted-foreground'
               )}>
-                {isPos && '+'}{trend}%
+                {variationLabel(trend)}
               </span>
-              {trendLabel && <span className="text-[10px] text-muted-foreground">{trendLabel}</span>}
+              {trendLabel && trend.kind === 'pct' && (
+                <span className="text-[10px] text-muted-foreground">{trendLabel}</span>
+              )}
             </div>
           )}
         </div>
@@ -411,7 +433,7 @@ function PerformanceBar({ label, value, color, delay }: {
 }
 
 // ─────────────────────────────────────────────────
-// Stats interface
+// Stats — fluxo (período) x posição (acumulado)
 // ─────────────────────────────────────────────────
 interface Stats {
   // Fluxo (período selecionado)
@@ -421,14 +443,14 @@ interface Stats {
   completedProcesses: number;
   revenue: number;
   paidInvoicesCount: number;
-  ticket: number;
-  // Variações vs período anterior (null = sem base de comparação)
-  clientsTrend: number | null;
-  leadsTrend: number | null;
-  revenueTrend: number | null;
-  processesTrend: number | null;
-  completedTrend: number | null;
-  paidTrend: number | null;
+  ticket: number | null;
+  // Variações vs período anterior
+  clientsTrend: Variation;
+  leadsTrend: Variation;
+  revenueTrend: Variation;
+  processesTrend: Variation;
+  completedTrend: Variation;
+  paidTrend: Variation;
   // Posição atual (estoque)
   totalClients: number;
   totalLeads: number;
@@ -436,117 +458,58 @@ interface Stats {
   activeProcesses: number;
   totalProcesses: number;
   pendingInvoices: number;
+  overdueInvoices: number;
   totalRevenue: number;
-  // Conversão do período
-  conversionRate: number;
+  // Conversão do período (null = sem leads no período)
+  conversionRate: number | null;
+  conversionPrev: number | null;
+  revenuePrev: number;
 }
+
+const NONE: Variation = { kind: 'none' };
 
 const EMPTY_STATS: Stats = {
   newClients: 0, newLeads: 0, newProcesses: 0, completedProcesses: 0,
-  revenue: 0, paidInvoicesCount: 0, ticket: 0,
-  clientsTrend: null, leadsTrend: null, revenueTrend: null,
-  processesTrend: null, completedTrend: null, paidTrend: null,
+  revenue: 0, paidInvoicesCount: 0, ticket: null,
+  clientsTrend: NONE, leadsTrend: NONE, revenueTrend: NONE,
+  processesTrend: NONE, completedTrend: NONE, paidTrend: NONE,
   totalClients: 0, totalLeads: 0, openLeads: 0, activeProcesses: 0,
-  totalProcesses: 0, pendingInvoices: 0, totalRevenue: 0,
-  conversionRate: 0,
+  totalProcesses: 0, pendingInvoices: 0, overdueInvoices: 0, totalRevenue: 0,
+  conversionRate: null, conversionPrev: null, revenuePrev: 0,
 };
-
-type PeriodKey = 'hoje' | 'semana' | 'mes' | 'mes_passado' | 'ano' | 'total';
-
-const PERIODS: { key: PeriodKey; label: string }[] = [
-  { key: 'hoje', label: 'Hoje' },
-  { key: 'semana', label: 'Semana' },
-  { key: 'mes', label: 'Este mês' },
-  { key: 'mes_passado', label: 'Mês passado' },
-  { key: 'ano', label: 'Este ano' },
-  { key: 'total', label: 'Total' },
-];
-
-interface Range {
-  start: Date | null;
-  end: Date | null;
-  prevStart: Date | null;
-  prevEnd: Date | null;
-  label: string;
-}
-
-function getRange(period: PeriodKey, now = new Date()): Range {
-  const d = (y: number, m: number, day: number) => new Date(y, m, day, 0, 0, 0, 0);
-  const y = now.getFullYear();
-  const m = now.getMonth();
-
-  switch (period) {
-    case 'hoje': {
-      const start = d(y, m, now.getDate());
-      const end = new Date(start.getTime() + 86400000);
-      return {
-        start, end,
-        prevStart: new Date(start.getTime() - 86400000), prevEnd: start,
-        label: 'Hoje',
-      };
-    }
-    case 'semana': {
-      const start = d(y, m, now.getDate() - now.getDay());
-      const end = new Date(start.getTime() + 7 * 86400000);
-      return {
-        start, end,
-        prevStart: new Date(start.getTime() - 7 * 86400000), prevEnd: start,
-        label: 'Esta semana',
-      };
-    }
-    case 'mes_passado': {
-      const start = d(y, m - 1, 1);
-      const end = d(y, m, 1);
-      return {
-        start, end,
-        prevStart: d(y, m - 2, 1), prevEnd: start,
-        label: start.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
-      };
-    }
-    case 'ano': {
-      const start = d(y, 0, 1);
-      const end = d(y + 1, 0, 1);
-      return {
-        start, end,
-        prevStart: d(y - 1, 0, 1), prevEnd: start,
-        label: `Ano de ${y}`,
-      };
-    }
-    case 'total':
-      return { start: null, end: null, prevStart: null, prevEnd: null, label: 'Acumulado histórico' };
-    case 'mes':
-    default: {
-      const start = d(y, m, 1);
-      const end = d(y, m + 1, 1);
-      return {
-        start, end,
-        prevStart: d(y, m - 1, 1), prevEnd: start,
-        label: start.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
-      };
-    }
-  }
-}
 
 const PAID_STATUSES = ['paid', 'received', 'confirmed'];
 const DONE_STATUSES = ['registrada', 'certificado', 'certificados', 'deferimento'];
-
-function variation(current: number, previous: number): number | null {
-  if (!previous) return null;
-  return Math.round(((current - previous) / previous) * 100);
-}
 
 // ─────────────────────────────────────────────────
 // Main Dashboard
 // ─────────────────────────────────────────────────
 export default function AdminDashboard() {
-  const { isMasterAdmin, isLoading: loadingFinancial } = useCanViewFinancialValues();
+  useCanViewFinancialValues();
   const [period, setPeriod] = useState<PeriodKey>('mes');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
   const [stats, setStats] = useState<Stats>(EMPTY_STATS);
+  const [loadingStats, setLoadingStats] = useState(true);
   const [greeting, setGreeting] = useState('');
   const [adminName, setAdminName] = useState('');
   const [currentTime, setCurrentTime] = useState('');
-  const range = getRange(period);
-  const isTotal = period === 'total';
+  const [dataQuality, setDataQuality] = useState<QualitySummary>({
+    missingOriginPct: null, missingSectorPct: null, missingStatePct: null,
+  });
+
+  const parseInput = (value: string): Date | null => {
+    if (!value) return null;
+    const [y, m, d] = value.split('-').map(Number);
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d);
+  };
+
+  const range: DateRange = useMemo(
+    () => getRange(period, { from: parseInput(customFrom), to: parseInput(customTo) }),
+    [period, customFrom, customTo],
+  );
+  const isTotal = range.start === null && range.end === null;
 
   // Clock
   useEffect(() => {
@@ -564,20 +527,16 @@ export default function AdminDashboard() {
     setGreeting(hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite');
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user?.id) {
-        const { data } = await supabase.from('profiles').select('full_name').eq('id', session.user.id).single();
+        const { data } = await supabase.from('profiles').select('full_name').eq('id', session.user.id).maybeSingle();
         if (data?.full_name) setAdminName(data.full_name.split(' ')[0]);
       }
     });
   }, []);
 
-  useEffect(() => {
-    fetchStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period]);
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
+    setLoadingStats(true);
     try {
-      const r = getRange(period);
+      const r = range;
 
       const inWindow = (table: 'profiles' | 'leads' | 'brand_processes', col: string, from: Date | null, to: Date | null) => {
         let q = supabase.from(table).select('id', { count: 'exact', head: true });
@@ -611,20 +570,25 @@ export default function AdminDashboard() {
         supabase.from('brand_processes').select('id', { count: 'exact', head: true }),
         supabase.from('brand_processes').select('id', { count: 'exact', head: true }).eq('status', 'em_andamento'),
         supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-        // Faturas (para receita por período)
-        supabase.from('invoices').select('amount, status, payment_date, created_at').in('status', PAID_STATUSES).range(0, 4999),
+        supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('status', 'overdue'),
+        // Faturas pagas (receita por período)
+        supabase.from('invoices').select('amount, payment_date, created_at').in('status', PAID_STATUSES).range(0, 4999),
       ]);
 
       const count = (i: number) =>
-        results[i].status === 'fulfilled' ? ((results[i] as any).value?.count || 0) : 0;
+        results[i].status === 'fulfilled' ? ((results[i] as PromiseFulfilledResult<{ count: number | null }>).value?.count || 0) : 0;
 
-      const invoices: any[] =
-        results[14].status === 'fulfilled' ? ((results[14] as any).value?.data || []) : [];
+      type InvoiceRow = { amount: number | string | null; payment_date: string | null; created_at: string };
+      const invoices: InvoiceRow[] =
+        results[15].status === 'fulfilled'
+          ? ((results[15] as PromiseFulfilledResult<{ data: InvoiceRow[] | null }>).value?.data || [])
+          : [];
 
       const paidIn = (from: Date | null, to: Date | null) => {
         const rows = invoices.filter((i) => {
           if (!from && !to) return true;
           const ref = new Date(i.payment_date || i.created_at);
+          if (Number.isNaN(ref.getTime())) return false;
           if (from && ref < from) return false;
           if (to && ref >= to) return false;
           return true;
@@ -641,6 +605,8 @@ export default function AdminDashboard() {
 
       const newClients = count(0);
       const newLeads = count(1);
+      const prevClients = count(4);
+      const prevLeads = count(5);
 
       setStats({
         newClients,
@@ -649,9 +615,9 @@ export default function AdminDashboard() {
         completedProcesses: count(3),
         revenue: paidNow.total,
         paidInvoicesCount: paidNow.qtd,
-        ticket: paidNow.qtd > 0 ? paidNow.total / paidNow.qtd : 0,
-        clientsTrend: variation(newClients, count(4)),
-        leadsTrend: variation(newLeads, count(5)),
+        ticket: paidNow.qtd > 0 ? paidNow.total / paidNow.qtd : null,
+        clientsTrend: variation(newClients, prevClients),
+        leadsTrend: variation(newLeads, prevLeads),
         processesTrend: variation(count(2), count(6)),
         completedTrend: variation(count(3), count(7)),
         revenueTrend: variation(paidNow.total, paidPrev.total),
@@ -662,70 +628,103 @@ export default function AdminDashboard() {
         totalProcesses: count(11),
         activeProcesses: count(12),
         pendingInvoices: count(13),
+        overdueInvoices: count(14),
         totalRevenue,
-        conversionRate: newLeads > 0 ? Math.round((newClients / newLeads) * 1000) / 10 : 0,
+        conversionRate: rate(newClients, newLeads),
+        conversionPrev: rate(prevClients, prevLeads),
+        revenuePrev: paidPrev.total,
       });
     } catch (err) {
       console.warn('[Dashboard] Erro ao carregar estatísticas:', err);
+    } finally {
+      setLoadingStats(false);
     }
-  };
+  }, [range]);
 
-  const trendLabel = isTotal ? undefined : 'vs período ant.';
+  useEffect(() => { fetchStats(); }, [fetchStats]);
 
-  const flowCards: KpiCardProps[] = [
+  const alerts = useMemo(() => buildAlerts({
+    pendingInvoices: stats.pendingInvoices,
+    overdueInvoices: stats.overdueInvoices,
+    paidInvoices: stats.paidInvoicesCount,
+    conversion: stats.conversionRate,
+    conversionPrev: stats.conversionPrev,
+    revenue: stats.revenue,
+    revenuePrev: stats.revenuePrev,
+    leadsPeriod: stats.newLeads,
+    missingOriginPct: dataQuality.missingOriginPct,
+    missingSectorPct: dataQuality.missingSectorPct,
+    missingStatePct: dataQuality.missingStatePct,
+  }), [stats, dataQuality]);
+
+  const trendLabel = 'vs período anterior';
+
+  const kpiCards: KpiCardProps[] = [
     {
-      title: isTotal ? 'Clientes (total)' : 'Novos Clientes', value: isTotal ? stats.totalClients : stats.newClients,
+      title: isTotal ? 'Clientes (acumulado)' : 'Novos Clientes',
+      value: isTotal ? stats.totalClients : stats.newClients,
       icon: Users, gradient: 'from-blue-500 to-cyan-400',
       color: '#3b82f6', accentColor: '#60a5fa',
-      trend: isTotal ? undefined : stats.clientsTrend ?? undefined, trendLabel,
-      sub: `Total histórico: ${stats.totalClients.toLocaleString('pt-BR')}`,
+      trend: isTotal ? undefined : stats.clientsTrend, trendLabel,
+      sub: `Base total: ${formatInt(stats.totalClients)}`,
+      tooltip: 'Clientes cadastrados dentro do período selecionado. A base total é a soma histórica.',
       index: 0,
     },
     {
-      title: isTotal ? 'Leads (total)' : 'Leads Recebidos', value: isTotal ? stats.totalLeads : stats.newLeads,
+      title: isTotal ? 'Leads (acumulado)' : 'Leads Recebidos',
+      value: isTotal ? stats.totalLeads : stats.newLeads,
       icon: Target, gradient: 'from-violet-500 to-purple-400',
       color: '#8b5cf6', accentColor: '#a78bfa',
-      trend: isTotal ? undefined : stats.leadsTrend ?? undefined, trendLabel,
-      sub: `Em aberto agora: ${stats.openLeads.toLocaleString('pt-BR')}`,
+      trend: isTotal ? undefined : stats.leadsTrend, trendLabel,
+      sub: `Em aberto agora: ${formatInt(stats.openLeads)}`,
+      tooltip: 'Leads que entraram no período. "Em aberto" é a posição atual, independente do período.',
       index: 1,
     },
     {
-      title: isTotal ? 'Processos (total)' : 'Novos Processos', value: isTotal ? stats.totalProcesses : stats.newProcesses,
+      title: isTotal ? 'Processos (acumulado)' : 'Novos Processos',
+      value: isTotal ? stats.totalProcesses : stats.newProcesses,
       icon: Layers, gradient: 'from-amber-500 to-orange-400',
       color: '#f59e0b', accentColor: '#fbbf24',
-      trend: isTotal ? undefined : stats.processesTrend ?? undefined, trendLabel,
-      sub: `Ativos agora: ${stats.activeProcesses.toLocaleString('pt-BR')}`,
+      trend: isTotal ? undefined : stats.processesTrend, trendLabel,
+      sub: `Ativos agora: ${formatInt(stats.activeProcesses)}`,
+      tooltip: 'Processos abertos no período. "Ativos" mostra quantos estão em andamento hoje.',
       index: 2,
     },
     {
-      title: 'Processos Concluídos', value: stats.completedProcesses,
+      title: 'Processos Concluídos',
+      value: stats.completedProcesses,
       icon: CheckCircle, gradient: 'from-emerald-500 to-green-400',
       color: '#10b981', accentColor: '#34d399',
-      trend: isTotal ? undefined : stats.completedTrend ?? undefined, trendLabel,
+      trend: isTotal ? undefined : stats.completedTrend, trendLabel,
+      tooltip: 'Processos com registro concedido ou certificado, pela data da última atualização.',
       index: 3,
     },
     {
-      title: 'Faturas Pagas', value: isTotal ? stats.paidInvoicesCount : stats.paidInvoicesCount,
+      title: 'Faturas Pagas',
+      value: stats.paidInvoicesCount,
       icon: CreditCard, gradient: 'from-indigo-500 to-blue-400',
       color: '#6366f1', accentColor: '#818cf8',
-      trend: isTotal ? undefined : stats.paidTrend ?? undefined, trendLabel,
-      sub: `Pendentes agora: ${stats.pendingInvoices.toLocaleString('pt-BR')}`,
+      trend: isTotal ? undefined : stats.paidTrend, trendLabel,
+      sub: `Pendentes: ${formatInt(stats.pendingInvoices)} · Vencidas: ${formatInt(stats.overdueInvoices)}`,
+      tooltip: 'Faturas efetivamente pagas no período, pela data de pagamento.',
       index: 4,
     },
     {
-      title: isTotal ? 'Receita Acumulada' : 'Receita Recebida', value: isTotal ? stats.totalRevenue : stats.revenue,
+      title: isTotal ? 'Receita Acumulada' : 'Receita do Período',
+      value: isTotal ? stats.totalRevenue : stats.revenue,
       prefix: 'R$ ',
       icon: TrendingUp, gradient: 'from-emerald-600 to-teal-400',
       color: '#059669', accentColor: '#10b981',
-      trend: isTotal ? undefined : stats.revenueTrend ?? undefined, trendLabel,
-      sub: isTotal
-        ? undefined
-        : `Ticket médio: R$ ${stats.ticket.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`,
+      trend: isTotal ? undefined : stats.revenueTrend, trendLabel,
+      sub: stats.ticket === null
+        ? 'Ticket médio: sem faturas pagas'
+        : `Ticket médio: ${formatBRL(stats.ticket)}`,
+      tooltip: 'Somente valores recebidos no período. Cobranças em aberto não entram aqui.',
       index: 5,
     },
   ];
 
-  const kpiCards = flowCards;
+
 
 
   return (
