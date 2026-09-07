@@ -2296,6 +2296,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                             >
                               <Edit2 className="h-3 w-3" /> Editar
                             </Button>
+                            </div>
                           )}
                         </div>
 
