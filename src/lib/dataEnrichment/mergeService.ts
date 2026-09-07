@@ -49,8 +49,12 @@ export const buildMergePayload = (
         normalizeEmail(current.email) === value ||
         emails.some(e => normalizeEmail(e) === value);
       if (already) continue;
-      emails.push(value);
-      emailsChanged = true;
+      if (!current.email) {
+        payload.email = value;
+      } else {
+        emails.push(value);
+        emailsChanged = true;
+      }
       updatedLabels.push('E-mail');
       continue;
     }

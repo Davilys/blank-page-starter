@@ -1,6 +1,7 @@
 /** Tipos compartilhados da camada de enriquecimento cadastral. */
 
 export type EnrichmentSource = 'BrasilAPI' | 'ViaCEP' | 'CPF Provider';
+export type DocumentType = 'cnpj' | 'cpf' | 'cep';
 
 export interface EnrichedAddress {
   zip_code?: string | null;
@@ -24,13 +25,23 @@ export interface EnrichedData extends EnrichedAddress {
   phones?: string[];
 }
 
-export type EnrichmentStatus = 'ok' | 'not_found' | 'unavailable' | 'invalid' | 'error';
+export type EnrichmentStatus =
+  | 'success'
+  | 'provider_unavailable'
+  | 'invalid_document'
+  | 'not_found'
+  | 'rate_limited'
+  | 'timeout'
+  | 'provider_error'
+  | 'unauthorized';
 
 export interface EnrichmentResult {
+  success: boolean;
   status: EnrichmentStatus;
   /** Mensagem amigável já pronta para exibição (nunca técnica). */
   message?: string;
-  sources: EnrichmentSource[];
+  source: EnrichmentSource | null;
+  documentType: DocumentType;
   data?: EnrichedData;
 }
 
@@ -41,6 +52,10 @@ export interface EnrichmentProvider {
   /** Indica se o provedor está configurado e pode ser usado. */
   isAvailable(): boolean;
   fetch(identifier: string): Promise<EnrichmentResult>;
+}
+
+export interface CpfProvider extends EnrichmentProvider {
+  lookupByCpf(cpf: string): Promise<EnrichmentResult>;
 }
 
 /** Dados atuais do CRM usados na comparação. */

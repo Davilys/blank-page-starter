@@ -5,17 +5,20 @@
  * Para habilitar no futuro (Serpro ou provedor pago), implemente a chamada na Edge Function
  * `enrich-client-data` (type = 'cpf') com as credenciais em Secrets e ajuste `isAvailable()`.
  */
-import type { EnrichmentProvider, EnrichmentResult } from '../types';
+import type { CpfProvider, EnrichmentResult } from '../types';
 
-export const cpfProvider: EnrichmentProvider = {
+const unavailable = (): EnrichmentResult => ({
+  success: false,
+  status: 'provider_unavailable',
+  message: 'Para este cadastro, a consulta automática de CPF ainda não está configurada.\nVocê pode continuar usando a atualização automática para empresas com CNPJ.',
+  source: 'CPF Provider',
+  documentType: 'cpf',
+});
+
+export const cpfProvider: CpfProvider = {
   id: 'cpf-nao-configurado',
   source: 'CPF Provider',
   isAvailable: () => false,
-  async fetch(): Promise<EnrichmentResult> {
-    return {
-      status: 'unavailable',
-      message: 'Consulta de CPF não disponível no momento.',
-      sources: [],
-    };
-  },
+  async lookupByCpf(): Promise<EnrichmentResult> { return unavailable(); },
+  async fetch(cpf: string): Promise<EnrichmentResult> { return this.lookupByCpf(cpf); },
 };
