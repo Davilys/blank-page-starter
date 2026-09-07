@@ -38,7 +38,7 @@ export const enrichClient = async (client: CrmClientSnapshot): Promise<Enrichmen
     return cpfProvider.lookupByCpf(id.value, client.birth_date);
   }
 
-  const cacheKey = `cnpj:${id.value}`;
+  const cacheKey = `${id.type}:${id.value}:${client.birth_date || ''}`;
   const cached = cache.get(cacheKey);
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.result;
 
@@ -46,7 +46,9 @@ export const enrichClient = async (client: CrmClientSnapshot): Promise<Enrichmen
   if (pending) return pending;
 
   const run = (async (): Promise<EnrichmentResult> => {
-    const result = await brasilApiProvider.fetch(id.value);
+    const result = id.type === 'cpf'
+      ? await cpfProvider.lookupByCpf(id.value, client.birth_date)
+      : await brasilApiProvider.fetch(id.value);
 
     if (result.status === 'success' && result.data) {
       const zip = normalizeZip(result.data.zip_code);

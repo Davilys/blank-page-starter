@@ -2346,6 +2346,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                               <InfoRow icon={User} label="Nome Completo" value={client.full_name} copyable />
                               <InfoRow icon={Hash} label="CPF" value={profileData?.cpf || client.cpf_cnpj} mono copyable />
                               <InfoRow icon={Hash} label="CNPJ" value={profileData?.cnpj} mono copyable />
+                              <InfoRow icon={CalendarIcon} label="Data de nascimento" value={profileData?.birth_date ? format(new Date(`${profileData.birth_date}T12:00:00`), 'dd/MM/yyyy') : null} />
                               <InfoRow icon={Mail} label="E-mail" value={client.email} copyable onAction={() => { if (client.email) setShowEmailCompose(true); }} />
                                {(profileData?.additional_emails || []).map((email: string, index: number) => (
                                  <InfoRow key={`additional-email-${email}`} icon={Mail} label={`E-mail adicional ${index + 1}`} value={email} copyable onAction={() => { if (email) setShowEmailCompose(true); }} />
