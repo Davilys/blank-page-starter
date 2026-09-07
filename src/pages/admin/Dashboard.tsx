@@ -409,17 +409,125 @@ function PerformanceBar({ label, value, color, delay }: {
 // Stats interface
 // ─────────────────────────────────────────────────
 interface Stats {
+  // Fluxo (período selecionado)
+  newClients: number;
+  newLeads: number;
+  newProcesses: number;
+  completedProcesses: number;
+  revenue: number;
+  paidInvoicesCount: number;
+  ticket: number;
+  // Variações vs período anterior (null = sem base de comparação)
+  clientsTrend: number | null;
+  leadsTrend: number | null;
+  revenueTrend: number | null;
+  processesTrend: number | null;
+  completedTrend: number | null;
+  paidTrend: number | null;
+  // Posição atual (estoque)
   totalClients: number;
   totalLeads: number;
+  openLeads: number;
   activeProcesses: number;
+  totalProcesses: number;
   pendingInvoices: number;
   totalRevenue: number;
-  completedProcesses: number;
-  clientsTrend: number;
-  leadsTrend: number;
-  revenueTrend: number;
-  totalProcesses: number;
+  // Conversão do período
   conversionRate: number;
+}
+
+const EMPTY_STATS: Stats = {
+  newClients: 0, newLeads: 0, newProcesses: 0, completedProcesses: 0,
+  revenue: 0, paidInvoicesCount: 0, ticket: 0,
+  clientsTrend: null, leadsTrend: null, revenueTrend: null,
+  processesTrend: null, completedTrend: null, paidTrend: null,
+  totalClients: 0, totalLeads: 0, openLeads: 0, activeProcesses: 0,
+  totalProcesses: 0, pendingInvoices: 0, totalRevenue: 0,
+  conversionRate: 0,
+};
+
+type PeriodKey = 'hoje' | 'semana' | 'mes' | 'mes_passado' | 'ano' | 'total';
+
+const PERIODS: { key: PeriodKey; label: string }[] = [
+  { key: 'hoje', label: 'Hoje' },
+  { key: 'semana', label: 'Semana' },
+  { key: 'mes', label: 'Este mês' },
+  { key: 'mes_passado', label: 'Mês passado' },
+  { key: 'ano', label: 'Este ano' },
+  { key: 'total', label: 'Total' },
+];
+
+interface Range {
+  start: Date | null;
+  end: Date | null;
+  prevStart: Date | null;
+  prevEnd: Date | null;
+  label: string;
+}
+
+function getRange(period: PeriodKey, now = new Date()): Range {
+  const d = (y: number, m: number, day: number) => new Date(y, m, day, 0, 0, 0, 0);
+  const y = now.getFullYear();
+  const m = now.getMonth();
+
+  switch (period) {
+    case 'hoje': {
+      const start = d(y, m, now.getDate());
+      const end = new Date(start.getTime() + 86400000);
+      return {
+        start, end,
+        prevStart: new Date(start.getTime() - 86400000), prevEnd: start,
+        label: 'Hoje',
+      };
+    }
+    case 'semana': {
+      const start = d(y, m, now.getDate() - now.getDay());
+      const end = new Date(start.getTime() + 7 * 86400000);
+      return {
+        start, end,
+        prevStart: new Date(start.getTime() - 7 * 86400000), prevEnd: start,
+        label: 'Esta semana',
+      };
+    }
+    case 'mes_passado': {
+      const start = d(y, m - 1, 1);
+      const end = d(y, m, 1);
+      return {
+        start, end,
+        prevStart: d(y, m - 2, 1), prevEnd: start,
+        label: start.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
+      };
+    }
+    case 'ano': {
+      const start = d(y, 0, 1);
+      const end = d(y + 1, 0, 1);
+      return {
+        start, end,
+        prevStart: d(y - 1, 0, 1), prevEnd: start,
+        label: `Ano de ${y}`,
+      };
+    }
+    case 'total':
+      return { start: null, end: null, prevStart: null, prevEnd: null, label: 'Acumulado histórico' };
+    case 'mes':
+    default: {
+      const start = d(y, m, 1);
+      const end = d(y, m + 1, 1);
+      return {
+        start, end,
+        prevStart: d(y, m - 1, 1), prevEnd: start,
+        label: start.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
+      };
+    }
+  }
+}
+
+const PAID_STATUSES = ['paid', 'received', 'confirmed'];
+const DONE_STATUSES = ['registrada', 'certificado', 'certificados', 'deferimento'];
+
+function variation(current: number, previous: number): number | null {
+  if (!previous) return null;
+  return Math.round(((current - previous) / previous) * 100);
 }
 
 // ─────────────────────────────────────────────────
@@ -427,15 +535,13 @@ interface Stats {
 // ─────────────────────────────────────────────────
 export default function AdminDashboard() {
   const { isMasterAdmin, isLoading: loadingFinancial } = useCanViewFinancialValues();
-  const [stats, setStats] = useState<Stats>({
-    totalClients: 0, totalLeads: 0, activeProcesses: 0,
-    pendingInvoices: 0, totalRevenue: 0, completedProcesses: 0,
-    clientsTrend: 0, leadsTrend: 0, revenueTrend: 0,
-    totalProcesses: 0, conversionRate: 0,
-  });
+  const [period, setPeriod] = useState<PeriodKey>('mes');
+  const [stats, setStats] = useState<Stats>(EMPTY_STATS);
   const [greeting, setGreeting] = useState('');
   const [adminName, setAdminName] = useState('');
   const [currentTime, setCurrentTime] = useState('');
+  const range = getRange(period);
+  const isTotal = period === 'total';
 
   // Clock
   useEffect(() => {
@@ -451,7 +557,6 @@ export default function AdminDashboard() {
   useEffect(() => {
     const hour = new Date().getHours();
     setGreeting(hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite');
-    fetchStats();
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user?.id) {
         const { data } = await supabase.from('profiles').select('full_name').eq('id', session.user.id).single();
@@ -460,112 +565,163 @@ export default function AdminDashboard() {
     });
   }, []);
 
+  useEffect(() => {
+    fetchStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period]);
+
   const fetchStats = async () => {
     try {
-      const now = new Date();
-      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const r = getRange(period);
+
+      const inWindow = (table: 'profiles' | 'leads' | 'brand_processes', col: string, from: Date | null, to: Date | null) => {
+        let q = supabase.from(table).select('id', { count: 'exact', head: true });
+        if (from) q = q.gte(col, from.toISOString());
+        if (to) q = q.lt(col, to.toISOString());
+        return q;
+      };
+
+      const doneWindow = (from: Date | null, to: Date | null) => {
+        let q = supabase.from('brand_processes').select('id', { count: 'exact', head: true }).in('status', DONE_STATUSES);
+        if (from) q = q.gte('updated_at', from.toISOString());
+        if (to) q = q.lt('updated_at', to.toISOString());
+        return q;
+      };
 
       const results = await Promise.allSettled([
-        supabase.from('profiles').select('id', { count: 'exact' }),
-        supabase.from('leads').select('id', { count: 'exact' }),
-        supabase.from('brand_processes').select('id, status'),
-        supabase.from('invoices').select('id, status, amount, created_at'),
-        supabase.from('profiles').select('id', { count: 'exact' }).gte('created_at', lastMonth.toISOString()).lt('created_at', thisMonth.toISOString()),
-        supabase.from('leads').select('id', { count: 'exact' }).gte('created_at', lastMonth.toISOString()).lt('created_at', thisMonth.toISOString()),
-        supabase.from('invoices').select('amount').eq('status', 'paid').gte('created_at', lastMonth.toISOString()).lt('created_at', thisMonth.toISOString()),
+        // Fluxo — período
+        inWindow('profiles', 'created_at', r.start, r.end),
+        inWindow('leads', 'created_at', r.start, r.end),
+        inWindow('brand_processes', 'created_at', r.start, r.end),
+        doneWindow(r.start, r.end),
+        // Fluxo — período anterior
+        inWindow('profiles', 'created_at', r.prevStart, r.prevEnd),
+        inWindow('leads', 'created_at', r.prevStart, r.prevEnd),
+        inWindow('brand_processes', 'created_at', r.prevStart, r.prevEnd),
+        doneWindow(r.prevStart, r.prevEnd),
+        // Posição atual
+        supabase.from('profiles').select('id', { count: 'exact', head: true }),
+        supabase.from('leads').select('id', { count: 'exact', head: true }),
+        supabase.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'novo'),
+        supabase.from('brand_processes').select('id', { count: 'exact', head: true }),
+        supabase.from('brand_processes').select('id', { count: 'exact', head: true }).eq('status', 'em_andamento'),
+        supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+        // Faturas (para receita por período)
+        supabase.from('invoices').select('amount, status, payment_date, created_at').in('status', PAID_STATUSES).range(0, 4999),
       ]);
 
-      const getValue = <T,>(r: PromiseSettledResult<T>, fallback: T): T =>
-        r.status === 'fulfilled' ? r.value : fallback;
+      const count = (i: number) =>
+        results[i].status === 'fulfilled' ? ((results[i] as any).value?.count || 0) : 0;
 
-      const emptyRes = { data: null, count: 0, error: null };
-      const clientsRes = getValue(results[0], emptyRes as any);
-      const leadsRes = getValue(results[1], emptyRes as any);
-      const processesRes = getValue(results[2], emptyRes as any);
-      const invoicesRes = getValue(results[3], emptyRes as any);
-      const lastMonthClients = getValue(results[4], emptyRes as any);
-      const lastMonthLeads = getValue(results[5], emptyRes as any);
-      const lastMonthRevenue = getValue(results[6], emptyRes as any);
+      const invoices: any[] =
+        results[14].status === 'fulfilled' ? ((results[14] as any).value?.data || []) : [];
 
-      const processes = processesRes.data || [];
-      const invoices = invoicesRes.data || [];
-      const paidInvoices = invoices.filter((i: any) => i.status === 'paid' || i.status === 'confirmed' || i.status === 'received');
-      const totalRevenue = paidInvoices.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
-      const thisMonthClients = (clientsRes.count || 0) - (lastMonthClients.count || 0);
-      const thisMonthLeads = (leadsRes.count || 0) - (lastMonthLeads.count || 0);
-      const lastMonthRevenueTotal = lastMonthRevenue.data?.reduce((sum: number, i: any) => sum + Number(i.amount), 0) || 0;
-      const clientsTrend = lastMonthClients.count ? ((thisMonthClients - (lastMonthClients.count || 0)) / (lastMonthClients.count || 1)) * 100 : 0;
-      const leadsTrend = lastMonthLeads.count ? ((thisMonthLeads - (lastMonthLeads.count || 0)) / (lastMonthLeads.count || 1)) * 100 : 0;
-      const revenueTrend = lastMonthRevenueTotal ? ((totalRevenue - lastMonthRevenueTotal) / lastMonthRevenueTotal) * 100 : 0;
-      const totalLeads = leadsRes.count || 0;
-      const totalClients = clientsRes.count || 0;
-      const conversionRate = totalLeads > 0 ? Math.round((totalClients / totalLeads) * 100) : 0;
+      const paidIn = (from: Date | null, to: Date | null) => {
+        const rows = invoices.filter((i) => {
+          if (!from && !to) return true;
+          const ref = new Date(i.payment_date || i.created_at);
+          if (from && ref < from) return false;
+          if (to && ref >= to) return false;
+          return true;
+        });
+        return {
+          total: rows.reduce((s, i) => s + Number(i.amount || 0), 0),
+          qtd: rows.length,
+        };
+      };
+
+      const paidNow = paidIn(r.start, r.end);
+      const paidPrev = paidIn(r.prevStart, r.prevEnd);
+      const totalRevenue = paidIn(null, null).total;
+
+      const newClients = count(0);
+      const newLeads = count(1);
 
       setStats({
-        totalClients, totalLeads,
-        activeProcesses: processes.filter((p: any) => p.status === 'em_andamento').length,
-        pendingInvoices: invoices.filter((i: any) => i.status === 'pending').length,
+        newClients,
+        newLeads,
+        newProcesses: count(2),
+        completedProcesses: count(3),
+        revenue: paidNow.total,
+        paidInvoicesCount: paidNow.qtd,
+        ticket: paidNow.qtd > 0 ? paidNow.total / paidNow.qtd : 0,
+        clientsTrend: variation(newClients, count(4)),
+        leadsTrend: variation(newLeads, count(5)),
+        processesTrend: variation(count(2), count(6)),
+        completedTrend: variation(count(3), count(7)),
+        revenueTrend: variation(paidNow.total, paidPrev.total),
+        paidTrend: variation(paidNow.qtd, paidPrev.qtd),
+        totalClients: count(8),
+        totalLeads: count(9),
+        openLeads: count(10),
+        totalProcesses: count(11),
+        activeProcesses: count(12),
+        pendingInvoices: count(13),
         totalRevenue,
-        completedProcesses: processes.filter((p: any) => p.status === 'registrada').length,
-        clientsTrend: Math.round(clientsTrend),
-        leadsTrend: Math.round(leadsTrend),
-        revenueTrend: Math.round(revenueTrend),
-        totalProcesses: processes.length,
-        conversionRate,
+        conversionRate: newLeads > 0 ? Math.round((newClients / newLeads) * 1000) / 10 : 0,
       });
     } catch (err) {
       console.warn('[Dashboard] Erro ao carregar estatísticas:', err);
     }
   };
 
-  const kpiCards: KpiCardProps[] = [
+  const trendLabel = isTotal ? undefined : 'vs período ant.';
+
+  const flowCards: KpiCardProps[] = [
     {
-      title: 'Total Clientes', value: stats.totalClients,
+      title: isTotal ? 'Clientes (total)' : 'Novos Clientes', value: isTotal ? stats.totalClients : stats.newClients,
       icon: Users, gradient: 'from-blue-500 to-cyan-400',
       color: '#3b82f6', accentColor: '#60a5fa',
-      trend: stats.clientsTrend, trendLabel: 'vs mês ant.',
-      ringMax: stats.totalClients + stats.totalLeads,
+      trend: isTotal ? undefined : stats.clientsTrend ?? undefined, trendLabel,
+      sub: `Total histórico: ${stats.totalClients.toLocaleString('pt-BR')}`,
       index: 0,
     },
     {
-      title: 'Leads Ativos', value: stats.totalLeads,
+      title: isTotal ? 'Leads (total)' : 'Leads Recebidos', value: isTotal ? stats.totalLeads : stats.newLeads,
       icon: Target, gradient: 'from-violet-500 to-purple-400',
       color: '#8b5cf6', accentColor: '#a78bfa',
-      trend: stats.leadsTrend, trendLabel: 'vs mês ant.',
-      tag: 'LIVE',
+      trend: isTotal ? undefined : stats.leadsTrend ?? undefined, trendLabel,
+      sub: `Em aberto agora: ${stats.openLeads.toLocaleString('pt-BR')}`,
       index: 1,
     },
     {
-      title: 'Processos Ativos', value: stats.activeProcesses,
+      title: isTotal ? 'Processos (total)' : 'Novos Processos', value: isTotal ? stats.totalProcesses : stats.newProcesses,
       icon: Layers, gradient: 'from-amber-500 to-orange-400',
       color: '#f59e0b', accentColor: '#fbbf24',
-      ringMax: stats.totalProcesses,
+      trend: isTotal ? undefined : stats.processesTrend ?? undefined, trendLabel,
+      sub: `Ativos agora: ${stats.activeProcesses.toLocaleString('pt-BR')}`,
       index: 2,
     },
     {
-      title: 'Concluídos', value: stats.completedProcesses,
+      title: 'Processos Concluídos', value: stats.completedProcesses,
       icon: CheckCircle, gradient: 'from-emerald-500 to-green-400',
       color: '#10b981', accentColor: '#34d399',
-      ringMax: stats.totalProcesses,
+      trend: isTotal ? undefined : stats.completedTrend ?? undefined, trendLabel,
       index: 3,
     },
     {
-      title: 'Faturas Pendentes', value: stats.pendingInvoices,
-      icon: CreditCard, gradient: 'from-rose-500 to-pink-400',
-      color: '#f43f5e', accentColor: '#fb7185',
-      tag: stats.pendingInvoices > 0 ? 'ATENÇÃO' : 'OK',
+      title: 'Faturas Pagas', value: isTotal ? stats.paidInvoicesCount : stats.paidInvoicesCount,
+      icon: CreditCard, gradient: 'from-indigo-500 to-blue-400',
+      color: '#6366f1', accentColor: '#818cf8',
+      trend: isTotal ? undefined : stats.paidTrend ?? undefined, trendLabel,
+      sub: `Pendentes agora: ${stats.pendingInvoices.toLocaleString('pt-BR')}`,
       index: 4,
     },
     {
-      title: 'Receita Total', value: stats.totalRevenue,
+      title: isTotal ? 'Receita Acumulada' : 'Receita Recebida', value: isTotal ? stats.totalRevenue : stats.revenue,
       prefix: 'R$ ',
       icon: TrendingUp, gradient: 'from-emerald-600 to-teal-400',
       color: '#059669', accentColor: '#10b981',
-      trend: stats.revenueTrend, trendLabel: 'vs mês ant.',
+      trend: isTotal ? undefined : stats.revenueTrend ?? undefined, trendLabel,
+      sub: isTotal
+        ? undefined
+        : `Ticket médio: R$ ${stats.ticket.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`,
       index: 5,
     },
   ];
+
+  const kpiCards = flowCards;
+
 
   return (
     <>
