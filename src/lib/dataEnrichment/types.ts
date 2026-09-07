@@ -28,6 +28,7 @@ export interface EnrichedData extends EnrichedAddress {
 export type EnrichmentStatus =
   | 'success'
   | 'provider_unavailable'
+  | 'missing_birth_date'
   | 'invalid_document'
   | 'not_found'
   | 'rate_limited'
@@ -55,7 +56,7 @@ export interface EnrichmentProvider {
 }
 
 export interface CpfProvider extends EnrichmentProvider {
-  lookupByCpf(cpf: string): Promise<EnrichmentResult>;
+  lookupByCpf(cpf: string, birthDate?: string | null): Promise<EnrichmentResult>;
 }
 
 /** Dados atuais do CRM usados na comparação. */
@@ -67,6 +68,7 @@ export interface CrmClientSnapshot {
   cpf?: string | null;
   cnpj?: string | null;
   cpf_cnpj?: string | null;
+  birth_date?: string | null;
   company_name?: string | null;
   trade_name?: string | null;
   registration_status?: string | null;

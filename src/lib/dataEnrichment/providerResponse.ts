@@ -25,6 +25,7 @@ const responseSchema = z.object({
   status: z.enum([
     'success',
     'provider_unavailable',
+    'missing_birth_date',
     'invalid_document',
     'not_found',
     'rate_limited',

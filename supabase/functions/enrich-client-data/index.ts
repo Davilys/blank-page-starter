@@ -40,6 +40,8 @@ const GENERIC_ERROR = 'Não foi possível consultar os dados agora. Tente novame
 type DocumentType = 'cnpj' | 'cpf' | 'cep';
 type Source = 'BrasilAPI' | 'ViaCEP' | 'CPF Provider' | null;
 
+let serproToken: { value: string; expiresAt: number } | null = null;
+
 const result = (
   success: boolean,
   status: string,
@@ -57,6 +59,49 @@ const countFields = (data: Record<string, unknown>) =>
 
 const logDiagnostic = (payload: Record<string, unknown>) => {
   console.log(JSON.stringify({ event: 'data_enrichment', ...payload }));
+};
+
+const isValidCPF = (raw: string): boolean => {
+  const cpf = onlyDigits(raw);
+  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+  const digit = (length: number) => {
+    let sum = 0;
+    for (let i = 0; i < length; i += 1) sum += Number(cpf[i]) * (length + 1 - i);
+    const remainder = (sum * 10) % 11;
+    return remainder === 10 ? 0 : remainder;
+  };
+  return digit(9) === Number(cpf[9]) && digit(10) === Number(cpf[10]);
+};
+
+const formatBirthDate = (value: unknown): string | null => {
+  const raw = String(value ?? '');
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  if (!match) return null;
+  const date = new Date(`${raw}T00:00:00Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== raw || date > new Date()) return null;
+  return `${match[3]}${match[2]}${match[1]}`;
+};
+
+const getSerproToken = async (): Promise<string | null> => {
+  if (serproToken && serproToken.expiresAt > Date.now() + 60_000) return serproToken.value;
+  const key = Deno.env.get('SERPRO_CPF_CONSUMER_KEY');
+  const secret = Deno.env.get('SERPRO_CPF_CONSUMER_SECRET');
+  if (!key || !secret) return null;
+  const response = await fetchWithTimeout('https://gateway.apiserpro.serpro.gov.br/token', 12000, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${btoa(`${key}:${secret}`)}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
+    },
+    body: 'grant_type=client_credentials',
+  });
+  if (!response.ok) return null;
+  const body = await response.json().catch(() => ({}));
+  if (typeof body?.access_token !== 'string') return null;
+  const expiresIn = Number(body?.expires_in) || 3300;
+  serproToken = { value: body.access_token, expiresAt: Date.now() + expiresIn * 1000 };
+  return serproToken.value;
 };
 
 Deno.serve(async (req) => {

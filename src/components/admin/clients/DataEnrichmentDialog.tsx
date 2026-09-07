@@ -202,9 +202,16 @@ export function DataEnrichmentDialog({ open, onOpenChange, client, onUpdated, on
             )}
 
             {result && result.status !== 'success' && (
-              <div className="rounded-2xl border border-border bg-muted/30 p-4 flex items-start gap-2">
-                <AlertCircle className={`h-4 w-4 mt-0.5 shrink-0 ${['provider_error', 'timeout'].includes(result.status) ? 'text-destructive' : 'text-muted-foreground'}`} />
-                <p className="text-sm whitespace-pre-line">{result.message || 'Nenhuma atualização cadastral encontrada.'}</p>
+              <div className="rounded-2xl border border-border bg-muted/30 p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className={`h-4 w-4 mt-0.5 shrink-0 ${['provider_error', 'timeout'].includes(result.status) ? 'text-destructive' : 'text-muted-foreground'}`} />
+                  <p className="text-sm whitespace-pre-line">{result.message || 'Nenhuma atualização cadastral encontrada.'}</p>
+                </div>
+                {result.status === 'missing_birth_date' && onEditRegistration && (
+                  <Button size="sm" variant="outline" onClick={() => { handleClose(false); onEditRegistration(); }}>
+                    Informar data de nascimento
+                  </Button>
+                )}
               </div>
             )}
 

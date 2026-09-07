@@ -35,7 +35,7 @@ export const enrichClient = async (client: CrmClientSnapshot): Promise<Enrichmen
   }
 
   if (id.type === 'cpf') {
-    return cpfProvider.lookupByCpf(id.value);
+    return cpfProvider.lookupByCpf(id.value, client.birth_date);
   }
 
   const cacheKey = `cnpj:${id.value}`;
