@@ -2261,6 +2261,15 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                             <span className="text-sm font-semibold">Dados Pessoais</span>
                           </div>
                           {!editingContacts && (
+                            <div className="flex items-center gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs gap-1"
+                              onClick={() => setShowEnrichment(true)}
+                            >
+                              <RefreshCw className="h-3 w-3" /> Atualizar os dados
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
