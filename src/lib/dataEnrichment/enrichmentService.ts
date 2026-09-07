@@ -34,10 +34,6 @@ export const enrichClient = async (client: CrmClientSnapshot): Promise<Enrichmen
     };
   }
 
-  if (id.type === 'cpf') {
-    return cpfProvider.lookupByCpf(id.value, client.birth_date);
-  }
-
   const cacheKey = `${id.type}:${id.value}:${client.birth_date || ''}`;
   const cached = cache.get(cacheKey);
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.result;
