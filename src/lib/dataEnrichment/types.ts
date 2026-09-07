@@ -46,7 +46,7 @@ export interface EnrichmentResult {
   data?: EnrichedData;
 }
 
-/** Contrato genérico de provedor — permite plugar Serpro ou provedor pago no futuro. */
+/** Contrato genérico para fontes cadastrais autorizadas. */
 export interface EnrichmentProvider {
   readonly id: string;
   readonly source: EnrichmentSource;
