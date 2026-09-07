@@ -128,3 +128,6 @@ verify_jwt = false
 
 [functions.list-asaas-payments-for-client]
 verify_jwt = false
+
+[functions.enrich-client-data]
+verify_jwt = true
