@@ -875,26 +875,27 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-0.5">Taxa de Conversão</p>
-                  <p className="text-lg font-bold text-foreground">{stats.totalClients} / {stats.totalLeads}</p>
-                  <p className="text-[10px] text-muted-foreground">leads → clientes</p>
+                  <p className="text-lg font-bold text-foreground">{stats.newClients} / {stats.newLeads}</p>
+                  <p className="text-[10px] text-muted-foreground">leads → clientes no período</p>
                 </div>
               </div>
 
               {/* Performance bars */}
               <div className="space-y-2 pt-2 border-t border-border/40">
-                <PerformanceBar label="Processos concluídos"
-                  value={stats.totalProcesses > 0 ? Math.round((stats.completedProcesses / stats.totalProcesses) * 100) : 0}
+                <PerformanceBar label="Processos concluídos no período"
+                  value={stats.newProcesses > 0 ? Math.min(Math.round((stats.completedProcesses / stats.newProcesses) * 100), 100) : 0}
                   color="#10b981" delay={0.8} />
                 <PerformanceBar label="Faturas pagas"
-                  value={stats.pendingInvoices > 0
-                    ? Math.round(((stats.totalClients - stats.pendingInvoices) / stats.totalClients) * 100)
-                    : 100}
+                  value={(stats.paidInvoicesCount + stats.pendingInvoices) > 0
+                    ? Math.round((stats.paidInvoicesCount / (stats.paidInvoicesCount + stats.pendingInvoices)) * 100)
+                    : 0}
                   color="#6366f1" delay={0.95} />
-                <PerformanceBar label="Leads qualificados"
-                  value={Math.min(stats.conversionRate + 20, 100)}
+                <PerformanceBar label="Leads em aberto"
+                  value={stats.totalLeads > 0 ? Math.round((stats.openLeads / stats.totalLeads) * 100) : 0}
                   color="#f59e0b" delay={1.1} />
               </div>
             </motion.div>
+
 
             {/* Quick Access */}
             <QuickAccess />
