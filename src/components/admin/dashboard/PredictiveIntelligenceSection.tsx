@@ -292,7 +292,8 @@ export function PredictiveIntelligenceSection() {
           <RiskBadge score={globalScore?.score || 0} />
           {!hasData && (
             <p className="text-[10px] text-muted-foreground text-center mt-2 leading-tight">
-              Motor em aprendizado. Score aumentará conforme processos forem finalizados.
+              Motor preditivo aguardando volume mínimo de processos finalizados. Os indicadores abaixo
+              permanecem sem base estatística até que existam julgamentos registrados.
             </p>
           )}
         </motion.div>
