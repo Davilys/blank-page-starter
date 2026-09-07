@@ -3923,6 +3923,40 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         onCreated={() => fetchClientData()}
       />
 
+      {/* ─── ATUALIZAÇÃO CADASTRAL ─── */}
+      <DataEnrichmentDialog
+        open={showEnrichment}
+        onOpenChange={setShowEnrichment}
+        client={{
+          id: client.id,
+          full_name: client.full_name || profileData?.full_name || null,
+          email: client.email || profileData?.email || null,
+          phone: client.phone || profileData?.phone || null,
+          cpf: profileData?.cpf ?? null,
+          cnpj: profileData?.cnpj ?? null,
+          cpf_cnpj: profileData?.cpf_cnpj ?? client.cpf_cnpj ?? null,
+          company_name: client.company_name || profileData?.company_name || null,
+          trade_name: profileData?.trade_name ?? null,
+          registration_status: profileData?.registration_status ?? null,
+          cnae: profileData?.cnae ?? null,
+          opening_date: profileData?.opening_date ?? null,
+          share_capital: profileData?.share_capital ?? null,
+          address: profileData?.address ?? null,
+          address_number: profileData?.address_number ?? null,
+          address_complement: profileData?.address_complement ?? null,
+          neighborhood: profileData?.neighborhood ?? null,
+          city: profileData?.city ?? null,
+          state: profileData?.state ?? null,
+          zip_code: profileData?.zip_code ?? null,
+          additional_phones: profileData?.additional_phones ?? [],
+          additional_emails: profileData?.additional_emails ?? [],
+        }}
+        onUpdated={async () => { await fetchClientData(); onUpdate(); }}
+        onEditRegistration={() => setEditingContacts(true)}
+      />
+
+
+
       {/* ─── SCHEDULING DIALOG (from pub Agenda button) ─── */}
       <Dialog open={!!schedulingPub} onOpenChange={(open) => { if (!open) setSchedulingPub(null); }}>
         <DialogContent className="z-[200] max-w-md">
