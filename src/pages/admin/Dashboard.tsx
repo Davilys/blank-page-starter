@@ -157,7 +157,7 @@ interface KpiCardProps {
 function KpiCard({
   title, value, prefix = '', suffix = '', icon: Icon,
   color, gradient, accentColor, trend, trendLabel,
-  index, ringMax, tag,
+  index, ringMax, tag, sub,
 }: KpiCardProps) {
   const isPos = (trend ?? 0) > 0;
   const isNeg = (trend ?? 0) < 0;
