@@ -110,8 +110,9 @@ interface CEOStats {
   conversionRate: number;
   totalLeads: number;
   totalContracts: number;
-  conversionSite: number;
-  conversionManual: number;
+  leadsSite: number;
+  leadsManual: number;
+  hasRiskData: boolean;
   avgProtocolDays: number;
   costPerLead: number;
   monthlyAdSpend: number;
@@ -125,7 +126,7 @@ export function CEOIntelligenceSection() {
     approvalRate: 0, totalJudged: 0, totalApproved: 0,
     appealRate: 0, totalRejected: 0, totalAppeals: 0,
     conversionRate: 0, totalLeads: 0, totalContracts: 0,
-    conversionSite: 0, conversionManual: 0,
+    leadsSite: 0, leadsManual: 0, hasRiskData: false,
     avgProtocolDays: 0,
     costPerLead: 0, monthlyAdSpend: 0,
   });
@@ -205,8 +206,7 @@ export function CEOIntelligenceSection() {
       const conversionRate = totalLeads > 0 ? Math.round((signedContracts / totalLeads) * 100) : 0;
       const siteLeads = leads.filter(l => l.origin === 'site' || l.origin === 'landpage').length;
       const manualLeads = leads.filter(l => l.origin === 'manual' || l.origin === 'indicacao' || l.origin === 'crm').length;
-      const conversionSite = siteLeads > 0 ? Math.round((signedContracts * 0.7 / siteLeads) * 100) : 0; // approximate
-      const conversionManual = manualLeads > 0 ? Math.round((signedContracts * 0.3 / manualLeads) * 100) : 0;
+      // Sem vínculo lead → contrato por origem no banco, exibimos apenas os volumes reais.
 
       // 8️⃣ Tempo Médio de Protocolo
       const protocolProcesses = processes.filter(p => p.deposit_date && p.created_at);
@@ -240,8 +240,9 @@ export function CEOIntelligenceSection() {
         conversionRate,
         totalLeads,
         totalContracts: signedContracts,
-        conversionSite: Math.min(conversionSite, 100),
-        conversionManual: Math.min(conversionManual, 100),
+        leadsSite: siteLeads,
+        leadsManual: manualLeads,
+        hasRiskData: resources.length > 0 || rejections > 0,
         avgProtocolDays: avgDays,
         costPerLead,
         monthlyAdSpend: savedAdSpend,
@@ -299,7 +300,7 @@ export function CEOIntelligenceSection() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         
         {/* 1 - Receita Projetada */}
-        <MetricCard title="Receita Projetada" icon={TrendingUp} color="#10b981" index={0}>
+        <MetricCard title="Receita Futura Contratada" icon={TrendingUp} color="#10b981" index={0}>
           <p className="text-2xl font-black text-foreground leading-none">
             <CountUp to={stats.projectedRevenue} prefix="R$ " />
           </p>
@@ -312,15 +313,18 @@ export function CEOIntelligenceSection() {
               <span className="text-muted-foreground">Cobranças pendentes</span>
               <span className="font-semibold text-foreground">{fmt(stats.recurringRevenue)}</span>
             </div>
+            <p className="text-[10px] text-muted-foreground pt-1">
+              Valor contratado ainda a receber — não é receita realizada.
+            </p>
           </div>
         </MetricCard>
 
         {/* 2 - Receita Recorrente */}
-        <MetricCard title="Receita Recorrente" icon={RefreshCw} color="#6366f1" index={1}>
+        <MetricCard title="Cobranças Pendentes" icon={RefreshCw} color="#6366f1" index={1}>
           <p className="text-2xl font-black text-foreground leading-none">
             <CountUp to={stats.recurringRevenue} prefix="R$ " />
           </p>
-          <p className="text-[10px] text-muted-foreground mt-1">Parcelamentos e cobranças futuras pendentes</p>
+          <p className="text-[10px] text-muted-foreground mt-1">Faturas emitidas aguardando pagamento</p>
           <div className="h-1.5 rounded-full bg-muted overflow-hidden mt-2">
             <motion.div
               className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500"
@@ -349,10 +353,19 @@ export function CEOIntelligenceSection() {
 
         {/* 4 - Risco Jurídico */}
         <MetricCard title="Risco Jurídico" icon={ShieldAlert} color={stats.riskLevel === 'Alto' ? '#ef4444' : stats.riskLevel === 'Médio' ? '#f59e0b' : '#10b981'} index={3}>
-          <div className="flex items-center justify-between">
-            <p className="text-2xl font-black text-foreground leading-none">Score: {stats.riskScore}</p>
-            <ScoreBadge level={stats.riskLevel} />
-          </div>
+          {stats.hasRiskData ? (
+            <div className="flex items-center justify-between">
+              <p className="text-2xl font-black text-foreground leading-none">Score: {stats.riskScore}</p>
+              <ScoreBadge level={stats.riskLevel} />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Score indisponível — dados insuficientes</p>
+          )}
+          {stats.hasRiskData && (
+            <p className="text-[10px] text-muted-foreground">
+              Score = oposições x3 + exigências de mérito x2 + recursos pendentes x2 + indeferimentos x4.
+            </p>
+          )}
           <div className="space-y-1 pt-2 border-t border-border/40 text-[10px]">
             <div className="flex justify-between"><span className="text-muted-foreground">Oposições/Exigências</span><span className="font-semibold text-foreground">{stats.totalAppeals}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Indeferimentos</span><span className="font-semibold text-foreground">{stats.totalRejected}</span></div>
@@ -361,24 +374,34 @@ export function CEOIntelligenceSection() {
 
         {/* 5 - Taxa de Deferimento */}
         <MetricCard title="Taxa de Deferimento" icon={Award} color="#22c55e" index={4}>
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <MiniRing pct={stats.approvalRate} color="#22c55e" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-xs font-black text-foreground">{stats.approvalRate}%</span>
+          {stats.totalJudged > 0 ? (
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <MiniRing pct={stats.approvalRate} color="#22c55e" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-xs font-black text-foreground">{stats.approvalRate}%</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-2xl font-black text-foreground leading-none"><CountUp to={stats.approvalRate} suffix="%" /></p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{stats.totalApproved} de {stats.totalJudged} julgados</p>
               </div>
             </div>
-            <div>
-              <p className="text-2xl font-black text-foreground leading-none"><CountUp to={stats.approvalRate} suffix="%" /></p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">{stats.totalApproved} de {stats.totalJudged} julgados</p>
-            </div>
-          </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Sem dados suficientes — nenhum processo julgado registrado</p>
+          )}
         </MetricCard>
 
         {/* 6 - Taxa de Recurso */}
         <MetricCard title="Taxa de Recurso" icon={Scale} color="#a855f7" index={5}>
-          <p className="text-2xl font-black text-foreground leading-none"><CountUp to={stats.appealRate} suffix="%" /></p>
-          <p className="text-[10px] text-muted-foreground mt-1">{stats.totalAppeals} recursos / {stats.totalRejected} indeferimentos</p>
+          {stats.totalRejected > 0 ? (
+            <>
+              <p className="text-2xl font-black text-foreground leading-none"><CountUp to={stats.appealRate} suffix="%" /></p>
+              <p className="text-[10px] text-muted-foreground mt-1">{stats.totalAppeals} recursos / {stats.totalRejected} indeferimentos</p>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">Sem dados suficientes — nenhum indeferimento registrado</p>
+          )}
           <div className="h-1.5 rounded-full bg-muted overflow-hidden mt-2">
             <motion.div
               className="h-full rounded-full bg-gradient-to-r from-purple-500 to-fuchsia-500"
@@ -391,30 +414,40 @@ export function CEOIntelligenceSection() {
 
         {/* 7 - Taxa de Conversão */}
         <MetricCard title="Conversão Comercial" icon={Target} color="#3b82f6" index={6}>
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <MiniRing pct={stats.conversionRate} color="#3b82f6" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-xs font-black text-foreground">{stats.conversionRate}%</span>
+          {stats.totalLeads > 0 ? (
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <MiniRing pct={stats.conversionRate} color="#3b82f6" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-xs font-black text-foreground">{stats.conversionRate}%</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-2xl font-black text-foreground leading-none"><CountUp to={stats.conversionRate} suffix="%" /></p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{stats.totalContracts} contratos / {stats.totalLeads} leads</p>
               </div>
             </div>
-            <div>
-              <p className="text-2xl font-black text-foreground leading-none"><CountUp to={stats.conversionRate} suffix="%" /></p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">{stats.totalContracts} / {stats.totalLeads} leads</p>
-            </div>
-          </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Sem leads registrados</p>
+          )}
           <div className="space-y-1 pt-2 border-t border-border/40 text-[10px]">
-            <div className="flex justify-between"><span className="text-muted-foreground">Site/Landing</span><span className="font-semibold text-foreground">{stats.conversionSite}%</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Manual/CRM</span><span className="font-semibold text-foreground">{stats.conversionManual}%</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Leads de site/landing</span><span className="font-semibold text-foreground">{stats.leadsSite}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Leads manuais/CRM</span><span className="font-semibold text-foreground">{stats.leadsManual}</span></div>
           </div>
         </MetricCard>
 
         {/* 8 - Tempo Médio de Protocolo */}
         <MetricCard title="Tempo Médio Protocolo" icon={Clock} color="#06b6d4" index={7}>
-          <p className="text-2xl font-black text-foreground leading-none">
-            <CountUp to={stats.avgProtocolDays} /> <span className="text-sm font-medium text-muted-foreground">dias</span>
-          </p>
-          <p className="text-[10px] text-muted-foreground mt-1">Da assinatura do contrato ao protocolo INPI</p>
+          {stats.avgProtocolDays > 0 ? (
+            <>
+              <p className="text-2xl font-black text-foreground leading-none">
+                <CountUp to={stats.avgProtocolDays} /> <span className="text-sm font-medium text-muted-foreground">dias</span>
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-1">Do cadastro do processo ao depósito no INPI</p>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">Sem dados suficientes — faltam datas de depósito</p>
+          )}
         </MetricCard>
 
         {/* 9 - Custo por Lead */}
