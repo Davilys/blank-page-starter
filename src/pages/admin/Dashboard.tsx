@@ -840,7 +840,7 @@ export default function AdminDashboard() {
 
               {/* Live ticker */}
               <div className="mt-4 pt-4 border-t border-border/40">
-                <LiveTicker stats={stats} />
+                <LiveTicker stats={stats} periodLabel={range.label} />
               </div>
             </div>
           </motion.div>
