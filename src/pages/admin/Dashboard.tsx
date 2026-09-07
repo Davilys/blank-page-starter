@@ -803,9 +803,11 @@ export default function AdminDashboard() {
                   {/* Seletor de período */}
                   <div className="flex flex-wrap items-center gap-1.5 mt-3">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mr-1">Período:</span>
-                    {PERIODS.map(p => (
+                    {PERIOD_OPTIONS.map(p => (
                       <button
                         key={p.key}
+                        type="button"
+                        aria-pressed={period === p.key}
                         onClick={() => setPeriod(p.key)}
                         className={cn(
                           'px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors',
@@ -818,6 +820,23 @@ export default function AdminDashboard() {
                       </button>
                     ))}
                   </div>
+
+                  {period === 'custom' && (
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <label className="text-[10px] font-semibold text-muted-foreground" htmlFor="dash-from">De</label>
+                      <input
+                        id="dash-from" type="date" value={customFrom}
+                        onChange={(e) => setCustomFrom(e.target.value)}
+                        className="rounded-lg border border-border/60 bg-background px-2 py-1 text-[11px]"
+                      />
+                      <label className="text-[10px] font-semibold text-muted-foreground" htmlFor="dash-to">até</label>
+                      <input
+                        id="dash-to" type="date" value={customTo}
+                        onChange={(e) => setCustomTo(e.target.value)}
+                        className="rounded-lg border border-border/60 bg-background px-2 py-1 text-[11px]"
+                      />
+                    </div>
+                  )}
                 </div>
 
 
