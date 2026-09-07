@@ -45,6 +45,7 @@ import { CreateInvoiceDialog } from './CreateInvoiceDialog';
 import { Separator } from '@/components/ui/separator';
 import { Newspaper, Gavel, Award, BellRing, Activity as ActivityIcon, ChevronDown, History } from 'lucide-react';
 import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
+import { DataEnrichmentDialog } from './DataEnrichmentDialog';
 
 const MASTER_ADMIN_EMAIL = 'davillys@gmail.com';
 
@@ -222,6 +223,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
 
   // Inline contact editor states
   const [editingContacts, setEditingContacts] = useState(false);
+  const [showEnrichment, setShowEnrichment] = useState(false);
   const [contactForm, setContactForm] = useState<any>({});
   const [savingContacts, setSavingContacts] = useState(false);
 
