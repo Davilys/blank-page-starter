@@ -45,6 +45,7 @@ import { CreateInvoiceDialog } from './CreateInvoiceDialog';
 import { Separator } from '@/components/ui/separator';
 import { Newspaper, Gavel, Award, BellRing, Activity as ActivityIcon, ChevronDown, History } from 'lucide-react';
 import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
+import { DataEnrichmentDialog } from './DataEnrichmentDialog';
 
 const MASTER_ADMIN_EMAIL = 'davillys@gmail.com';
 
@@ -222,6 +223,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
 
   // Inline contact editor states
   const [editingContacts, setEditingContacts] = useState(false);
+  const [showEnrichment, setShowEnrichment] = useState(false);
   const [contactForm, setContactForm] = useState<any>({});
   const [savingContacts, setSavingContacts] = useState(false);
 
@@ -467,7 +469,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         supabase.from('client_appointments').select('*').eq('user_id', client.id).order('scheduled_at', { ascending: true }),
         supabase.from('documents').select('*').eq('user_id', client.id).order('created_at', { ascending: false }),
         supabase.from('invoices').select('*').eq('user_id', client.id).order('due_date', { ascending: false }),
-        supabase.from('profiles').select('cpf, cnpj, company_name, address, neighborhood, city, state, zip_code, assigned_to, contract_value, origin, client_funnel_type, full_name, email, phone').eq('id', client.id).maybeSingle(),
+        supabase.from('profiles').select('cpf, cnpj, cpf_cnpj, company_name, address, address_number, address_complement, neighborhood, city, state, zip_code, assigned_to, contract_value, origin, client_funnel_type, full_name, email, phone, additional_phones, additional_emails, trade_name, registration_status, cnae, opening_date, share_capital').eq('id', client.id).maybeSingle(),
         supabase.from('contracts').select('contract_value, payment_method, signature_status').eq('user_id', client.id).order('created_at', { ascending: false }).limit(1),
         supabase.from('brand_processes').select('id, brand_name, business_area, process_number, pipeline_stage, status, created_at, updated_at, ncl_classes, inpi_protocol, deposit_date, grant_date, expiry_date, next_step, next_step_date, notes').eq('user_id', client.id).order('created_at', { ascending: false }),
         supabase.from('publicacoes_marcas').select('*').eq('client_id', client.id).order('proximo_prazo_critico', { ascending: true, nullsFirst: false }),
@@ -2259,6 +2261,15 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                             <span className="text-sm font-semibold">Dados Pessoais</span>
                           </div>
                           {!editingContacts && (
+                            <div className="flex items-center gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs gap-1"
+                              onClick={() => setShowEnrichment(true)}
+                            >
+                              <RefreshCw className="h-3 w-3" /> Atualizar os dados
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -2285,6 +2296,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                             >
                               <Edit2 className="h-3 w-3" /> Editar
                             </Button>
+                            </div>
                           )}
                         </div>
 
@@ -3910,6 +3922,40 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         clientName={client.full_name || client.email || 'Cliente'}
         onCreated={() => fetchClientData()}
       />
+
+      {/* ─── ATUALIZAÇÃO CADASTRAL ─── */}
+      <DataEnrichmentDialog
+        open={showEnrichment}
+        onOpenChange={setShowEnrichment}
+        client={{
+          id: client.id,
+          full_name: client.full_name || profileData?.full_name || null,
+          email: client.email || profileData?.email || null,
+          phone: client.phone || profileData?.phone || null,
+          cpf: profileData?.cpf ?? null,
+          cnpj: profileData?.cnpj ?? null,
+          cpf_cnpj: profileData?.cpf_cnpj ?? client.cpf_cnpj ?? null,
+          company_name: client.company_name || profileData?.company_name || null,
+          trade_name: profileData?.trade_name ?? null,
+          registration_status: profileData?.registration_status ?? null,
+          cnae: profileData?.cnae ?? null,
+          opening_date: profileData?.opening_date ?? null,
+          share_capital: profileData?.share_capital ?? null,
+          address: profileData?.address ?? null,
+          address_number: profileData?.address_number ?? null,
+          address_complement: profileData?.address_complement ?? null,
+          neighborhood: profileData?.neighborhood ?? null,
+          city: profileData?.city ?? null,
+          state: profileData?.state ?? null,
+          zip_code: profileData?.zip_code ?? null,
+          additional_phones: profileData?.additional_phones ?? [],
+          additional_emails: profileData?.additional_emails ?? [],
+        }}
+        onUpdated={async () => { await fetchClientData(); onUpdate(); }}
+        onEditRegistration={() => setEditingContacts(true)}
+      />
+
+
 
       {/* ─── SCHEDULING DIALOG (from pub Agenda button) ─── */}
       <Dialog open={!!schedulingPub} onOpenChange={(open) => { if (!open) setSchedulingPub(null); }}>

@@ -3699,11 +3699,16 @@ export type Database = {
       }
       profiles: {
         Row: {
+          additional_emails: string[]
+          additional_phones: string[]
           address: string | null
+          address_complement: string | null
+          address_number: string | null
           asaas_customer_id: string | null
           assigned_to: string | null
           city: string | null
           client_funnel_type: string | null
+          cnae: string | null
           cnpj: string | null
           company_name: string | null
           contract_value: number | null
@@ -3720,19 +3725,28 @@ export type Database = {
           negativado_em: string | null
           negativado_total: number | null
           neighborhood: string | null
+          opening_date: string | null
           origin: string | null
           phone: string | null
           priority: string | null
+          registration_status: string | null
+          share_capital: number | null
           state: string | null
+          trade_name: string | null
           updated_at: string | null
           zip_code: string | null
         }
         Insert: {
+          additional_emails?: string[]
+          additional_phones?: string[]
           address?: string | null
+          address_complement?: string | null
+          address_number?: string | null
           asaas_customer_id?: string | null
           assigned_to?: string | null
           city?: string | null
           client_funnel_type?: string | null
+          cnae?: string | null
           cnpj?: string | null
           company_name?: string | null
           contract_value?: number | null
@@ -3749,19 +3763,28 @@ export type Database = {
           negativado_em?: string | null
           negativado_total?: number | null
           neighborhood?: string | null
+          opening_date?: string | null
           origin?: string | null
           phone?: string | null
           priority?: string | null
+          registration_status?: string | null
+          share_capital?: number | null
           state?: string | null
+          trade_name?: string | null
           updated_at?: string | null
           zip_code?: string | null
         }
         Update: {
+          additional_emails?: string[]
+          additional_phones?: string[]
           address?: string | null
+          address_complement?: string | null
+          address_number?: string | null
           asaas_customer_id?: string | null
           assigned_to?: string | null
           city?: string | null
           client_funnel_type?: string | null
+          cnae?: string | null
           cnpj?: string | null
           company_name?: string | null
           contract_value?: number | null
@@ -3778,10 +3801,14 @@ export type Database = {
           negativado_em?: string | null
           negativado_total?: number | null
           neighborhood?: string | null
+          opening_date?: string | null
           origin?: string | null
           phone?: string | null
           priority?: string | null
+          registration_status?: string | null
+          share_capital?: number | null
           state?: string | null
+          trade_name?: string | null
           updated_at?: string | null
           zip_code?: string | null
         }
