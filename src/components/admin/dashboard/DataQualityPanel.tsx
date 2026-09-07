@@ -8,8 +8,15 @@ import { BlockError, BlockSkeleton, InfoTip, type BlockStatus } from './Dashboar
 
 type Table = 'leads' | 'profiles' | 'brand_processes';
 
-// `as any` evita explosão de tipos genéricos do PostgREST ao parametrizar tabela/coluna.
-const db = supabase as any;
+// Cast evita explosão de tipos genéricos do PostgREST ao parametrizar tabela/coluna.
+type LooseClient = {
+  from: (table: string) => {
+    select: (cols: string, opts: { count: 'exact'; head: true }) => {
+      not: (col: string, op: string, val: null) => { neq: (col: string, val: string) => Promise<{ count: number | null; error: unknown }> };
+    } & Promise<{ count: number | null; error: unknown }>;
+  };
+};
+const db = supabase as unknown as LooseClient;
 
 const countAll = (table: Table): Promise<{ count: number | null; error: unknown }> =>
   db.from(table).select('id', { count: 'exact', head: true });
