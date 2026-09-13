@@ -34,6 +34,8 @@ const dynamicTexts = [
 
 export default function Registrar() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { state: searchState } = useTrademarkSearch();
   const { t } = useLanguage();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);

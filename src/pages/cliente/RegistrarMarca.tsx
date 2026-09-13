@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { ClientLayout } from "@/components/cliente/ClientLayout";
 import { CheckoutProgress } from "@/components/cliente/checkout/CheckoutProgress";
-import { ViabilityStep } from "@/components/cliente/checkout/ViabilityStep";
+import { TrademarkSearch } from "@/modules/trademark-search/components/TrademarkSearch";
+import { toViabilityResult } from "@/modules/trademark-search/useTrademarkSearch";
 import { PersonalDataStep, type PersonalData } from "@/components/cliente/checkout/PersonalDataStep";
 import { BrandDataStep, type BrandData } from "@/components/cliente/checkout/BrandDataStep";
 import { PlanSelectionStep } from "@/components/cliente/checkout/PlanSelectionStep";
@@ -253,7 +254,11 @@ export default function RegistrarMarca() {
             <AnimatePresence mode="wait">
               {step === 1 && (
                 <motion.div key="step1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  <ViabilityStep onNext={handleViabilityNext} />
+                  <TrademarkSearch
+                    variant="checkout"
+                    continueLabel="Continuar o registro"
+                    onContinue={(brand, area, job) => handleViabilityNext(brand, area, toViabilityResult(job))}
+                  />
                 </motion.div>
               )}
               {step === 2 && (
