@@ -242,16 +242,12 @@ async function callUpstream(baseUrl: string, apiKey: string, path: string, init:
       signal: controller.signal,
     });
 
-    if (res.status === 404) {
-      await res.text().catch(() => '');
-      return { kind: 'not_found' };
-    }
-    if (res.status === 429 || res.status === 502 || res.status === 503 || res.status === 504) {
-      await res.text().catch(() => '');
-      return { kind: 'unavailable', status: res.status };
-    }
     if (!res.ok) {
-      await res.text().catch(() => '');
+      // Diagnóstico sem segredos: só status, caminho e um trecho curto do corpo (sem headers).
+      const snippet = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 200);
+      console.warn(`[webmarcas-inpi-search] upstream ${init.method} ${path} -> ${res.status} ${snippet}`);
+      if (res.status === 404) return { kind: 'not_found' };
+      if (res.status === 429 || res.status === 502 || res.status === 503 || res.status === 504) return { kind: 'unavailable', status: res.status };
       return { kind: 'error', status: res.status };
     }
     const data = await res.json().catch(() => null);
@@ -299,7 +295,12 @@ Deno.serve(async (req) => {
 
   const baseUrlRaw = Deno.env.get('WEBMARCAS_API_BASE_URL') ?? '';
   const apiKey = Deno.env.get('WEBMARCAS_API_KEY') ?? '';
-  const baseUrl = baseUrlRaw.trim().replace(/\/+$/, '');
+  // Aceita base URL com ou sem sufixo /v1 ou /v1/searches (os caminhos abaixo já incluem /v1/searches).
+  const baseUrl = baseUrlRaw
+    .trim()
+    .replace(/\/+$/, '')
+    .replace(/\/v1\/searches$/i, '')
+    .replace(/\/v1$/i, '');
   if (!baseUrl || !apiKey || !/^https:\/\//i.test(baseUrl)) {
     console.error('[webmarcas-inpi-search] secrets WEBMARCAS_API_BASE_URL/WEBMARCAS_API_KEY ausentes ou inválidos');
     return fail('not_configured', 'Serviço de consulta ainda não configurado.', 503, cors);

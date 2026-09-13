@@ -186,6 +186,12 @@ export function TrademarkSearchProvider({ children }: { children: ReactNode }) {
           schedulePoll(jobId, token);
           return;
         }
+        // A API pode levar alguns segundos para expor um job recém-criado (404 transitório).
+        // Só tratamos "não encontrado" como definitivo depois de uma janela de tolerância.
+        if (res.error.code === 'not_found' && s.startedAt && Date.now() - s.startedAt < NOT_FOUND_GRACE_MS) {
+          schedulePoll(jobId, token);
+          return;
+        }
         finishWithError({ code: res.error.code, message: OFFICIAL_ERROR_MESSAGE });
         return;
       }
