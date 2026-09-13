@@ -242,16 +242,12 @@ async function callUpstream(baseUrl: string, apiKey: string, path: string, init:
       signal: controller.signal,
     });
 
-    if (res.status === 404) {
-      await res.text().catch(() => '');
-      return { kind: 'not_found' };
-    }
-    if (res.status === 429 || res.status === 502 || res.status === 503 || res.status === 504) {
-      await res.text().catch(() => '');
-      return { kind: 'unavailable', status: res.status };
-    }
     if (!res.ok) {
-      await res.text().catch(() => '');
+      // Diagnóstico sem segredos: só status, caminho e um trecho curto do corpo (sem headers).
+      const snippet = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 200);
+      console.warn(`[webmarcas-inpi-search] upstream ${init.method} ${path} -> ${res.status} ${snippet}`);
+      if (res.status === 404) return { kind: 'not_found' };
+      if (res.status === 429 || res.status === 502 || res.status === 503 || res.status === 504) return { kind: 'unavailable', status: res.status };
       return { kind: 'error', status: res.status };
     }
     const data = await res.json().catch(() => null);
