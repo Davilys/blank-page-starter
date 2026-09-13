@@ -295,12 +295,12 @@ Deno.serve(async (req) => {
 
   const baseUrlRaw = Deno.env.get('WEBMARCAS_API_BASE_URL') ?? '';
   const apiKey = Deno.env.get('WEBMARCAS_API_KEY') ?? '';
-  // Aceita base URL com ou sem sufixo /v1 (os caminhos abaixo já incluem /v1).
-  const baseUrl = baseUrlRaw.trim().replace(/\/+$/, '').replace(/\/v1$/i, '');
-  try {
-    const parsed = new URL(baseUrl);
-    console.log(`[webmarcas-inpi-search] upstream base path="${parsed.pathname}" (host omitido)`);
-  } catch { /* validado abaixo */ }
+  // Aceita base URL com ou sem sufixo /v1 ou /v1/searches (os caminhos abaixo já incluem /v1/searches).
+  const baseUrl = baseUrlRaw
+    .trim()
+    .replace(/\/+$/, '')
+    .replace(/\/v1\/searches$/i, '')
+    .replace(/\/v1$/i, '');
   if (!baseUrl || !apiKey || !/^https:\/\//i.test(baseUrl)) {
     console.error('[webmarcas-inpi-search] secrets WEBMARCAS_API_BASE_URL/WEBMARCAS_API_KEY ausentes ou inválidos');
     return fail('not_configured', 'Serviço de consulta ainda não configurado.', 503, cors);
