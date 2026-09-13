@@ -97,7 +97,11 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
   const totalRecords = result?.records?.length ?? searches.reduce((acc, s) => acc + s.records.length, 0);
   const queriedAt = formatDate(result?.queried_at ?? null);
 
-  const whatsappMessage = `Olá! Consultei a marca ${brandName} (${businessArea}) no site da WebMarcas e quero uma análise da equipe. Protocolo da consulta: ${job.job_id}.`;
+  const hasOccurrences = job.status === 'completed' && result?.conclusion === 'requires_legal_review';
+  // Regra aprovada: ocorrências encontradas => CTA principal "Solicitar análise" (WhatsApp), não "registre agora".
+  const whatsappMessage = hasOccurrences
+    ? `Olá! Fiz a consulta da marca ${brandName} e foram encontradas ocorrências. Gostaria de solicitar uma análise técnica.`
+    : `Olá! Consultei a marca ${brandName} (${businessArea}) no site da WebMarcas e quero uma análise da equipe. Protocolo da consulta: ${job.job_id}.`;
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5 text-foreground">
@@ -170,23 +174,39 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {onContinue && (
-          <Button onClick={onContinue} className="h-12 rounded-xl font-bold sm:col-span-2">
-            {continueLabel}<ArrowRight className="w-4 h-4 ml-2" />
+        {hasOccurrences ? (
+          <Button asChild className="h-12 rounded-xl font-bold sm:col-span-2">
+            <a href={buildWhatsAppUrl(whatsappMessage)} target="_blank" rel="noopener noreferrer">
+              <MessageCircle className="w-4 h-4 mr-2" />Solicitar análise
+            </a>
           </Button>
+        ) : (
+          onContinue && (
+            <Button onClick={onContinue} className="h-12 rounded-xl font-bold sm:col-span-2">
+              {continueLabel}<ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          )
         )}
         {job.pdf_url && (
-          <Button asChild variant="outline" className="h-11 rounded-xl">
+          <Button asChild variant="outline" className={cn('h-11 rounded-xl', hasOccurrences && !onContinue && 'sm:col-span-2')}>
             <a href={job.pdf_url} target="_blank" rel="noopener noreferrer">
               <FileDown className="w-4 h-4 mr-2" />Baixar relatório (PDF)
             </a>
           </Button>
         )}
-        <Button asChild variant="outline" className={cn('h-11 rounded-xl', !job.pdf_url && 'sm:col-span-2')}>
-          <a href={buildWhatsAppUrl(whatsappMessage)} target="_blank" rel="noopener noreferrer">
-            <MessageCircle className="w-4 h-4 mr-2" />Falar com a equipe
-          </a>
-        </Button>
+        {hasOccurrences ? (
+          onContinue && (
+            <Button variant="outline" onClick={onContinue} className={cn('h-11 rounded-xl', !job.pdf_url && 'sm:col-span-2')}>
+              {continueLabel}<ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          )
+        ) : (
+          <Button asChild variant="outline" className={cn('h-11 rounded-xl', !job.pdf_url && 'sm:col-span-2')}>
+            <a href={buildWhatsAppUrl(whatsappMessage)} target="_blank" rel="noopener noreferrer">
+              <MessageCircle className="w-4 h-4 mr-2" />Falar com a equipe
+            </a>
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-muted-foreground">

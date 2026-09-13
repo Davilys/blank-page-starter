@@ -102,3 +102,5 @@ export const BRAND_MAX_LENGTH = 120;
 export const ACTIVITY_MAX_LENGTH = 160;
 export const POLL_INTERVAL_MS = 3000;
 export const POLL_MAX_DURATION_MS = 5 * 60 * 1000;
+/** Janela em que um "não encontrado" logo após criar o job é tratado como transitório. */
+export const NOT_FOUND_GRACE_MS = 45 * 1000;
