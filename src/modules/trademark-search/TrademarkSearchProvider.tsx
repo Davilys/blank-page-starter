@@ -180,7 +180,7 @@ export function TrademarkSearchProvider({ children }: { children: ReactNode }) {
       inFlight.current = false;
       if (token !== runToken.current) return;
 
-      if (!res.ok) {
+      if (res.ok === false) {
         // Falhas transitórias de rede continuam tentando dentro do limite de 5 min.
         if (res.error.code === 'network' || res.error.code === 'timeout' || res.error.code === 'upstream_timeout' || res.error.code === 'upstream_unavailable') {
           schedulePoll(jobId, token);
@@ -217,7 +217,7 @@ export function TrademarkSearchProvider({ children }: { children: ReactNode }) {
     const res = await trademarkSearchService.start(brand, activity, requestId);
     if (token !== runToken.current) return;
 
-    if (!res.ok) {
+    if (res.ok === false) {
       finishWithError({
         code: res.error.code,
         message: res.error.code === 'rate_limited' || res.error.code === 'invalid_input'
@@ -277,7 +277,7 @@ export function TrademarkSearchProvider({ children }: { children: ReactNode }) {
     } else if (s.phase === 'completed' && s.jobId) {
       // Link do PDF é assinado e expira: renova consultando o status de novo.
       trademarkSearchService.status(s.jobId).then((res) => {
-        if (token !== runToken.current || !res.ok) return;
+        if (token !== runToken.current || res.ok === false) return;
         if (res.job.status === 'completed' && res.job.result) applyJob(res.job, token, { silentRefresh: true });
       });
     }
