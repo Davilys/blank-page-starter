@@ -193,7 +193,7 @@ export function TrademarkSearchProvider({ children }: { children: ReactNode }) {
       applyJob(res.job, token);
       if (!isFinalJob(res.job)) schedulePoll(jobId, token);
     }, POLL_INTERVAL_MS);
-  }, [applyJob, clearTimer, finishWithError]);
+  };
 
   const runStart = useCallback(async (brand: string, activity: string, requestId: string) => {
     const token = ++runToken.current;
