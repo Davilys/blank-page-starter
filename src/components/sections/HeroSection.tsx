@@ -12,6 +12,7 @@ import consultant3 from "@/assets/consultants/consultant-3.jpg";
 
 const HeroSection = () => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
 
   const trustPills = [
     { icon: Shield, label: "Protocolo em 48h" },
