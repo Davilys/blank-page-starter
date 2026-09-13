@@ -131,3 +131,6 @@ verify_jwt = false
 
 [functions.enrich-client-data]
 verify_jwt = true
+
+[functions.webmarcas-inpi-search]
+verify_jwt = false
