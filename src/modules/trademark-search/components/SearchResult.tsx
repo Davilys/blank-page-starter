@@ -174,23 +174,39 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {onContinue && (
-          <Button onClick={onContinue} className="h-12 rounded-xl font-bold sm:col-span-2">
-            {continueLabel}<ArrowRight className="w-4 h-4 ml-2" />
+        {hasOccurrences ? (
+          <Button asChild className="h-12 rounded-xl font-bold sm:col-span-2">
+            <a href={buildWhatsAppUrl(whatsappMessage)} target="_blank" rel="noopener noreferrer">
+              <MessageCircle className="w-4 h-4 mr-2" />Solicitar análise
+            </a>
           </Button>
+        ) : (
+          onContinue && (
+            <Button onClick={onContinue} className="h-12 rounded-xl font-bold sm:col-span-2">
+              {continueLabel}<ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          )
         )}
         {job.pdf_url && (
-          <Button asChild variant="outline" className="h-11 rounded-xl">
+          <Button asChild variant="outline" className={cn('h-11 rounded-xl', hasOccurrences && !onContinue && 'sm:col-span-2')}>
             <a href={job.pdf_url} target="_blank" rel="noopener noreferrer">
               <FileDown className="w-4 h-4 mr-2" />Baixar relatório (PDF)
             </a>
           </Button>
         )}
-        <Button asChild variant="outline" className={cn('h-11 rounded-xl', !job.pdf_url && 'sm:col-span-2')}>
-          <a href={buildWhatsAppUrl(whatsappMessage)} target="_blank" rel="noopener noreferrer">
-            <MessageCircle className="w-4 h-4 mr-2" />Falar com a equipe
-          </a>
-        </Button>
+        {hasOccurrences ? (
+          onContinue && (
+            <Button variant="outline" onClick={onContinue} className={cn('h-11 rounded-xl', !job.pdf_url && 'sm:col-span-2')}>
+              {continueLabel}<ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          )
+        ) : (
+          <Button asChild variant="outline" className={cn('h-11 rounded-xl', !job.pdf_url && 'sm:col-span-2')}>
+            <a href={buildWhatsAppUrl(whatsappMessage)} target="_blank" rel="noopener noreferrer">
+              <MessageCircle className="w-4 h-4 mr-2" />Falar com a equipe
+            </a>
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-muted-foreground">
