@@ -4,6 +4,7 @@ import { trademarkSearchService, validateSearchInput, normalizeTerm } from './tr
 import {
   ACTIVITY_MAX_LENGTH,
   BRAND_MAX_LENGTH,
+  NOT_FOUND_GRACE_MS,
   OFFICIAL_ERROR_MESSAGE,
   POLL_INTERVAL_MS,
   POLL_MAX_DURATION_MS,
