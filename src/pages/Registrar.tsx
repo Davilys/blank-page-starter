@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckoutProgress } from "@/components/cliente/checkout/CheckoutProgress";
-import { ViabilityStep } from "@/components/cliente/checkout/ViabilityStep";
+import { TrademarkSearch } from "@/modules/trademark-search/components/TrademarkSearch";
+import { useTrademarkSearch, toViabilityResult } from "@/modules/trademark-search/useTrademarkSearch";
 import { PersonalDataStep, type PersonalData } from "@/components/cliente/checkout/PersonalDataStep";
 import { BrandDataStep, type BrandData } from "@/components/cliente/checkout/BrandDataStep";
 import { PlanSelectionStep } from "@/components/cliente/checkout/PlanSelectionStep";
@@ -33,6 +34,8 @@ const dynamicTexts = [
 
 export default function Registrar() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { state: searchState } = useTrademarkSearch();
   const { t } = useLanguage();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -93,38 +96,14 @@ export default function Registrar() {
     };
     fetchUserData();
 
-    // Check for pre-filled viability data from ViabilitySearchSection (Index page)
-    const storedData = sessionStorage.getItem('viabilityData');
-    if (storedData) {
-      try {
-        const parsed = JSON.parse(storedData);
-        if (parsed.brandName && parsed.businessArea && parsed.level) {
-          const viabilityResult: ViabilityResult = {
-            success: true,
-            level: parsed.level,
-            title: parsed.level === 'high' ? 'Alta Viabilidade' : 
-                   parsed.level === 'medium' ? 'Viabilidade Média' : 
-                   parsed.level === 'low' ? 'Baixa Viabilidade' : 'Marca Bloqueada',
-            description: 'Viabilidade já verificada anteriormente.',
-            classes: parsed.classes || [],
-            classDescriptions: parsed.classDescriptions || [],
-          };
-          setViabilityData({
-            brandName: parsed.brandName,
-            businessArea: parsed.businessArea,
-            result: viabilityResult,
-          });
-          if (Array.isArray(parsed.classes)) {
-            setSuggestedClasses(parsed.classes);
-            setSuggestedClassDescriptions(parsed.classDescriptions || []);
-          }
-          setStep(2);
-          sessionStorage.removeItem('viabilityData');
-        }
-      } catch (e) {
-        console.error('Error parsing viability data:', e);
-      }
+    // Veio da home clicando em "Continuar o registro": a consulta já concluída fica no Provider.
+    const s = searchState;
+    if ((location.state as { continueSearch?: boolean } | null)?.continueSearch && s.phase === 'completed' && s.job) {
+      setViabilityData({ brandName: s.brandName, businessArea: s.businessArea, result: toViabilityResult(s.job) });
+      setStep(2);
+      navigate(location.pathname, { replace: true, state: null });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleViabilityNext = (brandName: string, businessArea: string, result: ViabilityResult) => {
@@ -316,7 +295,11 @@ export default function Registrar() {
         >
           <CardContent className="p-6 md:p-8">
             {step === 1 && (
-              <ViabilityStep onNext={handleViabilityNext} />
+              <TrademarkSearch
+                variant="checkout"
+                continueLabel="Continuar o registro"
+                onContinue={(brand, area, job) => handleViabilityNext(brand, area, toViabilityResult(job))}
+              />
             )}
 
             {step === 2 && personalData !== null && (
