@@ -97,7 +97,11 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
   const totalRecords = result?.records?.length ?? searches.reduce((acc, s) => acc + s.records.length, 0);
   const queriedAt = formatDate(result?.queried_at ?? null);
 
-  const whatsappMessage = `Olá! Consultei a marca ${brandName} (${businessArea}) no site da WebMarcas e quero uma análise da equipe. Protocolo da consulta: ${job.job_id}.`;
+  const hasOccurrences = job.status === 'completed' && result?.conclusion === 'requires_legal_review';
+  // Regra aprovada: ocorrências encontradas => CTA principal "Solicitar análise" (WhatsApp), não "registre agora".
+  const whatsappMessage = hasOccurrences
+    ? `Olá! Fiz a consulta da marca ${brandName} e foram encontradas ocorrências. Gostaria de solicitar uma análise técnica.`
+    : `Olá! Consultei a marca ${brandName} (${businessArea}) no site da WebMarcas e quero uma análise da equipe. Protocolo da consulta: ${job.job_id}.`;
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5 text-foreground">
