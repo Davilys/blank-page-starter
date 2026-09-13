@@ -154,10 +154,15 @@ export function TrademarkSearchProvider({ children }: { children: ReactNode }) {
     }
 
     // queued / running
-    setState((prev) => ({ ...prev, phase: job.status, jobId: job.job_id, job }));
+    const phase = job.status === 'running' ? 'running' : 'queued';
+    setState((prev) => ({ ...prev, phase, jobId: job.job_id, job }));
   }, [clearTimer, finishWithError, setState]);
 
-  const schedulePoll = useCallback((jobId: string, token: number) => {
+  // Ref evita auto-referência no useCallback (que quebra a inferência de tipos do TS).
+  const schedulePollRef = useRef<(jobId: string, token: number) => void>(() => undefined);
+  const schedulePoll = useCallback((jobId: string, token: number) => schedulePollRef.current(jobId, token), []);
+
+  schedulePollRef.current = (jobId: string, token: number) => {
     clearTimer();
     pollTimer.current = setTimeout(async () => {
       if (token !== runToken.current) return;
