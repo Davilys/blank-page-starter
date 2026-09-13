@@ -68,6 +68,7 @@ const SectionRedirect = ({ section }: { section: string }) => {
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ChatModeProvider } from "@/contexts/ChatModeContext";
+import { TrademarkSearchProvider } from "@/modules/trademark-search/TrademarkSearchProvider";
 
 // Only the landing page is eagerly loaded for instant first paint
 import Index from "./pages/Index";
@@ -207,6 +208,7 @@ const App = () => (
     <ThemeProvider>
       <LanguageProvider>
         <ChatModeProvider>
+        <TrademarkSearchProvider>
         <TooltipProvider>
           <Toaster />
           <Sonner />
@@ -403,6 +405,7 @@ const App = () => (
             </RouteErrorBoundary>
           </BrowserRouter>
         </TooltipProvider>
+        </TrademarkSearchProvider>
         </ChatModeProvider>
       </LanguageProvider>
     </ThemeProvider>

@@ -1,7 +1,8 @@
 import { Shield, FileSignature, UserCheck, CalendarCheck, Star, Zap } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { motion } from "framer-motion";
-import ViabilitySearchSection from "@/components/sections/ViabilitySearchSection";
+import { useNavigate } from "react-router-dom";
+import { TrademarkSearch } from "@/modules/trademark-search/components/TrademarkSearch";
 import ScribbleUnderline from "@/components/decorative/ScribbleUnderline";
 import WaveDivider from "@/components/decorative/WaveDivider";
 import Seal48h from "@/components/decorative/Seal48h";
@@ -101,7 +102,11 @@ const HeroSection = () => {
               className="absolute -top-20 -right-4 sm:-top-24 sm:-right-6 md:-top-28 md:-right-10 z-20 scale-[0.8] lg:scale-100 origin-top-right"
             />
             <div className="relative rounded-[2rem] bg-white p-6 md:p-8 shadow-[0_28px_70px_-16px_rgba(11,22,60,0.4)]">
-              <ViabilitySearchSection compact />
+              <TrademarkSearch
+                variant="landing"
+                continueLabel="Continuar o registro"
+                onContinue={() => navigate("/registrar")}
+              />
             </div>
           </div>
 
