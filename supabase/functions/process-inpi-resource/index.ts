@@ -60,22 +60,62 @@ function sanitizeExtracted(raw: any) {
 
 // ═══════════════════════════════════════════════════════════
 // HELPER: Call OpenAI Responses API
+// O modelo NUNCA é escolhido pelo cliente: vem de `ctx.modelConfig`,
+// resolvido no servidor a partir da modalidade validada.
 // ═══════════════════════════════════════════════════════════
+interface CallContext {
+  modelConfig: ModelConfig;
+  operation: string;
+  resourceType: string;
+  correlationId: string;
+  promptVersion: string;
+  logger?: (entry: AiCallLogEntry) => Promise<void>;
+}
+
+const PROMPT_VERSION = 'recursos-inpi-2026-09-fase1';
+
 async function callOpenAI(
   apiKey: string,
   systemPrompt: string,
   userParts: any[],
   maxTokens: number = 16000,
-  temperature?: number,
-  timeoutMs: number = 120000
-): Promise<{ content: string; error?: string; status?: number }> {
+  _temperature?: number,
+  timeoutMs: number = 120000,
+  ctx?: CallContext,
+): Promise<{ content: string; error?: string; status?: number; errorKind?: string }> {
   const inputMessages = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userParts },
   ];
 
+  const modelConfig: ModelConfig = ctx?.modelConfig ?? { model: 'gpt-5-mini', reasoningEffort: 'minimal', dedicated: false };
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const started = Date.now();
+
+  const finish = async (
+    result: { content: string; error?: string; status?: number; errorKind?: string },
+    usage?: { input_tokens?: number; output_tokens?: number },
+  ) => {
+    if (ctx?.logger) {
+      await ctx.logger({
+        resource_type: ctx.resourceType,
+        operation: ctx.operation,
+        model: modelConfig.model,
+        dedicated_model: modelConfig.dedicated,
+        reasoning_effort: modelConfig.reasoningEffort,
+        prompt_version: ctx.promptVersion,
+        duration_ms: Date.now() - started,
+        status: result.error ? 'error' : 'ok',
+        http_status: result.status ?? null,
+        error_kind: result.errorKind ?? null,
+        input_tokens: usage?.input_tokens ?? null,
+        output_tokens: usage?.output_tokens ?? null,
+        correlation_id: ctx.correlationId,
+      });
+    }
+    return result;
+  };
 
   try {
     const response = await fetch('https://api.openai.com/v1/responses', {
@@ -86,13 +126,10 @@ async function callOpenAI(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini',
+        model: modelConfig.model,
         input: inputMessages,
         max_output_tokens: maxTokens,
-        // reasoning "minimal" + verbosity "high" = resposta começa quase imediatamente
-        // e mantém texto longo e detalhado. Sem isso, o modelo gasta 60-120s só em
-        // reasoning tokens internos antes de escrever, estourando o limite de 150s.
-        reasoning: { effort: 'minimal' },
+        reasoning: { effort: modelConfig.reasoningEffort },
         text: { verbosity: 'high' },
       }),
     });
@@ -100,33 +137,57 @@ async function callOpenAI(
     if (!response.ok) {
       const errorText = await response.text();
       console.error('OpenAI API error:', response.status, errorText.substring(0, 500));
-      return { content: '', error: errorText, status: response.status };
+      const errorKind = isModelAccessError(response.status, errorText) ? 'model_access' : 'http';
+      return await finish({ content: '', error: errorText, status: response.status, errorKind });
     }
 
     const data = await response.json();
     let content = '';
+    let refusal = '';
     if (data.output && Array.isArray(data.output)) {
       for (const item of data.output) {
         if (item.type === 'message' && item.content) {
           for (const part of item.content) {
-            if (part.type === 'output_text') {
-              content += part.text;
-            }
+            if (part.type === 'output_text') content += part.text;
+            if (part.type === 'refusal') refusal += part.refusal || '';
           }
         }
       }
     }
 
-    return { content };
+    const usage = { input_tokens: data?.usage?.input_tokens, output_tokens: data?.usage?.output_tokens };
+
+    if (refusal && !content) {
+      return await finish({ content: '', error: `Recusa do modelo: ${refusal.slice(0, 300)}`, status: 422, errorKind: 'refusal' }, usage);
+    }
+
+    // Truncamento: a Responses API devolve status "incomplete" com o motivo.
+    if (data?.status === 'incomplete') {
+      const reason = data?.incomplete_details?.reason || 'desconhecido';
+      return await finish({
+        content,
+        error: `Resposta incompleta da IA (motivo: ${reason}). O conteúdo não foi considerado final.`,
+        status: 502,
+        errorKind: 'truncated',
+      }, usage);
+    }
+
+    return await finish({ content }, usage);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erro desconhecido na IA';
     const isTimeout = error instanceof Error && error.name === 'AbortError';
     console.error('OpenAI request failed:', isTimeout ? 'timeout' : message);
-    return { content: '', error: isTimeout ? 'Tempo limite da IA atingido' : message, status: isTimeout ? 408 : 500 };
+    return await finish({
+      content: '',
+      error: isTimeout ? 'Tempo limite da IA atingido' : message,
+      status: isTimeout ? 408 : 500,
+      errorKind: isTimeout ? 'timeout' : 'exception',
+    });
   } finally {
     clearTimeout(timeout);
   }
 }
+
 
 // ═══════════════════════════════════════════════════════════
 // HELPER: Convert file parts to Responses API format
