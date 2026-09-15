@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import type { EmailFolder, EmailAccount } from '@/pages/admin/Emails';
+import { SYNC_STATUS_LABEL, type AccountSyncInfo } from '@/hooks/useEmailSync';
 
 interface EmailSidebarProps {
   currentFolder: EmailFolder;
