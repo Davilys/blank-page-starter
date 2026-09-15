@@ -177,9 +177,10 @@ export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFina
           <div className="space-y-3">
             <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
               {[
+                { l: "Origem", v: LABEL_ORIGEM[origem] },
                 { l: "Valor", v: brl(invoice.amount) },
                 { l: "Vencimento", v: fmt(invoice.due_date) },
-                ...(invoice.status === "overdue" ? [{ l: "Dias em atraso", v: `${diasAtraso} dia${diasAtraso !== 1 ? "s" : ""}` }] : []),
+                ...(classificacao === "vencido" ? [{ l: "Dias em atraso", v: `${diasAtraso} dia${diasAtraso !== 1 ? "s" : ""}` }] : []),
               ].map((x) => (
                 <div key={x.l} className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">{x.l}</span>
