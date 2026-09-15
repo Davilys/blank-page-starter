@@ -63,9 +63,10 @@ export function EmailList({
   const [internalSearch, setInternalSearch] = useState('');
   const search = (externalSearch ?? internalSearch).trim();
   const [page, setPage] = useState(0);
+  const [tab, setTab] = useState<'all' | 'unread' | 'attachments'>('all');
   const queryClient = useQueryClient();
 
-  useEffect(() => { setPage(0); }, [folder, accountId, search]);
+  useEffect(() => { setPage(0); }, [folder, accountId, search, tab]);
 
   const buildQuery = (countOnly: boolean) => {
     let q = supabase
@@ -76,6 +77,9 @@ export function EmailList({
     if (folder === 'starred') q = q.eq('is_starred', true).eq('is_archived', false);
     else if (folder === 'archived') q = q.eq('is_archived', true);
     else q = q.eq('folder', folder).eq('is_archived', false);
+
+    if (tab === 'unread') q = q.eq('is_read', false);
+    if (tab === 'attachments') q = q.eq('has_attachments', true);
 
     if (search) {
       const term = `%${search.replace(/[%_]/g, '')}%`;
