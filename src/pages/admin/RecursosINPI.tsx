@@ -602,7 +602,7 @@ export default function RecursosINPI() {
     });
   };
 
-  const processDocument = async () => {
+  const processDocument = async (override?: { files?: File[]; orientation?: string; caseId?: string }) => {
     if (resourceType === 'notificacao_extrajudicial') {
       return processNotificacao();
     }
@@ -612,7 +612,9 @@ export default function RecursosINPI() {
     if (resourceType === 'troca_procurador' || resourceType === 'nomeacao_procurador') {
       return processProcurador();
     }
-    if (multipleFiles.length === 0 || !resourceType) {
+    const filesToSend = override?.files?.length ? override.files : multipleFiles;
+    const orientationToSend = (override?.orientation ?? userOrientation).trim();
+    if (filesToSend.length === 0 || !resourceType) {
       toast.error('Anexe pelo menos um documento para continuar');
       return;
     }
@@ -624,7 +626,7 @@ export default function RecursosINPI() {
 
       // Convert all files to base64
       const filesBase64 = await Promise.all(
-        multipleFiles.map(async (f) => ({
+        filesToSend.map(async (f) => ({
           base64: await fileToBase64(f),
           type: f.type,
           name: f.name,
@@ -632,7 +634,7 @@ export default function RecursosINPI() {
       );
 
       const { data: pass1Data, error: pass1Error } = await supabase.functions.invoke('process-inpi-resource', {
-        body: { files: filesBase64, resourceType, agentStrategy: agent.promptExtra, agentName: agent.name, generationPass: 'pass1', userOrientation: userOrientation.trim() || undefined }
+        body: { files: filesBase64, resourceType, agentStrategy: agent.promptExtra, agentName: agent.name, generationPass: 'pass1', userOrientation: orientationToSend || undefined }
       });
 
       if (pass1Error) throw pass1Error;
