@@ -4099,6 +4099,17 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         onEditRegistration={() => setEditingContacts(true)}
       />
 
+      {/* ─── AÇÕES DA COBRANÇA (cobrar / acordo) ─── */}
+      <InvoiceActionsSheet
+        invoice={selectedInvoice}
+        open={invoiceSheetOpen}
+        onOpenChange={setInvoiceSheetOpen}
+        canManageFinance={canManageFinance}
+        onChanged={async () => { await fetchClientData(); onUpdate(); }}
+      />
+
+
+
 
 
       {/* ─── SCHEDULING DIALOG (from pub Agenda button) ─── */}
