@@ -73,7 +73,34 @@ serve(async (req) => {
       );
     }
 
+    // Modelo resolvido no SERVIDOR pela modalidade validada: só as três
+    // modalidades desta entrega usam o modelo dedicado; as demais seguem
+    // exatamente com o modelo anterior (gpt-5-mini).
+    const modelConfig = resolveModelConfig(resourceType, 'gpt-5-mini', 'minimal');
+    const isDedicatedFlow = isRecursosInpiModality(resourceType);
+    const correlationId = crypto.randomUUID();
+    const startedAt = Date.now();
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY')!,
+    );
+    const logAdjust = (status: string, httpStatus?: number | null, errorKind?: string | null) =>
+      logAiCall(supabaseAdmin as never, {
+        resource_type: typeof resourceType === 'string' ? resourceType : 'desconhecido',
+        operation: 'ajuste',
+        model: modelConfig.model,
+        dedicated_model: modelConfig.dedicated,
+        reasoning_effort: modelConfig.reasoningEffort,
+        prompt_version: 'recursos-inpi-2026-09-fase1',
+        duration_ms: Date.now() - startedAt,
+        status,
+        http_status: httpStatus ?? null,
+        error_kind: errorKind ?? null,
+        correlation_id: correlationId,
+      });
+
     const hasEvidences = Array.isArray(evidences) && evidences.length > 0;
+
 
     const systemPrompt = `Você é um ADVOGADO ESPECIALISTA EM PROPRIEDADE INDUSTRIAL de ELITE da WEBMARCAS.
 
