@@ -28,6 +28,7 @@ interface EmailAccount {
   imap_port: number | null;
   is_default: boolean;
   assigned_to: string | null;
+  auto_reply_enabled?: boolean | null;
 }
 
 interface AdminProfile {
@@ -447,6 +448,25 @@ export function EmailSettings() {
                             <Mail className="h-3 w-3" />
                             IMAP: {account.imap_host ? `${account.imap_host}:${account.imap_port}` : <span className="text-destructive">Não configurado</span>}
                           </p>
+                          <label className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 accent-[hsl(var(--primary))]"
+                              checked={account.auto_reply_enabled !== false}
+                              onChange={async (e) => {
+                                const { error } = await supabase
+                                  .from('email_accounts')
+                                  .update({ auto_reply_enabled: e.target.checked })
+                                  .eq('id', account.id);
+                                if (error) toast.error('Não foi possível salvar o ajuste');
+                                else {
+                                  toast.success(e.target.checked ? 'Resposta automática ativada' : 'Resposta automática desativada');
+                                  queryClient.invalidateQueries({ queryKey: ['email-accounts'] });
+                                }
+                              }}
+                            />
+                            Resposta automática de recebimento
+                          </label>
                         </div>
                       </div>
                     </div>

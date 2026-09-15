@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import type { EmailFolder, EmailAccount } from '@/pages/admin/Emails';
+import { SYNC_STATUS_LABEL, type AccountSyncInfo } from '@/hooks/useEmailSync';
 
 interface EmailSidebarProps {
   currentFolder: EmailFolder;
@@ -28,7 +29,17 @@ interface EmailSidebarProps {
   selectedAccountId?: string | null;
   onAccountChange?: (accountId: string) => void;
   unreadByAccount?: Record<string, number>;
+  syncByAccount?: Record<string, AccountSyncInfo>;
 }
+
+const STATUS_DOT: Record<string, string> = {
+  syncing: 'bg-primary animate-pulse',
+  ok: 'bg-emerald-500',
+  delayed: 'bg-amber-500',
+  error: 'bg-destructive',
+  auth_required: 'bg-destructive',
+  unknown: 'bg-muted-foreground/50',
+};
 
 const mainFolders: { id: EmailFolder; label: string; icon: React.ComponentType<{ className?: string }>; badge?: keyof EmailSidebarProps['stats'] }[] = [
   { id: 'inbox', label: 'Caixa de Entrada', icon: Inbox, badge: 'unread' },
@@ -58,7 +69,7 @@ const quickFilters: { id: EmailFolder; label: string; icon: React.ComponentType<
   { id: 'filter-support', label: 'Suporte', icon: HeadphonesIcon, color: 'text-rose-500' },
 ];
 
-export function EmailSidebar({ currentFolder, onFolderChange, onCompose, stats, isMasterAdmin = false, emailAccounts, selectedAccountId, onAccountChange, unreadByAccount }: EmailSidebarProps) {
+export function EmailSidebar({ currentFolder, onFolderChange, onCompose, stats, isMasterAdmin = false, emailAccounts, selectedAccountId, onAccountChange, unreadByAccount, syncByAccount }: EmailSidebarProps) {
   const [showFilters, setShowFilters] = useState(true);
   const [showTools, setShowTools] = useState(true);
   const [showAccounts, setShowAccounts] = useState(true);
@@ -126,10 +137,16 @@ export function EmailSidebar({ currentFolder, onFolderChange, onCompose, stats, 
                   <p className={cn('text-[10px] truncate', account.display_name ? 'text-muted-foreground' : 'text-xs font-medium')}>
                     {account.email_address}
                   </p>
+                  {syncByAccount?.[account.id] && (
+                    <span className="mt-0.5 flex items-center gap-1 text-[9px] text-muted-foreground">
+                      <span
+                        className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', STATUS_DOT[syncByAccount[account.id].status])}
+                        aria-hidden
+                      />
+                      {SYNC_STATUS_LABEL[syncByAccount[account.id].status]}
+                    </span>
+                  )}
                 </div>
-                {isActive && (
-                  <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
-                )}
                 {unreadByAccount && unreadByAccount[account.id] > 0 && (
                   <Badge
                     variant={isActive ? 'secondary' : 'default'}

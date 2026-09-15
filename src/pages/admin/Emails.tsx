@@ -12,6 +12,8 @@ import { EmailAutomations } from '@/components/admin/email/EmailAutomations';
 import { EmailCampaigns } from '@/components/admin/email/EmailCampaigns';
 import { EmailSequences } from '@/components/admin/email/EmailSequences';
 import { EmailMetricsBar } from '@/components/admin/email/EmailMetricsBar';
+import { EmailSyncBar } from '@/components/admin/email/EmailSyncBar';
+import { useEmailSync } from '@/hooks/useEmailSync';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -66,6 +68,7 @@ export default function Emails() {
   const [aiDraftBody, setAiDraftBody] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
   const isMobile = useIsMobile();
   const { isMasterAdmin, userId, hasPermission } = useAdminPermissions();
   const canSeeAllEmails = isMasterAdmin || hasPermission('emails', 'can_view');
@@ -97,6 +100,12 @@ export default function Emails() {
 
   // Get selected account email for filtering sent emails
   const selectedAccount = emailAccounts.find(a => a.id === selectedAccountId);
+
+  // Real, per-account sync state + run history
+  const { byAccount: syncByAccount, runs: syncRuns, syncNow } = useEmailSync(
+    emailAccounts.map(a => a.id),
+    selectedAccountId,
+  );
 
   // Read URL params to auto-open compose with client data
   useEffect(() => {
@@ -269,9 +278,13 @@ export default function Emails() {
         onSelectEmail={handleSelectEmail}
         accountId={selectedAccountId}
         accountEmail={selectedAccount?.email_address}
+        externalSearch={search}
+        selectedEmailId={selectedEmail?.id || null}
       />
     );
   };
+
+  const showSyncBar = !['templates', 'settings', 'automations', 'campaigns', 'sequences'].includes(currentFolder);
 
   const getFolderLabel = () => {
     const map: Record<string, string> = {
@@ -296,6 +309,7 @@ export default function Emails() {
       selectedAccountId={selectedAccountId}
       onAccountChange={handleAccountChange}
       unreadByAccount={unreadByAccount}
+      syncByAccount={syncByAccount}
     />
   );
 
@@ -353,16 +367,22 @@ export default function Emails() {
                   <PenSquare className="h-5 w-5" />
                 </Button>
               )}
-              <div className="hidden md:flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-3 py-1.5">
-                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Sistema Ativo</span>
-              </div>
-              {isMobile && (
-                <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse md:hidden" />
-              )}
             </div>
           </div>
           <EmailMetricsBar stats={stats} />
+          {showSyncBar && (
+            <div className="mt-3">
+              <EmailSyncBar
+                accountEmail={selectedAccount?.email_address}
+                info={selectedAccountId ? syncByAccount[selectedAccountId] : undefined}
+                runs={syncRuns}
+                onSyncNow={() => selectedAccountId && syncNow(selectedAccountId)}
+                onCompose={handleCompose}
+                search={search}
+                onSearchChange={setSearch}
+              />
+            </div>
+          )}
         </div>
 
         {/* Main Layout */}
