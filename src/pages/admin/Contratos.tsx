@@ -704,6 +704,12 @@ export default function AdminContratos() {
       (signatureFilter === 'not_signed' && contract.signature_status !== 'signed') ||
       (signatureFilter === 'paid' && isContractPaid(contract));
 
+    const matchesStat =
+      statFilter === 'total' ||
+      (statFilter === 'signed' && contract.signature_status === 'signed') ||
+      (statFilter === 'pending' && contract.signature_status !== 'signed') ||
+      (statFilter === 'paid' && isContractPaid(contract));
+
     const matchesTab = getContractTabMatch(contract, activeTab);
 
     let matchesDate = true;
@@ -719,7 +725,7 @@ export default function AdminContratos() {
       }
     }
     
-    return matchesSearch && matchesSignature && matchesTab && matchesDate;
+    return matchesSearch && matchesSignature && matchesStat && matchesTab && matchesDate;
   });
 
   const { canViewFinancialValues, isLoading: finLoading } = useCanViewFinancialValues();
