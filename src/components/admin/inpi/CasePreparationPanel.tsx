@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import {
   Upload, FileText, X, Loader2, CheckCircle2, AlertTriangle, Brain, Save, RefreshCw,
-  ClipboardList, Zap,
+  ClipboardList, Zap, Eye,
 } from 'lucide-react';
 import {
   CASE_CATEGORIES, ACCEPTED_EXTENSIONS, MAX_FILE_BYTES, EXTRACTION_LABEL,
