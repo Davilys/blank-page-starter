@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { BarChart3, ChevronRight, Filter, Info, LayoutGrid, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, ChevronRight, Filter, Info, LayoutGrid, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -90,7 +91,6 @@ const CARD_CONFIG: Array<{
   chart: string;
 }> = [
   { key: 'recebidas', title: 'Recebidas', tone: 'text-billing-received', border: 'border-billing-received/25', surface: 'bg-billing-received/5', bar: 'bg-billing-received', chart: 'hsl(var(--billing-received))' },
-  { key: 'confirmadas', title: 'Confirmadas', tone: 'text-billing-confirmed', border: 'border-billing-confirmed/25', surface: 'bg-billing-confirmed/5', bar: 'bg-billing-confirmed', chart: 'hsl(var(--billing-confirmed))' },
   { key: 'aguardando', title: 'Aguardando pagamento', tone: 'text-billing-awaiting', border: 'border-billing-awaiting/25', surface: 'bg-billing-awaiting/5', bar: 'bg-billing-awaiting', chart: 'hsl(var(--billing-awaiting))' },
   { key: 'vencidas', title: 'Vencidas', tone: 'text-billing-overdue', border: 'border-billing-overdue/25', surface: 'bg-billing-overdue/5', bar: 'bg-billing-overdue', chart: 'hsl(var(--billing-overdue))' },
 ];
