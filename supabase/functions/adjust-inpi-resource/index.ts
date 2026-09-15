@@ -345,6 +345,8 @@ ${formattingRules}`;
       }
     }
 
+    await logAdjust('success', 200, null);
+
     return new Response(
       JSON.stringify({
         success: true,
