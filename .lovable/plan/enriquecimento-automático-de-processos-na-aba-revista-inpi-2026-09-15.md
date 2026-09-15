@@ -31,6 +31,7 @@ Código IPAS, texto e tipo do despacho, número e data da RPI, prazos, TAG, vín
 ## Detalhes técnicos
 
 **Backend (novo)** — `supabase/functions/inpi-process-lookup/index.ts`:
+
 - Exige sessão válida (JWT verificado em código) e permissão de admin via `has_role`; sem sessão/permissão retorna 401/403.
 - Valida no servidor que o número tem exatamente 9 dígitos ASCII (string, zeros à esquerda preservados).
 - `POST {WEBMARCAS_API_BASE_URL}/v1/processes/lookup` com `Authorization: Bearer WEBMARCAS_API_KEY` (secrets já configurados), corpo `{"process_number":"..."}`, timeout 45 s, sem polling e sem Idempotency-Key.
@@ -48,4 +49,10 @@ Número inválido (letras, 8 e 10 dígitos), zeros à esquerda, sem sessão/perm
 
 ## Entrega
 
-Ao final: arquivos e funções alterados, migração aplicada, resultado dos testes, resultado da consulta real e como reverter apenas esta alteração (remover a função, a tabela de cache e o hook).
+Ao final: arquivos e funções alterados, migração aplicada, resultado dos testes, resultado da consulta real e como reverter apenas esta alteração (remover a função, a tabela de cache e o hook). O plano está alinhado ao que você pediu. **Pode aprovar, com estes ajustes antes da implementação:**
+
+1. **Múltiplas classes:** a API atual normaliza apenas uma classe em `ncl_class`. O Lovable deve preservar o retorno recebido, mas não prometer múltiplas classes até ampliarmos esse campo na API.
+2. **Permissões:** confirmar se a Revista INPI é realmente exclusiva de administradores. Se outros colaboradores já têm acesso autorizado, não bloqueá-los com uma regra nova de “somente admin”.
+3. **Cache e limites:** deduplicação e limites precisam funcionar no backend entre diferentes instâncias, não apenas na memória do hook. Se houver múltiplas organizações, separar o cache por organização.
+4. **Gravação condicional:** reler e depois salvar não basta. A atualização precisa verificar atomicamente que o campo continua vazio ou com placeholder, para não sobrescrever uma edição simultânea.
+5. **Reversão:** remover função, tabela e hook não desfaz os campos preenchidos em `rpi_entries`. Registrar os valores anteriores e os campos alterados para permitir reversão segura, sem apagar alterações manuais posteriores.
