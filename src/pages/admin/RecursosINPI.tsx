@@ -24,6 +24,7 @@ import { ptBR } from 'date-fns/locale';
 import { INPIResourcePDFPreview } from '@/components/admin/INPIResourcePDFPreview';
 import { INPILegalChatDialog } from '@/components/admin/inpi/INPILegalChatDialog';
 import { EvidenceGallery, type EvidenceRow } from '@/components/admin/inpi/EvidenceGallery';
+import CasePreparationPanel from '@/components/admin/inpi/CasePreparationPanel';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface ExtractedData {
