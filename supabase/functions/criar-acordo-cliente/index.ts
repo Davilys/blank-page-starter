@@ -97,6 +97,26 @@ serve(async (req) => {
       user_agent: (req.headers.get("user-agent") || "").slice(0, 200) || null,
     };
 
+    // ══════════════════════════ CONSULTA AO ASAAS ══════════════════════════
+    if (action === "consultar") {
+      const invoiceId: string = body.invoice_id;
+      if (!invoiceId) return json({ error: "invoice_id é obrigatório" }, 400);
+      const { data: inv } = await admin.from("invoices")
+        .select("id, asaas_invoice_id, invoice_url, amount, status").eq("id", invoiceId).maybeSingle();
+      if (!inv) return json({ error: "Fatura não encontrada" }, 404);
+      if (!inv.asaas_invoice_id) return json({ success: true, asaas: null, message: "Fatura sem vínculo com o Asaas" });
+      try {
+        const p = await asaas(`/payments/${inv.asaas_invoice_id}`);
+        const link = p.invoiceUrl || p.bankSlipUrl || null;
+        if (link && link !== inv.invoice_url) {
+          await admin.from("invoices").update({ invoice_url: link }).eq("id", invoiceId);
+        }
+        return json({ success: true, asaas: resumoAsaas(p), link });
+      } catch (e: any) {
+        return json({ success: false, asaas: null, error: "Não foi possível consultar o Asaas", status: e.status || null });
+      }
+    }
+
     // ══════════════════════════ RETRY DO CANCELAMENTO ══════════════════════
     if (action === "retry-cancelamento") {
       const acordoId: string = body.acordo_id;
