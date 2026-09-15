@@ -1315,7 +1315,7 @@ serve(async (req) => {
         ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
       ];
       if (body) body.files = undefined;
-      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25);
+      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25, 120000, makeCtx('notificacao'));
       if (result.error) {
         return new Response(JSON.stringify({ error: `Erro IA: ${result.status}` }), { status: result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
@@ -1430,7 +1430,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
         ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
       ];
       if (body) body.files = undefined;
-      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000);
+      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, undefined, 120000, makeCtx('resposta_notificacao'));
       
       if (result.error) {
         console.error('OpenAI error for resposta_notificacao:', result.status, result.error.substring(0, 300));
@@ -1474,7 +1474,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
         ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
       ];
       if (body) body.files = undefined;
-      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25);
+      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25, 120000, makeCtx('procurador'));
       if (result.error) {
         return new Response(JSON.stringify({ error: `Erro IA: ${result.status}` }), { status: result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
