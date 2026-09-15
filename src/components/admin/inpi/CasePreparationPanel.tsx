@@ -26,6 +26,10 @@ interface CaseDoc {
   extraction_status: ExtractionStatus;
   extraction_notes: string | null;
   review_status: string;
+  page_count: number | null;
+  interpreted_pages: number | null;
+  unreadable_pages: number | null;
+  vision_read_pages: number | null;
 }
 
 interface OrientationRow {
