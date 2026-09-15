@@ -273,11 +273,15 @@ serve(async (req) => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("sync-asaas-client-invoices error", msg);
-    await admin.from("asaas_sync_logs").insert({
-      client_id: (await req.clone().json().catch(() => ({})))?.client_id || "00000000-0000-0000-0000-000000000000",
-      sync_run_id: syncRunId, sucesso: false, incompleta: true,
-      erro: msg.slice(0, 500), duracao_ms: Date.now() - started,
-    }).then(() => {}, () => {});
+    if (clientIdParaLog) {
+      try {
+        await admin.from("asaas_sync_logs").insert({
+          client_id: clientIdParaLog,
+          sync_run_id: syncRunId, sucesso: false, incompleta: true,
+          erro: msg.slice(0, 500), duracao_ms: Date.now() - started,
+        });
+      } catch { /* log é auxiliar */ }
+    }
     return json({ error: msg }, 500);
   }
 });
