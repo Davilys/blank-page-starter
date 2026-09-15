@@ -60,6 +60,28 @@ export interface ExportPackageState {
   annexes: NativeAnnexDoc[];
   isComplete: boolean;
   draftStamp: string | null;
+  /** Pacote incompleto ou sem conferência: só prévia, nunca protocolo. */
+  previewOnly: boolean;
+}
+
+interface ReviewFinding {
+  tipo?: string;
+  trecho?: string;
+  problema?: string;
+  sugestao?: string;
+  bloqueante?: boolean;
+  fontes?: string[];
+}
+
+interface ReviewRow {
+  id: string;
+  content_hash: string;
+  documents_hash: string | null;
+  findings: ReviewFinding[];
+  summary: string | null;
+  has_blocking: boolean;
+  model: string | null;
+  created_at: string;
 }
 
 interface Props {
