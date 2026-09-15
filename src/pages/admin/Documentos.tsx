@@ -23,6 +23,7 @@ import { DocumentUploader } from '@/components/shared/DocumentUploader';
 import { DocumentPreview } from '@/components/shared/DocumentPreview';
 import { cn } from '@/lib/utils';
 import { exportDocumentsZip, importDocumentsZip, downloadBlob, type ProgressCallback } from '@/lib/zipExportImport';
+import { classifyDocumentName } from '@/lib/documentClassifier';
 
 // ─── Types ────────────────────────────────────────
 interface Document {
@@ -58,6 +59,10 @@ const DOC_CONFIG: Record<string, {
   parecer:    { label: 'Parecer INPI',   color: 'from-orange-500 to-amber-400', glow: '#f97316', accent: '#fb923c', bg: '#f9731618', icon: MessageSquare,order: 6 },
   comprovante:{ label: 'Comprovantes',   color: 'from-teal-500 to-cyan-400',    glow: '#14b8a6', accent: '#2dd4bf', bg: '#14b8a618', icon: Package,     order: 7 },
   outro:      { label: 'Outro',          color: 'from-slate-500 to-gray-400',   glow: '#64748b', accent: '#94a3b8', bg: '#64748b18', icon: FileIcon,    order: 8 },
+  anexo:      { label: 'Outro',          color: 'from-slate-500 to-gray-400',   glow: '#64748b', accent: '#94a3b8', bg: '#64748b18', icon: FileIcon,    order: 8 },
+  distrato:            { label: 'Distrato', color: 'from-blue-500 to-cyan-400', glow: '#3b82f6', accent: '#60a5fa', bg: '#3b82f618', icon: Shield, order: 0 },
+  distrato_multa:      { label: 'Distrato', color: 'from-blue-500 to-cyan-400', glow: '#3b82f6', accent: '#60a5fa', bg: '#3b82f618', icon: Shield, order: 0 },
+  distrato_sem_multa:  { label: 'Distrato', color: 'from-blue-500 to-cyan-400', glow: '#3b82f6', accent: '#60a5fa', bg: '#3b82f618', icon: Shield, order: 0 },
 };
 
 // ─── Fixed particles ──────────────────────────────
@@ -138,7 +143,7 @@ function KpiCard({ title, value, prefix = '', icon: Icon, gradient, glow, accent
 function TypeDistBar({ documents }: { documents: Document[] }) {
   const total = documents.length || 1;
   const types = Object.entries(DOC_CONFIG)
-    .filter(([k]) => k !== 'contract')
+    .filter(([k]) => !['contract', 'anexo', 'distrato', 'distrato_multa', 'distrato_sem_multa'].includes(k))
     .sort((a, b) => a[1].order - b[1].order)
     .map(([key, cfg]) => ({
       key, cfg,
@@ -186,7 +191,7 @@ function TypeDistBar({ documents }: { documents: Document[] }) {
 // ─── Type Filter Chips ────────────────────────────
 const FILTER_TABS = [
   { value: 'todos',      label: 'Todos',          icon: FolderOpen, types: [] as string[] },
-  { value: 'contrato',   label: 'Contrato',        icon: Shield,     types: ['contrato', 'contract'] },
+  { value: 'contrato',   label: 'Contrato',        icon: Shield,     types: ['contrato', 'contract', 'distrato', 'distrato_multa', 'distrato_sem_multa'] },
   { value: 'procuracao', label: 'Procuração',      icon: Scale,      types: ['procuracao'] },
   { value: 'taxa',       label: 'Taxa',            icon: Receipt,    types: ['taxa'] },
   { value: 'busca_inpi', label: 'Busca INPI',      icon: Landmark,   types: ['busca_inpi'] },
@@ -194,7 +199,7 @@ const FILTER_TABS = [
   { value: 'rpi',        label: 'RPI',             icon: Newspaper,  types: ['rpi'] },
   { value: 'parecer',    label: 'Parecer',         icon: MessageSquare, types: ['parecer'] },
   { value: 'comprovante',label: 'Comprovantes',    icon: Package,    types: ['comprovante'] },
-  { value: 'outro',      label: 'Outros',          icon: FileIcon,   types: ['outro'] },
+  { value: 'outro',      label: 'Outros',          icon: FileIcon,   types: ['outro', 'anexo'] },
 ];
 
 // ─── File icon helper ─────────────────────────────
@@ -438,10 +443,14 @@ function UploadDialog({
     if (!form.user_id) { toast.error('Selecione um cliente primeiro'); return; }
     try {
       const protocol = generateProtocol();
+      const finalName = form.name || fileName;
+      const finalType = form.document_type && form.document_type !== 'outro'
+        ? form.document_type
+        : classifyDocumentName(finalName);
       const { error } = await supabase.from('documents').insert({
-        name: form.name || fileName,
+        name: finalName,
         file_url: fileUrl,
-        document_type: form.document_type,
+        document_type: finalType,
         file_size: fileSize,
         user_id: form.user_id,
         process_id: form.process_id || null,
@@ -601,7 +610,7 @@ function UploadDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-card/95 backdrop-blur-xl border-border/50">
-                  {Object.entries(DOC_CONFIG).filter(([k]) => k !== 'contract').map(([k, v]) => (
+                  {Object.entries(DOC_CONFIG).filter(([k]) => !['contract', 'anexo', 'distrato', 'distrato_multa', 'distrato_sem_multa'].includes(k)).map(([k, v]) => (
                     <SelectItem key={k} value={k}>{v.label}</SelectItem>
                   ))}
                 </SelectContent>
@@ -690,7 +699,7 @@ export default function AdminDocumentos() {
   // ─── Derived stats ─────────────────────────────
   const stats = useMemo(() => {
     const totalSize = documents.reduce((acc, d) => acc + (d.file_size || 0), 0);
-    const contratos = documents.filter(d => ['contrato', 'contract'].includes(d.document_type || '')).length;
+    const contratos = documents.filter(d => ['contrato', 'contract', 'distrato', 'distrato_multa', 'distrato_sem_multa'].includes(d.document_type || '')).length;
     const thisMonth = documents.filter(d => {
       if (!d.created_at) return false;
       const now = new Date();
