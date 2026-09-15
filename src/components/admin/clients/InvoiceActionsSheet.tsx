@@ -216,6 +216,10 @@ export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFina
                   disabled={busy} onClick={() => setShowAcordo(true)}>
                   <Handshake className="h-3.5 w-3.5 mr-1" />Fazer acordo
                 </Button>
+                <Button size="sm" variant="outline" className="h-9 text-xs col-span-2 border-red-500/40 text-red-600 hover:bg-red-500/10"
+                  disabled={busy} onClick={() => setConfirmExcluir(true)}>
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />Excluir cobrança
+                </Button>
               </div>
             )}
 
