@@ -29,6 +29,7 @@ import { format, addDays, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { calcAutoFields } from '@/components/admin/publicacao/helpers';
 import { useJuridicoStages } from '@/hooks/useJuridicoStages';
+import { ProcessoIdentificadoRow, classifyEntry, entryDataState } from '@/components/admin/inpi/ProcessoIdentificadoRow';
 // PublicacaoTab moved to its own page at /admin/publicacao
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -62,9 +63,43 @@ interface RpiEntry {
   tag: string | null;
   deadline_date?: string | null;
   priority?: 'urgent' | 'medium' | null;
+  relation_primary?: string | null;
+  relation_types?: string[] | null;
+  is_destituicao?: boolean | null;
+  is_nomeacao?: boolean | null;
+  is_substituicao?: boolean | null;
+  needs_human_review?: boolean | null;
+  review_reason?: string | null;
+  match_candidates?: unknown;
+  enrichment_status?: string | null;
+  dispatches?: unknown;
+  protocols?: unknown;
   client?: { full_name: string | null; email: string; company_name: string | null };
   process?: { pipeline_stage: string | null; status: string | null };
 }
+
+type QuickFilter =
+  | 'all' | 'criticos' | 'exigencias' | 'indeferimentos' | 'deferimentos' | 'oposicoes'
+  | 'publicacoes' | 'recursos' | 'concessoes' | 'arquivamentos' | 'procurador'
+  | 'sem_cliente' | 'incompletos' | 'revisao';
+
+const QUICK_FILTERS: Array<{ value: QuickFilter; label: string }> = [
+  { value: 'all', label: 'Todos' },
+  { value: 'criticos', label: 'Atenção imediata' },
+  { value: 'exigencias', label: 'Exigências' },
+  { value: 'indeferimentos', label: 'Indeferimentos' },
+  { value: 'deferimentos', label: 'Deferimentos' },
+  { value: 'oposicoes', label: 'Oposições' },
+  { value: 'publicacoes', label: 'Publicações para oposição' },
+  { value: 'recursos', label: 'Recursos' },
+  { value: 'concessoes', label: 'Concessões' },
+  { value: 'arquivamentos', label: 'Arquivamentos' },
+  { value: 'procurador', label: 'Alterações de procurador' },
+  { value: 'sem_cliente', label: 'Sem cliente vinculado' },
+  { value: 'incompletos', label: 'Dados incompletos' },
+  { value: 'revisao', label: 'Revisão necessária' },
+];
+
 
 interface Profile {
   id: string;
@@ -249,6 +284,7 @@ export default function RevistaINPI() {
   const [processing, setProcessing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMatched, setFilterMatched] = useState<'all' | 'matched' | 'unmatched'>('all');
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const [fetchingRemote, setFetchingRemote] = useState(false);
   const [recentRpis, setRecentRpis] = useState<number[]>([]);
   const [rpWithXml, setRpWithXml] = useState<number[]>([]);
@@ -922,11 +958,45 @@ export default function RevistaINPI() {
     finally { setUpdatingTag(null); }
   };
 
+  const matchesQuickFilter = (entry: RpiEntry, filter: QuickFilter): boolean => {
+    const cls = classifyEntry(entry as any);
+    switch (filter) {
+      case 'all': return true;
+      case 'criticos': return cls.priority === 'critico';
+      case 'exigencias': return cls.category === 'exigencia';
+      case 'indeferimentos': return cls.category === 'indeferimento';
+      case 'deferimentos': return cls.category === 'deferimento';
+      case 'oposicoes': return cls.category === 'oposicao';
+      case 'publicacoes': return cls.category === 'publicacao_oposicao';
+      case 'recursos': return cls.category === 'recurso';
+      case 'concessoes': return cls.category === 'concessao';
+      case 'arquivamentos': return cls.category === 'arquivamento';
+      case 'procurador': return cls.category === 'procurador';
+      case 'sem_cliente': return !entry.matched_client_id;
+      case 'incompletos': return entryDataState(entry as any) === 'parciais';
+      case 'revisao': return entryDataState(entry as any) === 'revisao';
+      default: return true;
+    }
+  };
+
   const filteredEntries = entries.filter(entry => {
-    const matchesSearch = entry.brand_name?.toLowerCase().includes(searchTerm.toLowerCase()) || entry.process_number?.includes(searchTerm) || entry.holder_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = searchTerm.trim().toLowerCase();
+    const clientName = `${entry.client?.full_name || ''} ${entry.client?.company_name || ''}`.toLowerCase();
+    const matchesSearch = !term
+      || (entry.brand_name || '').toLowerCase().includes(term)
+      || (entry.process_number || '').includes(term)
+      || (entry.holder_name || '').toLowerCase().includes(term)
+      || (entry.dispatch_code || '').toLowerCase().includes(term)
+      || clientName.includes(term);
     const matchesFilter = filterMatched === 'all' || (filterMatched === 'matched' && entry.matched_client_id) || (filterMatched === 'unmatched' && !entry.matched_client_id);
-    return matchesSearch && matchesFilter;
+    return matchesSearch && matchesFilter && matchesQuickFilter(entry, quickFilter);
   });
+
+  const quickFilterCounts = QUICK_FILTERS.map(f => ({
+    ...f,
+    count: entries.filter(e => matchesQuickFilter(e, f.value)).length,
+  }));
+
 
   const matchedEntries = entries.filter(e => e.matched_client_id);
   const deferimentos = entries.filter(e => (e.dispatch_text || '').toLowerCase().includes('deferid'));
@@ -1222,6 +1292,25 @@ export default function RevistaINPI() {
                   </div>
                 </div>
 
+                {/* Filtros rápidos */}
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Filtros de despacho">
+                  {quickFilterCounts.map(f => (
+                    <button
+                      key={f.value}
+                      type="button"
+                      onClick={() => setQuickFilter(f.value)}
+                      aria-pressed={quickFilter === f.value}
+                      className={`rounded-full border px-3 py-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                        quickFilter === f.value
+                          ? 'border-primary bg-primary/10 text-primary font-medium'
+                          : 'border-border text-muted-foreground hover:bg-muted'
+                      }`}
+                    >
+                      {f.label} <span className="opacity-60">({f.count})</span>
+                    </button>
+                  ))}
+                </div>
+
                 {/* Process Cards */}
                 <div className="space-y-3">
                   <AnimatePresence mode="popLayout">
@@ -1238,86 +1327,21 @@ export default function RevistaINPI() {
                           exit={{ opacity: 0, scale: 0.95 }}
                           transition={{ delay: Math.min(index * 0.04, 0.4), duration: 0.35 }}
                         >
-                          <Card
-                            className={`group cursor-pointer transition-all duration-300 overflow-hidden ${
-                              isExpanded
-                                ? 'border-primary/40 shadow-lg shadow-primary/5 ring-1 ring-primary/10'
-                                : 'hover:border-primary/20 hover:shadow-md'
-                            }`}
-                            onClick={() => setExpandedEntryId(isExpanded ? null : entry.id)}
-                          >
-                            {/* Card Header Row */}
-                            <div className="px-5 py-4 flex items-center gap-4">
-                              {/* Status indicator */}
-                              <div className={`relative flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center ${
-                                entry.update_status === 'updated'
-                                  ? 'bg-emerald-500/10'
-                                  : entry.matched_client_id
-                                  ? 'bg-primary/10'
-                                  : 'bg-muted'
-                              }`}>
-                                {entry.update_status === 'updated' ? (
-                                  <CheckCircle className="h-5 w-5 text-emerald-600" />
-                                ) : (
-                                  <FileText className="h-5 w-5 text-primary" />
-                                )}
-                                {entry.matched_client_id && entry.update_status !== 'updated' && (
-                                  <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 border-2 border-card animate-pulse" />
-                                )}
+                          <div className="overflow-hidden rounded-xl">
+                            <ProcessoIdentificadoRow
+                              entry={entry as any}
+                              expanded={isExpanded}
+                              onOpen={() => setExpandedEntryId(isExpanded ? null : entry.id)}
+                              onAssign={(_e, ev) => handleOpenAssignDialog(entry, ev)}
+                            />
+                            {tagOption && (
+                              <div className="px-4 pt-2">
+                                <Badge className={`${tagOption.color} text-[10px] border-0`}>
+                                  {tagOption.label}
+                                </Badge>
                               </div>
+                            )}
 
-                              {/* Brand & Process */}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-bold text-foreground truncate max-w-[200px]">
-                                    {entry.brand_name || 'Marca não identificada'}
-                                  </span>
-                                  <code className="text-[11px] font-mono bg-muted/70 px-2 py-0.5 rounded-md text-muted-foreground">
-                                    {entry.process_number}
-                                  </code>
-                                  {entry.ncl_classes && entry.ncl_classes.length > 0 && (
-                                    <Badge variant="secondary" className="font-mono text-[10px] h-5">
-                                      NCL {entry.ncl_classes.join(', ')}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                                  {entry.dispatch_text || entry.dispatch_type || 'Sem descrição do despacho'}
-                                </p>
-                              </div>
-
-                              {/* Right side badges */}
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                {getDispatchBadge(entry.dispatch_type)}
-                                {tagOption && (
-                                  <Badge className={`${tagOption.color} text-[10px] border-0`}>
-                                    {tagOption.label}
-                                  </Badge>
-                                )}
-                                {entry.matched_client_id ? (
-                                  <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] gap-1">
-                                    <Users className="h-3 w-3" />
-                                    {entry.client?.full_name?.split(' ')[0] || 'Cliente'}
-                                  </Badge>
-                                ) : (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 text-xs gap-1.5 rounded-lg border-primary/30 text-primary hover:bg-primary/10"
-                                    onClick={(e) => handleOpenAssignDialog(entry, e)}
-                                  >
-                                    <UserPlus className="h-3 w-3" />
-                                    Vincular
-                                  </Button>
-                                )}
-                                <motion.div
-                                  animate={{ rotate: isExpanded ? 90 : 0 }}
-                                  transition={{ duration: 0.2 }}
-                                >
-                                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                                </motion.div>
-                              </div>
-                            </div>
 
                             {/* Expanded Detail Panel */}
                             <AnimatePresence>
@@ -1656,7 +1680,7 @@ export default function RevistaINPI() {
                                 </motion.div>
                               )}
                             </AnimatePresence>
-                          </Card>
+                          </div>
                         </motion.div>
                       );
                     })}
