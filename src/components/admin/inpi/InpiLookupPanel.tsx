@@ -180,6 +180,57 @@ export function InpiLookupPanel({ entry, onApplied, controller }: Props) {
             </p>
           )}
 
+          {state.link && (state.link.status === 'linked' || state.link.status === 'already_linked') && (
+            <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-2.5">
+              <p className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                <UserCheck className="h-3.5 w-3.5" />
+                {state.link.status === 'linked'
+                  ? `Vinculado automaticamente pela consulta ao INPI a ${state.link.client_name || 'cliente identificado'}`
+                  : `Cliente já vinculado: ${state.link.client_name || '—'}`}
+              </p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {state.link.created_process
+                  ? 'A marca foi criada na ficha do cliente com os dados oficiais.'
+                  : 'A marca na ficha do cliente foi completada apenas nos campos vazios.'}
+                {state.link.merged > 0 &&
+                  ` ${state.link.merged} registro(s) duplicado(s) do mesmo processo foram unificados.`}
+              </p>
+            </div>
+          )}
+
+          {state.link && state.link.status === 'candidates' && state.link.candidates.length > 0 && (
+            <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-2.5">
+              <p className="flex items-center gap-1.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                <UserPlus className="h-3.5 w-3.5" />
+                Possíveis clientes para este processo (confirme para vincular):
+              </p>
+              <div className="mt-1.5 space-y-1">
+                {state.link.candidates.map((c) => (
+                  <div key={c.client_id} className="flex items-center justify-between gap-2">
+                    <span className="truncate text-[11px] text-foreground">
+                      {c.name || 'Sem nome'}{' '}
+                      <span className="text-muted-foreground">
+                        · por {c.reason === 'titular' ? 'titular' : 'nome da marca'}
+                      </span>
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 rounded-lg px-2 text-[11px]"
+                      disabled={confirming === c.client_id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void confirmCandidate(c.client_id);
+                      }}
+                    >
+                      {confirming === c.client_id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Confirmar'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {lookup.detail_status === 'unavailable' && (
             <p className="text-[11px] text-muted-foreground">
               Dados principais consultados. Detalhes adicionais indisponíveis neste momento.
