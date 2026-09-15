@@ -167,8 +167,8 @@ export async function extractContent(file: File): Promise<ExtractionResult> {
       for (let p = 1; p <= doc.numPages; p++) {
         const page = await doc.getPage(p);
         const content = await page.getTextContent();
-        const text = content.items
-          .map((it: { str?: string }) => it.str || '')
+        const text = (content.items as Array<{ str?: string }>)
+          .map((it) => it.str || '')
           .join(' ')
           .trim();
         if (text.length > 40) {

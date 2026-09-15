@@ -58,7 +58,7 @@ async function rasterizePdf(blob: Blob): Promise<{ images: AnnexPageImage[]; tot
     if (!ctx) throw new Error('Canvas indisponível para converter o PDF.');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+    await page.render({ canvasContext: ctx, viewport, canvas } as unknown as Parameters<typeof page.render>[0]).promise;
     images.push(await canvasToJpeg(canvas));
   }
   return { images, total: doc.numPages };
