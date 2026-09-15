@@ -434,6 +434,24 @@ serve(async (req) => {
       console.log('Payment refunded:', paymentId);
     }
 
+    // Cobrança apagada/cancelada diretamente no Asaas: sai da lista ativa do cliente,
+    // mas permanece no histórico do CRM.
+    if (event === 'PAYMENT_DELETED' || paymentStatus === 'DELETED') {
+      await supabaseAdmin
+        .from('invoices')
+        .update({
+          status: 'canceled',
+          asaas_status_raw: paymentStatus || 'DELETED',
+          sync_status: 'removida_asaas',
+          removida_em: new Date().toISOString(),
+          ultima_sincronizacao_asaas: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('asaas_invoice_id', paymentId);
+
+      console.log('Payment deleted in Asaas:', paymentId);
+    }
+
     return new Response(
       JSON.stringify({ success: true, message: `Processed event: ${event}` }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
