@@ -23,6 +23,7 @@ import { DocumentUploader } from '@/components/shared/DocumentUploader';
 import { DocumentPreview } from '@/components/shared/DocumentPreview';
 import { cn } from '@/lib/utils';
 import { exportDocumentsZip, importDocumentsZip, downloadBlob, type ProgressCallback } from '@/lib/zipExportImport';
+import { classifyDocumentName } from '@/lib/documentClassifier';
 
 // ─── Types ────────────────────────────────────────
 interface Document {
@@ -58,6 +59,10 @@ const DOC_CONFIG: Record<string, {
   parecer:    { label: 'Parecer INPI',   color: 'from-orange-500 to-amber-400', glow: '#f97316', accent: '#fb923c', bg: '#f9731618', icon: MessageSquare,order: 6 },
   comprovante:{ label: 'Comprovantes',   color: 'from-teal-500 to-cyan-400',    glow: '#14b8a6', accent: '#2dd4bf', bg: '#14b8a618', icon: Package,     order: 7 },
   outro:      { label: 'Outro',          color: 'from-slate-500 to-gray-400',   glow: '#64748b', accent: '#94a3b8', bg: '#64748b18', icon: FileIcon,    order: 8 },
+  anexo:      { label: 'Outro',          color: 'from-slate-500 to-gray-400',   glow: '#64748b', accent: '#94a3b8', bg: '#64748b18', icon: FileIcon,    order: 8 },
+  distrato:            { label: 'Distrato', color: 'from-blue-500 to-cyan-400', glow: '#3b82f6', accent: '#60a5fa', bg: '#3b82f618', icon: Shield, order: 0 },
+  distrato_multa:      { label: 'Distrato', color: 'from-blue-500 to-cyan-400', glow: '#3b82f6', accent: '#60a5fa', bg: '#3b82f618', icon: Shield, order: 0 },
+  distrato_sem_multa:  { label: 'Distrato', color: 'from-blue-500 to-cyan-400', glow: '#3b82f6', accent: '#60a5fa', bg: '#3b82f618', icon: Shield, order: 0 },
 };
 
 // ─── Fixed particles ──────────────────────────────
