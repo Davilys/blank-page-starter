@@ -153,11 +153,52 @@ export default function CasePreparationPanel({
             sheet_names: result.sheetNames,
           })
           .eq('id', row.id);
+
+        // PDF sem texto ou imagem não é documento ilegível: as páginas vão
+        // para a leitura visual da IA e só o que for realmente interpretado
+        // é registrado.
+        if (result.status === 'recebido' || result.status === 'parcial') {
+          await runVisionRead(row.id, file);
+        }
       }
       await reloadDocs(caseId);
       if (orientation) markStale();
     } finally {
       setBusyCategory(null);
+    }
+  };
+
+  /** Envia as páginas digitalizadas para leitura visual da IA. */
+  const runVisionRead = async (docId: string, file: File) => {
+    if (!caseId) return;
+    if (visionBusy.has(docId)) return; // protege contra clique repetido
+    setVisionBusy((s) => new Set(s).add(docId));
+    try {
+      const ext = fileExtension(file.name);
+      let pages: { page: number; dataUrl: string }[] = [];
+      if (ext === 'pdf') {
+        const all = await rasterizePdfPages(file, Array.from({ length: 12 }, (_, i) => i + 1));
+        pages = all;
+      } else if (isImageExt(ext)) {
+        pages = [{ page: 1, dataUrl: await imageToDataUrl(file) }];
+      }
+      if (!pages.length) return;
+      const { data, error } = await supabase.functions.invoke('read-inpi-scanned-pages', {
+        body: { caseId, documentId: docId, pages },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Falha na leitura visual');
+      toast.success(
+        `${file.name}: ${data.pages_interpreted} página(s) interpretada(s) por leitura visual.`,
+      );
+    } catch (e) {
+      toast.warning(
+        `${file.name}: leitura visual não concluída (${e instanceof Error ? e.message : 'erro'}). ` +
+          'As páginas seguem como não conferidas.',
+      );
+    } finally {
+      setVisionBusy((s) => { const n = new Set(s); n.delete(docId); return n; });
+      await reloadDocs(caseId);
     }
   };
 
