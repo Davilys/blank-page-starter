@@ -226,17 +226,27 @@ serve(async (req) => {
             after.from_name = msg.from.name || row.from_name;
           }
 
+          const changed =
+            (after.subject ?? null) !== (row.subject ?? null) ||
+            (after.body_text ?? null) !== (row.body_text ?? null) ||
+            (after.body_html ?? null) !== (row.body_html ?? null) ||
+            (after.snippet ?? null) !== (row.snippet ?? null) ||
+            (after.from_email ?? row.from_email ?? null) !== (row.from_email ?? null) ||
+            (after.from_name ?? row.from_name ?? null) !== (row.from_name ?? null);
+
+          const stamp = new Date().toISOString();
           results.push({
             id: row.id,
-            status: mode === "apply" ? "applied" : "preview",
+            status: !changed ? "unchanged" : mode === "apply" ? "applied" : "preview",
+            reprocessed_at: changed && mode === "apply" ? stamp : undefined,
             before: { subject: row.subject, from: row.from_email, from_name: row.from_name, snippet: row.snippet, has_body: !!(row.body_text || row.body_html) },
             after: { subject: after.subject, from: after.from_email ?? row.from_email, from_name: after.from_name ?? row.from_name, snippet: after.snippet, has_body: !!(after.body_text || after.body_html) },
           });
 
-          if (mode === "apply") {
+          if (mode === "apply" && changed) {
             await supabase.from("email_inbox").update({
               ...after,
-              reprocessed_at: new Date().toISOString(),
+              reprocessed_at: stamp,
               original_backup: {
                 subject: row.subject,
                 from_email: row.from_email,
