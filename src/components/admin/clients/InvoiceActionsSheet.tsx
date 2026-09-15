@@ -22,6 +22,8 @@ export interface InvoiceLike {
   invoice_url?: string | null;
   asaas_invoice_id?: string | null;
   acordo_id?: string | null;
+  sync_status?: string | null;
+  origem?: string | null;
 }
 
 interface Props {
@@ -35,8 +37,6 @@ interface Props {
 const brl = (v: number) => Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmt = (iso: string) => { const [y, m, d] = (iso || "").split("-"); return d ? `${d}/${m}/${y}` : "—"; };
 
-const ABERTAS = ["pending", "overdue"];
-
 export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFinance, onChanged }: Props) {
   const [asaas, setAsaas] = useState<{ status: string; link: string | null } | null>(null);
   const [loadingAsaas, setLoadingAsaas] = useState(false);
@@ -49,7 +49,14 @@ export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFina
   const [excluindo, setExcluindo] = useState(false);
 
   const busy = cobrando || retrying || excluindo;
-  const isOpenInvoice = !!invoice && ABERTAS.includes(invoice.status);
+  const classificacao = invoice
+    ? classificarCobranca({ status: invoice.status, due_date: invoice.due_date, sync_status: invoice.sync_status })
+    : "inativo";
+  // Ações financeiras apenas em cobranças realmente ativas (a vencer ou vencidas).
+  const isOpenInvoice = !!invoice && permiteAcoesFinanceiras(classificacao);
+  const origem: OrigemCobranca = invoice?.origem === "asaas" || invoice?.origem === "acordo" || invoice?.origem === "interna"
+    ? invoice.origem
+    : (invoice?.asaas_invoice_id ? "asaas" : "interna");
   const diasAtraso = invoice
     ? Math.max(0, Math.floor((Date.now() - new Date(invoice.due_date + "T00:00:00").getTime()) / 86400000))
     : 0;
