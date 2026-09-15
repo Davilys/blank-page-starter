@@ -3133,9 +3133,16 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
 
                   {/* Summary card */}
                   <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <BarChart3 className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-semibold">Resumo Financeiro</span>
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <div className="flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-semibold">Resumo Financeiro</span>
+                      </div>
+                      {canManageFinance && (
+                        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setNovaFaturaOpen(true)}>
+                          <FilePlus2 className="h-3.5 w-3.5 mr-1" />Nova fatura
+                        </Button>
+                      )}
                     </div>
                     {(() => {
                       // Faturas canceladas (inclusive as substituídas por acordo) não entram no resumo;
