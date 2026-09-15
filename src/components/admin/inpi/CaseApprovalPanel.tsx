@@ -502,7 +502,6 @@ export default function CaseApprovalPanel({
               prévia carimbada.
             </div>
           )}
-          </div>
           {approvals.some((a) => a.invalidated_at) && (
             <>
               <Separator />
