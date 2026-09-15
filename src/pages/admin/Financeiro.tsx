@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, lazy, Suspense, useCallback, useMemo } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,18 +12,15 @@ import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  Search, Plus, CreditCard, TrendingUp, Clock, CheckCircle, Wallet,
+  Search, Plus, CreditCard, CheckCircle, Wallet,
   QrCode, FileText, Loader2, ExternalLink, Copy, EyeOff, RefreshCw,
-  ArrowUpRight, ArrowDownRight, DollarSign, AlertTriangle, Zap, Filter,
-  Calendar, ChevronLeft, ChevronRight
+  DollarSign, AlertTriangle, Zap
 } from 'lucide-react';
-import { format, subMonths, addMonths, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, subDays } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { format, subMonths, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { useNavigate } from 'react-router-dom';
 import { loadClientForSheet } from '@/lib/clientSheet';
 import type { ClientWithProcess } from '@/components/admin/clients/ClientKanbanBoard';
 import {
@@ -92,12 +89,6 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   inativo:  { label: 'Cancelada', color: 'text-muted-foreground', bg: 'bg-muted/40 border border-border',          dot: 'bg-muted-foreground', glow: '' },
 };
 
-const ORIGEM_LABEL: Record<string, string> = {
-  asaas: 'Asaas',
-  interna: 'Fatura interna',
-  acordo: 'Acordo',
-};
-
 const PAYMENT_OPTIONS = {
   pix:    { label: 'PIX',             icon: QrCode,      color: 'text-emerald-500', bg: 'bg-emerald-500/10 border-emerald-500/30', description: 'Pagamento instantâneo' },
   boleto: { label: 'Boleto',          icon: FileText,    color: 'text-blue-500',    bg: 'bg-blue-500/10 border-blue-500/30',       description: 'Vencimento em 3 dias úteis' },
@@ -122,7 +113,6 @@ const EMPTY_BILLING_DATA: BillingSituationData = {
 };
 
 export default function AdminFinanceiro() {
-  const navigate = useNavigate();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [processes, setProcesses] = useState<Process[]>([]);
@@ -193,8 +183,6 @@ export default function AdminFinanceiro() {
   });
   const [syncing, setSyncing] = useState(false);
   const [syncRun, setSyncRun] = useState<any | null>(null);
-  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('month');
-  const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [sortKey, setSortKey] = useState<SortKey>('cliente');
@@ -846,9 +834,9 @@ export default function AdminFinanceiro() {
               ) : (
                 <AnimatePresence>
                   {invoices.map((invoice, idx) => {
-                    const ns = (invoice.classificacao || 'a_vencer') as keyof typeof STATUS_CONFIG;
-                    const sc = STATUS_CONFIG[ns] || STATUS_CONFIG.a_vencer;
-                    const isOverdue = ns === 'vencido';
+                    const ns = (invoice.classificacao || 'aguardando') as keyof typeof STATUS_CONFIG;
+                    const sc = STATUS_CONFIG[ns] || STATUS_CONFIG.aguardando;
+                    const isOverdue = ns === 'vencidas';
 
                     return (
                       <motion.tr
@@ -900,7 +888,7 @@ export default function AdminFinanceiro() {
                         </TableCell>
                         <TableCell className="py-3.5">
                           <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium', sc.bg, sc.color)}>
-                            <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', sc.dot, ns === 'a_vencer' && 'animate-pulse')} />
+                            <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', sc.dot, ns === 'aguardando' && 'animate-pulse')} />
                             {sc.label}
                           </span>
                         </TableCell>
@@ -916,7 +904,7 @@ export default function AdminFinanceiro() {
                                 <Copy className="h-3.5 w-3.5 text-emerald-500" />
                               </Button>
                             )}
-                            {ns !== 'pago' && ns !== 'inativo' && (
+                            {(ns === 'aguardando' || ns === 'vencidas') && (
                               <Button variant="ghost" size="sm" className="h-7 text-xs text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10 px-2"
                                 onClick={() => updateStatus(invoice.id, 'paid')}>
                                 <CheckCircle className="h-3.5 w-3.5 mr-1" /> Pago
