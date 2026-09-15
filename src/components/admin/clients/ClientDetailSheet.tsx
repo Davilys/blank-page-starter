@@ -2977,23 +2977,29 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                       <div className="flex items-center gap-2">
                         <BarChart3 className="h-4 w-4 text-primary" />
                         <span className="text-sm font-semibold">Cobranças Asaas</span>
-                        {asaasCustomerIds.length > 1 && (
+                        {asaasCustomerIds.length > 0 && (
                           <Badge className="text-[9px] h-4 px-1 bg-primary/15 text-primary border-primary/30 border">
-                            {asaasCustomerIds.length} contas
+                            {asaasCustomerIds.length} conta{asaasCustomerIds.length > 1 ? 's' : ''} Asaas
                           </Badge>
                         )}
                       </div>
                       <Button
                         variant="ghost" size="sm" className="h-7 px-2"
-                        onClick={() => client && loadAsaasPayments(client.id)}
-                        disabled={loadingAsaasPayments}
+                        onClick={handleSincronizarAsaas}
+                        disabled={sincronizando || loadingAsaasPayments}
                       >
-                        {loadingAsaasPayments
+                        {sincronizando || loadingAsaasPayments
                           ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           : <RefreshCw className="h-3.5 w-3.5" />}
-                        <span className="text-[11px] ml-1">Atualizar</span>
+                        <span className="text-[11px] ml-1">{sincronizando ? 'Sincronizando...' : 'Sincronizar'}</span>
                       </Button>
                     </div>
+
+                    {ultimaSync && (
+                      <p className="text-[10px] text-muted-foreground">
+                        Última sincronização: {format(ultimaSync, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                      </p>
+                    )}
 
                     {asaasTotals && (
                       <div className="grid grid-cols-3 gap-2 text-center">
@@ -3003,7 +3009,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                           <p className="text-[10px] text-muted-foreground">{asaasTotals.count_pago} cobrança(s)</p>
                         </div>
                         <div className="rounded-lg bg-background/60 p-2">
-                          <p className="text-[10px] text-muted-foreground uppercase">Em aberto</p>
+                          <p className="text-[10px] text-muted-foreground uppercase">A vencer</p>
                           <p className="font-bold text-sm text-amber-500">{asaasTotals.aberto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                           <p className="text-[10px] text-muted-foreground">{asaasTotals.count_aberto} cobrança(s)</p>
                         </div>
