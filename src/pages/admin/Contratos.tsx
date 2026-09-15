@@ -177,6 +177,7 @@ export default function AdminContratos() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [signatureFilter, setSignatureFilter] = useState<string>('all');
+  const [statFilter, setStatFilter] = useState<'total' | 'signed' | 'pending' | 'paid'>('total');
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
