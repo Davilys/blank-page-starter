@@ -1,14 +1,21 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import JSZip from 'https://esm.sh/jszip@3.10.1';
+import {
+  ProcessBlockScanner,
+  parseProcessBlock,
+  sha256Hex,
+  type ParsedProcess,
+} from '../_shared/rpiXml.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const ATTORNEY_NAME = 'Davilys Danques Oliveira Cunha';
+const ATTORNEY_NAME = 'DAVILYS DANQUES DE OLIVEIRA CUNHA';
 const ATTORNEY_SEARCH_TERM = 'davilys';
+const ATTORNEY_SEARCH_TERMS = ['davilys', 'danques'];
 
 const INPI_BASE_URL = 'https://revistas.inpi.gov.br';
 
@@ -396,8 +403,12 @@ function createScanner(): { scanner: ProcessBlockScanner; result: ScanResult; fe
 }
 
 
-// Try multiple URLs to download the RPI XML, with session
-async function tryDownloadRpiXml(rpiNumber: number, sessionCookies: string | null): Promise<string | null> {
+// Baixa o XML da RPI e entrega o conteúdo em pedaços para o scanner
+async function downloadAndScanRpiXml(
+  rpiNumber: number,
+  sessionCookies: string | null,
+  feed: (chunk: string) => void,
+): Promise<{ ok: boolean; sourceUrl: string | null }> {
   const urls = [
     `${INPI_BASE_URL}/txt/RM${rpiNumber}.zip`,
     `${INPI_BASE_URL}/xml/RM${rpiNumber}.zip`,
