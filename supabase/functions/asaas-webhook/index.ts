@@ -251,6 +251,9 @@ serve(async (req) => {
           .update({
             status: 'confirmed',
             payment_date: payment.paymentDate || payment.confirmedDate || new Date().toISOString().split('T')[0],
+            asaas_status_raw: paymentStatus,
+            sync_status: 'ativa',
+            ultima_sincronizacao_asaas: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
           .eq('asaas_invoice_id', paymentId);
@@ -322,6 +325,9 @@ serve(async (req) => {
             status: 'confirmed',
             payment_date: payment.paymentDate || payment.confirmedDate || new Date().toISOString().split('T')[0],
             user_id: confirmResult.userId,
+            asaas_status_raw: paymentStatus,
+            sync_status: 'ativa',
+            ultima_sincronizacao_asaas: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
           .eq('asaas_invoice_id', paymentId);
@@ -361,7 +367,7 @@ serve(async (req) => {
     if (paymentStatus === 'OVERDUE') {
       await supabaseAdmin
         .from('invoices')
-        .update({ status: 'overdue', updated_at: new Date().toISOString() })
+        .update({ status: 'overdue', asaas_status_raw: paymentStatus, sync_status: 'ativa', ultima_sincronizacao_asaas: new Date().toISOString(), updated_at: new Date().toISOString() })
         .eq('asaas_invoice_id', paymentId);
 
       // Multichannel notification for overdue (CRM + SMS + WhatsApp + Email)
@@ -422,7 +428,7 @@ serve(async (req) => {
     if (paymentStatus === 'REFUNDED' || paymentStatus === 'REFUND_REQUESTED') {
       await supabaseAdmin
         .from('invoices')
-        .update({ status: 'refunded', updated_at: new Date().toISOString() })
+        .update({ status: 'refunded', asaas_status_raw: paymentStatus, sync_status: 'ativa', ultima_sincronizacao_asaas: new Date().toISOString(), updated_at: new Date().toISOString() })
         .eq('asaas_invoice_id', paymentId);
       
       console.log('Payment refunded:', paymentId);
