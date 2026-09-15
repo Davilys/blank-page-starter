@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { AlertTriangle, BarChart3, ChevronRight, Filter, Info, LayoutGrid, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, ChevronRight, Filter, Info, LayoutGrid, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
