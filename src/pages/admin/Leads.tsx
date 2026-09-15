@@ -83,34 +83,44 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // ─── KPI Card (static) ──────────────────────────
-function KpiCard({ title, value, prefix = '', icon: Icon, gradient, glow, accent, trend }: {
+function KpiCard({ title, value, prefix = '', icon: Icon, gradient, glow, accent, trend, onClick, active }: {
   title: string; value: number; prefix?: string;
   icon: React.ElementType; gradient: string; glow: string; accent: string;
-  trend?: number;
+  trend?: number; onClick?: () => void; active?: boolean;
 }) {
   const isPos = (trend ?? 0) >= 0;
   const formatted = prefix + value.toLocaleString('pt-BR');
-  return (
-    <div className="group relative">
-      <div className="relative rounded-2xl overflow-hidden border bg-card/60 backdrop-blur-xl border-border/50 shadow-[0_4px_24px_hsl(var(--foreground)/0.05)] hover:shadow-md transition-shadow">
-        <div className={cn('absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r', gradient)} />
-        <div className="relative p-4">
-          <div className="flex items-start justify-between mb-3">
-            <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br shadow-lg', gradient)}>
-              <Icon className="h-5 w-5 text-white" />
-            </div>
-            {trend !== undefined && (
-              <span className={cn('text-[10px] font-bold flex items-center gap-0.5', isPos ? 'text-emerald-500' : 'text-rose-500')}>
-                <ArrowUpRight className={cn('h-3 w-3', !isPos && 'rotate-90')} />
-                {isPos && '+'}{trend}%
-              </span>
-            )}
+  const inner = (
+    <div className={cn(
+      'relative rounded-2xl overflow-hidden border bg-card/60 backdrop-blur-xl border-border/50 shadow-[0_4px_24px_hsl(var(--foreground)/0.05)] transition-all',
+      onClick && 'hover:shadow-md hover:-translate-y-0.5 cursor-pointer',
+      active && 'ring-2 ring-offset-2 ring-offset-background shadow-lg'
+    )} style={active ? { boxShadow: `0 4px 24px ${glow}40` } : undefined}>
+      <div className={cn('absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r', gradient)} />
+      <div className="relative p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br shadow-lg', gradient)}>
+            <Icon className="h-5 w-5 text-white" />
           </div>
-          <p className="text-2xl font-black tracking-tight text-foreground leading-none">{formatted}</p>
-          <p className="text-[11px] font-medium text-muted-foreground mt-1">{title}</p>
+          {active ? (
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground uppercase tracking-wider">Selecionado</span>
+          ) : trend !== undefined ? (
+            <span className={cn('text-[10px] font-bold flex items-center gap-0.5', isPos ? 'text-emerald-500' : 'text-rose-500')}>
+              <ArrowUpRight className={cn('h-3 w-3', !isPos && 'rotate-90')} />
+              {isPos && '+'}{trend}%
+            </span>
+          ) : null}
         </div>
+        <p className="text-2xl font-black tracking-tight text-foreground leading-none">{formatted}</p>
+        <p className="text-[11px] font-medium text-muted-foreground mt-1">{title}</p>
       </div>
     </div>
+  );
+  if (!onClick) return <div className="group relative">{inner}</div>;
+  return (
+    <button type="button" onClick={onClick} aria-pressed={active} className="group relative w-full text-left">
+      {inner}
+    </button>
   );
 }
 
@@ -504,6 +514,7 @@ export default function AdminLeads() {
   const [importExportOpen, setImportExportOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statFilter, setStatFilter] = useState<string>('total');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
