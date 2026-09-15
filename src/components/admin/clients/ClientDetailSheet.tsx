@@ -3137,20 +3137,39 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                       <BarChart3 className="h-4 w-4 text-primary" />
                       <span className="text-sm font-semibold">Resumo Financeiro</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      {[
-                        { label: 'Total', value: invoices.reduce((a, i) => a + Number(i.amount), 0), color: 'text-foreground' },
-                        { label: 'Pago', value: invoices.filter(i => i.status === 'paid').reduce((a, i) => a + Number(i.amount), 0), color: 'text-emerald-500' },
-                        { label: 'Pendente', value: invoices.filter(i => i.status !== 'paid').reduce((a, i) => a + Number(i.amount), 0), color: 'text-amber-500' },
-                      ].map(item => (
-                        <div key={item.label} className="text-center">
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">{item.label}</p>
-                          <p className={cn('font-bold text-sm', item.color)}>
-                            {item.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          </p>
+                    {(() => {
+                      // Faturas canceladas (inclusive as substituídas por acordo) não entram no resumo;
+                      // as parcelas do acordo entram no lugar da cobrança original, sem duplicar valor.
+                      const hoje = new Date().toISOString().slice(0, 10);
+                      const PAGO_ASAAS = ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'];
+                      const acordosAtivos = new Set(acordos.filter(a => a.status === 'ativo').map(a => a.id));
+                      const parcelasAtivas = acordoParcelas.filter(p => acordosAtivos.has(p.acordo_id) && p.status !== 'CANCELLED');
+                      const ignoradas = ['cancelled', 'refunded'];
+                      const vivas = invoices.filter(i => !ignoradas.includes(i.status));
+                      const pago = vivas.filter(i => i.status === 'paid').reduce((a, i) => a + Number(i.amount), 0)
+                        + parcelasAtivas.filter(p => PAGO_ASAAS.includes(p.status)).reduce((a, p) => a + Number(p.valor_centavos) / 100, 0);
+                      const vencido = vivas.filter(i => i.status === 'overdue').reduce((a, i) => a + Number(i.amount), 0)
+                        + parcelasAtivas.filter(p => !PAGO_ASAAS.includes(p.status) && p.data_vencimento < hoje).reduce((a, p) => a + Number(p.valor_centavos) / 100, 0);
+                      const pendente = vivas.filter(i => i.status !== 'paid' && i.status !== 'overdue').reduce((a, i) => a + Number(i.amount), 0)
+                        + parcelasAtivas.filter(p => !PAGO_ASAAS.includes(p.status) && p.data_vencimento >= hoje).reduce((a, p) => a + Number(p.valor_centavos) / 100, 0);
+                      return (
+                        <div className="grid grid-cols-4 gap-3">
+                          {[
+                            { label: 'Total', value: pago + pendente + vencido, color: 'text-foreground' },
+                            { label: 'Pago', value: pago, color: 'text-emerald-500' },
+                            { label: 'Pendente', value: pendente, color: 'text-amber-500' },
+                            { label: 'Vencido', value: vencido, color: 'text-red-500' },
+                          ].map(item => (
+                            <div key={item.label} className="text-center">
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">{item.label}</p>
+                              <p className={cn('font-bold text-sm', item.color)}>
+                                {item.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              </p>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })()}
                   </div>
 
                   {loading ? (
