@@ -2084,6 +2084,77 @@ export type Database = {
           },
         ]
       }
+      email_repair_runs: {
+        Row: {
+          account_id: string | null
+          created_at: string
+          error: string | null
+          examined: number
+          failed: number
+          finished_at: string | null
+          id: string
+          limit_count: number
+          mode: string
+          not_found: number
+          processed: number
+          repaired: number
+          results: Json
+          started_at: string
+          started_by: string | null
+          status: string
+          unchanged: number
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string
+          error?: string | null
+          examined?: number
+          failed?: number
+          finished_at?: string | null
+          id?: string
+          limit_count?: number
+          mode?: string
+          not_found?: number
+          processed?: number
+          repaired?: number
+          results?: Json
+          started_at?: string
+          started_by?: string | null
+          status?: string
+          unchanged?: number
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string
+          error?: string | null
+          examined?: number
+          failed?: number
+          finished_at?: string | null
+          id?: string
+          limit_count?: number
+          mode?: string
+          not_found?: number
+          processed?: number
+          repaired?: number
+          results?: Json
+          started_at?: string
+          started_by?: string | null
+          status?: string
+          unchanged?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_repair_runs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_reprocess_queue: {
         Row: {
           account_id: string

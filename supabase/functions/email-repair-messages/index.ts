@@ -60,10 +60,11 @@ serve(async (req) => {
   try {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const body = await req.json().catch(() => ({}));
-    const mode: "preview" | "apply" | "revert" = body.mode || "preview";
+    const mode: "preview" | "apply" | "revert" | "status" = body.mode || "preview";
     const accountId: string | undefined = body.account_id;
     const limit = Math.min(Number(body.limit) || 30, 100);
     const ids: string[] | undefined = body.email_ids;
+    const runId: string | undefined = body.run_id;
 
     // Caller must be an authenticated admin.
     const authHeader = req.headers.get("Authorization") || "";
@@ -75,17 +76,68 @@ serve(async (req) => {
     const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
     if (!isAdmin) return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } });
 
+    const json = (payload: unknown, status = 200) =>
+      new Response(JSON.stringify(payload), { status, headers: { "Content-Type": "application/json", ...corsHeaders } });
+
+    // Latest run (used by the UI to restore progress after reopening the page).
+    if (mode === "status") {
+      const { data: run } = await supabase
+        .from("email_repair_runs")
+        .select("*")
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return json({ success: true, run });
+    }
+
     if (mode === "revert") {
-      const targets = ids || [];
+      // Revert only messages repaired by this run, and only when the stored
+      // repair timestamp still matches (no later edit is overwritten).
+      const { data: run } = runId
+        ? await supabase.from("email_repair_runs").select("*").eq("id", runId).maybeSingle()
+        : { data: null as any };
+      const runResults: any[] = (run?.results as any[]) || [];
+      const targets = ids?.length ? ids : runResults.filter((r) => r.status === "applied").map((r) => r.id);
       let reverted = 0;
+      let skipped = 0;
       for (const id of targets) {
-        const { data: row } = await supabase.from("email_inbox").select("id, original_backup").eq("id", id).maybeSingle();
-        if (!row?.original_backup) continue;
-        await supabase.from("email_inbox").update({ ...(row.original_backup as Record<string, unknown>), original_backup: null, reprocessed_at: null }).eq("id", id);
+        const { data: row } = await supabase
+          .from("email_inbox")
+          .select("id, original_backup, reprocessed_at")
+          .eq("id", id)
+          .maybeSingle();
+        if (!row?.original_backup) { skipped++; continue; }
+        const stamp = runResults.find((r) => r.id === id)?.reprocessed_at;
+        if (stamp && row.reprocessed_at && row.reprocessed_at !== stamp) { skipped++; continue; }
+        await supabase
+          .from("email_inbox")
+          .update({ ...(row.original_backup as Record<string, unknown>), original_backup: null, reprocessed_at: null })
+          .eq("id", id);
         reverted++;
       }
-      return new Response(JSON.stringify({ success: true, reverted }), { headers: { "Content-Type": "application/json", ...corsHeaders } });
+      if (run?.id) {
+        await supabase.from("email_repair_runs").update({ status: "reverted" }).eq("id", run.id);
+      }
+      return json({ success: true, reverted, skipped });
     }
+
+    // One repair at a time.
+    const { data: runningRun } = await supabase
+      .from("email_repair_runs")
+      .select("id, mode, account_id, started_at")
+      .eq("status", "running")
+      .maybeSingle();
+    if (runningRun) {
+      return json({ error: "already_running", run: runningRun }, 409);
+    }
+
+    const { data: runRow, error: runErr } = await supabase
+      .from("email_repair_runs")
+      .insert({ account_id: accountId ?? null, mode, limit_count: limit, started_by: userId, status: "running" })
+      .select()
+      .maybeSingle();
+    if (runErr) return json({ error: "already_running" }, 409);
+    const currentRunId = runRow?.id as string;
 
     // Select defective messages: old parser + (mojibake subject | empty body | unknown sender | header leak)
     let q = supabase
@@ -174,17 +226,27 @@ serve(async (req) => {
             after.from_name = msg.from.name || row.from_name;
           }
 
+          const changed =
+            (after.subject ?? null) !== (row.subject ?? null) ||
+            (after.body_text ?? null) !== (row.body_text ?? null) ||
+            (after.body_html ?? null) !== (row.body_html ?? null) ||
+            (after.snippet ?? null) !== (row.snippet ?? null) ||
+            (after.from_email ?? row.from_email ?? null) !== (row.from_email ?? null) ||
+            (after.from_name ?? row.from_name ?? null) !== (row.from_name ?? null);
+
+          const stamp = new Date().toISOString();
           results.push({
             id: row.id,
-            status: mode === "apply" ? "applied" : "preview",
+            status: !changed ? "unchanged" : mode === "apply" ? "applied" : "preview",
+            reprocessed_at: changed && mode === "apply" ? stamp : undefined,
             before: { subject: row.subject, from: row.from_email, from_name: row.from_name, snippet: row.snippet, has_body: !!(row.body_text || row.body_html) },
             after: { subject: after.subject, from: after.from_email ?? row.from_email, from_name: after.from_name ?? row.from_name, snippet: after.snippet, has_body: !!(after.body_text || after.body_html) },
           });
 
-          if (mode === "apply") {
+          if (mode === "apply" && changed) {
             await supabase.from("email_inbox").update({
               ...after,
-              reprocessed_at: new Date().toISOString(),
+              reprocessed_at: stamp,
               original_backup: {
                 subject: row.subject,
                 from_email: row.from_email,
@@ -198,6 +260,12 @@ serve(async (req) => {
               },
             }).eq("id", row.id);
           }
+
+          // Live progress so the screen can be closed and reopened.
+          await supabase
+            .from("email_repair_runs")
+            .update({ processed: results.length, examined: candidates.length })
+            .eq("id", currentRunId);
         }
       } catch (e: any) {
         results.push({ account_id: accId, status: "error", error: e?.message });
@@ -210,15 +278,32 @@ serve(async (req) => {
       examined: candidates.length,
       repaired: results.filter((r) => r.status === "applied").length,
       preview: results.filter((r) => r.status === "preview").length,
-      source_unavailable: results.filter((r) => r.status === "source_unavailable").length,
-      errors: results.filter((r) => r.status === "error").length,
+      unchanged: results.filter((r) => r.status === "unchanged").length,
+      not_found: results.filter((r) => r.status === "source_unavailable" || r.status === "folder_not_found").length,
+      failed: results.filter((r) => r.status === "error").length,
     };
 
-    return new Response(JSON.stringify({ success: true, mode, summary, results }), {
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
+    await supabase.from("email_repair_runs").update({
+      status: "completed",
+      processed: results.length,
+      examined: summary.examined,
+      repaired: summary.repaired + summary.preview,
+      unchanged: summary.unchanged,
+      not_found: summary.not_found,
+      failed: summary.failed,
+      results,
+      finished_at: new Date().toISOString(),
+    }).eq("id", currentRunId);
+
+    return json({ success: true, mode, run_id: currentRunId, summary, results });
   } catch (e: any) {
     console.error("email-repair-messages error:", e?.message);
+    try {
+      const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      await sb.from("email_repair_runs")
+        .update({ status: "failed", error: e?.message || "unknown", finished_at: new Date().toISOString() })
+        .eq("status", "running");
+    } catch { /* ignore */ }
     return new Response(JSON.stringify({ error: e?.message || "unknown" }), {
       status: 500, headers: { "Content-Type": "application/json", ...corsHeaders },
     });

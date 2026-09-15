@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Settings, Mail, Server, Check, Loader2, AlertCircle, Wifi, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { EmailRepairPanel } from './EmailRepairPanel';
 
 const MASTER_EMAIL = 'davillys@gmail.com';
 
@@ -500,6 +501,11 @@ export function EmailSettings() {
             )}
           </CardContent>
         </Card>
+
+        <EmailRepairPanel
+          accounts={(accounts || []).map((a) => ({ id: a.id, email_address: a.email_address, imap_host: a.imap_host }))}
+          isAdmin={isMaster || hasPermission('emails', 'can_view')}
+        />
       </div>
     </ScrollArea>
   );
