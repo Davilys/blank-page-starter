@@ -89,7 +89,7 @@ export function EmailList({
   };
 
   const { data: emails, isLoading, isError, isFetching } = useQuery({
-    queryKey: ['emails', folder, accountId, accountEmail, search, page],
+    queryKey: ['emails', folder, accountId, accountEmail, search, page, tab],
     queryFn: async () => {
       if (!accountId) return [] as Email[];
       if (folder === 'scheduled' || folder === 'automated') return [] as Email[];
@@ -135,7 +135,7 @@ export function EmailList({
 
   // Counters come from the database, never from the loaded page.
   const { data: counts } = useQuery({
-    queryKey: ['email-counts', folder, accountId, search],
+    queryKey: ['email-counts', folder, accountId, search, tab],
     queryFn: async () => {
       if (!accountId) return { folder: 0, filtered: 0, unread: 0 };
       const [{ count: filtered }, { count: total }, { count: unread }] = await Promise.all([
