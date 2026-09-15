@@ -2494,6 +2494,9 @@ export type Database = {
           byte_size: number | null
           case_id: string
           category: string
+          conversion_notes: string | null
+          conversion_status: string
+          converted_page_count: number | null
           created_at: string
           declared_mime_type: string | null
           display_order: number
@@ -2502,15 +2505,18 @@ export type Database = {
           extraction_status: string
           file_name: string
           id: string
+          interpreted_pages: number | null
           is_active: boolean
           mime_type: string | null
           page_count: number | null
+          processing_confirmed_at: string | null
           receipt_status: string
           replaced_by: string | null
           review_status: string
           sha256: string | null
           sheet_names: string[] | null
           storage_path: string
+          unreadable_pages: number | null
           updated_at: string
           uploaded_by: string | null
           version: number
@@ -2519,6 +2525,9 @@ export type Database = {
           byte_size?: number | null
           case_id: string
           category: string
+          conversion_notes?: string | null
+          conversion_status?: string
+          converted_page_count?: number | null
           created_at?: string
           declared_mime_type?: string | null
           display_order?: number
@@ -2527,15 +2536,18 @@ export type Database = {
           extraction_status?: string
           file_name: string
           id?: string
+          interpreted_pages?: number | null
           is_active?: boolean
           mime_type?: string | null
           page_count?: number | null
+          processing_confirmed_at?: string | null
           receipt_status?: string
           replaced_by?: string | null
           review_status?: string
           sha256?: string | null
           sheet_names?: string[] | null
           storage_path: string
+          unreadable_pages?: number | null
           updated_at?: string
           uploaded_by?: string | null
           version?: number
@@ -2544,6 +2556,9 @@ export type Database = {
           byte_size?: number | null
           case_id?: string
           category?: string
+          conversion_notes?: string | null
+          conversion_status?: string
+          converted_page_count?: number | null
           created_at?: string
           declared_mime_type?: string | null
           display_order?: number
@@ -2552,15 +2567,18 @@ export type Database = {
           extraction_status?: string
           file_name?: string
           id?: string
+          interpreted_pages?: number | null
           is_active?: boolean
           mime_type?: string | null
           page_count?: number | null
+          processing_confirmed_at?: string | null
           receipt_status?: string
           replaced_by?: string | null
           review_status?: string
           sha256?: string | null
           sheet_names?: string[] | null
           storage_path?: string
+          unreadable_pages?: number | null
           updated_at?: string
           uploaded_by?: string | null
           version?: number
@@ -2687,6 +2705,88 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "inpi_resource_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inpi_export_packages: {
+        Row: {
+          approval_id: string | null
+          case_id: string | null
+          content_hash: string | null
+          created_at: string
+          documents_hash: string | null
+          draft_version_id: string | null
+          failed_documents: Json
+          file_name: string | null
+          generated_by: string | null
+          id: string
+          is_complete: boolean
+          is_draft_stamped: boolean
+          manifest: Json
+          resource_id: string | null
+          total_annexes: number
+          total_pages: number | null
+          updated_at: string
+        }
+        Insert: {
+          approval_id?: string | null
+          case_id?: string | null
+          content_hash?: string | null
+          created_at?: string
+          documents_hash?: string | null
+          draft_version_id?: string | null
+          failed_documents?: Json
+          file_name?: string | null
+          generated_by?: string | null
+          id?: string
+          is_complete?: boolean
+          is_draft_stamped?: boolean
+          manifest?: Json
+          resource_id?: string | null
+          total_annexes?: number
+          total_pages?: number | null
+          updated_at?: string
+        }
+        Update: {
+          approval_id?: string | null
+          case_id?: string | null
+          content_hash?: string | null
+          created_at?: string
+          documents_hash?: string | null
+          draft_version_id?: string | null
+          failed_documents?: Json
+          file_name?: string | null
+          generated_by?: string | null
+          id?: string
+          is_complete?: boolean
+          is_draft_stamped?: boolean
+          manifest?: Json
+          resource_id?: string | null
+          total_annexes?: number
+          total_pages?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inpi_export_packages_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "inpi_case_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inpi_export_packages_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "inpi_resource_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inpi_export_packages_draft_version_id_fkey"
+            columns: ["draft_version_id"]
+            isOneToOne: false
+            referencedRelation: "inpi_draft_versions"
             referencedColumns: ["id"]
           },
         ]
