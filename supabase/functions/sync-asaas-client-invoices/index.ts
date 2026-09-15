@@ -75,6 +75,7 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const clientId = (body.client_id || "").toString().trim();
     if (!clientId) return json({ error: "client_id é obrigatório" }, 400);
+    clientIdParaLog = clientId;
 
     const { data: profile } = await admin
       .from("profiles").select("id, email, cpf_cnpj, cpf, cnpj, asaas_customer_id, full_name")
