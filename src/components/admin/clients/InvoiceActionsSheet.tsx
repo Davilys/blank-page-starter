@@ -251,6 +251,37 @@ export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFina
           onCreated={() => { onChanged(); onOpenChange(false); }}
         />
       )}
+
+      <AlertDialog open={confirmExcluir} onOpenChange={(v) => { if (!excluindo) setConfirmExcluir(v); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir esta cobrança?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A cobrança será cancelada no Asaas e ficará no histórico como <strong>cancelada</strong>. O cliente deixa de poder pagá-la.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground">Motivo do cancelamento</label>
+            <Textarea
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              placeholder="Ex.: cobrança gerada em duplicidade"
+              className="min-h-[72px] text-sm"
+              disabled={excluindo}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={excluindo}>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={excluindo || motivo.trim().length < 3}
+              onClick={(e) => { e.preventDefault(); handleExcluir(); }}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {excluindo ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />Excluindo...</> : "Excluir cobrança"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
