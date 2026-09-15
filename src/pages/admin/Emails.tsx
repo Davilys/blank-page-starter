@@ -366,16 +366,22 @@ export default function Emails() {
                   <PenSquare className="h-5 w-5" />
                 </Button>
               )}
-              <div className="hidden md:flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-3 py-1.5">
-                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Sistema Ativo</span>
-              </div>
-              {isMobile && (
-                <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse md:hidden" />
-              )}
             </div>
           </div>
           <EmailMetricsBar stats={stats} />
+          {showSyncBar && (
+            <div className="mt-3">
+              <EmailSyncBar
+                accountEmail={selectedAccount?.email_address}
+                info={selectedAccountId ? syncByAccount[selectedAccountId] : undefined}
+                runs={syncRuns}
+                onSyncNow={() => selectedAccountId && syncNow(selectedAccountId)}
+                onCompose={handleCompose}
+                search={search}
+                onSearchChange={setSearch}
+              />
+            </div>
+          )}
         </div>
 
         {/* Main Layout */}
