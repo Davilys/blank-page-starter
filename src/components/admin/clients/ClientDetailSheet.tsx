@@ -27,7 +27,7 @@ import {
   CheckCircle, TrendingUp, Receipt, Trash2, UserCheck,
   Bell, Send, MapPin, Hash, Globe, Briefcase, Shield,
   ChevronRight, Activity, RefreshCw, Eye, Copy, Edit2,
-  Package, BarChart3, Wallet, FileCheck, Lock, Video, KeyRound, Handshake
+  Package, BarChart3, Wallet, FileCheck, Lock, Video, KeyRound, Handshake, FilePlus2
 } from 'lucide-react';
 import type { ClientWithProcess } from './ClientKanbanBoard';
 import { PIPELINE_STAGES, COMMERCIAL_PIPELINE_STAGES } from './ClientKanbanBoard';
