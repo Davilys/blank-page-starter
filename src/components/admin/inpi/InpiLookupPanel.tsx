@@ -51,6 +51,32 @@ interface Props {
 export function InpiLookupPanel({ entry, onApplied, controller }: Props) {
   const { get, ensure, refetch } = controller;
   const state: LookupState = get(entry.process_number);
+  const [confirming, setConfirming] = useState<string | null>(null);
+
+  const confirmCandidate = async (clientId: string) => {
+    setConfirming(clientId);
+    try {
+      const { error } = await supabase
+        .from('rpi_entries')
+        .update({
+          matched_client_id: clientId,
+          linked_at: new Date().toISOString(),
+          auto_link_source: 'confirmado_manual',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', entry.id)
+        .is('matched_client_id', null);
+      if (error) throw error;
+      // nova consulta organiza a marca na ficha do cliente e o cartão da aba Publicação
+      await refetch(entry.process_number, entry.id);
+      toast.success('Cliente vinculado e ficha atualizada');
+      onApplied(entry.process_number);
+    } catch {
+      toast.error('Não foi possível vincular o cliente agora.');
+    } finally {
+      setConfirming(null);
+    }
+  };
 
   useEffect(() => {
     if (isIncomplete(entry)) ensure(entry.process_number, entry.id);
