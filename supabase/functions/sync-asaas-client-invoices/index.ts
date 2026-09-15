@@ -55,6 +55,7 @@ serve(async (req) => {
   const started = Date.now();
   const admin = createClient(SUPABASE_URL, SERVICE_KEY);
   const syncRunId = crypto.randomUUID();
+  let clientIdParaLog: string | null = null;
 
   try {
     if (!ASAAS_API_KEY) return json({ error: "Integração Asaas não configurada" }, 503);
