@@ -2372,6 +2372,325 @@ export type Database = {
         }
         Relationships: []
       }
+      inpi_ai_call_logs: {
+        Row: {
+          case_id: string | null
+          correlation_id: string
+          created_at: string
+          dedicated_model: boolean
+          duration_ms: number | null
+          error_kind: string | null
+          http_status: number | null
+          id: string
+          input_tokens: number | null
+          model: string
+          operation: string
+          output_tokens: number | null
+          prompt_version: string | null
+          reasoning_effort: string | null
+          resource_type: string
+          status: string
+        }
+        Insert: {
+          case_id?: string | null
+          correlation_id: string
+          created_at?: string
+          dedicated_model?: boolean
+          duration_ms?: number | null
+          error_kind?: string | null
+          http_status?: number | null
+          id?: string
+          input_tokens?: number | null
+          model: string
+          operation: string
+          output_tokens?: number | null
+          prompt_version?: string | null
+          reasoning_effort?: string | null
+          resource_type: string
+          status: string
+        }
+        Update: {
+          case_id?: string | null
+          correlation_id?: string
+          created_at?: string
+          dedicated_model?: boolean
+          duration_ms?: number | null
+          error_kind?: string | null
+          http_status?: number | null
+          id?: string
+          input_tokens?: number | null
+          model?: string
+          operation?: string
+          output_tokens?: number | null
+          prompt_version?: string | null
+          reasoning_effort?: string | null
+          resource_type?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      inpi_case_approvals: {
+        Row: {
+          approval_kind: string
+          approved_at: string
+          approved_by: string
+          case_id: string
+          content_hash: string
+          documents_hash: string | null
+          draft_version_id: string
+          id: string
+          invalidated_at: string | null
+          invalidation_reason: string | null
+          notes: string | null
+          orientation_hash: string | null
+        }
+        Insert: {
+          approval_kind: string
+          approved_at?: string
+          approved_by: string
+          case_id: string
+          content_hash: string
+          documents_hash?: string | null
+          draft_version_id: string
+          id?: string
+          invalidated_at?: string | null
+          invalidation_reason?: string | null
+          notes?: string | null
+          orientation_hash?: string | null
+        }
+        Update: {
+          approval_kind?: string
+          approved_at?: string
+          approved_by?: string
+          case_id?: string
+          content_hash?: string
+          documents_hash?: string | null
+          draft_version_id?: string
+          id?: string
+          invalidated_at?: string | null
+          invalidation_reason?: string | null
+          notes?: string | null
+          orientation_hash?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inpi_case_approvals_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "inpi_resource_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inpi_case_approvals_draft_version_id_fkey"
+            columns: ["draft_version_id"]
+            isOneToOne: false
+            referencedRelation: "inpi_draft_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inpi_case_documents: {
+        Row: {
+          byte_size: number | null
+          case_id: string
+          category: string
+          created_at: string
+          declared_mime_type: string | null
+          display_order: number
+          extracted_text: string | null
+          extraction_notes: string | null
+          extraction_status: string
+          file_name: string
+          id: string
+          is_active: boolean
+          mime_type: string | null
+          page_count: number | null
+          receipt_status: string
+          replaced_by: string | null
+          review_status: string
+          sha256: string | null
+          sheet_names: string[] | null
+          storage_path: string
+          updated_at: string
+          uploaded_by: string | null
+          version: number
+        }
+        Insert: {
+          byte_size?: number | null
+          case_id: string
+          category: string
+          created_at?: string
+          declared_mime_type?: string | null
+          display_order?: number
+          extracted_text?: string | null
+          extraction_notes?: string | null
+          extraction_status?: string
+          file_name: string
+          id?: string
+          is_active?: boolean
+          mime_type?: string | null
+          page_count?: number | null
+          receipt_status?: string
+          replaced_by?: string | null
+          review_status?: string
+          sha256?: string | null
+          sheet_names?: string[] | null
+          storage_path: string
+          updated_at?: string
+          uploaded_by?: string | null
+          version?: number
+        }
+        Update: {
+          byte_size?: number | null
+          case_id?: string
+          category?: string
+          created_at?: string
+          declared_mime_type?: string | null
+          display_order?: number
+          extracted_text?: string | null
+          extraction_notes?: string | null
+          extraction_status?: string
+          file_name?: string
+          id?: string
+          is_active?: boolean
+          mime_type?: string | null
+          page_count?: number | null
+          receipt_status?: string
+          replaced_by?: string | null
+          review_status?: string
+          sha256?: string | null
+          sheet_names?: string[] | null
+          storage_path?: string
+          updated_at?: string
+          uploaded_by?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inpi_case_documents_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "inpi_resource_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inpi_case_documents_replaced_by_fkey"
+            columns: ["replaced_by"]
+            isOneToOne: false
+            referencedRelation: "inpi_case_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inpi_case_orientations: {
+        Row: {
+          case_id: string
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          documents_fingerprint: string | null
+          editable_text: string | null
+          human_edited: boolean
+          id: string
+          is_stale: boolean
+          model: string | null
+          sections: Json
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          case_id: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          documents_fingerprint?: string | null
+          editable_text?: string | null
+          human_edited?: boolean
+          id?: string
+          is_stale?: boolean
+          model?: string | null
+          sections?: Json
+          updated_at?: string
+          version: number
+        }
+        Update: {
+          case_id?: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          documents_fingerprint?: string | null
+          editable_text?: string | null
+          human_edited?: boolean
+          id?: string
+          is_stale?: boolean
+          model?: string | null
+          sections?: Json
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inpi_case_orientations_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "inpi_resource_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inpi_draft_versions: {
+        Row: {
+          case_id: string
+          content: string
+          content_hash: string
+          created_at: string
+          created_by: string | null
+          documents_fingerprint: string | null
+          id: string
+          internal_report: string | null
+          model: string | null
+          orientation_version: number | null
+          prompt_version: string | null
+          version: number
+        }
+        Insert: {
+          case_id: string
+          content: string
+          content_hash: string
+          created_at?: string
+          created_by?: string | null
+          documents_fingerprint?: string | null
+          id?: string
+          internal_report?: string | null
+          model?: string | null
+          orientation_version?: number | null
+          prompt_version?: string | null
+          version: number
+        }
+        Update: {
+          case_id?: string
+          content?: string
+          content_hash?: string
+          created_at?: string
+          created_by?: string | null
+          documents_fingerprint?: string | null
+          id?: string
+          internal_report?: string | null
+          model?: string | null
+          orientation_version?: number | null
+          prompt_version?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inpi_draft_versions_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "inpi_resource_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inpi_knowledge_base: {
         Row: {
           category: string
@@ -2419,6 +2738,71 @@ export type Database = {
           valid_until?: string | null
         }
         Relationships: []
+      }
+      inpi_resource_cases: {
+        Row: {
+          agent_id: string
+          agent_name: string
+          brand_name: string | null
+          client_id: string | null
+          created_at: string
+          current_draft_version: number
+          current_orientation_version: number
+          id: string
+          is_homologation: boolean
+          last_error: string | null
+          owner_id: string
+          process_number: string | null
+          resource_id: string | null
+          resource_type: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          agent_name: string
+          brand_name?: string | null
+          client_id?: string | null
+          created_at?: string
+          current_draft_version?: number
+          current_orientation_version?: number
+          id?: string
+          is_homologation?: boolean
+          last_error?: string | null
+          owner_id: string
+          process_number?: string | null
+          resource_id?: string | null
+          resource_type: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          agent_name?: string
+          brand_name?: string | null
+          client_id?: string | null
+          created_at?: string
+          current_draft_version?: number
+          current_orientation_version?: number
+          id?: string
+          is_homologation?: boolean
+          last_error?: string | null
+          owner_id?: string
+          process_number?: string | null
+          resource_id?: string | null
+          resource_type?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inpi_resource_cases_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "inpi_resources"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inpi_resource_evidences: {
         Row: {
