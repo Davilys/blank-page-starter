@@ -1191,8 +1191,29 @@ export default function RecursosINPI() {
                 </p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {step === 'list' && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleCheckModel}
+                    disabled={checkingModel}
+                    className="gap-2 rounded-xl"
+                  >
+                    <Brain className="h-4 w-4" />
+                    {checkingModel ? 'Verificando modelo…' : 'Verificar modelo de IA'}
+                  </Button>
+                  {modelStatus && (
+                    <span
+                      className={`text-xs max-w-[280px] ${modelStatus.ok ? 'text-emerald-600' : 'text-destructive'}`}
+                    >
+                      {modelStatus.ok ? `Disponível: ${modelStatus.model}` : modelStatus.error}
+                    </span>
+                  )}
+                </div>
+              )}
               {step === 'list' ? (
+
                 <Button onClick={() => setStep('select-type')} size="lg" className="gap-2 shadow-lg shadow-primary/20 rounded-xl">
                   <Sparkles className="h-4 w-4" />
                   Criar Recurso com IA
