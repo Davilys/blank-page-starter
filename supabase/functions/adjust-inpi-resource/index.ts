@@ -201,13 +201,13 @@ ${formattingRules}`;
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'gpt-5-mini',
+            model: modelConfig.model,
             input: [
               { role: 'system', content: systemPrompt },
               { role: 'user', content: [{ type: 'input_text', text: userPrompt }] },
             ],
             max_output_tokens: 12000,
-            reasoning: { effort: 'minimal' },
+            reasoning: { effort: modelConfig.reasoningEffort },
             text: { verbosity: 'high' },
           }),
         });
