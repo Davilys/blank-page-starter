@@ -341,6 +341,31 @@ export default function RecursosINPI() {
   const [checkingModel, setCheckingModel] = useState(false);
   const [modelStatus, setModelStatus] = useState<{ ok: boolean; model?: string; error?: string } | null>(null);
 
+  const handleCheckModel = async () => {
+    setCheckingModel(true);
+    setModelStatus(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('process-inpi-resource', {
+        body: { action: 'model_probe' },
+      });
+      if (error) throw error;
+      const ok = Boolean(data?.success);
+      setModelStatus({ ok, model: data?.model, error: data?.error });
+      if (ok) {
+        toast.success(`Modelo disponível: ${data?.model}`);
+      } else {
+        toast.error(data?.error || 'Modelo indisponível nesta conta.');
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Falha ao verificar o modelo.';
+      setModelStatus({ ok: false, error: msg });
+      toast.error(msg);
+    } finally {
+      setCheckingModel(false);
+    }
+  };
+
+
   const [file, setFile] = useState<File | null>(null);
   const [multipleFiles, setMultipleFiles] = useState<File[]>([]);
   const [userOrientation, setUserOrientation] = useState('');
