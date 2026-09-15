@@ -29,6 +29,23 @@ export interface LookupDivergence {
   official: unknown;
 }
 
+export interface LinkCandidate {
+  client_id: string;
+  name: string | null;
+  reason: string;
+}
+
+export interface LinkResult {
+  status: 'linked' | 'already_linked' | 'candidates' | 'none' | 'skipped' | 'error';
+  client_id: string | null;
+  client_name: string | null;
+  process_id: string | null;
+  source: string | null;
+  candidates: LinkCandidate[];
+  merged: number;
+  created_process: boolean;
+}
+
 export interface LookupState {
   loading: boolean;
   lookup: ProcessLookup | null;
@@ -36,6 +53,7 @@ export interface LookupState {
   divergences: LookupDivergence[];
   saved: boolean;
   fromCache: boolean;
+  link: LinkResult | null;
   error: { code: string; message: string } | null;
 }
 
@@ -46,6 +64,7 @@ const EMPTY: LookupState = {
   divergences: [],
   saved: false,
   fromCache: false,
+  link: null,
   error: null,
 };
 
@@ -105,6 +124,7 @@ export function useProcessLookup() {
             lookup?: ProcessLookup | null;
             applied?: string[];
             divergences?: LookupDivergence[];
+            link?: LinkResult | null;
             error?: { code: string; message: string };
           };
 
@@ -115,6 +135,7 @@ export function useProcessLookup() {
             divergences: res?.divergences ?? [],
             saved: res?.saved === true,
             fromCache: res?.from_cache === true,
+            link: res?.link ?? null,
             error: res?.error ?? null,
           };
         } catch {
