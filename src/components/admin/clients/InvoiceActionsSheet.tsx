@@ -237,7 +237,7 @@ export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFina
 
             {!isOpenInvoice && (
               <p className="text-[11px] text-muted-foreground text-center">
-                Cobrança {invoice.status} — disponível apenas para consulta.
+                Cobrança {statusLabel.toLowerCase()} — disponível apenas para consulta.
               </p>
             )}
           </div>
