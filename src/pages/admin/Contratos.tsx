@@ -778,12 +778,12 @@ export default function AdminContratos() {
     if (totalPages > 1) add(totalPages);
     return pages;
   };
-  const totalValue = filteredContracts.reduce((sum, c) => sum + (c.contract_value || 0), 0);
-  const signedCount = filteredContracts.filter(c => c.signature_status === 'signed').length;
-  const pendingCount = filteredContracts.filter(c => c.signature_status !== 'signed').length;
-  const signedPct = filteredContracts.length > 0 ? (signedCount / filteredContracts.length) * 100 : 0;
-  const pendingPct = filteredContracts.length > 0 ? (pendingCount / filteredContracts.length) * 100 : 0;
-  const paidContracts = filteredContracts.filter(isContractPaid);
+  const totalValue = baseFiltered.reduce((sum, c) => sum + (c.contract_value || 0), 0);
+  const signedCount = baseFiltered.filter(c => c.signature_status === 'signed').length;
+  const pendingCount = baseFiltered.filter(c => c.signature_status !== 'signed').length;
+  const signedPct = baseFiltered.length > 0 ? (signedCount / baseFiltered.length) * 100 : 0;
+  const pendingPct = baseFiltered.length > 0 ? (pendingCount / baseFiltered.length) * 100 : 0;
+  const paidContracts = baseFiltered.filter(isContractPaid);
   const paidCount = paidContracts.length;
   const paidValue = paidContracts.reduce((sum, c) => sum + (c.contract_value || 0), 0);
   const paidPct = signedCount > 0 ? (paidCount / signedCount) * 100 : 0;
