@@ -781,75 +781,22 @@ export default function AdminFinanceiro() {
           </div>
         )}
 
-        {/* ── STAT CARDS ─────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { title: 'Total Faturado', value: totals.total, icon: TrendingUp, color: 'text-primary', accent: 'from-primary/20 to-primary/5', border: 'border-primary/20', ring: 'bg-primary/15', count: totals.count_total, countLabel: 'faturas' },
-            { title: 'Aguardando',     value: totals.a_vencer, icon: Clock,       color: 'text-amber-500', accent: 'from-amber-500/20 to-amber-500/5', border: 'border-amber-500/20', ring: 'bg-amber-500/15', count: totals.count_a_vencer, countLabel: 'a vencer' },
-            { title: 'Recebido',       value: totals.pago,    icon: CheckCircle, color: 'text-emerald-500', accent: 'from-emerald-500/20 to-emerald-500/5', border: 'border-emerald-500/20', ring: 'bg-emerald-500/15', count: totals.count_pago, countLabel: 'pagas' },
-            { title: 'Vencido',        value: totals.vencido, icon: AlertTriangle, color: 'text-red-500', accent: 'from-red-500/20 to-red-500/5', border: 'border-red-500/20', ring: 'bg-red-500/15', count: totals.count_vencido, countLabel: 'vencidas' },
-          ].map((stat, i) => (
-            <motion.div key={stat.title} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
-              <Card
-                className={cn('relative overflow-hidden border transition-all hover:shadow-lg hover:shadow-black/10 hover:-translate-y-0.5', stat.border, (stat.title === 'Vencido' || stat.title === 'Aguardando') && 'cursor-pointer')}
-                onClick={
-                  stat.title === 'Vencido'
-                    ? () => navigate('/admin/financeiro/vencidos')
-                    : stat.title === 'Aguardando'
-                    ? () => navigate('/admin/financeiro/aguardando')
-                    : undefined
-                }
-              >
-                <div className={cn('absolute inset-0 bg-gradient-to-br opacity-60', stat.accent)} />
-                <CardContent className="relative pt-5 pb-4 px-5">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className={cn('flex h-9 w-9 items-center justify-center rounded-xl', stat.ring)}>
-                      <stat.icon className={cn('h-5 w-5', stat.color)} />
-                    </div>
-                    <span className="text-xs text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">
-                      {stat.count} {stat.countLabel}
-                    </span>
-                  </div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                    {stat.title}
-                    {stat.title === 'Vencido' && <span className="ml-1 text-[10px] normal-case text-red-400">(clique p/ cobrar)</span>}
-                    {stat.title === 'Aguardando' && <span className="ml-1 text-[10px] normal-case text-amber-600">(clique p/ lembrar)</span>}
-                  </p>
-                  {canViewFinancialValues ? (
-                    <p className={cn('text-xl font-bold', stat.color)}>
-                      R$ {fmt(stat.value)}
-                    </p>
-                  ) : (
-                    <p className="text-lg font-bold flex items-center gap-1.5 text-muted-foreground/40">
-                      <EyeOff className="h-4 w-4" /> Restrito
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* ── PROGRESS BAR ───────────────────────── */}
-        {totals.total > 0 && canViewFinancialValues && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-            className="rounded-2xl border border-border/60 bg-muted/20 p-4 space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium text-muted-foreground">Composição do Faturamento</span>
-              <span className="text-xs text-muted-foreground">R$ {fmt(totals.total)} total</span>
-            </div>
-            <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted/60 gap-0.5">
-              <motion.div initial={{ width: 0 }} animate={{ width: `${paidPct}%` }} transition={{ duration: 1, ease: 'easeOut', delay: 0.4 }} className="h-full bg-emerald-500 rounded-l-full" />
-              <motion.div initial={{ width: 0 }} animate={{ width: `${pendingPct}%` }} transition={{ duration: 1, ease: 'easeOut', delay: 0.55 }} className="h-full bg-amber-500" />
-              <div className="h-full flex-1 bg-red-500/60 rounded-r-full" />
-            </div>
-            <div className="flex gap-5 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />Recebido {paidPct.toFixed(0)}%</span>
-              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-500 inline-block" />Pendente {pendingPct.toFixed(0)}%</span>
-              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-red-500/60 inline-block" />Vencido {overduePct.toFixed(0)}%</span>
-            </div>
-          </motion.div>
-        )}
+        <BillingSituationSection
+          data={billingData}
+          loading={billingLoading}
+          canViewValues={canViewFinancialValues}
+          period={billingPeriod}
+          customFrom={customFrom}
+          customTo={customTo}
+          filters={billingFilters}
+          activeSituation={filterStatus}
+          clients={clients}
+          onPeriodChange={(value) => { setBillingPeriod(value); setPage(1); }}
+          onCustomFromChange={(value) => { setCustomFrom(value); setPage(1); }}
+          onCustomToChange={(value) => { setCustomTo(value); setPage(1); }}
+          onFiltersChange={(value) => { setBillingFilters(value); setPage(1); }}
+          onSituationChange={(value) => { setFilterStatus(value); setPage(1); }}
+        />
 
         {/* ── TABLE ──────────────────────────────── */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
@@ -861,73 +808,6 @@ export default function AdminFinanceiro() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input placeholder="Buscar por número, assunto ou cliente..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 bg-background/60 border-border/60 h-9" />
-              </div>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-full sm:w-36 h-9 bg-background/60 border-border/60">
-                  <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value="paid">Pago</SelectItem>
-                  <SelectItem value="overdue">Vencido</SelectItem>
-                  <SelectItem value="cancelled">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Date quick filters */}
-              <div className="flex items-center border rounded-lg bg-background/60 border-border/60 overflow-hidden">
-                <Button
-                  variant={dateFilter === 'today' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="rounded-none h-9 text-xs"
-                  onClick={() => setDateFilter(dateFilter === 'today' ? 'all' : 'today')}
-                >
-                  <Calendar className="h-3.5 w-3.5 mr-1" />
-                  Hoje
-                </Button>
-                <Button
-                  variant={dateFilter === 'week' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="rounded-none border-l border-border/60 h-9 text-xs"
-                  onClick={() => setDateFilter(dateFilter === 'week' ? 'all' : 'week')}
-                >
-                  <Calendar className="h-3.5 w-3.5 mr-1" />
-                  Semana
-                </Button>
-                <Button
-                  variant={dateFilter === 'month' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="rounded-none border-l border-border/60 h-9 text-xs"
-                  onClick={() => setDateFilter(dateFilter === 'month' ? 'all' : 'month')}
-                >
-                  <Calendar className="h-3.5 w-3.5 mr-1" />
-                  Mês
-                </Button>
-              </div>
-
-              {/* Month navigator */}
-              <div className="flex items-center border rounded-lg bg-background/60 border-border/60">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 rounded-r-none"
-                  onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="px-3 text-sm font-medium capitalize min-w-[120px] text-center">
-                  {format(selectedMonth, "MMM 'de' yyyy", { locale: ptBR })}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 rounded-l-none"
-                  onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
               </div>
             </div>
           </div>
