@@ -76,6 +76,20 @@ serve(async (req) => {
 
     console.log(`Processing payment ${paymentId} with status ${paymentStatus}`);
 
+    // STEP 0: parcelas de acordo (tabela própria — não passam por invoices)
+    try {
+      await supabaseAdmin
+        .from('acordo_parcelas')
+        .update({
+          status: paymentStatus,
+          invoice_url: payment.invoiceUrl || undefined,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('asaas_payment_id', paymentId);
+    } catch (e) {
+      console.error('Falha ao atualizar parcela de acordo', e);
+    }
+
     // STEP 1: Always try to update invoice first (most common case)
     const { data: invoice, error: invoiceError } = await supabaseAdmin
       .from('invoices')
