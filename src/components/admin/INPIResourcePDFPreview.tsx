@@ -888,7 +888,7 @@ export async function generateNativePDF(opts: NativePDFOptions): Promise<Blob | 
   pdf.save(pdfFileName);
 }
 
-export function INPIResourcePDFPreview({ resource, content, resourceType, debugEvidenceOverride }: INPIResourcePDFPreviewProps) {
+export function INPIResourcePDFPreview({ resource, content, resourceType, debugEvidenceOverride, annexes, draftStamp }: INPIResourcePDFPreviewProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [evidences, setEvidences] = useState<ResourceEvidence[]>([]);
@@ -1160,6 +1160,8 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
         approvalDate,
         isExtrajudicialDoc,
         isProcuradorPetition,
+        annexes,
+        draftStamp,
       });
     } catch (error) {
       console.error('Error generating PDF:', error);
