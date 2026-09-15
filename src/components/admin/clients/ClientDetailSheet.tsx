@@ -47,6 +47,7 @@ import { Newspaper, Gavel, Award, BellRing, Activity as ActivityIcon, ChevronDow
 import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
 import { DataEnrichmentDialog } from './DataEnrichmentDialog';
 import { InvoiceActionsSheet, type InvoiceLike } from './InvoiceActionsSheet';
+import { NovaFaturaDialog } from './NovaFaturaDialog';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 
 const MASTER_ADMIN_EMAIL = 'davillys@gmail.com';
