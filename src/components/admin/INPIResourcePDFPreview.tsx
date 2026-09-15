@@ -423,11 +423,12 @@ const CONTENT_W_MM = A4_W_MM - MARGIN_L - MARGIN_R;
 const stripInlineMd = (t: string) =>
   t.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*\n]+)\*/g, '$1').replace(/`([^`]+)`/g, '$1');
 
-async function generateNativePDF(opts: NativePDFOptions): Promise<void> {
+export async function generateNativePDF(opts: NativePDFOptions): Promise<Blob | void> {
   const {
     pdfFileName, bodyContent, evidences, evidenceByNum, findEvidenceBySlug,
     uncitedEvidences, documentTitleUpper, resource, approvalDate,
     isExtrajudicialDoc, isProcuradorPetition,
+    annexes = [], draftStamp = null, returnBlob = false,
   } = opts;
 
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
