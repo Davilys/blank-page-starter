@@ -4879,6 +4879,30 @@ export type Database = {
     }
     Functions: {
       add_admin_role: { Args: { target_user_id: string }; Returns: undefined }
+      admin_asaas_accounts: {
+        Args: { p_owner?: string }
+        Returns: {
+          asaas_customer_id: string
+          cliente_nome: string
+          cobrancas: number
+        }[]
+      }
+      admin_billing_situation: {
+        Args: {
+          p_account?: string
+          p_client?: string
+          p_due_from?: string
+          p_due_to?: string
+          p_from?: string
+          p_origin?: string
+          p_owner?: string
+          p_payment_from?: string
+          p_payment_method?: string
+          p_payment_to?: string
+          p_to?: string
+        }
+        Returns: Json
+      }
       admin_invoices_list: {
         Args: {
           p_dir?: string
@@ -4912,12 +4936,57 @@ export type Database = {
           user_id: string
         }[]
       }
+      admin_invoices_list_filtered: {
+        Args: {
+          p_account?: string
+          p_client?: string
+          p_dir?: string
+          p_due_from?: string
+          p_due_to?: string
+          p_from?: string
+          p_limit?: number
+          p_offset?: number
+          p_origin?: string
+          p_owner?: string
+          p_payment_from?: string
+          p_payment_method?: string
+          p_payment_to?: string
+          p_search?: string
+          p_situation?: string
+          p_sort?: string
+          p_to?: string
+        }
+        Returns: {
+          amount: number
+          asaas_invoice_id: string
+          classificacao: string
+          cliente_email: string
+          cliente_nome: string
+          created_at: string
+          description: string
+          due_date: string
+          id: string
+          invoice_url: string
+          origem: string
+          payment_date: string
+          payment_method: string
+          pix_code: string
+          status: string
+          sync_status: string
+          total_count: number
+          user_id: string
+        }[]
+      }
       admin_invoices_totals: {
         Args: { p_from?: string; p_owner?: string; p_to?: string }
         Returns: Json
       }
       calculate_predictive_score: { Args: { p_classe?: string }; Returns: Json }
       classificar_cobranca: {
+        Args: { p_due_date: string; p_status: string; p_sync_status: string }
+        Returns: string
+      }
+      classificar_situacao_cobranca: {
         Args: { p_due_date: string; p_status: string; p_sync_status: string }
         Returns: string
       }

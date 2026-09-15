@@ -31,6 +31,12 @@ export default {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
         },
+        billing: {
+          received: "hsl(var(--billing-received))",
+          confirmed: "hsl(var(--billing-confirmed))",
+          awaiting: "hsl(var(--billing-awaiting))",
+          overdue: "hsl(var(--billing-overdue))",
+        },
         muted: {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",

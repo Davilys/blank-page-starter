@@ -1,0 +1,23 @@
+CREATE OR REPLACE FUNCTION public.admin_invoices_list_filtered(
+  p_search text DEFAULT NULL, p_situation text DEFAULT 'all', p_from date DEFAULT NULL, p_to date DEFAULT NULL,
+  p_owner uuid DEFAULT NULL, p_sort text DEFAULT 'cliente', p_dir text DEFAULT 'asc', p_limit integer DEFAULT 50, p_offset integer DEFAULT 0,
+  p_account text DEFAULT NULL, p_payment_method text DEFAULT NULL, p_client uuid DEFAULT NULL, p_origin text DEFAULT NULL,
+  p_due_from date DEFAULT NULL, p_due_to date DEFAULT NULL, p_payment_from date DEFAULT NULL, p_payment_to date DEFAULT NULL
+) RETURNS TABLE(id uuid, description text, amount numeric, due_date date, status text, classificacao text, payment_date date, user_id uuid, invoice_url text, pix_code text, payment_method text, created_at timestamptz, sync_status text, origem text, asaas_invoice_id text, cliente_nome text, cliente_email text, total_count bigint)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=public AS $$
+DECLARE v_dir text:=CASE WHEN lower(COALESCE(p_dir,'asc'))='desc' THEN 'DESC' ELSE 'ASC' END; v_order text; v_sql text;
+BEGIN
+ IF NOT public.has_role(auth.uid(),'admin') THEN RAISE EXCEPTION 'Apenas administradores'; END IF;
+ v_order:=CASE lower(COALESCE(p_sort,'cliente')) WHEN 'descricao' THEN format('public.nome_ordenavel(f.description) %s, f.due_date ASC',v_dir) WHEN 'valor' THEN format('f.amount %s, f.nome_ord ASC',v_dir) WHEN 'metodo' THEN format('lower(COALESCE(f.payment_method,%L)) %s, f.nome_ord ASC','',v_dir) WHEN 'vencimento' THEN format('f.due_date %s NULLS LAST, f.nome_ord ASC',v_dir) WHEN 'status' THEN format('f.classificacao %s, f.due_date ASC',v_dir) ELSE format('f.nome_ord %s, f.ordem_status ASC, f.due_date ASC',v_dir) END;
+ v_sql:=format($q$ WITH base AS (
+  SELECT i.id,i.description,i.amount,i.due_date,i.status,i.payment_date,i.user_id,i.invoice_url,i.pix_code,i.payment_method,i.created_at,i.sync_status,i.origem,i.asaas_invoice_id,p.full_name cliente_nome,p.email cliente_email,
+   COALESCE(public.classificar_situacao_cobranca(i.status,i.due_date,i.sync_status),'inativas') classificacao,public.nome_ordenavel(COALESCE(p.full_name,p.email,'zzzz')) nome_ord,
+   CASE COALESCE(public.classificar_situacao_cobranca(i.status,i.due_date,i.sync_status),'inativas') WHEN 'vencidas' THEN 0 WHEN 'aguardando' THEN 1 WHEN 'confirmadas' THEN 2 WHEN 'recebidas' THEN 3 ELSE 4 END ordem_status,
+   CASE WHEN public.classificar_situacao_cobranca(i.status,i.due_date,i.sync_status) IN ('recebidas','confirmadas') THEN COALESCE(i.payment_date,i.due_date,i.created_at::date) ELSE COALESCE(i.due_date,i.created_at::date) END reference_date
+  FROM public.invoices i LEFT JOIN public.profiles p ON p.id=i.user_id WHERE ($1 IS NULL OR p.assigned_to=$1 OR p.created_by=$1) AND ($2 IS NULL OR $2='' OR i.asaas_customer_id=$2) AND ($3 IS NULL OR $3='' OR lower(COALESCE(i.payment_method,''))=lower($3)) AND ($4 IS NULL OR i.user_id=$4) AND ($5 IS NULL OR $5='' OR lower(COALESCE(i.origem,'interna'))=lower($5)) AND ($6 IS NULL OR i.due_date >= $6) AND ($7 IS NULL OR i.due_date <= $7) AND ($8 IS NULL OR i.payment_date >= $8) AND ($9 IS NULL OR i.payment_date <= $9) AND ($10 IS NULL OR $10='' OR public.nome_ordenavel(p.full_name) LIKE '%%'||public.nome_ordenavel($10)||'%%' OR lower(COALESCE(p.email,'')) LIKE '%%'||lower($10)||'%%' OR public.nome_ordenavel(i.description) LIKE '%%'||public.nome_ordenavel($10)||'%%' OR lower(COALESCE(i.asaas_invoice_id,'')) LIKE '%%'||lower($10)||'%%' OR (regexp_replace($10,'[^0-9]','','g')<>'' AND regexp_replace(COALESCE(p.cpf_cnpj,''),'[^0-9]','','g') LIKE '%%'||regexp_replace($10,'[^0-9]','','g')||'%%'))
+ ), f AS (SELECT * FROM base WHERE ($11='all' OR classificacao=$11) AND ($12 IS NULL OR reference_date >= $12) AND ($13 IS NULL OR reference_date <= $13))
+ SELECT f.id,f.description,f.amount,f.due_date,f.status,f.classificacao,f.payment_date,f.user_id,f.invoice_url,f.pix_code,f.payment_method,f.created_at,f.sync_status,f.origem,f.asaas_invoice_id,f.cliente_nome,f.cliente_email,count(*) OVER() total_count FROM f ORDER BY %s LIMIT $14 OFFSET $15 $q$,v_order);
+ RETURN QUERY EXECUTE v_sql USING p_owner,p_account,p_payment_method,p_client,p_origin,p_due_from,p_due_to,p_payment_from,p_payment_to,p_search,COALESCE(p_situation,'all'),p_from,p_to,GREATEST(COALESCE(p_limit,50),1),GREATEST(COALESCE(p_offset,0),0);
+END; $$;
+REVOKE ALL ON FUNCTION public.admin_invoices_list_filtered(text, text, date, date, uuid, text, text, integer, integer, text, text, uuid, text, date, date, date, date) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.admin_invoices_list_filtered(text, text, date, date, uuid, text, text, integer, integer, text, text, uuid, text, date, date, date, date) TO authenticated, service_role;

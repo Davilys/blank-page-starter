@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, lazy, Suspense, useCallback, useMemo } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,20 +12,24 @@ import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  Search, Plus, CreditCard, TrendingUp, Clock, CheckCircle, Wallet,
+  Search, Plus, CreditCard, CheckCircle, Wallet,
   QrCode, FileText, Loader2, ExternalLink, Copy, EyeOff, RefreshCw,
-  ArrowUpRight, ArrowDownRight, DollarSign, AlertTriangle, Zap, Filter,
-  Calendar, ChevronLeft, ChevronRight
+  DollarSign, AlertTriangle, Zap
 } from 'lucide-react';
-import { format, subMonths, addMonths, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, subDays } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { format, subMonths, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { useNavigate } from 'react-router-dom';
 import { loadClientForSheet } from '@/lib/clientSheet';
 import type { ClientWithProcess } from '@/components/admin/clients/ClientKanbanBoard';
+import {
+  BillingSituationSection,
+  type BillingFilters,
+  type BillingPeriod,
+  type BillingSituationData,
+  type BillingSituationKey,
+} from '@/components/admin/financeiro/BillingSituationSection';
 
 // Lazy load the heavy ClientDetailSheet — same component used in Clientes/Devedores/Publicações
 const ClientDetailSheet = lazy(() =>
@@ -62,6 +66,13 @@ interface Client {
   full_name: string | null;
   email: string;
   cpf_cnpj: string | null;
+  asaas_customer_id: string | null;
+}
+
+interface AsaasAccount {
+  asaas_customer_id: string;
+  cliente_nome: string;
+  cobrancas: number;
 }
 
 interface Process {
@@ -76,15 +87,14 @@ type PaymentType = 'avista' | 'parcelado';
 // Classificação vinda do banco (regra única: pago | a_vencer | vencido | inativo)
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; dot: string; glow: string }> = {
   pago:     { label: 'Pago',      color: 'text-emerald-400', bg: 'bg-emerald-500/10 border border-emerald-500/20', dot: 'bg-emerald-400', glow: 'shadow-emerald-500/20' },
+  recebidas:{ label: 'Recebida',  color: 'text-emerald-400', bg: 'bg-emerald-500/10 border border-emerald-500/20', dot: 'bg-emerald-400', glow: 'shadow-emerald-500/20' },
+  confirmadas:{ label: 'Confirmada', color: 'text-blue-400', bg: 'bg-blue-500/10 border border-blue-500/20', dot: 'bg-blue-400', glow: 'shadow-blue-500/20' },
   a_vencer: { label: 'A vencer',  color: 'text-amber-400',   bg: 'bg-amber-500/10 border border-amber-500/20',     dot: 'bg-amber-400',   glow: 'shadow-amber-500/20'   },
+  aguardando:{ label: 'Aguardando', color: 'text-amber-400', bg: 'bg-amber-500/10 border border-amber-500/20', dot: 'bg-amber-400', glow: 'shadow-amber-500/20' },
   vencido:  { label: 'Vencida',   color: 'text-red-400',     bg: 'bg-red-500/10 border border-red-500/20',         dot: 'bg-red-400',     glow: 'shadow-red-500/20'     },
+  vencidas: { label: 'Vencida',   color: 'text-red-400',     bg: 'bg-red-500/10 border border-red-500/20',         dot: 'bg-red-400',     glow: 'shadow-red-500/20'     },
   inativo:  { label: 'Cancelada', color: 'text-muted-foreground', bg: 'bg-muted/40 border border-border',          dot: 'bg-muted-foreground', glow: '' },
-};
-
-const ORIGEM_LABEL: Record<string, string> = {
-  asaas: 'Asaas',
-  interna: 'Fatura interna',
-  acordo: 'Acordo',
+  inativas: { label: 'Cancelada', color: 'text-muted-foreground', bg: 'bg-muted/40 border border-border',          dot: 'bg-muted-foreground', glow: '' },
 };
 
 const PAYMENT_OPTIONS = {
@@ -97,10 +107,23 @@ const INSTALLMENT_OPTIONS = { boleto: [1, 2, 3, 4, 5, 6], cartao: [1, 2, 3, 4, 5
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
+const EMPTY_BILLING_CATEGORY = { gross_amount: 0, net_amount: null, clients_count: 0, invoices_count: 0, composition: [] };
+const EMPTY_BILLING_DATA: BillingSituationData = {
+  total: 0,
+  net_available: false,
+  categories: {
+    recebidas: EMPTY_BILLING_CATEGORY,
+    confirmadas: EMPTY_BILLING_CATEGORY,
+    aguardando: EMPTY_BILLING_CATEGORY,
+    vencidas: EMPTY_BILLING_CATEGORY,
+  },
+  series: [],
+};
+
 export default function AdminFinanceiro() {
-  const navigate = useNavigate();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [asaasAccounts, setAsaasAccounts] = useState<AsaasAccount[]>([]);
   const [processes, setProcesses] = useState<Process[]>([]);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -158,14 +181,17 @@ export default function AdminFinanceiro() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const [totals, setTotals] = useState({
-    total: 0, pago: 0, a_vencer: 0, vencido: 0,
-    count_total: 0, count_pago: 0, count_a_vencer: 0, count_vencido: 0,
+  const [billingData, setBillingData] = useState<BillingSituationData>(EMPTY_BILLING_DATA);
+  const [billingLoading, setBillingLoading] = useState(true);
+  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('month');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [billingFilters, setBillingFilters] = useState<BillingFilters>({
+    account: '', paymentMethod: '', client: '', origin: '',
+    dueFrom: '', dueTo: '', paymentFrom: '', paymentTo: '',
   });
   const [syncing, setSyncing] = useState(false);
   const [syncRun, setSyncRun] = useState<any | null>(null);
-  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
-  const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [sortKey, setSortKey] = useState<SortKey>('cliente');
@@ -179,21 +205,33 @@ export default function AdminFinanceiro() {
 
   const dateRange = useMemo(() => {
     const today = new Date();
-    if (dateFilter === 'today') {
+    if (billingPeriod === 'today') {
       const d = format(startOfDay(today), 'yyyy-MM-dd');
       return { from: d, to: d };
     }
-    if (dateFilter === 'week') {
+    if (billingPeriod === 'week') {
       return {
         from: format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
         to: format(endOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
       };
     }
-    if (dateFilter === 'month') {
-      return { from: format(startOfMonth(selectedMonth), 'yyyy-MM-dd'), to: format(endOfMonth(selectedMonth), 'yyyy-MM-dd') };
+    if (billingPeriod === 'month') {
+      return { from: format(startOfMonth(today), 'yyyy-MM-dd'), to: format(endOfMonth(today), 'yyyy-MM-dd') };
     }
+    if (billingPeriod === 'previous_month') {
+      const previous = subMonths(today, 1);
+      return { from: format(startOfMonth(previous), 'yyyy-MM-dd'), to: format(endOfMonth(previous), 'yyyy-MM-dd') };
+    }
+    if (billingPeriod === 'quarter') {
+      const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3;
+      const quarterStart = new Date(today.getFullYear(), quarterStartMonth, 1);
+      const quarterEnd = new Date(today.getFullYear(), quarterStartMonth + 3, 0);
+      return { from: format(quarterStart, 'yyyy-MM-dd'), to: format(quarterEnd, 'yyyy-MM-dd') };
+    }
+    if (billingPeriod === 'year') return { from: `${today.getFullYear()}-01-01`, to: `${today.getFullYear()}-12-31` };
+    if (billingPeriod === 'custom') return { from: customFrom || null, to: customTo || null };
     return { from: null as string | null, to: null as string | null };
-  }, [dateFilter, selectedMonth]);
+  }, [billingPeriod, customFrom, customTo]);
 
   // ── Sincronização geral com o Asaas (em blocos, retomável) ──────────────
   const runSyncLoop = useCallback(async (runInicial: any) => {
@@ -275,9 +313,9 @@ export default function AdminFinanceiro() {
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('admin_invoices_list', {
+      const { data, error } = await supabase.rpc('admin_invoices_list_filtered', {
         p_search: debouncedSearch || null,
-        p_status: filterStatus,
+        p_situation: filterStatus,
         p_from: dateRange.from,
         p_to: dateRange.to,
         p_owner: ownerFilter,
@@ -285,6 +323,14 @@ export default function AdminFinanceiro() {
         p_dir: sortDir,
         p_limit: PAGE_SIZE,
         p_offset: (page - 1) * PAGE_SIZE,
+        p_account: billingFilters.account || null,
+        p_payment_method: billingFilters.paymentMethod || null,
+        p_client: billingFilters.client || null,
+        p_origin: billingFilters.origin || null,
+        p_due_from: billingFilters.dueFrom || null,
+        p_due_to: billingFilters.dueTo || null,
+        p_payment_from: billingFilters.paymentFrom || null,
+        p_payment_to: billingFilters.paymentTo || null,
       });
       if (error) throw error;
       const rows = (data || []) as unknown as Invoice[];
@@ -300,29 +346,43 @@ export default function AdminFinanceiro() {
       setTotalCount(0);
     }
     setLoading(false);
-  }, [debouncedSearch, filterStatus, dateRange.from, dateRange.to, ownerFilter, sortKey, sortDir, page]);
+  }, [debouncedSearch, filterStatus, dateRange.from, dateRange.to, ownerFilter, sortKey, sortDir, page, billingFilters]);
 
   const fetchTotals = useCallback(async () => {
+    setBillingLoading(true);
     try {
-      const { data, error } = await supabase.rpc('admin_invoices_totals', {
+      const { data, error } = await supabase.rpc('admin_billing_situation', {
         p_from: dateRange.from,
         p_to: dateRange.to,
         p_owner: ownerFilter,
+        p_account: billingFilters.account || null,
+        p_payment_method: billingFilters.paymentMethod || null,
+        p_client: billingFilters.client || null,
+        p_origin: billingFilters.origin || null,
+        p_due_from: billingFilters.dueFrom || null,
+        p_due_to: billingFilters.dueTo || null,
+        p_payment_from: billingFilters.paymentFrom || null,
+        p_payment_to: billingFilters.paymentTo || null,
       });
       if (error) throw error;
-      const t = (data || {}) as any;
-      setTotals({
-        total: Number(t.total || 0),
-        pago: Number(t.pago || 0),
-        a_vencer: Number(t.a_vencer || 0),
-        vencido: Number(t.vencido || 0),
-        count_total: Number(t.count_total || 0),
-        count_pago: Number(t.count_pago || 0),
-        count_a_vencer: Number(t.count_a_vencer || 0),
-        count_vencido: Number(t.count_vencido || 0),
+      const raw = (data || {}) as any;
+      const normalized = { ...EMPTY_BILLING_DATA, ...raw, categories: { ...EMPTY_BILLING_DATA.categories, ...(raw.categories || {}) } };
+      (Object.keys(normalized.categories) as BillingSituationKey[]).forEach((key) => {
+        const category = normalized.categories[key];
+        normalized.categories[key] = {
+          ...EMPTY_BILLING_CATEGORY,
+          ...category,
+          gross_amount: Number(category?.gross_amount || 0),
+          net_amount: category?.net_amount == null ? null : Number(category.net_amount),
+          clients_count: Number(category?.clients_count || 0),
+          invoices_count: Number(category?.invoices_count || 0),
+          composition: (category?.composition || []).map((item: any) => ({ ...item, amount: Number(item.amount || 0), count: Number(item.count || 0) })),
+        };
       });
+      setBillingData({ ...normalized, total: Number(normalized.total || 0) });
     } catch (e) { console.warn('totais indisponíveis', e); }
-  }, [dateRange.from, dateRange.to, ownerFilter]);
+    finally { setBillingLoading(false); }
+  }, [dateRange.from, dateRange.to, ownerFilter, billingFilters]);
 
   useEffect(() => {
     if (currentUserId !== null) { fetchInvoices(); }
@@ -331,6 +391,12 @@ export default function AdminFinanceiro() {
   useEffect(() => {
     if (currentUserId !== null) { fetchTotals(); }
   }, [currentUserId, fetchTotals]);
+
+  useEffect(() => {
+    if (currentUserId === null) return;
+    supabase.rpc('admin_asaas_accounts', { p_owner: ownerFilter })
+      .then(({ data, error }) => { if (!error) setAsaasAccounts((data || []) as AsaasAccount[]); });
+  }, [currentUserId, ownerFilter]);
 
   useEffect(() => {
     if (currentUserId !== null) { fetchClients(); fetchProcesses(); }
@@ -345,7 +411,7 @@ export default function AdminFinanceiro() {
 
     // Non-master admins only see their own clients
     const buildQuery = () => {
-      let q = supabase.from('profiles').select('id, full_name, email, cpf_cnpj');
+      let q = supabase.from('profiles').select('id, full_name, email, cpf_cnpj, asaas_customer_id');
       if (!isMasterAdmin && currentUserId) {
         q = q.or(`assigned_to.eq.${currentUserId},created_by.eq.${currentUserId}`);
       }
@@ -425,10 +491,6 @@ export default function AdminFinanceiro() {
   const handleDialogClose = (open: boolean) => { setDialogOpen(open); if (!open) resetForm(); };
   const copyToClipboard = (text: string) => { navigator.clipboard.writeText(text); toast.success('Código copiado!'); };
 
-  const paidPct = totals.total > 0 ? (totals.pago / totals.total) * 100 : 0;
-  const pendingPct = totals.total > 0 ? (totals.a_vencer / totals.total) * 100 : 0;
-  const overduePct = totals.total > 0 ? (totals.vencido / totals.total) * 100 : 0;
-
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const inicioFaixa = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const fimFaixa = Math.min(page * PAGE_SIZE, totalCount);
@@ -489,7 +551,7 @@ export default function AdminFinanceiro() {
                 {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
                 {syncing ? 'Sincronizando...' : 'Sincronizar Asaas'}
               </Button>
-              <Button variant="outline" size="sm" onClick={fetchInvoices} className="gap-2 border-border/60">
+              <Button variant="outline" size="sm" onClick={() => { fetchInvoices(); fetchTotals(); }} className="gap-2 border-border/60">
                 <RefreshCw className="h-4 w-4" /> Atualizar
               </Button>
               <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
@@ -722,75 +784,23 @@ export default function AdminFinanceiro() {
           </div>
         )}
 
-        {/* ── STAT CARDS ─────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { title: 'Total Faturado', value: totals.total, icon: TrendingUp, color: 'text-primary', accent: 'from-primary/20 to-primary/5', border: 'border-primary/20', ring: 'bg-primary/15', count: totals.count_total, countLabel: 'faturas' },
-            { title: 'Aguardando',     value: totals.a_vencer, icon: Clock,       color: 'text-amber-500', accent: 'from-amber-500/20 to-amber-500/5', border: 'border-amber-500/20', ring: 'bg-amber-500/15', count: totals.count_a_vencer, countLabel: 'a vencer' },
-            { title: 'Recebido',       value: totals.pago,    icon: CheckCircle, color: 'text-emerald-500', accent: 'from-emerald-500/20 to-emerald-500/5', border: 'border-emerald-500/20', ring: 'bg-emerald-500/15', count: totals.count_pago, countLabel: 'pagas' },
-            { title: 'Vencido',        value: totals.vencido, icon: AlertTriangle, color: 'text-red-500', accent: 'from-red-500/20 to-red-500/5', border: 'border-red-500/20', ring: 'bg-red-500/15', count: totals.count_vencido, countLabel: 'vencidas' },
-          ].map((stat, i) => (
-            <motion.div key={stat.title} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
-              <Card
-                className={cn('relative overflow-hidden border transition-all hover:shadow-lg hover:shadow-black/10 hover:-translate-y-0.5', stat.border, (stat.title === 'Vencido' || stat.title === 'Aguardando') && 'cursor-pointer')}
-                onClick={
-                  stat.title === 'Vencido'
-                    ? () => navigate('/admin/financeiro/vencidos')
-                    : stat.title === 'Aguardando'
-                    ? () => navigate('/admin/financeiro/aguardando')
-                    : undefined
-                }
-              >
-                <div className={cn('absolute inset-0 bg-gradient-to-br opacity-60', stat.accent)} />
-                <CardContent className="relative pt-5 pb-4 px-5">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className={cn('flex h-9 w-9 items-center justify-center rounded-xl', stat.ring)}>
-                      <stat.icon className={cn('h-5 w-5', stat.color)} />
-                    </div>
-                    <span className="text-xs text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">
-                      {stat.count} {stat.countLabel}
-                    </span>
-                  </div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                    {stat.title}
-                    {stat.title === 'Vencido' && <span className="ml-1 text-[10px] normal-case text-red-400">(clique p/ cobrar)</span>}
-                    {stat.title === 'Aguardando' && <span className="ml-1 text-[10px] normal-case text-amber-600">(clique p/ lembrar)</span>}
-                  </p>
-                  {canViewFinancialValues ? (
-                    <p className={cn('text-xl font-bold', stat.color)}>
-                      R$ {fmt(stat.value)}
-                    </p>
-                  ) : (
-                    <p className="text-lg font-bold flex items-center gap-1.5 text-muted-foreground/40">
-                      <EyeOff className="h-4 w-4" /> Restrito
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* ── PROGRESS BAR ───────────────────────── */}
-        {totals.total > 0 && canViewFinancialValues && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-            className="rounded-2xl border border-border/60 bg-muted/20 p-4 space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium text-muted-foreground">Composição do Faturamento</span>
-              <span className="text-xs text-muted-foreground">R$ {fmt(totals.total)} total</span>
-            </div>
-            <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted/60 gap-0.5">
-              <motion.div initial={{ width: 0 }} animate={{ width: `${paidPct}%` }} transition={{ duration: 1, ease: 'easeOut', delay: 0.4 }} className="h-full bg-emerald-500 rounded-l-full" />
-              <motion.div initial={{ width: 0 }} animate={{ width: `${pendingPct}%` }} transition={{ duration: 1, ease: 'easeOut', delay: 0.55 }} className="h-full bg-amber-500" />
-              <div className="h-full flex-1 bg-red-500/60 rounded-r-full" />
-            </div>
-            <div className="flex gap-5 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />Recebido {paidPct.toFixed(0)}%</span>
-              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-500 inline-block" />Pendente {pendingPct.toFixed(0)}%</span>
-              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-red-500/60 inline-block" />Vencido {overduePct.toFixed(0)}%</span>
-            </div>
-          </motion.div>
-        )}
+        <BillingSituationSection
+          data={billingData}
+          loading={billingLoading}
+          canViewValues={canViewFinancialValues}
+          period={billingPeriod}
+          customFrom={customFrom}
+          customTo={customTo}
+          filters={billingFilters}
+          activeSituation={filterStatus}
+          clients={clients}
+          accounts={asaasAccounts}
+          onPeriodChange={(value) => { setBillingPeriod(value); setPage(1); }}
+          onCustomFromChange={(value) => { setCustomFrom(value); setPage(1); }}
+          onCustomToChange={(value) => { setCustomTo(value); setPage(1); }}
+          onFiltersChange={(value) => { setBillingFilters(value); setPage(1); }}
+          onSituationChange={(value) => { setFilterStatus(value); setPage(1); }}
+        />
 
         {/* ── TABLE ──────────────────────────────── */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
@@ -802,73 +812,6 @@ export default function AdminFinanceiro() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input placeholder="Buscar por número, assunto ou cliente..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 bg-background/60 border-border/60 h-9" />
-              </div>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-full sm:w-36 h-9 bg-background/60 border-border/60">
-                  <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value="paid">Pago</SelectItem>
-                  <SelectItem value="overdue">Vencido</SelectItem>
-                  <SelectItem value="cancelled">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Date quick filters */}
-              <div className="flex items-center border rounded-lg bg-background/60 border-border/60 overflow-hidden">
-                <Button
-                  variant={dateFilter === 'today' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="rounded-none h-9 text-xs"
-                  onClick={() => setDateFilter(dateFilter === 'today' ? 'all' : 'today')}
-                >
-                  <Calendar className="h-3.5 w-3.5 mr-1" />
-                  Hoje
-                </Button>
-                <Button
-                  variant={dateFilter === 'week' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="rounded-none border-l border-border/60 h-9 text-xs"
-                  onClick={() => setDateFilter(dateFilter === 'week' ? 'all' : 'week')}
-                >
-                  <Calendar className="h-3.5 w-3.5 mr-1" />
-                  Semana
-                </Button>
-                <Button
-                  variant={dateFilter === 'month' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="rounded-none border-l border-border/60 h-9 text-xs"
-                  onClick={() => setDateFilter(dateFilter === 'month' ? 'all' : 'month')}
-                >
-                  <Calendar className="h-3.5 w-3.5 mr-1" />
-                  Mês
-                </Button>
-              </div>
-
-              {/* Month navigator */}
-              <div className="flex items-center border rounded-lg bg-background/60 border-border/60">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 rounded-r-none"
-                  onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="px-3 text-sm font-medium capitalize min-w-[120px] text-center">
-                  {format(selectedMonth, "MMM 'de' yyyy", { locale: ptBR })}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 rounded-l-none"
-                  onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
               </div>
             </div>
           </div>
@@ -907,9 +850,9 @@ export default function AdminFinanceiro() {
               ) : (
                 <AnimatePresence>
                   {invoices.map((invoice, idx) => {
-                    const ns = (invoice.classificacao || 'a_vencer') as keyof typeof STATUS_CONFIG;
-                    const sc = STATUS_CONFIG[ns] || STATUS_CONFIG.a_vencer;
-                    const isOverdue = ns === 'vencido';
+                    const ns = (invoice.classificacao || 'aguardando') as keyof typeof STATUS_CONFIG;
+                    const sc = STATUS_CONFIG[ns] || STATUS_CONFIG.aguardando;
+                    const isOverdue = ns === 'vencidas';
 
                     return (
                       <motion.tr
@@ -961,7 +904,7 @@ export default function AdminFinanceiro() {
                         </TableCell>
                         <TableCell className="py-3.5">
                           <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium', sc.bg, sc.color)}>
-                            <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', sc.dot, ns === 'a_vencer' && 'animate-pulse')} />
+                            <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', sc.dot, ns === 'aguardando' && 'animate-pulse')} />
                             {sc.label}
                           </span>
                         </TableCell>
@@ -977,7 +920,7 @@ export default function AdminFinanceiro() {
                                 <Copy className="h-3.5 w-3.5 text-emerald-500" />
                               </Button>
                             )}
-                            {ns !== 'pago' && ns !== 'inativo' && (
+                            {(ns === 'aguardando' || ns === 'vencidas') && (
                               <Button variant="ghost" size="sm" className="h-7 text-xs text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10 px-2"
                                 onClick={() => updateStatus(invoice.id, 'paid')}>
                                 <CheckCircle className="h-3.5 w-3.5 mr-1" /> Pago
