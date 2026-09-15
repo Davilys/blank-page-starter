@@ -28,6 +28,7 @@ import { DatePeriodFilter, type DateFilterType } from '@/components/admin/client
 import { motion } from 'framer-motion';
 import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
 import { EyeOff } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { exportContractsZip, importContractsZip, downloadBlob } from '@/lib/zipExportImport';
 import {
   Pagination,
@@ -99,64 +100,84 @@ const AnimatedRing = ({ percentage, color, size = 64 }: { percentage: number; co
 
 // --- Stat Card Component ---
 const StatCard = ({ 
-  icon: Icon, label, value, subtitle, color, gradient, delay, ring 
+  icon: Icon, label, value, subtitle, color, gradient, delay, ring, onClick, active
 }: { 
   icon: any; label: string; value: string | number; subtitle?: string; 
   color: string; gradient: string; delay: number; ring?: number;
-}) => (
-  <motion.div
-    initial={{ opacity: 0, y: 24, scale: 0.95 }}
-    animate={{ opacity: 1, y: 0, scale: 1 }}
-    transition={{ duration: 0.5, delay, ease: [0.16, 1, 0.3, 1] }}
-    whileHover={{ y: -4, scale: 1.02 }}
-    className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5 group cursor-default"
-  >
-    {/* Decorative bg */}
-    <div className={`absolute -top-12 -right-12 w-32 h-32 rounded-full opacity-[0.07] ${gradient}`} />
-    <div className={`absolute -bottom-8 -left-8 w-24 h-24 rounded-full opacity-[0.04] ${gradient}`} />
+  onClick?: () => void; active?: boolean;
+}) => {
+  const inner = (
+    <motion.div
+      initial={{ opacity: 0, y: 24, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.5, delay, ease: [0.16, 1, 0.3, 1] }}
+      whileHover={onClick ? { y: -4, scale: 1.02 } : undefined}
+      className={cn(
+        "relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5 group",
+        onClick ? "cursor-pointer" : "cursor-default",
+        active && "ring-2 ring-offset-2 ring-offset-background"
+      )}
+      style={active ? { boxShadow: `0 4px 24px ${color}40, inset 0 0 40px ${color}15` } : undefined}
+    >
+      {/* Decorative bg */}
+      <div className={`absolute -top-12 -right-12 w-32 h-32 rounded-full opacity-[0.07] ${gradient}`} />
+      <div className={`absolute -bottom-8 -left-8 w-24 h-24 rounded-full opacity-[0.04] ${gradient}`} />
 
-    <div className="relative flex items-center justify-between">
-      <div className="flex-1">
-        <div className="flex items-center gap-2 mb-2">
-          <div className={`p-2 rounded-xl ${gradient} shadow-lg`}>
-            <Icon className="h-4 w-4 text-white" />
+      <div className="relative flex items-center justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <div className={`p-2 rounded-xl ${gradient} shadow-lg`}>
+              <Icon className="h-4 w-4 text-white" />
+            </div>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</span>
+            {active && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground uppercase tracking-wider">Selecionado</span>
+            )}
           </div>
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</span>
+          <motion.p
+            className="text-3xl font-bold tracking-tight"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6, delay: delay + 0.2 }}
+          >
+            {value}
+          </motion.p>
+          {subtitle && (
+            <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+          )}
         </div>
-        <motion.p
-          className="text-3xl font-bold tracking-tight"
-          initial={{ opacity: 0, x: -10 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6, delay: delay + 0.2 }}
-        >
-          {value}
-        </motion.p>
-        {subtitle && (
-          <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+        {ring !== undefined && (
+          <div className="relative">
+            <AnimatedRing percentage={ring} color={color} size={56} />
+            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold">
+              {Math.round(ring)}%
+            </span>
+          </div>
         )}
       </div>
-      {ring !== undefined && (
-        <div className="relative">
-          <AnimatedRing percentage={ring} color={color} size={56} />
-          <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold">
-            {Math.round(ring)}%
-          </span>
-        </div>
-      )}
-    </div>
 
-    {/* Hover glow */}
-    <div className={`absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`}
-      style={{ boxShadow: `inset 0 0 40px ${color}15, 0 0 30px ${color}08` }}
-    />
-  </motion.div>
-);
+      {/* Hover glow */}
+      {!active && (
+        <div className={`absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`}
+          style={{ boxShadow: `inset 0 0 40px ${color}15, 0 0 30px ${color}08` }}
+        />
+      )}
+    </motion.div>
+  );
+  if (!onClick) return inner;
+  return (
+    <button type="button" onClick={onClick} aria-pressed={active} className="text-left w-full">
+      {inner}
+    </button>
+  );
+};
 
 export default function AdminContratos() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [signatureFilter, setSignatureFilter] = useState<string>('all');
+  const [statFilter, setStatFilter] = useState<'total' | 'signed' | 'pending' | 'paid'>('total');
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -683,6 +704,12 @@ export default function AdminContratos() {
       (signatureFilter === 'not_signed' && contract.signature_status !== 'signed') ||
       (signatureFilter === 'paid' && isContractPaid(contract));
 
+    const matchesStat =
+      statFilter === 'total' ||
+      (statFilter === 'signed' && contract.signature_status === 'signed') ||
+      (statFilter === 'pending' && contract.signature_status !== 'signed') ||
+      (statFilter === 'paid' && isContractPaid(contract));
+
     const matchesTab = getContractTabMatch(contract, activeTab);
 
     let matchesDate = true;
@@ -698,7 +725,7 @@ export default function AdminContratos() {
       }
     }
     
-    return matchesSearch && matchesSignature && matchesTab && matchesDate;
+    return matchesSearch && matchesSignature && matchesStat && matchesTab && matchesDate;
   });
 
   const { canViewFinancialValues, isLoading: finLoading } = useCanViewFinancialValues();
@@ -706,7 +733,28 @@ export default function AdminContratos() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, signatureFilter, dateFilter, activeTab, selectedMonth]);
+  }, [search, signatureFilter, statFilter, dateFilter, activeTab, selectedMonth]);
+
+  // Base list (search + tab + date) used for stable card counts,
+  // independent of signature/stat quick filters
+  const baseFiltered = contracts.filter(contract => {
+    const clientName = contract.profile?.full_name || '';
+    const matchesSearch =
+      contract.contract_number?.toLowerCase().includes(search.toLowerCase()) ||
+      contract.subject?.toLowerCase().includes(search.toLowerCase()) ||
+      clientName.toLowerCase().includes(search.toLowerCase());
+    const matchesTab = getContractTabMatch(contract, activeTab);
+    let matchesDate = true;
+    if (dateFilter !== 'all' && contract.created_at) {
+      const contractDate = new Date(contract.created_at);
+      if (dateFilter === 'today') matchesDate = isToday(contractDate);
+      else if (dateFilter === 'week') matchesDate = isThisWeek(contractDate, { locale: ptBR });
+      else if (dateFilter === 'month')
+        matchesDate = contractDate.getMonth() === selectedMonth.getMonth() &&
+                      contractDate.getFullYear() === selectedMonth.getFullYear();
+    }
+    return matchesSearch && matchesTab && matchesDate;
+  });
 
   const totalPages = Math.max(1, Math.ceil(filteredContracts.length / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
@@ -730,12 +778,12 @@ export default function AdminContratos() {
     if (totalPages > 1) add(totalPages);
     return pages;
   };
-  const totalValue = filteredContracts.reduce((sum, c) => sum + (c.contract_value || 0), 0);
-  const signedCount = filteredContracts.filter(c => c.signature_status === 'signed').length;
-  const pendingCount = filteredContracts.filter(c => c.signature_status !== 'signed').length;
-  const signedPct = filteredContracts.length > 0 ? (signedCount / filteredContracts.length) * 100 : 0;
-  const pendingPct = filteredContracts.length > 0 ? (pendingCount / filteredContracts.length) * 100 : 0;
-  const paidContracts = filteredContracts.filter(isContractPaid);
+  const totalValue = baseFiltered.reduce((sum, c) => sum + (c.contract_value || 0), 0);
+  const signedCount = baseFiltered.filter(c => c.signature_status === 'signed').length;
+  const pendingCount = baseFiltered.filter(c => c.signature_status !== 'signed').length;
+  const signedPct = baseFiltered.length > 0 ? (signedCount / baseFiltered.length) * 100 : 0;
+  const pendingPct = baseFiltered.length > 0 ? (pendingCount / baseFiltered.length) * 100 : 0;
+  const paidContracts = baseFiltered.filter(isContractPaid);
   const paidCount = paidContracts.length;
   const paidValue = paidContracts.reduce((sum, c) => sum + (c.contract_value || 0), 0);
   const paidPct = signedCount > 0 ? (paidCount / signedCount) * 100 : 0;
@@ -965,21 +1013,25 @@ export default function AdminContratos() {
           <StatCard
             icon={FileText}
             label="Total"
-            value={filteredContracts.length}
+            value={baseFiltered.length}
             subtitle="contratos encontrados"
             color="hsl(210, 100%, 40%)"
             gradient="bg-gradient-to-br from-primary to-primary/70"
             delay={0.1}
+            onClick={() => { setStatFilter(prev => prev === 'total' ? 'total' : 'total'); setSignatureFilter('all'); }}
+            active={statFilter === 'total'}
           />
           <StatCard
             icon={CheckCircle}
             label="Assinados"
             value={signedCount}
-            subtitle={`de ${filteredContracts.length} contratos`}
+            subtitle={`de ${baseFiltered.length} contratos`}
             color="hsl(152, 76%, 45%)"
             gradient="bg-gradient-to-br from-emerald-500 to-emerald-600"
             delay={0.2}
             ring={signedPct}
+            onClick={() => { setStatFilter(prev => prev === 'signed' ? 'total' : 'signed'); setSignatureFilter('all'); }}
+            active={statFilter === 'signed'}
           />
           <StatCard
             icon={PenTool}
@@ -990,6 +1042,8 @@ export default function AdminContratos() {
             gradient="bg-gradient-to-br from-destructive to-red-600"
             delay={0.3}
             ring={pendingPct}
+            onClick={() => { setStatFilter(prev => prev === 'pending' ? 'total' : 'pending'); setSignatureFilter('all'); }}
+            active={statFilter === 'pending'}
           />
           <StatCard
             icon={BadgeCheck}
@@ -1000,6 +1054,8 @@ export default function AdminContratos() {
             gradient="bg-gradient-to-br from-teal-500 to-emerald-600"
             delay={0.35}
             ring={paidPct}
+            onClick={() => { setStatFilter(prev => prev === 'paid' ? 'total' : 'paid'); setSignatureFilter('all'); }}
+            active={statFilter === 'paid'}
           />
           <StatCard
             icon={canViewFinancialValues ? DollarSign : EyeOff}
