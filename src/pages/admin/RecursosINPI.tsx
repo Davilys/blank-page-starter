@@ -78,6 +78,9 @@ interface ProcuradorData {
 
 type Step = 'list' | 'select-type' | 'select-agent' | 'notificacao-data' | 'procurador-data' | 'resposta-notificacao-data' | 'upload' | 'processing' | 'review' | 'approved';
 
+// Modalidades com o fluxo de preparação documental + consultoria preparatória.
+const UPGRADED_MODALITIES = ['indeferimento', 'exigencia_merito', 'oposicao'];
+
 const RESOURCE_TYPE_LABELS: Record<string, string> = {
   indeferimento: 'Recurso contra Indeferimento',
   exigencia_merito: 'Exigência de Mérito',
