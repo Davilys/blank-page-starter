@@ -1,9 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, RefreshCw, ExternalLink, AlertTriangle, Globe } from 'lucide-react';
+import { Loader2, RefreshCw, ExternalLink, AlertTriangle, Globe, UserCheck, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { useProcessLookup, type LookupState } from '@/hooks/useProcessLookup';
 
 export interface LookupEntryLike {
