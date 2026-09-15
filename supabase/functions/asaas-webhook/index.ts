@@ -107,6 +107,9 @@ serve(async (req) => {
         .update({
           status: invoiceStatus,
           payment_date: paymentDate,
+          asaas_status_raw: paymentStatus,
+          sync_status: 'ativa',
+          ultima_sincronizacao_asaas: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq('id', invoice.id);
