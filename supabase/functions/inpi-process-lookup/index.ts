@@ -14,7 +14,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
-const UPSTREAM_TIMEOUT_MS = 45_000;
+const UPSTREAM_TIMEOUT_MS = 35_000;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const FAILURE_COOLDOWN_MS = 5 * 60 * 1000;
 const MAX_CONCURRENT_UPSTREAM = 4;
