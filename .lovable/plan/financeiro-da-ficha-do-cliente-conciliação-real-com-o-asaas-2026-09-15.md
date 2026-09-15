@@ -9,27 +9,35 @@ As faturas locais gravam status no padrão do Asaas (`received`, `canceled`, `ov
 ## O que muda
 
 ### 1. Botões do topo (só a ordem)
+
 Frequentes: Chat, E-mail, Notificar, Detalhes do Processo. Administrativas: Mover, Nova Fatura, Cliente Especial, Resetar Senha. Destrutiva, separada ao final: Excluir (mantém confirmação e permissão). Nenhuma ação financeira vira botão de topo.
 
 ### 2. Ordem e rótulos da aba
+
 Resumo financeiro consolidado → Vencidas (mais antiga primeiro) → A vencer (vencimento mais próximo) → Pagas → Canceladas/removidas (recolhido, "Ver histórico"). Cada linha ganha um selo discreto de origem: Asaas, Fatura interna ou Acordo.
 
 ### 3. Cartão "Cobranças Asaas"
+
 Rótulo "Em aberto" passa a "A vencer"; valor e quantidade em cada indicador; contador do cabeçalho vira "N contas Asaas" (nunca contagem de boletos). Botão "Atualizar" vira "Sincronizar" (mesmo ícone, estilo e posição), com "Sincronizando...", bloqueio de cliques, mensagem de sucesso/falha e "Última sincronização: dd/MM/yyyy às HH:mm".
 
 ### 4. Sincronização real
+
 "Sincronizar" varre o Asaas ao vivo: resolve todas as contas do cliente (asaas_customer_id, CPF/CNPJ, e-mail), percorre toda a paginação de cobranças, cria no CRM o que falta, atualiza valor, vencimento, descrição, link e status do que existe, e reclassifica tudo. Se qualquer página falhar, der timeout ou retornar parcial, **nada é removido** e a tela avisa que a sincronização foi incompleta.
 
 ### 5. Sumidas e canceladas
+
 Cobrança que não existe mais no Asaas sai da lista ativa e de todos os totais, fica marcada como "Removida do Asaas" e só aparece no histórico — nunca é apagada do banco. Cancelada/estornada idem: fora dos totais, sem botões de cobrar ou acordo.
 
 ### 6. Resumo financeiro
+
 Recalculado após cada sincronização e após cada evento (pagamento, cancelamento, acordo, webhook), sem recarregar a página: Total ativo (a vencer + vencidas válidas), Pago, A vencer (vencimento hoje ou futuro), Vencido (vencimento passado). Ficam de fora pagas, canceladas, estornadas, removidas e originais substituídas por acordo.
 
 ### 7. Sem duplicidade interna/Asaas
+
 Fatura interna e cobrança Asaas são fundidas em uma linha única quando houver vínculo real (`asaas_invoice_id`, externalReference, invoice_id, acordo). O status do Asaas manda; o vínculo interno é preservado. Nunca deduplicar por valor igual.
 
 ### 8. Cobranças clicáveis
+
 Cada cobrança ativa abre o painel já existente com descrição, origem, valor, vencimento, dias em atraso, status no Asaas, "Abrir no Asaas", "Cobrar cliente", "Fazer acordo" e "Fechar" — sem fechar durante uma operação. Pagas, canceladas, estornadas e removidas abrem só em consulta.
 
 Cobrar cliente e Fazer acordo continuam como já estão (reuso de `cobrar-fatura-vencida` e `criar-acordo-cliente`, trava de 24 h, juros 10 % editável em centavos, vencimento no mesmo dia do mês, criação das parcelas antes do cancelamento da original, idempotência e permissão financeira). O acordo passa a fixar boleto como forma de cobrança e as parcelas aparecem como "Parcela X de Y" com selo "Acordo ativo".
@@ -42,4 +50,98 @@ Cobrar cliente e Fazer acordo continuam como já estão (reuso de `cobrar-fatura
 
 **Frontend**: novo utilitário `src/lib/financeiro/statusCobranca.ts` com a normalização única de status (`received`/`confirmed`/`received_in_cash`/`dunning_received` → pago; `overdue`/`dunning_requested` ou pendente vencida → vencido; `canceled`/`cancelled`/`refunded`/`chargeback` → fora dos totais) usada pelo resumo, pelas listas e pelo painel de ações. `ClientDetailSheet.tsx` reordena os botões e as seções, consome a nova função e o log de sincronização; `InvoiceActionsSheet.tsx` recebe origem e trava ações em cobranças não ativas. `asaas-webhook` passa a gravar `ultima_sincronizacao_asaas` e a manter `sync_status` coerente.
 
-**Testes** antes de publicar, com dados reais de leitura (sem criar boletos): cliente com paga, a vencer, vencida, cancelada, com várias contas Asaas, paginação, API indisponível (nada removido), fatura interna vinculada, valores iguais em serviços diferentes, sincronização repetida sem duplicar, admin sem permissão financeira e o caso do print com indicadores zerados. Entrego resultado dos testes, arquivos e funções alterados, migrações, endpoints e a comparação dos valores antes/depois — só então publicamos.
+**Testes** antes de publicar, com dados reais de leitura (sem criar boletos): cliente com paga, a vencer, vencida, cancelada, com várias contas Asaas, paginação, API indisponível (nada removido), fatura interna vinculada, valores iguais em serviços diferentes, sincronização repetida sem duplicar, admin sem permissão financeira e o caso do print com indicadores zerados. Entrego resultado dos testes, arquivos e funções alterados, migrações, endpoints e a comparação dos valores antes/depois — só então publicamos. PLANO APROVADO COM QUATRO AJUSTES OBRIGATÓRIOS ANTES DA IMPLEMENTAÇÃO:
+
+1. NORMALIZAÇÃO TAMBÉM NO BACKEND
+
+Não deixar a normalização de status somente em:
+
+`src/lib/financeiro/statusCobranca.ts`
+
+A regra precisa ser única e utilizada também por:
+
+- Edge Functions;
+- Webhook do Asaas;
+- Sincronização;
+- Cálculo dos totais;
+- Listas;
+- Painel de detalhes.
+
+Criar uma implementação compartilhada ou garantir testes que mantenham frontend e backend com o mesmo mapeamento. O backend deve ser a fonte definitiva dos totais.
+
+Mapeamento mínimo:
+
+- `received`, `confirmed`, `received_in_cash` e `dunning_received` → pago;
+- `pending` com vencimento hoje ou futuro → a vencer;
+- `overdue`, `dunning_requested` ou `pending` com vencimento passado → vencido;
+- `canceled`, `cancelled`, `refunded`, `chargeback` e equivalentes finais → fora dos totais ativos.
+
+Preservar também o status original retornado pelo Asaas para auditoria. Não substituir definitivamente o status original apenas pelo status normalizado.
+
+2. SINCRONIZAÇÃO EM DUAS ETAPAS
+
+Não atualizar ou remover registros enquanto as páginas da API ainda estiverem sendo consultadas.
+
+Executar assim:
+
+1. Buscar todas as contas Asaas autorizadas;
+2. Buscar todas as páginas de todas as contas;
+3. Guardar o resultado em memória ou área temporária identificada por `sync_run_id`;
+4. Validar que nenhuma conta ou página falhou;
+5. Somente após a validação completa iniciar a conciliação no banco;
+6. Aplicar upserts, mudanças de status e marcações de removidas dentro de uma operação controlada;
+7. Recalcular os totais;
+8. Finalizar o log de sincronização.
+
+Se qualquer página falhar:
+
+- Não marcar cobrança como removida;
+- Não publicar um resumo parcial como se fosse completo;
+- Manter os dados anteriores na tela;
+- Registrar a tentativa como incompleta;
+- Avisar o usuário.
+
+Isso evita que uma falha na última página deixe metade da ficha atualizada.
+
+3. IDENTIFICAÇÃO DAS CONTAS ASAAS
+
+Usar como vínculo principal os `asaas_customer_id` já cadastrados.
+
+CPF/CNPJ poderá localizar uma conta que perdeu o vínculo, desde que haja correspondência exata e única.
+
+Não vincular automaticamente uma conta apenas pelo e-mail, pois e-mails podem ser repetidos, compartilhados ou alterados.
+
+Se a busca por CPF/CNPJ ou e-mail encontrar mais de uma possibilidade sem vínculo confirmado:
+
+- Não incorporar cobranças automaticamente;
+- Registrar a ambiguidade;
+- Mostrar aviso para conferência do administrador;
+- Não remover cobranças já existentes.
+
+4. CORREÇÃO DOS DADOS ANTIGOS
+
+Além de corrigir a tela, executar uma migração ou rotina controlada para reclassificar os registros existentes.
+
+Os dados informados mostram:
+
+- 386 cobranças `canceled`;
+- 205 cobranças `received`;
+- 189 cobranças `overdue`;
+- 140 cobranças `pending`.
+
+A correção não pode funcionar apenas para cobranças sincronizadas futuramente.
+
+Depois da implementação:
+
+- Reprocessar os status já armazenados;
+- Retirar as 386 canceladas dos totais ativos;
+- Reconhecer as 205 recebidas como pagas;
+- Reconhecer as 189 vencidas;
+- Classificar as 140 pendentes pela data de vencimento;
+- Gerar relatório comparando os totais antes e depois;
+- Não alterar ou excluir registros históricos;
+- Não criar, cancelar ou modificar boletos no Asaas durante essa correção.
+
+O primeiro teste deve ser somente leitura e conciliação. Depois, apresentar o resultado antes da publicação em produção.
+
+Com esses quatro ajustes, pode executar o plano.

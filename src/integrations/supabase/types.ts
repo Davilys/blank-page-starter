@@ -270,6 +270,66 @@ export type Database = {
         }
         Relationships: []
       }
+      asaas_sync_logs: {
+        Row: {
+          ambiguous_customer_ids: string[]
+          client_id: string
+          created_at: string
+          customer_ids: string[]
+          duracao_ms: number | null
+          erro: string | null
+          executed_by: string | null
+          id: string
+          incompleta: boolean
+          sucesso: boolean
+          sync_run_id: string
+          totais_antes: Json | null
+          totais_depois: Json | null
+          total_atualizadas: number
+          total_criadas: number
+          total_encontradas: number
+          total_removidas: number
+        }
+        Insert: {
+          ambiguous_customer_ids?: string[]
+          client_id: string
+          created_at?: string
+          customer_ids?: string[]
+          duracao_ms?: number | null
+          erro?: string | null
+          executed_by?: string | null
+          id?: string
+          incompleta?: boolean
+          sucesso?: boolean
+          sync_run_id: string
+          totais_antes?: Json | null
+          totais_depois?: Json | null
+          total_atualizadas?: number
+          total_criadas?: number
+          total_encontradas?: number
+          total_removidas?: number
+        }
+        Update: {
+          ambiguous_customer_ids?: string[]
+          client_id?: string
+          created_at?: string
+          customer_ids?: string[]
+          duracao_ms?: number | null
+          erro?: string | null
+          executed_by?: string | null
+          id?: string
+          incompleta?: boolean
+          sucesso?: boolean
+          sync_run_id?: string
+          totais_antes?: Json | null
+          totais_depois?: Json | null
+          total_atualizadas?: number
+          total_criadas?: number
+          total_encontradas?: number
+          total_removidas?: number
+        }
+        Relationships: []
+      }
       award_entries: {
         Row: {
           brand_name: string | null
@@ -2349,6 +2409,7 @@ export type Database = {
           amount: number
           asaas_customer_id: string | null
           asaas_invoice_id: string | null
+          asaas_status_raw: string | null
           boleto_code: string | null
           cancelado_em: string | null
           cancelado_por: string | null
@@ -2362,6 +2423,7 @@ export type Database = {
           id: string
           invoice_url: string | null
           negociacao_id: string | null
+          origem: string
           originado_pelo_crm: boolean
           payment_date: string | null
           payment_link: string | null
@@ -2370,8 +2432,11 @@ export type Database = {
           pix_payload: string | null
           pix_qr_code: string | null
           process_id: string | null
+          removida_em: string | null
           renegociacao_id: string | null
           status: string | null
+          sync_status: string
+          ultima_sincronizacao_asaas: string | null
           updated_at: string | null
           user_id: string | null
         }
@@ -2380,6 +2445,7 @@ export type Database = {
           amount: number
           asaas_customer_id?: string | null
           asaas_invoice_id?: string | null
+          asaas_status_raw?: string | null
           boleto_code?: string | null
           cancelado_em?: string | null
           cancelado_por?: string | null
@@ -2393,6 +2459,7 @@ export type Database = {
           id?: string
           invoice_url?: string | null
           negociacao_id?: string | null
+          origem?: string
           originado_pelo_crm?: boolean
           payment_date?: string | null
           payment_link?: string | null
@@ -2401,8 +2468,11 @@ export type Database = {
           pix_payload?: string | null
           pix_qr_code?: string | null
           process_id?: string | null
+          removida_em?: string | null
           renegociacao_id?: string | null
           status?: string | null
+          sync_status?: string
+          ultima_sincronizacao_asaas?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -2411,6 +2481,7 @@ export type Database = {
           amount?: number
           asaas_customer_id?: string | null
           asaas_invoice_id?: string | null
+          asaas_status_raw?: string | null
           boleto_code?: string | null
           cancelado_em?: string | null
           cancelado_por?: string | null
@@ -2424,6 +2495,7 @@ export type Database = {
           id?: string
           invoice_url?: string | null
           negociacao_id?: string | null
+          origem?: string
           originado_pelo_crm?: boolean
           payment_date?: string | null
           payment_link?: string | null
@@ -2432,8 +2504,11 @@ export type Database = {
           pix_payload?: string | null
           pix_qr_code?: string | null
           process_id?: string | null
+          removida_em?: string | null
           renegociacao_id?: string | null
           status?: string | null
+          sync_status?: string
+          ultima_sincronizacao_asaas?: string | null
           updated_at?: string | null
           user_id?: string | null
         }

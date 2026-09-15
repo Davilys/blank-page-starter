@@ -49,6 +49,7 @@ import { DataEnrichmentDialog } from './DataEnrichmentDialog';
 import { InvoiceActionsSheet, type InvoiceLike } from './InvoiceActionsSheet';
 import { NovaFaturaDialog } from './NovaFaturaDialog';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { classificarCobranca, LABEL_ORIGEM, type OrigemCobranca } from '@/lib/financeiro/statusCobranca';
 
 const MASTER_ADMIN_EMAIL = 'davillys@gmail.com';
 
@@ -211,6 +212,9 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceLike | null>(null);
   const [invoiceSheetOpen, setInvoiceSheetOpen] = useState(false);
   const [novaFaturaOpen, setNovaFaturaOpen] = useState(false);
+  const [mostrarHistoricoFin, setMostrarHistoricoFin] = useState(false);
+  const [sincronizando, setSincronizando] = useState(false);
+  const [ultimaSync, setUltimaSync] = useState<Date | null>(null);
   const [asaasOverdue, setAsaasOverdue] = useState<any[]>([]);
   const [asaasRenegs, setAsaasRenegs] = useState<any[]>([]);
   const [asaasRenegParcelas, setAsaasRenegParcelas] = useState<any[]>([]);
@@ -632,6 +636,33 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
       console.warn('loadAsaasPayments failed', e);
       setAsaasPayments([]); setAsaasTotals(null); setAsaasCustomerIds([]);
     } finally { setLoadingAsaasPayments(false); }
+  };
+
+  // ─── Sincronização real com o Asaas (conciliação completa sob demanda) ─────
+  const handleSincronizarAsaas = async () => {
+    if (!client || sincronizando) return;
+    setSincronizando(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-asaas-client-invoices', {
+        body: { client_id: client.id },
+      });
+      if (error) throw error;
+      const d: any = data || {};
+      if (d?.error) throw new Error(d.error);
+      const dep = d.totais_depois || {};
+      toast.success('Sincronização concluída', {
+        description: `${d.contas_consultadas ?? 0} conta(s) Asaas · ${d.cobrancas_encontradas ?? 0} cobrança(s) · ${d.criadas ?? 0} nova(s), ${d.atualizadas ?? 0} atualizada(s), ${d.removidas ?? 0} removida(s)`,
+      });
+      setUltimaSync(new Date());
+      await fetchClientData();
+      await loadAsaasPayments(client.id);
+      void dep;
+    } catch (e: any) {
+      const msg = e?.message || 'Não foi possível concluir a sincronização';
+      toast.error('Falha na sincronização', { description: msg });
+    } finally {
+      setSincronizando(false);
+    }
   };
 
   // ─── Note CRUD ────────────────────────────────────────────────────────────
@@ -1275,13 +1306,15 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
   const isSigned = invoices.length > 0 || documents.length > 0;
   const contractValue = editData.contract_value || client.contract_value || 0;
 
+  // Ordem: ações frequentes → administrativas → destrutiva (Excluir sempre por último).
   const QUICK_ACTIONS = [
+    // Frequentes
     { id: 'chat', label: 'Chat', icon: MessageCircle, cls: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700' },
-    { id: 'move', label: 'Mover', icon: ArrowUpRight, cls: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60' },
     { id: 'email', label: 'Email', icon: Mail, cls: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 hover:bg-amber-200' },
     { id: 'notification', label: 'Notificar', icon: Bell, cls: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200' },
-    { id: 'excluir', label: 'Excluir', icon: Trash2, cls: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200' },
     { id: 'processo', label: 'Detalhes do Processo', icon: FileText, cls: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/60' },
+    // Administrativas
+    { id: 'move', label: 'Mover', icon: ArrowUpRight, cls: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60' },
     { id: 'nova_fatura', label: 'Nova Fatura', icon: Receipt, cls: 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300 hover:bg-teal-200 dark:hover:bg-teal-900/60' },
     {
       id: 'cliente_especial',
@@ -1294,6 +1327,8 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
     ...(isMasterAdmin && client?.email && client.email !== MASTER_ADMIN_EMAIL ? [
       { id: 'reset_senha', label: 'Resetar Senha', icon: KeyRound, cls: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60' },
     ] : []),
+    // Destrutiva
+    { id: 'excluir', label: 'Excluir', icon: Trash2, cls: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200' },
   ];
 
   const handleTabsWheel = (event: WheelEvent<HTMLDivElement>) => {
@@ -2942,23 +2977,29 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                       <div className="flex items-center gap-2">
                         <BarChart3 className="h-4 w-4 text-primary" />
                         <span className="text-sm font-semibold">Cobranças Asaas</span>
-                        {asaasCustomerIds.length > 1 && (
+                        {asaasCustomerIds.length > 0 && (
                           <Badge className="text-[9px] h-4 px-1 bg-primary/15 text-primary border-primary/30 border">
-                            {asaasCustomerIds.length} contas
+                            {asaasCustomerIds.length} conta{asaasCustomerIds.length > 1 ? 's' : ''} Asaas
                           </Badge>
                         )}
                       </div>
                       <Button
                         variant="ghost" size="sm" className="h-7 px-2"
-                        onClick={() => client && loadAsaasPayments(client.id)}
-                        disabled={loadingAsaasPayments}
+                        onClick={handleSincronizarAsaas}
+                        disabled={sincronizando || loadingAsaasPayments}
                       >
-                        {loadingAsaasPayments
+                        {sincronizando || loadingAsaasPayments
                           ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           : <RefreshCw className="h-3.5 w-3.5" />}
-                        <span className="text-[11px] ml-1">Atualizar</span>
+                        <span className="text-[11px] ml-1">{sincronizando ? 'Sincronizando...' : 'Sincronizar'}</span>
                       </Button>
                     </div>
+
+                    {ultimaSync && (
+                      <p className="text-[10px] text-muted-foreground">
+                        Última sincronização: {format(ultimaSync, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                      </p>
+                    )}
 
                     {asaasTotals && (
                       <div className="grid grid-cols-3 gap-2 text-center">
@@ -2968,7 +3009,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                           <p className="text-[10px] text-muted-foreground">{asaasTotals.count_pago} cobrança(s)</p>
                         </div>
                         <div className="rounded-lg bg-background/60 p-2">
-                          <p className="text-[10px] text-muted-foreground uppercase">Em aberto</p>
+                          <p className="text-[10px] text-muted-foreground uppercase">A vencer</p>
                           <p className="font-bold text-sm text-amber-500">{asaasTotals.aberto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                           <p className="text-[10px] text-muted-foreground">{asaasTotals.count_aberto} cobrança(s)</p>
                         </div>
@@ -2989,7 +3030,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                     {asaasPayments.length > 0 && (() => {
                       const groups: Array<{ key: 'vencido'|'aberto'|'pago'; label: string; tone: string }> = [
                         { key: 'vencido', label: 'Vencidas', tone: 'text-red-500' },
-                        { key: 'aberto', label: 'Em aberto', tone: 'text-amber-500' },
+                        { key: 'aberto', label: 'A vencer', tone: 'text-amber-500' },
                         { key: 'pago', label: 'Pagas', tone: 'text-emerald-500' },
                       ];
                       return groups.map(g => {
@@ -3147,26 +3188,37 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                       )}
                     </div>
                     {(() => {
-                      // Faturas canceladas (inclusive as substituídas por acordo) não entram no resumo;
-                      // as parcelas do acordo entram no lugar da cobrança original, sem duplicar valor.
+                      // Classificação única (mesma regra do backend): canceladas, estornadas e
+                      // removidas do Asaas ficam fora dos totais; parcelas de acordo entram no
+                      // lugar da cobrança original, sem duplicar valor.
                       const hoje = new Date().toISOString().slice(0, 10);
                       const PAGO_ASAAS = ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'];
                       const acordosAtivos = new Set(acordos.filter(a => a.status === 'ativo').map(a => a.id));
                       const parcelasAtivas = acordoParcelas.filter(p => acordosAtivos.has(p.acordo_id) && p.status !== 'CANCELLED');
-                      const ignoradas = ['cancelled', 'refunded'];
-                      const vivas = invoices.filter(i => !ignoradas.includes(i.status));
-                      const pago = vivas.filter(i => i.status === 'paid').reduce((a, i) => a + Number(i.amount), 0)
-                        + parcelasAtivas.filter(p => PAGO_ASAAS.includes(p.status)).reduce((a, p) => a + Number(p.valor_centavos) / 100, 0);
-                      const vencido = vivas.filter(i => i.status === 'overdue').reduce((a, i) => a + Number(i.amount), 0)
-                        + parcelasAtivas.filter(p => !PAGO_ASAAS.includes(p.status) && p.data_vencimento < hoje).reduce((a, p) => a + Number(p.valor_centavos) / 100, 0);
-                      const pendente = vivas.filter(i => i.status !== 'paid' && i.status !== 'overdue').reduce((a, i) => a + Number(i.amount), 0)
-                        + parcelasAtivas.filter(p => !PAGO_ASAAS.includes(p.status) && p.data_vencimento >= hoje).reduce((a, p) => a + Number(p.valor_centavos) / 100, 0);
+                      const idsParcelas = new Set(parcelasAtivas.map((p: any) => p.asaas_payment_id).filter(Boolean));
+                      // Não somar duas vezes: fatura vinculada a uma parcela de acordo é contada na parcela.
+                      const faturas = invoices.filter((i: any) => !idsParcelas.has(i.asaas_invoice_id));
+
+                      let pago = 0, aVencer = 0, vencido = 0;
+                      for (const i of faturas as any[]) {
+                        const c = classificarCobranca({ status: i.status, due_date: i.due_date, sync_status: i.sync_status });
+                        const v = Number(i.amount || 0);
+                        if (c === 'pago') pago += v;
+                        else if (c === 'vencido') vencido += v;
+                        else if (c === 'a_vencer') aVencer += v;
+                      }
+                      for (const p of parcelasAtivas as any[]) {
+                        const v = Number(p.valor_centavos) / 100;
+                        if (PAGO_ASAAS.includes(p.status)) pago += v;
+                        else if (p.data_vencimento < hoje) vencido += v;
+                        else aVencer += v;
+                      }
                       return (
                         <div className="grid grid-cols-4 gap-3">
                           {[
-                            { label: 'Total', value: pago + pendente + vencido, color: 'text-foreground' },
+                            { label: 'Total ativo', value: aVencer + vencido, color: 'text-foreground' },
                             { label: 'Pago', value: pago, color: 'text-emerald-500' },
-                            { label: 'Pendente', value: pendente, color: 'text-amber-500' },
+                            { label: 'A vencer', value: aVencer, color: 'text-amber-500' },
                             { label: 'Vencido', value: vencido, color: 'text-red-500' },
                           ].map(item => (
                             <div key={item.label} className="text-center">
@@ -3185,59 +3237,110 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                     <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
                   ) : invoices.length === 0 ? (
                     <EmptyState icon={CreditCard} title="Nenhuma fatura" description="As faturas deste cliente aparecerão aqui" />
-                  ) : (
-                    <div className="space-y-2">
-                      <AnimatePresence>
-                        {invoices.map((inv, i) => {
-                          const STATUS = {
-                            paid: { label: 'Paga', cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
-                            pending: { label: 'Pendente', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
-                            overdue: { label: 'Vencida', cls: 'bg-red-500/15 text-red-400 border-red-500/30' },
-                            cancelled: { label: 'Cancelada', cls: 'bg-muted text-muted-foreground border-border' },
-                          }[inv.status] || { label: inv.status, cls: 'bg-muted text-muted-foreground' };
-                          const temAcordo = !!(inv as any).acordo_id;
-                          const canceladaPorAcordo = temAcordo && inv.status === 'cancelled';
-                          return (
-                            <motion.div
-                              key={inv.id}
-                              initial={{ opacity: 0, y: -6 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: i * 0.04 }}
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => { setSelectedInvoice(inv as any); setInvoiceSheetOpen(true); }}
-                              onKeyDown={(e) => { if (e.key === 'Enter') { setSelectedInvoice(inv as any); setInvoiceSheetOpen(true); } }}
-                              className={cn(
-                                'flex items-center gap-3 p-3 rounded-xl border bg-card cursor-pointer transition-all hover:shadow-md',
-                                inv.status === 'overdue' ? 'border-red-500/30 hover:border-red-500/60'
-                                  : inv.status === 'pending' ? 'border-amber-500/30 hover:border-amber-500/60'
-                                  : 'border-border hover:border-primary/40'
-                              )}
+                  ) : (() => {
+                    const acordosAtivosIds = new Set(acordos.filter(a => a.status === 'ativo').map(a => a.id));
+                    const idsParcelas = new Set(
+                      acordoParcelas.filter(p => acordosAtivosIds.has(p.acordo_id) && p.status !== 'CANCELLED')
+                        .map((p: any) => p.asaas_payment_id).filter(Boolean)
+                    );
+                    const lista = (invoices as any[]).filter(i => !idsParcelas.has(i.asaas_invoice_id));
+                    const byDueAsc = (a: any, b: any) => (a.due_date || '').localeCompare(b.due_date || '');
+                    const grupo = (c: string) => lista.filter(i =>
+                      classificarCobranca({ status: i.status, due_date: i.due_date, sync_status: i.sync_status }) === c);
+                    const vencidas = grupo('vencido').sort(byDueAsc);
+                    const aVencer = grupo('a_vencer').sort(byDueAsc);
+                    const pagas = grupo('pago').sort((a, b) => (b.payment_date || b.due_date || '').localeCompare(a.payment_date || a.due_date || ''));
+                    const historico = grupo('inativo').sort((a, b) => (b.due_date || '').localeCompare(a.due_date || ''));
+
+                    const renderItem = (inv: any, i: number) => {
+                      const cls = classificarCobranca({ status: inv.status, due_date: inv.due_date, sync_status: inv.sync_status });
+                      const removida = inv.sync_status && inv.sync_status !== 'ativa';
+                      const temAcordo = !!inv.acordo_id;
+                      const canceladaPorAcordo = temAcordo && cls === 'inativo';
+                      const origem: OrigemCobranca = inv.origem === 'asaas' || inv.origem === 'acordo' || inv.origem === 'interna'
+                        ? inv.origem
+                        : (inv.asaas_invoice_id ? 'asaas' : 'interna');
+                      const STATUS = removida
+                        ? { label: 'Removida do Asaas', cls: 'bg-muted text-muted-foreground border-border' }
+                        : cls === 'pago' ? { label: 'Paga', cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' }
+                        : cls === 'vencido' ? { label: 'Vencida', cls: 'bg-red-500/15 text-red-400 border-red-500/30' }
+                        : cls === 'a_vencer' ? { label: 'A vencer', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30' }
+                        : { label: 'Cancelada', cls: 'bg-muted text-muted-foreground border-border' };
+                      return (
+                        <motion.div
+                          key={inv.id}
+                          initial={{ opacity: 0, y: -6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: Math.min(i, 8) * 0.04 }}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => { setSelectedInvoice(inv as any); setInvoiceSheetOpen(true); }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { setSelectedInvoice(inv as any); setInvoiceSheetOpen(true); } }}
+                          className={cn(
+                            'flex items-center gap-3 p-3 rounded-xl border bg-card cursor-pointer transition-all hover:shadow-md',
+                            cls === 'vencido' ? 'border-red-500/30 hover:border-red-500/60'
+                              : cls === 'a_vencer' ? 'border-amber-500/30 hover:border-amber-500/60'
+                              : 'border-border hover:border-primary/40'
+                          )}
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                            <Receipt className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{inv.description}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              Vence: {inv.due_date ? format(new Date(inv.due_date), 'dd/MM/yyyy', { locale: ptBR }) : '—'}
+                              {canceladaPorAcordo
+                                ? ' · Cancelada por acordo'
+                                : cls === 'inativo' && inv.cancelado_em
+                                  ? ` · Cancelada manualmente${inv.cancelamento_motivo ? `: ${inv.cancelamento_motivo}` : ''}`
+                                  : ''}
+                            </p>
+                          </div>
+                          <div className="text-right flex-shrink-0 space-y-0.5">
+                            <p className="font-bold text-sm">{Number(inv.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                            <div className="flex items-center justify-end gap-1">
+                              <Badge variant="outline" className="text-[9px] h-4 px-1 text-muted-foreground">{LABEL_ORIGEM[origem]}</Badge>
+                              <Badge className={cn('border text-[10px] h-4 px-1.5', STATUS.cls)}>{STATUS.label}</Badge>
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    };
+
+                    const secao = (titulo: string, itens: any[]) => itens.length === 0 ? null : (
+                      <div className="space-y-2">
+                        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                          {titulo} ({itens.length})
+                        </p>
+                        {itens.map(renderItem)}
+                      </div>
+                    );
+
+                    return (
+                      <div className="space-y-4">
+                        <AnimatePresence>
+                          {secao('Vencidas', vencidas)}
+                          {secao('A vencer', aVencer)}
+                          {secao('Pagas', pagas)}
+                        </AnimatePresence>
+                        {historico.length > 0 && (
+                          <div className="space-y-2">
+                            <Button
+                              variant="ghost" size="sm"
+                              className="h-7 px-2 text-[11px] text-muted-foreground"
+                              onClick={() => setMostrarHistoricoFin(v => !v)}
                             >
-                              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                                <Receipt className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{inv.description}</p>
-                                <p className="text-[10px] text-muted-foreground">
-                                  Vence: {format(new Date(inv.due_date), 'dd/MM/yyyy', { locale: ptBR })}
-                                  {canceladaPorAcordo
-                                    ? ' · Cancelada por acordo'
-                                    : inv.status === 'cancelled' && (inv as any).cancelado_em
-                                      ? ` · Cancelada manualmente${(inv as any).cancelamento_motivo ? `: ${(inv as any).cancelamento_motivo}` : ''}`
-                                      : ''}
-                                </p>
-                              </div>
-                              <div className="text-right flex-shrink-0">
-                                <p className="font-bold text-sm">{Number(inv.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                                <Badge className={cn('border text-[10px] h-4 px-1.5', STATUS.cls)}>{STATUS.label}</Badge>
-                              </div>
-                            </motion.div>
-                          );
-                        })}
-                      </AnimatePresence>
-                    </div>
-                  )}
+                              {mostrarHistoricoFin ? 'Ocultar histórico' : `Ver histórico (${historico.length})`}
+                            </Button>
+                            {mostrarHistoricoFin && (
+                              <div className="space-y-2 opacity-80">{historico.map(renderItem)}</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* ───── PARCELAS DE ACORDO ───── */}
                   {acordos.filter(a => a.status === 'ativo' || a.bloqueado_por_pendencia).map((ac) => {

@@ -137,3 +137,6 @@ verify_jwt = false
 
 [functions.criar-acordo-cliente]
 verify_jwt = false
+
+[functions.sync-asaas-client-invoices]
+verify_jwt = false

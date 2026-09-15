@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { FazerAcordoDialog } from "./FazerAcordoDialog";
+import { classificarCobranca, contaNoTotalAtivo, LABEL_ORIGEM, LABEL_CLASSIFICACAO, type OrigemCobranca } from "@/lib/financeiro/statusCobranca";
 
 export interface InvoiceLike {
   id: string;
@@ -22,6 +23,8 @@ export interface InvoiceLike {
   invoice_url?: string | null;
   asaas_invoice_id?: string | null;
   acordo_id?: string | null;
+  sync_status?: string | null;
+  origem?: string | null;
 }
 
 interface Props {
@@ -35,8 +38,6 @@ interface Props {
 const brl = (v: number) => Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmt = (iso: string) => { const [y, m, d] = (iso || "").split("-"); return d ? `${d}/${m}/${y}` : "—"; };
 
-const ABERTAS = ["pending", "overdue"];
-
 export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFinance, onChanged }: Props) {
   const [asaas, setAsaas] = useState<{ status: string; link: string | null } | null>(null);
   const [loadingAsaas, setLoadingAsaas] = useState(false);
@@ -49,7 +50,14 @@ export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFina
   const [excluindo, setExcluindo] = useState(false);
 
   const busy = cobrando || retrying || excluindo;
-  const isOpenInvoice = !!invoice && ABERTAS.includes(invoice.status);
+  const classificacao = invoice
+    ? classificarCobranca({ status: invoice.status, due_date: invoice.due_date, sync_status: invoice.sync_status })
+    : "inativo";
+  // Ações financeiras apenas em cobranças realmente ativas (a vencer ou vencidas).
+  const isOpenInvoice = !!invoice && contaNoTotalAtivo(classificacao);
+  const origem: OrigemCobranca = invoice?.origem === "asaas" || invoice?.origem === "acordo" || invoice?.origem === "interna"
+    ? invoice.origem
+    : (invoice?.asaas_invoice_id ? "asaas" : "interna");
   const diasAtraso = invoice
     ? Math.max(0, Math.floor((Date.now() - new Date(invoice.due_date + "T00:00:00").getTime()) / 86400000))
     : 0;
@@ -146,13 +154,16 @@ export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFina
 
   if (!invoice) return null;
 
-  const statusCls = invoice.status === "overdue"
+  const statusCls = classificacao === "vencido"
     ? "bg-red-500/15 text-red-500 border-red-500/30"
-    : invoice.status === "pending"
+    : classificacao === "a_vencer"
       ? "bg-amber-500/15 text-amber-600 border-amber-500/30"
-      : invoice.status === "paid"
+      : classificacao === "pago"
         ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
         : "bg-muted text-muted-foreground border-border";
+  const removida = !!invoice.sync_status && invoice.sync_status !== "ativa";
+  const statusLabel = removida ? "Removida do Asaas" : LABEL_CLASSIFICACAO[classificacao];
+
 
   return (
     <>
@@ -166,9 +177,10 @@ export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFina
           <div className="space-y-3">
             <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
               {[
+                { l: "Origem", v: LABEL_ORIGEM[origem] },
                 { l: "Valor", v: brl(invoice.amount) },
                 { l: "Vencimento", v: fmt(invoice.due_date) },
-                ...(invoice.status === "overdue" ? [{ l: "Dias em atraso", v: `${diasAtraso} dia${diasAtraso !== 1 ? "s" : ""}` }] : []),
+                ...(classificacao === "vencido" ? [{ l: "Dias em atraso", v: `${diasAtraso} dia${diasAtraso !== 1 ? "s" : ""}` }] : []),
               ].map((x) => (
                 <div key={x.l} className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">{x.l}</span>
@@ -177,7 +189,7 @@ export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFina
               ))}
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Situação no CRM</span>
-                <Badge variant="outline" className={cn("h-5 text-[10px]", statusCls)}>{invoice.status}</Badge>
+                <Badge variant="outline" className={cn("h-5 text-[10px]", statusCls)}>{statusLabel}</Badge>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Situação no Asaas</span>
@@ -225,7 +237,7 @@ export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFina
 
             {!isOpenInvoice && (
               <p className="text-[11px] text-muted-foreground text-center">
-                Cobrança {invoice.status} — disponível apenas para consulta.
+                Cobrança {statusLabel.toLowerCase()} — disponível apenas para consulta.
               </p>
             )}
           </div>
