@@ -4491,6 +4491,47 @@ export type Database = {
         }
         Relationships: []
       }
+      rpi_enrichment_field_log: {
+        Row: {
+          applied_by: string | null
+          created_at: string
+          field_name: string
+          id: string
+          new_value: string | null
+          previous_value: string | null
+          process_number: string
+          rpi_entry_id: string
+        }
+        Insert: {
+          applied_by?: string | null
+          created_at?: string
+          field_name: string
+          id?: string
+          new_value?: string | null
+          previous_value?: string | null
+          process_number: string
+          rpi_entry_id: string
+        }
+        Update: {
+          applied_by?: string | null
+          created_at?: string
+          field_name?: string
+          id?: string
+          new_value?: string | null
+          previous_value?: string | null
+          process_number?: string
+          rpi_entry_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rpi_enrichment_field_log_rpi_entry_id_fkey"
+            columns: ["rpi_entry_id"]
+            isOneToOne: false
+            referencedRelation: "rpi_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rpi_enrichment_queue: {
         Row: {
           attempts: number
@@ -4710,6 +4751,87 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      rpi_process_lookups: {
+        Row: {
+          brand_name: string | null
+          class_status: string | null
+          created_at: string
+          current_status: string | null
+          detail_status: string | null
+          expiry_date: string | null
+          filing_date: string | null
+          grant_date: string | null
+          holder: string | null
+          id: string
+          last_error_at: string | null
+          last_error_code: string | null
+          legal_representative: string | null
+          lookup_status: string
+          nature: string | null
+          ncl_class: string | null
+          presentation: string | null
+          priority_date: string | null
+          process_number: string
+          queried_at: string | null
+          source: string | null
+          source_url: string | null
+          specification: string | null
+          updated_at: string
+        }
+        Insert: {
+          brand_name?: string | null
+          class_status?: string | null
+          created_at?: string
+          current_status?: string | null
+          detail_status?: string | null
+          expiry_date?: string | null
+          filing_date?: string | null
+          grant_date?: string | null
+          holder?: string | null
+          id?: string
+          last_error_at?: string | null
+          last_error_code?: string | null
+          legal_representative?: string | null
+          lookup_status?: string
+          nature?: string | null
+          ncl_class?: string | null
+          presentation?: string | null
+          priority_date?: string | null
+          process_number: string
+          queried_at?: string | null
+          source?: string | null
+          source_url?: string | null
+          specification?: string | null
+          updated_at?: string
+        }
+        Update: {
+          brand_name?: string | null
+          class_status?: string | null
+          created_at?: string
+          current_status?: string | null
+          detail_status?: string | null
+          expiry_date?: string | null
+          filing_date?: string | null
+          grant_date?: string | null
+          holder?: string | null
+          id?: string
+          last_error_at?: string | null
+          last_error_code?: string | null
+          legal_representative?: string | null
+          lookup_status?: string
+          nature?: string | null
+          ncl_class?: string | null
+          presentation?: string | null
+          priority_date?: string | null
+          process_number?: string
+          queried_at?: string | null
+          source?: string | null
+          source_url?: string | null
+          specification?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       rpi_uploads: {
         Row: {
