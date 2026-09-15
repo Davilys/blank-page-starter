@@ -337,6 +337,10 @@ export default function RecursosINPI() {
   const [step, setStep] = useState<Step>('list');
   const [resourceType, setResourceType] = useState('');
   const [selectedAgent, setSelectedAgent] = useState<AgentId>('mazzola');
+  // Verificação de disponibilidade do modelo dedicado (sem conteúdo de cliente).
+  const [checkingModel, setCheckingModel] = useState(false);
+  const [modelStatus, setModelStatus] = useState<{ ok: boolean; model?: string; error?: string } | null>(null);
+
   const [file, setFile] = useState<File | null>(null);
   const [multipleFiles, setMultipleFiles] = useState<File[]>([]);
   const [userOrientation, setUserOrientation] = useState('');
