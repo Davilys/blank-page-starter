@@ -1,0 +1,442 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
+import { toast } from 'sonner';
+import {
+  Upload, FileText, X, Loader2, CheckCircle2, AlertTriangle, Brain, Save, RefreshCw,
+  ClipboardList, Zap,
+} from 'lucide-react';
+import {
+  CASE_CATEGORIES, ACCEPTED_EXTENSIONS, MAX_FILE_BYTES, EXTRACTION_LABEL,
+  extractContent, sha256Hex, documentsFingerprint,
+  type CaseCategory, type ExtractionStatus,
+} from '@/lib/inpi/caseDocuments';
+
+interface CaseDoc {
+  id: string;
+  category: CaseCategory;
+  file_name: string;
+  byte_size: number | null;
+  sha256: string | null;
+  extraction_status: ExtractionStatus;
+  extraction_notes: string | null;
+  review_status: string;
+}
+
+interface OrientationRow {
+  id: string;
+  version: number;
+  sections: Record<string, unknown>;
+  editable_text: string | null;
+  human_edited: boolean;
+  documents_fingerprint: string | null;
+  confirmed_at: string | null;
+}
+
+interface Props {
+  resourceType: string;
+  agentId: string;
+  agentName: string;
+  agentStrategy: string;
+  onBack: () => void;
+  onProceed: (payload: { caseId: string; files: File[]; orientation: string }) => void;
+}
+
+const BUCKET = 'inpi-recursos-docs';
+
+export default function CasePreparationPanel({
+  resourceType, agentId, agentName, agentStrategy, onBack, onProceed,
+}: Props) {
+  const [caseId, setCaseId] = useState<string | null>(null);
+  const [docs, setDocs] = useState<CaseDoc[]>([]);
+  const [busyCategory, setBusyCategory] = useState<CaseCategory | null>(null);
+  const [orientation, setOrientation] = useState<OrientationRow | null>(null);
+  const [orientationText, setOrientationText] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const localFiles = useRef<Map<string, File>>(new Map());
+  const inputs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  /* ── Caso: criado uma única vez por sessão de preparação. ───────────── */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data, error } = await supabase
+        .from('inpi_resource_cases')
+        .insert({
+          owner_id: user.id,
+          resource_type: resourceType,
+          agent_id: agentId,
+          agent_name: agentName,
+          status: 'documentos',
+        })
+        .select('id')
+        .single();
+      if (error) { toast.error('Não foi possível abrir o caso: ' + error.message); return; }
+      if (!cancelled) setCaseId(data.id);
+    })();
+    return () => { cancelled = true; };
+  }, [resourceType, agentId, agentName]);
+
+  const reloadDocs = useCallback(async (id: string) => {
+    const { data } = await supabase
+      .from('inpi_case_documents')
+      .select('id, category, file_name, byte_size, sha256, extraction_status, extraction_notes, review_status')
+      .eq('case_id', id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true });
+    setDocs((data || []) as CaseDoc[]);
+  }, []);
+
+  const handleFiles = async (category: CaseCategory, fileList: FileList | null) => {
+    if (!fileList?.length || !caseId) return;
+    setBusyCategory(category);
+    const { data: { user } } = await supabase.auth.getUser();
+    try {
+      for (const file of Array.from(fileList)) {
+        if (file.size > MAX_FILE_BYTES) {
+          toast.error(`${file.name}: acima de 25 MB.`);
+          continue;
+        }
+        const hash = await sha256Hex(file);
+        if (docs.some((d) => d.sha256 === hash)) {
+          toast.info(`${file.name} já estava anexado.`);
+          continue;
+        }
+        const path = `${caseId}/${category}/${crypto.randomUUID()}-${file.name}`;
+        const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, {
+          contentType: file.type || 'application/octet-stream',
+        });
+        if (upErr) { toast.error(`${file.name}: falha no envio (${upErr.message})`); continue; }
+
+        const { data: row, error: insErr } = await supabase
+          .from('inpi_case_documents')
+          .insert({
+            case_id: caseId,
+            category,
+            file_name: file.name,
+            mime_type: file.type || null,
+            declared_mime_type: file.type || null,
+            byte_size: file.size,
+            storage_path: path,
+            sha256: hash,
+            extraction_status: 'lendo',
+            uploaded_by: user?.id ?? null,
+            display_order: docs.length,
+          })
+          .select('id')
+          .single();
+        if (insErr) { toast.error(`${file.name}: ${insErr.message}`); continue; }
+
+        localFiles.current.set(row.id, file);
+        const result = await extractContent(file);
+        await supabase
+          .from('inpi_case_documents')
+          .update({
+            extraction_status: result.status,
+            extraction_notes: result.notes,
+            extracted_text: result.text,
+            page_count: result.pageCount,
+            sheet_names: result.sheetNames,
+          })
+          .eq('id', row.id);
+      }
+      await reloadDocs(caseId);
+      if (orientation) markStale();
+    } finally {
+      setBusyCategory(null);
+    }
+  };
+
+  const removeDoc = async (docId: string) => {
+    if (!caseId) return;
+    await supabase.from('inpi_case_documents').update({ is_active: false }).eq('id', docId);
+    localFiles.current.delete(docId);
+    await reloadDocs(caseId);
+    if (orientation) markStale();
+  };
+
+  const currentFingerprint = useMemo(() => documentsFingerprint(docs), [docs]);
+  const isStale = !!orientation && orientation.documents_fingerprint !== currentFingerprint;
+
+  const markStale = () => {
+    if (!orientation) return;
+    supabase.from('inpi_case_orientations').update({ is_stale: true }).eq('id', orientation.id);
+  };
+
+  const usable = docs.filter((d) => d.extraction_status !== 'falha');
+  const failed = docs.filter((d) => d.extraction_status === 'falha');
+  const missingRequired = CASE_CATEGORIES.filter(
+    (c) => c.required && !usable.some((d) => d.category === c.key),
+  );
+
+  /* ── Orientação com IA ───────────────────────────────────────────────── */
+  const generateOrientation = async () => {
+    if (!caseId) return;
+    if (!usable.length) { toast.error('Anexe ao menos um arquivo utilizável.'); return; }
+    setGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-inpi-orientation', {
+        body: {
+          caseId,
+          agentStrategy,
+          previousEdits: orientation?.human_edited ? orientationText : undefined,
+        },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Falha ao gerar orientação');
+      setOrientation(data.orientation as OrientationRow);
+      setOrientationText((data.orientation as OrientationRow).editable_text || '');
+      toast.success('Orientação gerada. Revise e confirme antes de gerar a peça.');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Falha ao gerar orientação');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const saveOrientation = async () => {
+    if (!orientation) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from('inpi_case_orientations')
+      .update({ editable_text: orientationText, human_edited: true })
+      .eq('id', orientation.id);
+    setSaving(false);
+    if (error) { toast.error(error.message); return; }
+    setOrientation({ ...orientation, editable_text: orientationText, human_edited: true });
+    toast.success('Orientação salva.');
+  };
+
+  const confirmAndProceed = async () => {
+    if (!caseId || !orientation) return;
+    if (isStale) { toast.error('Os documentos mudaram. Atualize a análise antes de gerar a peça.'); return; }
+    const { error } = await supabase
+      .from('inpi_case_orientations')
+      .update({ confirmed_at: new Date().toISOString(), editable_text: orientationText })
+      .eq('id', orientation.id);
+    if (error) { toast.error(error.message); return; }
+    const files = docs.map((d) => localFiles.current.get(d.id)).filter(Boolean) as File[];
+    if (!files.length) {
+      toast.error('Reanexe os arquivos nesta sessão para gerar a peça.');
+      return;
+    }
+    onProceed({ caseId, files, orientation: orientationText });
+  };
+
+  const requestList = useMemo(() => {
+    const rec = (orientation?.sections?.['documentos_recomendados'] as
+      | { documento?: string; finalidade?: string }[]
+      | undefined) || [];
+    if (!rec.length) return '';
+    return (
+      'Prezado cliente, para seguirmos com a sua defesa no INPI precisamos dos itens abaixo:\n\n' +
+      rec.map((r, i) => `${i + 1}. ${r.documento} — ${r.finalidade}`).join('\n')
+    );
+  }, [orientation]);
+
+  const sections = orientation?.sections as Record<string, unknown> | undefined;
+  const listOf = (key: string): string[] => {
+    const v = sections?.[key];
+    return Array.isArray(v) ? v.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))) : [];
+  };
+
+  const statusBadge = (s: ExtractionStatus) => {
+    const map: Record<ExtractionStatus, string> = {
+      pendente: 'bg-muted text-muted-foreground',
+      lendo: 'bg-primary/10 text-primary',
+      lido: 'bg-emerald-500/10 text-emerald-600',
+      nativo: 'bg-primary/10 text-primary',
+      falha: 'bg-destructive/10 text-destructive',
+    };
+    return <Badge variant="outline" className={`text-[11px] ${map[s]}`}>{EXTRACTION_LABEL[s]}</Badge>;
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* DOCUMENTOS POR FINALIDADE */}
+      <Card className="border-primary/20">
+        <CardContent className="p-6 space-y-5">
+          <div>
+            <h2 className="text-xl font-bold">Documentos do caso</h2>
+            <p className="text-sm text-muted-foreground">
+              Anexe cada arquivo na finalidade correta. Aceita PDF, imagens, Word, Excel, CSV e texto.
+            </p>
+          </div>
+
+          {CASE_CATEGORIES.map((cat) => {
+            const catDocs = docs.filter((d) => d.category === cat.key);
+            const hint = (cat.hint as Record<string, string>)[resourceType] || cat.hint.default;
+            return (
+              <div key={cat.key} className="rounded-xl border p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-sm flex items-center gap-2">
+                      {cat.label}
+                      {cat.required && <span className="text-destructive text-xs">obrigatório</span>}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>
+                  </div>
+                  <Button
+                    variant="outline" size="sm" className="rounded-lg shrink-0"
+                    disabled={!caseId || busyCategory === cat.key}
+                    onClick={() => inputs.current[cat.key]?.click()}
+                  >
+                    {busyCategory === cat.key
+                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                      : <Upload className="h-4 w-4" />}
+                    <span className="ml-2">Anexar</span>
+                  </Button>
+                  <input
+                    ref={(el) => { inputs.current[cat.key] = el; }}
+                    type="file" multiple hidden accept={ACCEPTED_EXTENSIONS}
+                    onChange={(e) => { handleFiles(cat.key, e.target.files); e.target.value = ''; }}
+                  />
+                </div>
+
+                {catDocs.map((d) => (
+                  <div key={d.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/40">
+                    <FileText className="h-4 w-4 text-primary shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm truncate">{d.file_name}</p>
+                      <p className="text-[11px] text-muted-foreground truncate">
+                        {((d.byte_size || 0) / 1024).toFixed(1)} KB
+                        {d.extraction_notes ? ` • ${d.extraction_notes}` : ''}
+                      </p>
+                    </div>
+                    {statusBadge(d.extraction_status)}
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeDoc(d.id)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+
+          <div className="rounded-xl border p-4 text-sm space-y-1 bg-muted/30">
+            <p className="font-medium">Situação do dossiê</p>
+            <p className="text-muted-foreground">
+              {usable.length} arquivo(s) utilizável(is) • {failed.length} com falha de leitura
+            </p>
+            {missingRequired.length > 0 && (
+              <p className="text-amber-600 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Falta anexar: {missingRequired.map((m) => m.label).join(', ')}. É possível seguir, mas a
+                análise ficará incompleta.
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* CONSULTORIA PREPARATÓRIA */}
+      <Card className="border-amber-500/30">
+        <CardContent className="p-6 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Brain className="h-5 w-5 text-amber-600" /> Consultoria preparatória
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                A IA analisa os anexos e devolve fundamentos, provas, riscos e a estratégia para {agentName}.
+              </p>
+            </div>
+            <Button
+              onClick={generateOrientation}
+              disabled={generating || !usable.length}
+              className="rounded-xl gap-2 shrink-0"
+            >
+              {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
+              {orientation ? 'Atualizar análise' : 'Gerar orientação com IA'}
+            </Button>
+          </div>
+
+          {isStale && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm flex items-center gap-2">
+              <RefreshCw className="h-4 w-4 text-amber-600" />
+              Os documentos mudaram depois desta análise. Atualize antes de gerar a peça.
+            </div>
+          )}
+
+          {orientation && (
+            <div className="space-y-4">
+              <Separator />
+              {[
+                { key: 'fundamentos', title: 'Fundamentos a responder' },
+                { key: 'provas', title: 'Provas disponíveis e o que demonstram' },
+                { key: 'pontos_favoraveis', title: 'Pontos favoráveis' },
+                { key: 'pontos_desfavoraveis', title: 'Pontos desfavoráveis' },
+                { key: 'lacunas', title: 'Lacunas' },
+                { key: 'documentos_recomendados', title: 'Documentos adicionais recomendados' },
+              ].map(({ key, title }) => {
+                const items = listOf(key);
+                if (!items.length) return null;
+                return (
+                  <div key={key}>
+                    <p className="font-semibold text-sm mb-1">{title}</p>
+                    <ul className="space-y-1 text-sm text-muted-foreground">
+                      {items.map((it, i) => <li key={i}>• {it}</li>)}
+                    </ul>
+                  </div>
+                );
+              })}
+
+              <div>
+                <p className="font-semibold text-sm mb-1">
+                  Estratégia para {agentName} <span className="font-normal text-muted-foreground">(editável)</span>
+                </p>
+                <Textarea
+                  value={orientationText}
+                  onChange={(e) => setOrientationText(e.target.value)}
+                  rows={10}
+                  className="text-sm resize-y"
+                />
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Button variant="outline" size="sm" className="rounded-lg gap-2" onClick={saveOrientation} disabled={saving}>
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Salvar orientação
+                  </Button>
+                  {requestList && (
+                    <Button
+                      variant="outline" size="sm" className="rounded-lg gap-2"
+                      onClick={() => {
+                        navigator.clipboard.writeText(requestList);
+                        toast.success('Lista copiada. Nada foi enviado ao cliente automaticamente.');
+                      }}
+                    >
+                      <ClipboardList className="h-4 w-4" /> Copiar pedido de documentos
+                    </Button>
+                  )}
+                  {orientation.human_edited && (
+                    <Badge variant="outline" className="text-[11px] bg-emerald-500/10 text-emerald-600">
+                      <CheckCircle2 className="h-3 w-3 mr-1" /> Editada por humano
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="flex gap-3">
+        <Button variant="outline" onClick={onBack} className="rounded-xl">Voltar</Button>
+        <Button
+          onClick={confirmAndProceed}
+          disabled={!orientation || isStale || !usable.length}
+          className="flex-1 rounded-xl h-12 gap-2"
+        >
+          <Zap className="h-5 w-5" />
+          Confirmar orientação e gerar peça com {agentName}
+        </Button>
+      </div>
+    </div>
+  );
+}
