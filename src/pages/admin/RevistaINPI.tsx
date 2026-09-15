@@ -1292,6 +1292,25 @@ export default function RevistaINPI() {
                   </div>
                 </div>
 
+                {/* Filtros rápidos */}
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Filtros de despacho">
+                  {quickFilterCounts.map(f => (
+                    <button
+                      key={f.value}
+                      type="button"
+                      onClick={() => setQuickFilter(f.value)}
+                      aria-pressed={quickFilter === f.value}
+                      className={`rounded-full border px-3 py-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                        quickFilter === f.value
+                          ? 'border-primary bg-primary/10 text-primary font-medium'
+                          : 'border-border text-muted-foreground hover:bg-muted'
+                      }`}
+                    >
+                      {f.label} <span className="opacity-60">({f.count})</span>
+                    </button>
+                  ))}
+                </div>
+
                 {/* Process Cards */}
                 <div className="space-y-3">
                   <AnimatePresence mode="popLayout">
@@ -1661,7 +1680,7 @@ export default function RevistaINPI() {
                                 </motion.div>
                               )}
                             </AnimatePresence>
-                          </Card>
+                          </div>
                         </motion.div>
                       );
                     })}
