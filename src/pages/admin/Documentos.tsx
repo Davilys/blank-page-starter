@@ -438,10 +438,14 @@ function UploadDialog({
     if (!form.user_id) { toast.error('Selecione um cliente primeiro'); return; }
     try {
       const protocol = generateProtocol();
+      const finalName = form.name || fileName;
+      const finalType = form.document_type && form.document_type !== 'outro'
+        ? form.document_type
+        : classifyDocumentName(finalName);
       const { error } = await supabase.from('documents').insert({
-        name: form.name || fileName,
+        name: finalName,
         file_url: fileUrl,
-        document_type: form.document_type,
+        document_type: finalType,
         file_size: fileSize,
         user_id: form.user_id,
         process_id: form.process_id || null,
