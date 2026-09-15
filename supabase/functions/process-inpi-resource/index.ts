@@ -1758,7 +1758,10 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
 
     if (pass2Result.error) {
       console.error('PASS 2 failed:', pass2Result.status, pass2Result.error?.substring(0, 300));
+      const cfg = modelFailureResponse(pass2Result);
+      if (cfg) return cfg;
       // Return pass 1 content with enforced header
+
       const enriched = enrichExtractedData(extractedData, pass1Content);
       const normalizedPartial = enforceMandatoryOpening(pass1Content, resourceTypeLabel, enriched);
       return new Response(JSON.stringify({
