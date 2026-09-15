@@ -26,6 +26,13 @@ import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { loadClientForSheet } from '@/lib/clientSheet';
 import type { ClientWithProcess } from '@/components/admin/clients/ClientKanbanBoard';
+import {
+  BillingSituationSection,
+  type BillingFilters,
+  type BillingPeriod,
+  type BillingSituationData,
+  type BillingSituationKey,
+} from '@/components/admin/financeiro/BillingSituationSection';
 
 // Lazy load the heavy ClientDetailSheet — same component used in Clientes/Devedores/Publicações
 const ClientDetailSheet = lazy(() =>
@@ -76,8 +83,12 @@ type PaymentType = 'avista' | 'parcelado';
 // Classificação vinda do banco (regra única: pago | a_vencer | vencido | inativo)
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; dot: string; glow: string }> = {
   pago:     { label: 'Pago',      color: 'text-emerald-400', bg: 'bg-emerald-500/10 border border-emerald-500/20', dot: 'bg-emerald-400', glow: 'shadow-emerald-500/20' },
+  recebidas:{ label: 'Recebida',  color: 'text-emerald-400', bg: 'bg-emerald-500/10 border border-emerald-500/20', dot: 'bg-emerald-400', glow: 'shadow-emerald-500/20' },
+  confirmadas:{ label: 'Confirmada', color: 'text-blue-400', bg: 'bg-blue-500/10 border border-blue-500/20', dot: 'bg-blue-400', glow: 'shadow-blue-500/20' },
   a_vencer: { label: 'A vencer',  color: 'text-amber-400',   bg: 'bg-amber-500/10 border border-amber-500/20',     dot: 'bg-amber-400',   glow: 'shadow-amber-500/20'   },
+  aguardando:{ label: 'Aguardando', color: 'text-amber-400', bg: 'bg-amber-500/10 border border-amber-500/20', dot: 'bg-amber-400', glow: 'shadow-amber-500/20' },
   vencido:  { label: 'Vencida',   color: 'text-red-400',     bg: 'bg-red-500/10 border border-red-500/20',         dot: 'bg-red-400',     glow: 'shadow-red-500/20'     },
+  vencidas: { label: 'Vencida',   color: 'text-red-400',     bg: 'bg-red-500/10 border border-red-500/20',         dot: 'bg-red-400',     glow: 'shadow-red-500/20'     },
   inativo:  { label: 'Cancelada', color: 'text-muted-foreground', bg: 'bg-muted/40 border border-border',          dot: 'bg-muted-foreground', glow: '' },
 };
 
@@ -96,6 +107,19 @@ const PAYMENT_OPTIONS = {
 const INSTALLMENT_OPTIONS = { boleto: [1, 2, 3, 4, 5, 6], cartao: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] };
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
+const EMPTY_BILLING_CATEGORY = { gross_amount: 0, net_amount: null, clients_count: 0, invoices_count: 0, composition: [] };
+const EMPTY_BILLING_DATA: BillingSituationData = {
+  total: 0,
+  net_available: false,
+  categories: {
+    recebidas: EMPTY_BILLING_CATEGORY,
+    confirmadas: EMPTY_BILLING_CATEGORY,
+    aguardando: EMPTY_BILLING_CATEGORY,
+    vencidas: EMPTY_BILLING_CATEGORY,
+  },
+  series: [],
+};
 
 export default function AdminFinanceiro() {
   const navigate = useNavigate();
@@ -158,13 +182,18 @@ export default function AdminFinanceiro() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const [totals, setTotals] = useState({
-    total: 0, pago: 0, a_vencer: 0, vencido: 0,
-    count_total: 0, count_pago: 0, count_a_vencer: 0, count_vencido: 0,
+  const [billingData, setBillingData] = useState<BillingSituationData>(EMPTY_BILLING_DATA);
+  const [billingLoading, setBillingLoading] = useState(true);
+  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('month');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [billingFilters, setBillingFilters] = useState<BillingFilters>({
+    account: '', paymentMethod: '', client: '', origin: '',
+    dueFrom: '', dueTo: '', paymentFrom: '', paymentTo: '',
   });
   const [syncing, setSyncing] = useState(false);
   const [syncRun, setSyncRun] = useState<any | null>(null);
-  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('month');
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -179,21 +208,33 @@ export default function AdminFinanceiro() {
 
   const dateRange = useMemo(() => {
     const today = new Date();
-    if (dateFilter === 'today') {
+    if (billingPeriod === 'today') {
       const d = format(startOfDay(today), 'yyyy-MM-dd');
       return { from: d, to: d };
     }
-    if (dateFilter === 'week') {
+    if (billingPeriod === 'week') {
       return {
         from: format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
         to: format(endOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
       };
     }
-    if (dateFilter === 'month') {
-      return { from: format(startOfMonth(selectedMonth), 'yyyy-MM-dd'), to: format(endOfMonth(selectedMonth), 'yyyy-MM-dd') };
+    if (billingPeriod === 'month') {
+      return { from: format(startOfMonth(today), 'yyyy-MM-dd'), to: format(endOfMonth(today), 'yyyy-MM-dd') };
     }
+    if (billingPeriod === 'previous_month') {
+      const previous = subMonths(today, 1);
+      return { from: format(startOfMonth(previous), 'yyyy-MM-dd'), to: format(endOfMonth(previous), 'yyyy-MM-dd') };
+    }
+    if (billingPeriod === 'quarter') {
+      const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3;
+      const quarterStart = new Date(today.getFullYear(), quarterStartMonth, 1);
+      const quarterEnd = new Date(today.getFullYear(), quarterStartMonth + 3, 0);
+      return { from: format(quarterStart, 'yyyy-MM-dd'), to: format(quarterEnd, 'yyyy-MM-dd') };
+    }
+    if (billingPeriod === 'year') return { from: `${today.getFullYear()}-01-01`, to: `${today.getFullYear()}-12-31` };
+    if (billingPeriod === 'custom') return { from: customFrom || null, to: customTo || null };
     return { from: null as string | null, to: null as string | null };
-  }, [dateFilter, selectedMonth]);
+  }, [billingPeriod, customFrom, customTo]);
 
   // ── Sincronização geral com o Asaas (em blocos, retomável) ──────────────
   const runSyncLoop = useCallback(async (runInicial: any) => {
@@ -275,9 +316,9 @@ export default function AdminFinanceiro() {
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('admin_invoices_list', {
+      const { data, error } = await supabase.rpc('admin_invoices_list_filtered', {
         p_search: debouncedSearch || null,
-        p_status: filterStatus,
+        p_situation: filterStatus,
         p_from: dateRange.from,
         p_to: dateRange.to,
         p_owner: ownerFilter,
@@ -285,6 +326,14 @@ export default function AdminFinanceiro() {
         p_dir: sortDir,
         p_limit: PAGE_SIZE,
         p_offset: (page - 1) * PAGE_SIZE,
+        p_account: billingFilters.account || null,
+        p_payment_method: billingFilters.paymentMethod || null,
+        p_client: billingFilters.client || null,
+        p_origin: billingFilters.origin || null,
+        p_due_from: billingFilters.dueFrom || null,
+        p_due_to: billingFilters.dueTo || null,
+        p_payment_from: billingFilters.paymentFrom || null,
+        p_payment_to: billingFilters.paymentTo || null,
       });
       if (error) throw error;
       const rows = (data || []) as unknown as Invoice[];
@@ -300,29 +349,43 @@ export default function AdminFinanceiro() {
       setTotalCount(0);
     }
     setLoading(false);
-  }, [debouncedSearch, filterStatus, dateRange.from, dateRange.to, ownerFilter, sortKey, sortDir, page]);
+  }, [debouncedSearch, filterStatus, dateRange.from, dateRange.to, ownerFilter, sortKey, sortDir, page, billingFilters]);
 
   const fetchTotals = useCallback(async () => {
+    setBillingLoading(true);
     try {
-      const { data, error } = await supabase.rpc('admin_invoices_totals', {
+      const { data, error } = await supabase.rpc('admin_billing_situation', {
         p_from: dateRange.from,
         p_to: dateRange.to,
         p_owner: ownerFilter,
+        p_account: billingFilters.account || null,
+        p_payment_method: billingFilters.paymentMethod || null,
+        p_client: billingFilters.client || null,
+        p_origin: billingFilters.origin || null,
+        p_due_from: billingFilters.dueFrom || null,
+        p_due_to: billingFilters.dueTo || null,
+        p_payment_from: billingFilters.paymentFrom || null,
+        p_payment_to: billingFilters.paymentTo || null,
       });
       if (error) throw error;
-      const t = (data || {}) as any;
-      setTotals({
-        total: Number(t.total || 0),
-        pago: Number(t.pago || 0),
-        a_vencer: Number(t.a_vencer || 0),
-        vencido: Number(t.vencido || 0),
-        count_total: Number(t.count_total || 0),
-        count_pago: Number(t.count_pago || 0),
-        count_a_vencer: Number(t.count_a_vencer || 0),
-        count_vencido: Number(t.count_vencido || 0),
+      const raw = (data || {}) as any;
+      const normalized = { ...EMPTY_BILLING_DATA, ...raw, categories: { ...EMPTY_BILLING_DATA.categories, ...(raw.categories || {}) } };
+      (Object.keys(normalized.categories) as BillingSituationKey[]).forEach((key) => {
+        const category = normalized.categories[key];
+        normalized.categories[key] = {
+          ...EMPTY_BILLING_CATEGORY,
+          ...category,
+          gross_amount: Number(category?.gross_amount || 0),
+          net_amount: category?.net_amount == null ? null : Number(category.net_amount),
+          clients_count: Number(category?.clients_count || 0),
+          invoices_count: Number(category?.invoices_count || 0),
+          composition: (category?.composition || []).map((item: any) => ({ ...item, amount: Number(item.amount || 0), count: Number(item.count || 0) })),
+        };
       });
+      setBillingData({ ...normalized, total: Number(normalized.total || 0) });
     } catch (e) { console.warn('totais indisponíveis', e); }
-  }, [dateRange.from, dateRange.to, ownerFilter]);
+    finally { setBillingLoading(false); }
+  }, [dateRange.from, dateRange.to, ownerFilter, billingFilters]);
 
   useEffect(() => {
     if (currentUserId !== null) { fetchInvoices(); }
@@ -424,10 +487,6 @@ export default function AdminFinanceiro() {
 
   const handleDialogClose = (open: boolean) => { setDialogOpen(open); if (!open) resetForm(); };
   const copyToClipboard = (text: string) => { navigator.clipboard.writeText(text); toast.success('Código copiado!'); };
-
-  const paidPct = totals.total > 0 ? (totals.pago / totals.total) * 100 : 0;
-  const pendingPct = totals.total > 0 ? (totals.a_vencer / totals.total) * 100 : 0;
-  const overduePct = totals.total > 0 ? (totals.vencido / totals.total) * 100 : 0;
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const inicioFaixa = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;

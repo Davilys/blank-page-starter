@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { BarChart3, ChevronRight, Filter, Info, LayoutGrid, X } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
@@ -264,6 +265,7 @@ export function BillingSituationSection({
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Filtros das cobranças</DialogTitle></DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5"><Label>Status</Label><Select value={activeSituation} onValueChange={(value) => onSituationChange(value as BillingSituationKey | 'all')}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem>{CARD_CONFIG.map((item) => <SelectItem key={item.key} value={item.key}>{item.title}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-1.5"><Label>Conta Asaas</Label><Input value={filters.account} onChange={(event) => onFiltersChange({ ...filters, account: event.target.value })} placeholder="ID da conta no Asaas" /></div>
             <div className="space-y-1.5"><Label>Forma de pagamento</Label><Select value={filters.paymentMethod || 'all'} onValueChange={(value) => onFiltersChange({ ...filters, paymentMethod: value === 'all' ? '' : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todas</SelectItem><SelectItem value="pix">Pix</SelectItem><SelectItem value="boleto">Boleto</SelectItem><SelectItem value="credit_card">Cartão</SelectItem></SelectContent></Select></div>
             <div className="space-y-1.5"><Label>Cliente</Label><Select value={filters.client || 'all'} onValueChange={(value) => onFiltersChange({ ...filters, client: value === 'all' ? '' : value })}><SelectTrigger><SelectValue placeholder="Todos os clientes" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os clientes</SelectItem>{clients.map((client) => <SelectItem key={client.id} value={client.id}>{client.full_name || client.email}</SelectItem>)}</SelectContent></Select></div>
@@ -282,5 +284,3 @@ export function BillingSituationSection({
     </section>
   );
 }
-
-import * as React from 'react';
