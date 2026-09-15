@@ -591,10 +591,11 @@ serve(async (req) => {
 
     console.log(`Fetching RPI ${targetRpi}...`);
 
-    // Try to download with session
-    const xmlContent = await tryDownloadRpiXml(targetRpi, sessionCookies);
+    const t0 = Date.now();
+    const { feed, finish } = createScanner();
+    const download = await downloadAndScanRpiXml(targetRpi, sessionCookies, feed);
 
-    if (!xmlContent) {
+    if (!download.ok) {
       const latestWithXml = withXml.length > 0 ? withXml[0] : null;
       return new Response(
         JSON.stringify({
@@ -611,21 +612,27 @@ serve(async (req) => {
       );
     }
 
-    // Parse and process
-    const extractedProcesses = parseRpiXml(xmlContent, targetRpi);
-    console.log(`Found ${extractedProcesses.length} processes`);
+    const scan = finish();
+    const elapsedMs = Date.now() - t0;
+    console.log(
+      `Scan: ${scan.totalBlocks} blocos, ${scan.processes.length} processos únicos, ${scan.totalMentions} menções, ${scan.bytesRead} caracteres em ${elapsedMs}ms`,
+    );
 
-    if (extractedProcesses.length === 0) {
+    if (scan.processes.length === 0) {
       const { data: rpiUpload } = await supabase
         .from('rpi_uploads')
         .insert({
           file_name: `RPI_${targetRpi}_auto.xml`,
           file_path: `remote/RPI_${targetRpi}.xml`,
+          source_file_url: download.sourceUrl,
           rpi_number: targetRpi.toString(),
           rpi_date: new Date().toISOString().split('T')[0],
           status: 'completed',
+          is_preview: isPreview,
           total_processes_found: 0,
           total_clients_matched: 0,
+          total_mentions: 0,
+          parse_stats: { blocks: scan.totalBlocks, chars: scan.bytesRead, elapsed_ms: elapsedMs },
           summary: `RPI ${targetRpi} analisada. Nenhum processo do procurador ${ATTORNEY_NAME} foi publicado nesta edição.`,
           processed_at: new Date().toISOString(),
         })
@@ -637,6 +644,7 @@ serve(async (req) => {
           success: true,
           rpiNumber: targetRpi,
           totalProcesses: 0,
+          totalMentions: 0,
           matchedClients: 0,
           uploadId: rpiUpload?.id,
           message: `RPI ${targetRpi} processada. Nenhum processo do procurador encontrado.`,
@@ -650,57 +658,188 @@ serve(async (req) => {
       .insert({
         file_name: `RPI_${targetRpi}_auto.xml`,
         file_path: `remote/RPI_${targetRpi}.xml`,
+        source_file_url: download.sourceUrl,
         rpi_number: targetRpi.toString(),
         rpi_date: new Date().toISOString().split('T')[0],
         status: 'processing',
+        is_preview: isPreview,
       })
       .select()
       .single();
 
     if (uploadError) throw uploadError;
 
+    // ── vinculação segura ao cliente ───────────────────────────
     const { data: existingProcesses } = await supabase
       .from('brand_processes')
       .select('id, process_number, user_id, brand_name');
 
     const processMap = new Map(
-      (existingProcesses || []).map(p => [p.process_number?.replace(/\D/g, ''), p])
+      (existingProcesses || []).map((p: any) => [String(p.process_number || '').replace(/\D/g, ''), p]),
     );
 
     let matchedClients = 0;
-    const entries = extractedProcesses.map(proc => {
-      const cleanNumber = proc.processNumber.replace(/\D/g, '');
-      const existingProcess = processMap.get(cleanNumber);
-      if (existingProcess?.user_id) matchedClients++;
+    let ambiguous = 0;
+    const entries: any[] = [];
 
-      return {
+    for (const proc of scan.processes) {
+      const cleanNumber = proc.processNumber;
+      const existingProcess = processMap.get(cleanNumber);
+
+      let matchedClientId: string | null = existingProcess?.user_id ?? null;
+      let matchedProcessId: string | null = existingProcess?.id ?? null;
+      const candidates: any[] = [];
+
+      // Sem processo no CRM: tenta CPF/CNPJ exato do titular
+      if (!matchedClientId) {
+        const docs = proc.holders
+          .map((h) => (h.name.match(/\d{11,14}/) || [])[0])
+          .filter(Boolean) as string[];
+        for (const doc of docs) {
+          const { data: found } = await supabase.rpc('profiles_by_doc_digits', { p_doc: doc });
+          if (found && found.length === 1) {
+            matchedClientId = found[0].id;
+            candidates.push({ tipo: 'cpf_cnpj_exato', doc, profile_id: found[0].id });
+            break;
+          }
+          if (found && found.length > 1) {
+            ambiguous++;
+            candidates.push({ tipo: 'cpf_cnpj_ambiguo', doc, quantidade: found.length });
+          }
+        }
+      }
+
+      // Marca nunca vincula sozinha: entra apenas como candidato auxiliar
+      if (!matchedClientId && proc.brandName) {
+        const alvo = proc.brandName.toLowerCase();
+        const porMarca = (existingProcesses || []).filter(
+          (p: any) => (p.brand_name || '').toLowerCase().trim() === alvo,
+        );
+        if (porMarca.length > 0) {
+          ambiguous++;
+          for (const p of porMarca.slice(0, 5)) {
+            candidates.push({ tipo: 'marca_semelhante', process_id: p.id, user_id: p.user_id, brand_name: p.brand_name });
+          }
+        }
+      }
+
+      if (matchedClientId) matchedClients++;
+
+      const needsReview =
+        proc.isDestituicao || proc.isNomeacao || proc.isSubstituicao || (!matchedClientId && candidates.length > 0);
+
+      const holderName = proc.holders[0]?.name ?? proc.requerentes[0]?.name ?? null;
+
+      const fieldSources: Record<string, string> = {};
+      const mark = (field: string, value: unknown) => {
+        if (value !== null && value !== undefined && value !== '') fieldSources[field] = 'rpi_xml';
+      };
+      mark('brand_name', proc.brandName);
+      mark('holder_name', holderName);
+      mark('dispatch_code', proc.primaryDispatchCode);
+      mark('deposit_date', proc.depositDate);
+      mark('ncl_classes', proc.nclClasses.length ? proc.nclClasses : null);
+
+      entries.push({
         rpi_upload_id: rpiUpload.id,
         process_number: cleanNumber,
         brand_name: proc.brandName,
-        holder_name: proc.holderName,
-        attorney_name: proc.attorneyName || ATTORNEY_NAME,
+        holder_name: holderName,
+        attorney_name: ATTORNEY_NAME,
         ncl_classes: proc.nclClasses.length > 0 ? proc.nclClasses : null,
-        dispatch_code: proc.dispatchCode,
-        dispatch_text: proc.dispatchText,
-        dispatch_type: proc.dispatchType,
-        publication_date: convertBrazilianDateToISO(proc.publicationDate),
-        matched_client_id: existingProcess?.user_id || null,
-        matched_process_id: existingProcess?.id || null,
+        dispatch_code: proc.primaryDispatchCode,
+        dispatch_text: proc.primaryDispatchText,
+        dispatch_type: proc.primaryDispatchName || determineDispatchType(proc.primaryDispatchCode, proc.primaryDispatchText),
+        publication_date: null,
+        matched_client_id: matchedClientId,
+        matched_process_id: matchedProcessId,
         update_status: 'pending',
-      };
-    });
+        occurrences_count: proc.occurrences.length,
+        occurrences: proc.occurrences,
+        relation_types: proc.occurrences.length > 1
+          ? Array.from(new Set([...proc.relationTypes, 'multiplas_ocorrencias']))
+          : proc.relationTypes,
+        relation_primary: proc.relationPrimary,
+        relation_confidence: proc.relationConfidence,
+        is_destituicao: proc.isDestituicao,
+        is_nomeacao: proc.isNomeacao,
+        is_substituicao: proc.isSubstituicao,
+        procurador_anterior: proc.procuradorAnterior,
+        procurador_novo: proc.procuradorNovo,
+        needs_human_review: needsReview,
+        review_reason: proc.isDestituicao
+          ? 'Procurador destituído nesta publicação'
+          : (!matchedClientId && candidates.length > 0 ? 'Vínculo ambíguo — confirmar cliente' : null),
+        deposit_date: proc.depositDate,
+        concession_date: proc.concessionDate,
+        validity_date: proc.validityDate,
+        natureza: proc.natureza,
+        apresentacao: proc.apresentacao,
+        apostila: proc.apostila,
+        titulares: proc.holders,
+        requerentes: proc.requerentes,
+        procuradores: proc.procuradores,
+        dispatches: proc.dispatches,
+        protocols: proc.protocols,
+        ncl_specifications: proc.nclSpecifications,
+        vienna_classes: proc.viennaClasses,
+        field_sources: fieldSources,
+        match_candidates: candidates,
+        process_block_hash: await sha256Hex(`${targetRpi}:${cleanNumber}:${proc.occurrences.length}`),
+        source_file_ref: download.sourceUrl,
+        enrichment_status: proc.brandName && holderName ? 'completo' : 'pendente',
+      });
+    }
 
-    const { error: entriesError } = await supabase.from('rpi_entries').insert(entries);
+    const { data: insertedEntries, error: entriesError } = await supabase
+      .from('rpi_entries')
+      .upsert(entries, { onConflict: 'rpi_upload_id,process_number' })
+      .select('id, process_number, enrichment_status');
     if (entriesError) throw entriesError;
 
-    const summary = `RPI ${targetRpi} processada. ${extractedProcesses.length} publicações do procurador encontradas, ${matchedClients} correspondem a clientes WebMarcas.`;
+    // Fila de complementação: só o que ficou incompleto
+    const pendentes = (insertedEntries || []).filter((e: any) => e.enrichment_status === 'pendente');
+    if (pendentes.length > 0) {
+      await supabase.from('rpi_enrichment_queue').upsert(
+        pendentes.map((e: any) => ({
+          rpi_entry_id: e.id,
+          process_number: e.process_number,
+          status: 'pendente',
+          next_attempt_at: new Date().toISOString(),
+        })),
+        { onConflict: 'rpi_entry_id' },
+      );
+    }
+
+    const stats = {
+      blocks: scan.totalBlocks,
+      chars: scan.bytesRead,
+      elapsed_ms: elapsedMs,
+      mentions: scan.totalMentions,
+      unique_processes: scan.processes.length,
+      with_brand_xml: scan.processes.filter((p) => !!p.brandName).length,
+      with_holder_xml: scan.processes.filter((p) => p.holders.length > 0).length,
+      with_dispatch_code: scan.processes.filter((p) => !!p.primaryDispatchCode).length,
+      destituicoes: scan.processes.filter((p) => p.isDestituicao).length,
+      nomeacoes: scan.processes.filter((p) => p.isNomeacao).length,
+      substituicoes: scan.processes.filter((p) => p.isSubstituicao).length,
+      peticoes: scan.processes.filter((p) => p.relationTypes.includes('procurador_protocolo')).length,
+      ambiguos: ambiguous,
+      pendentes_enriquecimento: pendentes.length,
+    };
+
+    const summary = isPreview
+      ? `Prévia da RPI ${targetRpi}: ${scan.totalMentions} menções, ${scan.processes.length} processos únicos, ${matchedClients} vinculados a clientes. Nenhuma automação disparada.`
+      : `RPI ${targetRpi} processada. ${scan.processes.length} publicações do procurador encontradas, ${matchedClients} correspondem a clientes WebMarcas.`;
 
     await supabase
       .from('rpi_uploads')
       .update({
         status: 'completed',
-        total_processes_found: extractedProcesses.length,
+        total_processes_found: scan.processes.length,
         total_clients_matched: matchedClients,
+        total_mentions: scan.totalMentions,
+        parse_stats: stats,
         summary,
         processed_at: new Date().toISOString(),
       })
@@ -710,19 +849,27 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         rpiNumber: targetRpi,
-        totalProcesses: extractedProcesses.length,
+        preview: isPreview,
+        totalProcesses: scan.processes.length,
+        totalMentions: scan.totalMentions,
         matchedClients,
         uploadId: rpiUpload.id,
         message: summary,
-        processes: extractedProcesses.map(p => ({
+        stats,
+        processes: scan.processes.map((p) => ({
           processNumber: p.processNumber,
           brandName: p.brandName,
-          dispatchType: p.dispatchType,
-          holderName: p.holderName,
+          holderName: p.holders[0]?.name ?? null,
+          dispatchCode: p.primaryDispatchCode,
+          dispatchName: p.primaryDispatchName,
+          relationPrimary: p.relationPrimary,
+          occurrences: p.occurrences.length,
+          isDestituicao: p.isDestituicao,
         })),
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+
 
   } catch (error: unknown) {
     console.error('Error:', error);
