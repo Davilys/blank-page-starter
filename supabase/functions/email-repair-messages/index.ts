@@ -260,6 +260,12 @@ serve(async (req) => {
               },
             }).eq("id", row.id);
           }
+
+          // Live progress so the screen can be closed and reopened.
+          await supabase
+            .from("email_repair_runs")
+            .update({ processed: results.length, examined: candidates.length })
+            .eq("id", currentRunId);
         }
       } catch (e: any) {
         results.push({ account_id: accId, status: "error", error: e?.message });
@@ -272,15 +278,32 @@ serve(async (req) => {
       examined: candidates.length,
       repaired: results.filter((r) => r.status === "applied").length,
       preview: results.filter((r) => r.status === "preview").length,
-      source_unavailable: results.filter((r) => r.status === "source_unavailable").length,
-      errors: results.filter((r) => r.status === "error").length,
+      unchanged: results.filter((r) => r.status === "unchanged").length,
+      not_found: results.filter((r) => r.status === "source_unavailable" || r.status === "folder_not_found").length,
+      failed: results.filter((r) => r.status === "error").length,
     };
 
-    return new Response(JSON.stringify({ success: true, mode, summary, results }), {
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
+    await supabase.from("email_repair_runs").update({
+      status: "completed",
+      processed: results.length,
+      examined: summary.examined,
+      repaired: summary.repaired + summary.preview,
+      unchanged: summary.unchanged,
+      not_found: summary.not_found,
+      failed: summary.failed,
+      results,
+      finished_at: new Date().toISOString(),
+    }).eq("id", currentRunId);
+
+    return json({ success: true, mode, run_id: currentRunId, summary, results });
   } catch (e: any) {
     console.error("email-repair-messages error:", e?.message);
+    try {
+      const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      await sb.from("email_repair_runs")
+        .update({ status: "failed", error: e?.message || "unknown", finished_at: new Date().toISOString() })
+        .eq("status", "running");
+    } catch { /* ignore */ }
     return new Response(JSON.stringify({ error: e?.message || "unknown" }), {
       status: 500, headers: { "Content-Type": "application/json", ...corsHeaders },
     });
