@@ -54,7 +54,7 @@ export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFina
     ? classificarCobranca({ status: invoice.status, due_date: invoice.due_date, sync_status: invoice.sync_status })
     : "inativo";
   // Ações financeiras apenas em cobranças realmente ativas (a vencer ou vencidas).
-  const isOpenInvoice = !!invoice && permiteAcoesFinanceiras(classificacao);
+  const isOpenInvoice = !!invoice && contaNoTotalAtivo(classificacao);
   const origem: OrigemCobranca = invoice?.origem === "asaas" || invoice?.origem === "acordo" || invoice?.origem === "interna"
     ? invoice.origem
     : (invoice?.asaas_invoice_id ? "asaas" : "interna");
