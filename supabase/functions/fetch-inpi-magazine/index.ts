@@ -402,6 +402,23 @@ function createScanner(): { scanner: ProcessBlockScanner; result: ScanResult; fe
   };
 }
 
+function determineDispatchType(code: string | null, text: string | null): string {
+  const combined = normalizeText(`${code || ''} ${text || ''}`);
+  if (combined.includes('destitui')) return 'Destituição de procurador';
+  if (combined.includes('deferimento') || combined.includes('deferido')) return 'Deferimento';
+  if (combined.includes('indeferimento') || combined.includes('indeferido')) return 'Indeferimento';
+  if (combined.includes('exigencia')) return 'Exigência';
+  if (combined.includes('oposicao')) return 'Oposição';
+  if (combined.includes('certificado') || combined.includes('concessao')) return 'Certificado';
+  if (combined.includes('recurso')) return 'Recurso';
+  if (combined.includes('arquivamento') || combined.includes('arquivado')) return 'Arquivamento';
+  if (combined.includes('publicacao')) return 'Publicação';
+  if (combined.includes('sobrestamento')) return 'Sobrestamento';
+  if (combined.includes('anulacao')) return 'Anulação';
+  return 'Outro';
+}
+
+
 
 // Baixa o XML da RPI e entrega o conteúdo em pedaços para o scanner
 async function downloadAndScanRpiXml(
@@ -520,7 +537,8 @@ serve(async (req) => {
   }
 
   try {
-    const { rpiNumber, mode, force } = await req.json();
+    const { rpiNumber, mode, force, preview } = await req.json();
+    const isPreview = preview === true;
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
