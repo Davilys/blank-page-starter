@@ -137,10 +137,16 @@ export function EmailSidebar({ currentFolder, onFolderChange, onCompose, stats, 
                   <p className={cn('text-[10px] truncate', account.display_name ? 'text-muted-foreground' : 'text-xs font-medium')}>
                     {account.email_address}
                   </p>
+                  {syncByAccount?.[account.id] && (
+                    <span className="mt-0.5 flex items-center gap-1 text-[9px] text-muted-foreground">
+                      <span
+                        className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', STATUS_DOT[syncByAccount[account.id].status])}
+                        aria-hidden
+                      />
+                      {SYNC_STATUS_LABEL[syncByAccount[account.id].status]}
+                    </span>
+                  )}
                 </div>
-                {isActive && (
-                  <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
-                )}
                 {unreadByAccount && unreadByAccount[account.id] > 0 && (
                   <Badge
                     variant={isActive ? 'secondary' : 'default'}
