@@ -2404,8 +2404,26 @@ export default function RecursosINPI() {
             </motion.div>
           )}
 
+          {/* PREPARAÇÃO DOCUMENTAL + CONSULTORIA (três modalidades) */}
+          {step === 'upload' && UPGRADED_MODALITIES.includes(resourceType) && (
+            <motion.div key="upload-case" {...fadeIn}>
+              <CasePreparationPanel
+                resourceType={resourceType}
+                agentId={selectedAgent}
+                agentName={agent.name}
+                agentStrategy={agent.promptExtra}
+                onBack={() => setStep('select-agent')}
+                onProceed={({ caseId, files, orientation }) => {
+                  setMultipleFiles(files);
+                  setUserOrientation(orientation);
+                  processDocument({ files, orientation, caseId });
+                }}
+              />
+            </motion.div>
+          )}
+
           {/* UPLOAD */}
-          {step === 'upload' && (
+          {step === 'upload' && !UPGRADED_MODALITIES.includes(resourceType) && (
             <motion.div key="upload" {...fadeIn}>
               <Card className="border-primary/20 shadow-lg shadow-primary/5">
                 <CardContent className="p-8 space-y-6">
