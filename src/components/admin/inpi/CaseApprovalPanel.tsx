@@ -104,6 +104,8 @@ export default function CaseApprovalPanel({
   const [annexes, setAnnexes] = useState<AnnexDoc[] | null>(null);
   const [converting, setConverting] = useState(false);
   const [approving, setApproving] = useState<string | null>(null);
+  const [review, setReview] = useState<ReviewRow | null>(null);
+  const [reviewing, setReviewing] = useState(false);
 
   const reload = useCallback(async () => {
     const [{ data: d }, { data: a }, { data: o }] = await Promise.all([
