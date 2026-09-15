@@ -638,6 +638,33 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
     } finally { setLoadingAsaasPayments(false); }
   };
 
+  // ─── Sincronização real com o Asaas (conciliação completa sob demanda) ─────
+  const handleSincronizarAsaas = async () => {
+    if (!client || sincronizando) return;
+    setSincronizando(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-asaas-client-invoices', {
+        body: { client_id: client.id },
+      });
+      if (error) throw error;
+      const d: any = data || {};
+      if (d?.error) throw new Error(d.error);
+      const dep = d.totais_depois || {};
+      toast.success('Sincronização concluída', {
+        description: `${d.contas_consultadas ?? 0} conta(s) Asaas · ${d.cobrancas_encontradas ?? 0} cobrança(s) · ${d.criadas ?? 0} nova(s), ${d.atualizadas ?? 0} atualizada(s), ${d.removidas ?? 0} removida(s)`,
+      });
+      setUltimaSync(new Date());
+      await fetchClientData(client.id);
+      await loadAsaasPayments(client.id);
+      void dep;
+    } catch (e: any) {
+      const msg = e?.message || 'Não foi possível concluir a sincronização';
+      toast.error('Falha na sincronização', { description: msg });
+    } finally {
+      setSincronizando(false);
+    }
+  };
+
   // ─── Note CRUD ────────────────────────────────────────────────────────────
   const handleAddNote = async () => {
     if (!newNote.trim() || !client) return;
