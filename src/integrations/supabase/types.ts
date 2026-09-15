@@ -4491,72 +4491,215 @@ export type Database = {
         }
         Relationships: []
       }
+      rpi_enrichment_queue: {
+        Row: {
+          attempts: number
+          created_at: string
+          id: string
+          last_attempt_at: string | null
+          last_error: string | null
+          next_attempt_at: string
+          process_number: string
+          result: Json | null
+          rpi_entry_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          next_attempt_at?: string
+          process_number: string
+          result?: Json | null
+          rpi_entry_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          next_attempt_at?: string
+          process_number?: string
+          result?: Json | null
+          rpi_entry_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rpi_enrichment_queue_rpi_entry_id_fkey"
+            columns: ["rpi_entry_id"]
+            isOneToOne: false
+            referencedRelation: "rpi_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rpi_entries: {
         Row: {
+          apostila: string | null
+          apresentacao: string | null
           attorney_name: string | null
           brand_name: string | null
+          concession_date: string | null
           created_at: string
+          deposit_date: string | null
           dispatch_code: string | null
           dispatch_text: string | null
           dispatch_type: string | null
+          dispatches: Json
+          enrichment_status: string
+          field_sources: Json
           holder_name: string | null
           id: string
+          is_destituicao: boolean
+          is_nomeacao: boolean
+          is_substituicao: boolean
           last_reminder_sent_at: string | null
           linked_at: string | null
+          match_candidates: Json
           matched_client_id: string | null
           matched_process_id: string | null
+          natureza: string | null
           ncl_classes: string[] | null
+          ncl_specifications: Json
+          needs_human_review: boolean
+          occurrences: Json
+          occurrences_count: number
+          process_block_hash: string | null
           process_number: string
+          procurador_anterior: string | null
+          procurador_novo: string | null
+          procuradores: Json
+          protocols: Json
           publication_date: string | null
+          relation_confidence: number | null
+          relation_primary: string | null
+          relation_types: string[]
+          requerentes: Json
+          review_reason: string | null
           rpi_upload_id: string
+          situacao_atual: string | null
+          source_file_ref: string | null
           tag: string | null
+          titulares: Json
           update_status: string | null
           updated_at: string | null
           updated_by: string | null
+          validity_date: string | null
+          vienna_classes: Json
         }
         Insert: {
+          apostila?: string | null
+          apresentacao?: string | null
           attorney_name?: string | null
           brand_name?: string | null
+          concession_date?: string | null
           created_at?: string
+          deposit_date?: string | null
           dispatch_code?: string | null
           dispatch_text?: string | null
           dispatch_type?: string | null
+          dispatches?: Json
+          enrichment_status?: string
+          field_sources?: Json
           holder_name?: string | null
           id?: string
+          is_destituicao?: boolean
+          is_nomeacao?: boolean
+          is_substituicao?: boolean
           last_reminder_sent_at?: string | null
           linked_at?: string | null
+          match_candidates?: Json
           matched_client_id?: string | null
           matched_process_id?: string | null
+          natureza?: string | null
           ncl_classes?: string[] | null
+          ncl_specifications?: Json
+          needs_human_review?: boolean
+          occurrences?: Json
+          occurrences_count?: number
+          process_block_hash?: string | null
           process_number: string
+          procurador_anterior?: string | null
+          procurador_novo?: string | null
+          procuradores?: Json
+          protocols?: Json
           publication_date?: string | null
+          relation_confidence?: number | null
+          relation_primary?: string | null
+          relation_types?: string[]
+          requerentes?: Json
+          review_reason?: string | null
           rpi_upload_id: string
+          situacao_atual?: string | null
+          source_file_ref?: string | null
           tag?: string | null
+          titulares?: Json
           update_status?: string | null
           updated_at?: string | null
           updated_by?: string | null
+          validity_date?: string | null
+          vienna_classes?: Json
         }
         Update: {
+          apostila?: string | null
+          apresentacao?: string | null
           attorney_name?: string | null
           brand_name?: string | null
+          concession_date?: string | null
           created_at?: string
+          deposit_date?: string | null
           dispatch_code?: string | null
           dispatch_text?: string | null
           dispatch_type?: string | null
+          dispatches?: Json
+          enrichment_status?: string
+          field_sources?: Json
           holder_name?: string | null
           id?: string
+          is_destituicao?: boolean
+          is_nomeacao?: boolean
+          is_substituicao?: boolean
           last_reminder_sent_at?: string | null
           linked_at?: string | null
+          match_candidates?: Json
           matched_client_id?: string | null
           matched_process_id?: string | null
+          natureza?: string | null
           ncl_classes?: string[] | null
+          ncl_specifications?: Json
+          needs_human_review?: boolean
+          occurrences?: Json
+          occurrences_count?: number
+          process_block_hash?: string | null
           process_number?: string
+          procurador_anterior?: string | null
+          procurador_novo?: string | null
+          procuradores?: Json
+          protocols?: Json
           publication_date?: string | null
+          relation_confidence?: number | null
+          relation_primary?: string | null
+          relation_types?: string[]
+          requerentes?: Json
+          review_reason?: string | null
           rpi_upload_id?: string
+          situacao_atual?: string | null
+          source_file_ref?: string | null
           tag?: string | null
+          titulares?: Json
           update_status?: string | null
           updated_at?: string | null
           updated_by?: string | null
+          validity_date?: string | null
+          vienna_classes?: Json
         }
         Relationships: [
           {
@@ -4574,12 +4717,17 @@ export type Database = {
           file_name: string
           file_path: string
           id: string
+          is_preview: boolean
+          parse_progress: Json
+          parse_stats: Json
           processed_at: string | null
           rpi_date: string | null
           rpi_number: string | null
+          source_file_url: string | null
           status: string
           summary: string | null
           total_clients_matched: number | null
+          total_mentions: number | null
           total_processes_found: number | null
           uploaded_by: string | null
         }
@@ -4588,12 +4736,17 @@ export type Database = {
           file_name: string
           file_path: string
           id?: string
+          is_preview?: boolean
+          parse_progress?: Json
+          parse_stats?: Json
           processed_at?: string | null
           rpi_date?: string | null
           rpi_number?: string | null
+          source_file_url?: string | null
           status?: string
           summary?: string | null
           total_clients_matched?: number | null
+          total_mentions?: number | null
           total_processes_found?: number | null
           uploaded_by?: string | null
         }
@@ -4602,12 +4755,17 @@ export type Database = {
           file_name?: string
           file_path?: string
           id?: string
+          is_preview?: boolean
+          parse_progress?: Json
+          parse_stats?: Json
           processed_at?: string | null
           rpi_date?: string | null
           rpi_number?: string | null
+          source_file_url?: string | null
           status?: string
           summary?: string | null
           total_clients_matched?: number | null
+          total_mentions?: number | null
           total_processes_found?: number | null
           uploaded_by?: string | null
         }
