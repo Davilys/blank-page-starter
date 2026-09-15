@@ -474,5 +474,336 @@ Deno.serve(async (req) => {
     }
   }
 
-  return json({ ok: true, saved: true, from_cache: false, lookup: savedLookup, applied, divergences }, 200);
+  // ── vínculo automático do cliente (apenas certeza absoluta) ──
+  const link = await autoLinkClient(admin, {
+    entryId,
+    processNumber,
+    brandName: lookupRow.brand_name,
+    holder: lookupRow.holder,
+    holderDocument: str(proc.holder_document) ?? str(proc.holder_cpf_cnpj) ?? str(proc.holder_document_number),
+    nclClasses: nclNumbers(lookupRow.ncl_class),
+    depositDate: toIsoDate(lookupRow.filing_date),
+    grantDate: toIsoDate(lookupRow.grant_date),
+    expiryDate: toIsoDate(lookupRow.expiry_date),
+  });
+
+  return json(
+    { ok: true, saved: true, from_cache: false, lookup: savedLookup, applied, divergences, link },
+    200,
+  );
 });
+
+// ─────────────────────────────────────────────────────────────────────
+// Vínculo automático + organização da marca na ficha do cliente.
+// Nunca vincula por semelhança: só por número de processo já cadastrado
+// ou documento (CPF/CNPJ) exato e único. Não dispara notificações.
+// ─────────────────────────────────────────────────────────────────────
+
+type LinkCandidate = { client_id: string; name: string | null; reason: string };
+type LinkResult = {
+  status: 'linked' | 'already_linked' | 'candidates' | 'none' | 'skipped' | 'error';
+  client_id: string | null;
+  client_name: string | null;
+  process_id: string | null;
+  source: string | null;
+  candidates: LinkCandidate[];
+  merged: number;
+  created_process: boolean;
+};
+
+const DISPATCH_TO_PUB_STATUS: Record<string, string> = {
+  oposicao: 'oposicao',
+  'oposição': 'oposicao',
+  exigencia_merito: 'exigencia_merito',
+  'exigência de mérito': 'exigencia_merito',
+  'exigencia de merito': 'exigencia_merito',
+  indeferimento: 'indeferimento',
+  deferimento: 'deferimento',
+  certificado: 'certificado',
+  'concessão de registro': 'certificado',
+  'concessao de registro': 'certificado',
+  'renovação': 'renovacao',
+  renovacao: 'renovacao',
+  arquivado: 'arquivado',
+  arquivamento: 'arquivado',
+};
+
+// deno-lint-ignore no-explicit-any
+async function autoLinkClient(
+  admin: any,
+  input: {
+    entryId: string | null;
+    processNumber: string;
+    brandName: string | null;
+    holder: string | null;
+    holderDocument: string | null;
+    nclClasses: string[] | null;
+    depositDate: string | null;
+    grantDate: string | null;
+    expiryDate: string | null;
+  },
+): Promise<LinkResult> {
+  const base: LinkResult = {
+    status: 'skipped',
+    client_id: null,
+    client_name: null,
+    process_id: null,
+    source: null,
+    candidates: [],
+    merged: 0,
+    created_process: false,
+  };
+  if (!input.entryId) return base;
+
+  try {
+    const { data: entry } = await admin
+      .from('rpi_entries')
+      .select('*')
+      .eq('id', input.entryId)
+      .maybeSingle();
+    if (!entry) return base;
+
+    const nclNumeric = (input.nclClasses ?? [])
+      .map((n) => Number(n))
+      .filter((n) => Number.isFinite(n) && n > 0 && n <= 45);
+
+    // ── 1) processo já cadastrado no CRM ──
+    const { data: byProcess } = await admin
+      .from('brand_processes')
+      .select('id, user_id, brand_name, ncl_classes, deposit_date, grant_date, expiry_date, created_at, status')
+      .eq('process_number', input.processNumber)
+      .order('created_at', { ascending: true });
+
+    const owners = Array.from(
+      new Set(((byProcess ?? []) as Json[]).map((r) => r.user_id).filter(Boolean)),
+    ) as string[];
+
+    let clientId: string | null = entry.matched_client_id ?? null;
+    let source: string | null = clientId ? 'existente' : null;
+
+    if (!clientId && owners.length === 1) {
+      clientId = owners[0];
+      source = 'numero_do_processo';
+    }
+
+    // ── 2) documento exato do titular (quando a API retornar) ──
+    if (!clientId && input.holderDocument) {
+      const digits = input.holderDocument.replace(/\D/g, '');
+      if (digits.length === 11 || digits.length === 14) {
+        const { data: docMatches } = await admin.rpc('profiles_by_doc_digits', { p_doc: digits });
+        const ids = Array.from(new Set(((docMatches ?? []) as Json[]).map((r) => r.id))) as string[];
+        if (ids.length === 1) {
+          clientId = ids[0];
+          source = 'documento';
+        }
+      }
+    }
+
+    // ── sem certeza: devolve candidatos para confirmação humana ──
+    if (!clientId) {
+      const candidates: LinkCandidate[] = [];
+      const seen = new Set<string>();
+      const push = (id: string | null, name: string | null, reason: string) => {
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        candidates.push({ client_id: id, name, reason });
+      };
+
+      if (input.holder && input.holder.length >= 4) {
+        const term = input.holder.replace(/[%,]/g, ' ').trim();
+        const { data: byName } = await admin
+          .from('profiles')
+          .select('id, full_name, company_name')
+          .or(`full_name.ilike.%${term}%,company_name.ilike.%${term}%`)
+          .limit(5);
+        for (const p of (byName ?? []) as Json[]) {
+          push(p.id as string, (p.full_name as string) ?? (p.company_name as string) ?? null, 'titular');
+        }
+      }
+
+      const brand = input.brandName ?? (typeof entry.brand_name === 'string' ? entry.brand_name : null);
+      if (brand && brand.length >= 3) {
+        const term = brand.replace(/[%,]/g, ' ').trim();
+        const { data: byBrand } = await admin
+          .from('brand_processes')
+          .select('user_id, brand_name')
+          .ilike('brand_name', `%${term}%`)
+          .not('user_id', 'is', null)
+          .limit(5);
+        const ids = Array.from(new Set(((byBrand ?? []) as Json[]).map((r) => r.user_id))) as string[];
+        if (ids.length) {
+          const { data: profs } = await admin
+            .from('profiles')
+            .select('id, full_name, company_name')
+            .in('id', ids);
+          for (const p of (profs ?? []) as Json[]) {
+            push(p.id as string, (p.full_name as string) ?? (p.company_name as string) ?? null, 'marca');
+          }
+        }
+      }
+
+      if (candidates.length) {
+        await admin
+          .from('rpi_entries')
+          .update({ match_candidates: candidates, needs_human_review: true })
+          .eq('id', input.entryId)
+          .is('matched_client_id', null);
+      }
+      return { ...base, status: candidates.length ? 'candidates' : 'none', candidates };
+    }
+
+    // ── organiza as marcas do cliente para este processo ──
+    const { data: clientProcesses } = await admin
+      .from('brand_processes')
+      .select('id, brand_name, ncl_classes, deposit_date, grant_date, expiry_date, created_at, status')
+      .eq('user_id', clientId)
+      .eq('process_number', input.processNumber)
+      .order('created_at', { ascending: true });
+
+    const rows = (clientProcesses ?? []) as Json[];
+    let keep = rows[0] ?? null;
+    let merged = 0;
+    let createdProcess = false;
+
+    if (rows.length > 1) {
+      const score = (r: Json) =>
+        [r.brand_name, r.ncl_classes, r.deposit_date, r.grant_date, r.expiry_date].filter(
+          (v) => v != null && (!Array.isArray(v) || v.length > 0),
+        ).length;
+      keep = rows.reduce((a, b) => (score(b) > score(a) ? b : a), rows[0]);
+      for (const dup of rows) {
+        if (dup.id === keep!.id) continue;
+        await admin.from('publicacoes_marcas').update({ process_id: keep!.id }).eq('process_id', dup.id);
+        await admin.from('rpi_entries').update({ matched_process_id: keep!.id }).eq('matched_process_id', dup.id);
+        await admin
+          .from('brand_processes')
+          .update({
+            status: 'duplicado_unificado',
+            notes: `Unificado no registro ${keep!.id} pela consulta ao INPI em ${new Date().toISOString()}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', dup.id);
+        merged++;
+      }
+    }
+
+    if (!keep) {
+      const { data: created } = await admin
+        .from('brand_processes')
+        .insert({
+          user_id: clientId,
+          brand_name: input.brandName ?? (entry.brand_name as string) ?? 'Marca sem nome',
+          process_number: input.processNumber,
+          ncl_classes: nclNumeric.length ? nclNumeric : null,
+          deposit_date: input.depositDate,
+          grant_date: input.grantDate,
+          expiry_date: input.expiryDate,
+        })
+        .select('id, brand_name, ncl_classes, deposit_date, grant_date, expiry_date')
+        .maybeSingle();
+      keep = (created ?? null) as Json | null;
+      createdProcess = !!keep;
+    } else {
+      // completa apenas o que estiver vazio — nunca sobrescreve edição manual
+      const patch: Json = {};
+      if (isEmptyish(keep.brand_name) && input.brandName) patch.brand_name = input.brandName;
+      if ((!Array.isArray(keep.ncl_classes) || keep.ncl_classes.length === 0) && nclNumeric.length) {
+        patch.ncl_classes = nclNumeric;
+      }
+      if (keep.deposit_date == null && input.depositDate) patch.deposit_date = input.depositDate;
+      if (keep.grant_date == null && input.grantDate) patch.grant_date = input.grantDate;
+      if (keep.expiry_date == null && input.expiryDate) patch.expiry_date = input.expiryDate;
+      if (Object.keys(patch).length) {
+        patch.updated_at = new Date().toISOString();
+        await admin.from('brand_processes').update(patch).eq('id', keep.id as string);
+      }
+    }
+
+    const processId = (keep?.id as string) ?? null;
+    const alreadyLinked = !!entry.matched_client_id;
+
+    if (!alreadyLinked) {
+      await admin
+        .from('rpi_entries')
+        .update({
+          matched_client_id: clientId,
+          matched_process_id: processId,
+          linked_at: new Date().toISOString(),
+          auto_linked_at: new Date().toISOString(),
+          auto_link_source: source,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', input.entryId)
+        .is('matched_client_id', null);
+    } else if (processId && !entry.matched_process_id) {
+      await admin.from('rpi_entries').update({ matched_process_id: processId }).eq('id', input.entryId);
+    }
+
+    // ── cartão da aba Publicação (sem duplicar, sem notificar) ──
+    const dispatch = typeof entry.dispatch_type === 'string' ? entry.dispatch_type.toLowerCase() : '';
+    const pubStatus = DISPATCH_TO_PUB_STATUS[dispatch] ?? '003';
+    const nclText = nclNumeric.length
+      ? nclNumeric.join(', ')
+      : Array.isArray(entry.ncl_classes)
+      ? (entry.ncl_classes as string[]).join(', ')
+      : null;
+
+    const { data: pubByEntry } = await admin
+      .from('publicacoes_marcas')
+      .select('id, client_id, process_id, brand_name_rpi, ncl_class')
+      .eq('rpi_entry_id', input.entryId)
+      .maybeSingle();
+    let pub = pubByEntry as Json | null;
+    if (!pub) {
+      const { data: pubByPn } = await admin
+        .from('publicacoes_marcas')
+        .select('id, client_id, process_id, brand_name_rpi, ncl_class')
+        .eq('process_number_rpi', input.processNumber)
+        .maybeSingle();
+      pub = (pubByPn ?? null) as Json | null;
+    }
+
+    if (pub) {
+      const patch: Json = { updated_at: new Date().toISOString(), rpi_entry_id: input.entryId };
+      if (!pub.client_id) patch.client_id = clientId;
+      if (!pub.process_id && processId) patch.process_id = processId;
+      if (isEmptyish(pub.brand_name_rpi) && (input.brandName ?? entry.brand_name)) {
+        patch.brand_name_rpi = input.brandName ?? entry.brand_name;
+      }
+      if (isEmptyish(pub.ncl_class) && nclText) patch.ncl_class = nclText;
+      await admin.from('publicacoes_marcas').update(patch).eq('id', pub.id as string);
+    } else {
+      await admin.from('publicacoes_marcas').insert({
+        status: pubStatus,
+        tipo_publicacao: 'publicacao_rpi',
+        rpi_entry_id: input.entryId,
+        process_id: processId,
+        client_id: clientId,
+        brand_name_rpi: input.brandName ?? entry.brand_name ?? null,
+        process_number_rpi: input.processNumber,
+        ncl_class: nclText,
+        data_publicacao_rpi: entry.publication_date ?? null,
+      });
+    }
+
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('full_name, company_name')
+      .eq('id', clientId)
+      .maybeSingle();
+
+    return {
+      status: alreadyLinked ? 'already_linked' : 'linked',
+      client_id: clientId,
+      client_name: (profile?.full_name as string) ?? (profile?.company_name as string) ?? null,
+      process_id: processId,
+      source,
+      candidates: [],
+      merged,
+      created_process: createdProcess,
+    };
+  } catch (e) {
+    console.error('[inpi-process-lookup] vínculo automático falhou', (e as Error)?.message);
+    return { ...base, status: 'error' };
+  }
+}
