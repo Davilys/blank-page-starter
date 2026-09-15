@@ -4117,6 +4117,17 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         onChanged={async () => { await fetchClientData(); onUpdate(); }}
       />
 
+      {/* ─── NOVA FATURA ─── */}
+      {client && (
+        <NovaFaturaDialog
+          open={novaFaturaOpen}
+          onOpenChange={setNovaFaturaOpen}
+          userId={client.id}
+          clientName={client.full_name}
+          onCreated={async () => { await fetchClientData(); onUpdate(); }}
+        />
+      )}
+
 
 
 
