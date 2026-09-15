@@ -49,6 +49,7 @@ export default function AdminClientes() {
   const [selectedClient, setSelectedClient] = useState<ClientWithProcess | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [filters, setFilters] = useState<KanbanFilters>({ priority: [], origin: [] });
+  const [statFilter, setStatFilter] = useState<'total' | 'high' | 'process' | 'new'>('total');
   const [filterOpen, setFilterOpen] = useState(false);
   const [importExportOpen, setImportExportOpen] = useState(false);
   const [dateFilter, setDateFilter] = useState<DateFilterType>('all');
@@ -473,6 +474,18 @@ export default function AdminClientes() {
     return { total, high, withProcess, newThisMonth };
   }, [filteredClients]);
 
+  // Clients shown after the stat card selection
+  const displayedClients = useMemo(() => {
+    if (statFilter === 'total') return filteredClients;
+    if (statFilter === 'high') return filteredClients.filter(c => c.priority === 'high');
+    if (statFilter === 'process') return filteredClients.filter(c => !!c.process_id);
+    const now = new Date();
+    return filteredClients.filter(c => {
+      if (!c.created_at) return false;
+      return isWithinInterval(parseISO(c.created_at), { start: startOfMonth(now), end: endOfMonth(now) });
+    });
+  }, [filteredClients, statFilter]);
+
   return (
     <>
       <div className="space-y-5">
@@ -539,24 +552,36 @@ export default function AdminClientes() {
         {/* ── STAT CARDS ───────────────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { title: 'Total Clientes',    value: stats.total,        icon: Users,      accent: 'from-primary/20 to-primary/5',          border: 'border-primary/20',        ring: 'bg-primary/15',        color: 'text-primary'       },
-            { title: 'Alta Prioridade',   value: stats.high,         icon: Star,       accent: 'from-red-500/20 to-red-500/5',           border: 'border-red-500/20',        ring: 'bg-red-500/15',        color: 'text-red-500'       },
-            { title: 'Com Processo',      value: stats.withProcess,  icon: UserCheck,  accent: 'from-emerald-500/20 to-emerald-500/5',   border: 'border-emerald-500/20',    ring: 'bg-emerald-500/15',    color: 'text-emerald-500'   },
-            { title: 'Novos no Mês',      value: stats.newThisMonth, icon: UserPlus,   accent: 'from-violet-500/20 to-violet-500/5',     border: 'border-violet-500/20',     ring: 'bg-violet-500/15',     color: 'text-violet-500'    },
+            { key: 'total' as const,   title: 'Total Clientes',    value: stats.total,        icon: Users,      accent: 'from-primary/20 to-primary/5',          border: 'border-primary/20',        ring: 'bg-primary/15',        color: 'text-primary'       },
+            { key: 'high' as const,    title: 'Alta Prioridade',   value: stats.high,         icon: Star,       accent: 'from-red-500/20 to-red-500/5',           border: 'border-red-500/20',        ring: 'bg-red-500/15',        color: 'text-red-500'       },
+            { key: 'process' as const, title: 'Com Processo',      value: stats.withProcess,  icon: UserCheck,  accent: 'from-emerald-500/20 to-emerald-500/5',   border: 'border-emerald-500/20',    ring: 'bg-emerald-500/15',    color: 'text-emerald-500'   },
+            { key: 'new' as const,     title: 'Novos no Mês',      value: stats.newThisMonth, icon: UserPlus,   accent: 'from-violet-500/20 to-violet-500/5',     border: 'border-violet-500/20',     ring: 'bg-violet-500/15',     color: 'text-violet-500'    },
           ].map((s, i) => (
             <motion.div key={s.title} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
-              <div className={cn('relative overflow-hidden rounded-2xl border transition-all hover:shadow-lg hover:shadow-black/10 hover:-translate-y-0.5 bg-background', s.border)}>
+              <button
+                type="button"
+                aria-pressed={statFilter === s.key}
+                onClick={() => setStatFilter(prev => (prev === s.key ? 'total' : s.key))}
+                className={cn(
+                  'w-full text-left relative overflow-hidden rounded-2xl border transition-all hover:shadow-lg hover:shadow-black/10 hover:-translate-y-0.5 bg-background',
+                  s.border,
+                  statFilter === s.key && 'ring-2 ring-offset-2 ring-offset-background ring-primary shadow-lg'
+                )}
+              >
                 <div className={cn('absolute inset-0 bg-gradient-to-br opacity-60', s.accent)} />
                 <div className="relative p-5">
                   <div className="flex items-start justify-between mb-3">
                     <div className={cn('flex h-9 w-9 items-center justify-center rounded-xl', s.ring)}>
                       <s.icon className={cn('h-5 w-5', s.color)} />
                     </div>
+                    {statFilter === s.key && (
+                      <Badge variant="secondary" className="text-[10px] h-5">Selecionado</Badge>
+                    )}
                   </div>
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">{s.title}</p>
                   <p className={cn('text-3xl font-bold', s.color)}>{s.value}</p>
                 </div>
-              </div>
+              </button>
             </motion.div>
           ))}
         </div>
@@ -784,7 +809,7 @@ export default function AdminClientes() {
         {/* Remarketing Panel */}
         {showRemarketing && (
           <ClientRemarketingPanel
-            clients={filteredClients.map(c => ({
+            clients={displayedClients.map(c => ({
               id: c.id,
               full_name: c.full_name,
               email: c.email,
@@ -800,7 +825,7 @@ export default function AdminClientes() {
         {/* Content */}
         {viewMode === 'kanban' ? (
           <ClientKanbanBoard
-            clients={filteredClients}
+            clients={displayedClients}
             onClientClick={handleClientClick}
             onRefresh={refreshClients}
             filters={filters}
@@ -813,7 +838,7 @@ export default function AdminClientes() {
           />
         ) : (
           <ClientListView
-            clients={filteredClients}
+            clients={displayedClients}
             loading={loading}
             onClientClick={handleClientClick}
           />
