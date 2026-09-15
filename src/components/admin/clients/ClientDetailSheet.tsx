@@ -209,6 +209,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
   const [acordoParcelas, setAcordoParcelas] = useState<any[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceLike | null>(null);
   const [invoiceSheetOpen, setInvoiceSheetOpen] = useState(false);
+  const [novaFaturaOpen, setNovaFaturaOpen] = useState(false);
   const [asaasOverdue, setAsaasOverdue] = useState<any[]>([]);
   const [asaasRenegs, setAsaasRenegs] = useState<any[]>([]);
   const [asaasRenegParcelas, setAsaasRenegParcelas] = useState<any[]>([]);
