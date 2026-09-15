@@ -24,6 +24,7 @@ import { ptBR } from 'date-fns/locale';
 import { INPIResourcePDFPreview } from '@/components/admin/INPIResourcePDFPreview';
 import { INPILegalChatDialog } from '@/components/admin/inpi/INPILegalChatDialog';
 import { EvidenceGallery, type EvidenceRow } from '@/components/admin/inpi/EvidenceGallery';
+import CasePreparationPanel from '@/components/admin/inpi/CasePreparationPanel';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface ExtractedData {
@@ -77,6 +78,9 @@ interface ProcuradorData {
 }
 
 type Step = 'list' | 'select-type' | 'select-agent' | 'notificacao-data' | 'procurador-data' | 'resposta-notificacao-data' | 'upload' | 'processing' | 'review' | 'approved';
+
+// Modalidades com o fluxo de preparação documental + consultoria preparatória.
+const UPGRADED_MODALITIES = ['indeferimento', 'exigencia_merito', 'oposicao'];
 
 const RESOURCE_TYPE_LABELS: Record<string, string> = {
   indeferimento: 'Recurso contra Indeferimento',
@@ -602,7 +606,7 @@ export default function RecursosINPI() {
     });
   };
 
-  const processDocument = async () => {
+  const processDocument = async (override?: { files?: File[]; orientation?: string; caseId?: string }) => {
     if (resourceType === 'notificacao_extrajudicial') {
       return processNotificacao();
     }
@@ -612,7 +616,9 @@ export default function RecursosINPI() {
     if (resourceType === 'troca_procurador' || resourceType === 'nomeacao_procurador') {
       return processProcurador();
     }
-    if (multipleFiles.length === 0 || !resourceType) {
+    const filesToSend = override?.files?.length ? override.files : multipleFiles;
+    const orientationToSend = (override?.orientation ?? userOrientation).trim();
+    if (filesToSend.length === 0 || !resourceType) {
       toast.error('Anexe pelo menos um documento para continuar');
       return;
     }
@@ -624,7 +630,7 @@ export default function RecursosINPI() {
 
       // Convert all files to base64
       const filesBase64 = await Promise.all(
-        multipleFiles.map(async (f) => ({
+        filesToSend.map(async (f) => ({
           base64: await fileToBase64(f),
           type: f.type,
           name: f.name,
@@ -632,7 +638,7 @@ export default function RecursosINPI() {
       );
 
       const { data: pass1Data, error: pass1Error } = await supabase.functions.invoke('process-inpi-resource', {
-        body: { files: filesBase64, resourceType, agentStrategy: agent.promptExtra, agentName: agent.name, generationPass: 'pass1', userOrientation: userOrientation.trim() || undefined }
+        body: { files: filesBase64, resourceType, agentStrategy: agent.promptExtra, agentName: agent.name, generationPass: 'pass1', userOrientation: orientationToSend || undefined }
       });
 
       if (pass1Error) throw pass1Error;
@@ -666,6 +672,19 @@ export default function RecursosINPI() {
       if (insertError) throw insertError;
       setCurrentResourceId(insertedResource.id);
 
+      // Vincula a peça ao caso preparado (documentos + orientação confirmada).
+      if (override?.caseId) {
+        await supabase
+          .from('inpi_resource_cases')
+          .update({
+            resource_id: insertedResource.id,
+            status: 'minuta',
+            process_number: partialExtracted.process_number || null,
+            brand_name: partialExtracted.brand_name || null,
+          })
+          .eq('id', override.caseId);
+      }
+
       const { data: pass2Data, error: pass2Error } = await supabase.functions.invoke('process-inpi-resource', {
         body: {
           resourceType,
@@ -674,7 +693,7 @@ export default function RecursosINPI() {
           generationPass: 'pass2',
           pass1Content: pass1Data.pass1_content || partialContent,
           extractedData: partialExtracted,
-          userOrientation: userOrientation.trim() || undefined,
+          userOrientation: orientationToSend || undefined,
         }
       });
 
@@ -2006,7 +2025,7 @@ export default function RecursosINPI() {
               <div className="flex gap-3 pt-2">
                 <Button variant="outline" onClick={() => setStep('select-agent')} className="rounded-xl">Voltar</Button>
                 <Button 
-                  onClick={processDocument}
+                  onClick={() => processDocument()}
                   disabled={!notificanteData.nome || !notificadoData.nome}
                   size="lg" 
                   className={`flex-1 gap-3 rounded-xl h-14 text-base shadow-xl bg-gradient-to-r ${agent.color} hover:opacity-90 transition-opacity`}
@@ -2274,7 +2293,7 @@ export default function RecursosINPI() {
               <div className="flex gap-3 pt-2">
                 <Button variant="outline" onClick={() => setStep('select-agent')} className="rounded-xl">Voltar</Button>
                 <Button 
-                  onClick={processDocument}
+                  onClick={() => processDocument()}
                   disabled={!procuradorData.titular || !procuradorData.marca}
                   size="lg" 
                   className={`flex-1 gap-3 rounded-xl h-14 text-base shadow-xl bg-gradient-to-r ${agent.color} hover:opacity-90 transition-opacity`}
@@ -2389,7 +2408,7 @@ export default function RecursosINPI() {
               <div className="flex gap-3 pt-2">
                 <Button variant="outline" onClick={() => setStep('select-agent')} className="rounded-xl">Voltar</Button>
                 <Button 
-                  onClick={processDocument}
+                  onClick={() => processDocument()}
                   disabled={multipleFiles.length === 0}
                   size="lg" 
                   className={`flex-1 gap-3 rounded-xl h-14 text-base shadow-xl bg-gradient-to-r ${agent.color} hover:opacity-90 transition-opacity`}
@@ -2402,8 +2421,26 @@ export default function RecursosINPI() {
             </motion.div>
           )}
 
+          {/* PREPARAÇÃO DOCUMENTAL + CONSULTORIA (três modalidades) */}
+          {step === 'upload' && UPGRADED_MODALITIES.includes(resourceType) && (
+            <motion.div key="upload-case" {...fadeIn}>
+              <CasePreparationPanel
+                resourceType={resourceType}
+                agentId={selectedAgent}
+                agentName={agent.name}
+                agentStrategy={agent.promptExtra}
+                onBack={() => setStep('select-agent')}
+                onProceed={({ caseId, files, orientation }) => {
+                  setMultipleFiles(files);
+                  setUserOrientation(orientation);
+                  processDocument({ files, orientation, caseId });
+                }}
+              />
+            </motion.div>
+          )}
+
           {/* UPLOAD */}
-          {step === 'upload' && (
+          {step === 'upload' && !UPGRADED_MODALITIES.includes(resourceType) && (
             <motion.div key="upload" {...fadeIn}>
               <Card className="border-primary/20 shadow-lg shadow-primary/5">
                 <CardContent className="p-8 space-y-6">
@@ -2513,7 +2550,7 @@ export default function RecursosINPI() {
                   <div className="flex gap-3">
                     <Button variant="outline" onClick={() => { setMultipleFiles([]); setUserOrientation(''); setStep('select-agent'); }} className="rounded-xl">Voltar</Button>
                     <Button 
-                      onClick={processDocument} 
+                      onClick={() => processDocument()} 
                       disabled={multipleFiles.length === 0}
                       className={`flex-1 gap-2 rounded-xl h-12 text-base shadow-lg bg-gradient-to-r ${agent.color} hover:opacity-90`}
                     >
