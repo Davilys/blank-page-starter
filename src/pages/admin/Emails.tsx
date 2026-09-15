@@ -309,6 +309,7 @@ export default function Emails() {
       selectedAccountId={selectedAccountId}
       onAccountChange={handleAccountChange}
       unreadByAccount={unreadByAccount}
+      syncByAccount={syncByAccount}
     />
   );
 
