@@ -76,17 +76,68 @@ serve(async (req) => {
     const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
     if (!isAdmin) return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } });
 
+    const json = (payload: unknown, status = 200) =>
+      new Response(JSON.stringify(payload), { status, headers: { "Content-Type": "application/json", ...corsHeaders } });
+
+    // Latest run (used by the UI to restore progress after reopening the page).
+    if (mode === "status") {
+      const { data: run } = await supabase
+        .from("email_repair_runs")
+        .select("*")
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return json({ success: true, run });
+    }
+
     if (mode === "revert") {
-      const targets = ids || [];
+      // Revert only messages repaired by this run, and only when the stored
+      // repair timestamp still matches (no later edit is overwritten).
+      const { data: run } = runId
+        ? await supabase.from("email_repair_runs").select("*").eq("id", runId).maybeSingle()
+        : { data: null as any };
+      const runResults: any[] = (run?.results as any[]) || [];
+      const targets = ids?.length ? ids : runResults.filter((r) => r.status === "applied").map((r) => r.id);
       let reverted = 0;
+      let skipped = 0;
       for (const id of targets) {
-        const { data: row } = await supabase.from("email_inbox").select("id, original_backup").eq("id", id).maybeSingle();
-        if (!row?.original_backup) continue;
-        await supabase.from("email_inbox").update({ ...(row.original_backup as Record<string, unknown>), original_backup: null, reprocessed_at: null }).eq("id", id);
+        const { data: row } = await supabase
+          .from("email_inbox")
+          .select("id, original_backup, reprocessed_at")
+          .eq("id", id)
+          .maybeSingle();
+        if (!row?.original_backup) { skipped++; continue; }
+        const stamp = runResults.find((r) => r.id === id)?.reprocessed_at;
+        if (stamp && row.reprocessed_at && row.reprocessed_at !== stamp) { skipped++; continue; }
+        await supabase
+          .from("email_inbox")
+          .update({ ...(row.original_backup as Record<string, unknown>), original_backup: null, reprocessed_at: null })
+          .eq("id", id);
         reverted++;
       }
-      return new Response(JSON.stringify({ success: true, reverted }), { headers: { "Content-Type": "application/json", ...corsHeaders } });
+      if (run?.id) {
+        await supabase.from("email_repair_runs").update({ status: "reverted" }).eq("id", run.id);
+      }
+      return json({ success: true, reverted, skipped });
     }
+
+    // One repair at a time.
+    const { data: runningRun } = await supabase
+      .from("email_repair_runs")
+      .select("id, mode, account_id, started_at")
+      .eq("status", "running")
+      .maybeSingle();
+    if (runningRun) {
+      return json({ error: "already_running", run: runningRun }, 409);
+    }
+
+    const { data: runRow, error: runErr } = await supabase
+      .from("email_repair_runs")
+      .insert({ account_id: accountId ?? null, mode, limit_count: limit, started_by: userId, status: "running" })
+      .select()
+      .maybeSingle();
+    if (runErr) return json({ error: "already_running" }, 409);
+    const currentRunId = runRow?.id as string;
 
     // Select defective messages: old parser + (mojibake subject | empty body | unknown sender | header leak)
     let q = supabase
