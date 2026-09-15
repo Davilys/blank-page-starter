@@ -342,154 +342,59 @@ async function fetchAvailableRpis(sessionCookies: string | null): Promise<{ late
   }
 }
 
-interface ExtractedProcess {
-  processNumber: string;
-  brandName: string | null;
-  holderName: string | null;
-  attorneyName: string | null;
-  nclClasses: string[];
-  dispatchCode: string | null;
-  dispatchText: string | null;
-  dispatchType: string | null;
-  publicationDate: string | null;
+// ========== LEITURA ESTRUTURAL E INCREMENTAL DO XML ==========
+
+interface ScanResult {
+  processes: ParsedProcess[];
+  totalBlocks: number;
+  totalMentions: number;
+  bytesRead: number;
 }
 
-// Parse INPI XML - memory-efficient
-function parseRpiXml(xmlContent: string, rpiNumber: number): ExtractedProcess[] {
-  const processes: ExtractedProcess[] = [];
-  const MAX_PROCESSES = 300;
-  const BATCH_SIZE = 500;
+function createScanner(): { scanner: ProcessBlockScanner; result: ScanResult; feed: (chunk: string) => void; finish: () => ScanResult } {
+  const scanner = new ProcessBlockScanner();
+  const result: ScanResult = { processes: [], totalBlocks: 0, totalMentions: 0, bytesRead: 0 };
+  const byNumber = new Map<string, ParsedProcess>();
 
-  console.log(`Parsing XML content, size: ${xmlContent.length} bytes`);
-
-  const searchTerm = ATTORNEY_SEARCH_TERM.toLowerCase();
-  const searchRegex = new RegExp(searchTerm, 'i');
-
-  if (!searchRegex.test(xmlContent)) {
-    console.log('Attorney name not found in XML content');
-    return [];
-  }
-
-  console.log('Attorney name found! Extracting processes...');
-
-  const extractTagContent = (xml: string, tagName: string): string | null => {
-    const startTag = `<${tagName}`;
-    const endTag = `</${tagName}>`;
-    const startIdx = xml.indexOf(startTag);
-    if (startIdx === -1) return null;
-    const endIdx = xml.indexOf(endTag, startIdx);
-    if (endIdx === -1) return null;
-    const tagEndIdx = xml.indexOf('>', startIdx);
-    if (tagEndIdx === -1 || tagEndIdx > endIdx) return null;
-    let content = xml.substring(tagEndIdx + 1, endIdx).trim();
-    content = content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    return content || null;
-  };
-
-  const extractAttribute = (xml: string, tagName: string, attrName: string): string | null => {
-    const tagStart = xml.indexOf(`<${tagName}`);
-    if (tagStart === -1) return null;
-    const tagEnd = xml.indexOf('>', tagStart);
-    if (tagEnd === -1) return null;
-    const tagContent = xml.substring(tagStart, tagEnd);
-    const attrMatch = tagContent.match(new RegExp(`${attrName}\\s*=\\s*["']([^"']+)["']`, 'i'));
-    return attrMatch ? attrMatch[1].trim() : null;
-  };
-
-  const headerSection = xmlContent.slice(0, 2000);
-  const revistaMatch = headerSection.match(/<revista[^>]*data[^>]*=["']([^"']+)["']/i);
-  const publicationDate = revistaMatch ? revistaMatch[1] : null;
-
-  const processoEndTag = '</processo>';
-  const chunks = xmlContent.split(processoEndTag);
-  const totalChunks = chunks.length;
-
-  console.log(`Split into ${totalChunks} chunks`);
-  xmlContent = '';
-
-  for (let batchStart = 0; batchStart < totalChunks && processes.length < MAX_PROCESSES; batchStart += BATCH_SIZE) {
-    const batchEnd = Math.min(batchStart + BATCH_SIZE, totalChunks - 1);
-    for (let i = batchStart; i < batchEnd && processes.length < MAX_PROCESSES; i++) {
-      const chunk = chunks[i];
-      if (!chunk || chunk.length < 50) continue;
-      if (!searchRegex.test(chunk)) continue;
-
-      const processoStart = chunk.lastIndexOf('<processo');
-      if (processoStart === -1) continue;
-      const block = chunk.substring(processoStart) + processoEndTag;
-
-      let processNumber: string | null = null;
-      const numAttrMatch = block.match(/numero\s*=\s*["'](\d+)["']/i);
-      if (numAttrMatch) {
-        processNumber = numAttrMatch[1];
-      } else {
-        const numMatch = block.match(/(\d{9,12})/);
-        if (numMatch) processNumber = numMatch[1];
+  const handleBlocks = (blocks: string[]) => {
+    for (const block of blocks) {
+      result.totalBlocks++;
+      const parsed = parseProcessBlock(block, ATTORNEY_SEARCH_TERMS, ATTORNEY_NAME);
+      if (!parsed) continue;
+      result.totalMentions += parsed.occurrences.length;
+      const existing = byNumber.get(parsed.processNumber);
+      if (existing) {
+        // Mesmo processo em outro bloco da mesma revista: uma única linha,
+        // mas todas as ocorrências são preservadas para auditoria.
+        existing.occurrences.push(
+          ...parsed.occurrences.map((o, i) => ({ ...o, order: existing.occurrences.length + i + 1 })),
+        );
+        existing.relationTypes = Array.from(new Set([...existing.relationTypes, ...parsed.relationTypes]));
+        existing.isDestituicao = existing.isDestituicao || parsed.isDestituicao;
+        existing.isNomeacao = existing.isNomeacao || parsed.isNomeacao;
+        existing.isSubstituicao = existing.isSubstituicao || parsed.isSubstituicao;
+        existing.dispatches.push(...parsed.dispatches);
+        continue;
       }
-      if (!processNumber) continue;
-
-      const cleanNumber = processNumber.replace(/\D/g, '');
-
-      let isDuplicate = false;
-      for (const p of processes) {
-        if (p.processNumber === cleanNumber) { isDuplicate = true; break; }
-      }
-      if (isDuplicate) continue;
-
-      let brandName = extractTagContent(block, 'marca') || extractTagContent(block, 'nome') || extractTagContent(block, 'denominacao') || extractAttribute(block, 'marca', 'nome') || extractAttribute(block, 'marca', 'apresentacao');
-      if (brandName) brandName = brandName.replace(/<[^>]+>/g, '').trim();
-
-      const holderName = extractAttribute(block, 'titular', 'nome-razao-social') || extractTagContent(block, 'titular') || extractTagContent(block, 'requerente') || extractTagContent(block, 'depositante');
-      const dispatchCode = extractAttribute(block, 'despacho', 'codigo') || extractTagContent(block, 'codigo') || extractTagContent(block, 'cod-despacho');
-      const dispatchText = extractTagContent(block, 'texto-complementar') || extractTagContent(block, 'descricao') || extractTagContent(block, 'texto');
-
-      const nclClasses: string[] = [];
-      const nclRegex = /classe-nice[^>]*codigo[^>]*=["'](\d+)["']/gi;
-      let nclMatch;
-      while ((nclMatch = nclRegex.exec(block)) !== null) nclClasses.push(nclMatch[1]);
-      if (nclClasses.length === 0) {
-        const classMatch = block.match(/classe[s]?\s*:?\s*([\d,\s]+)/i);
-        if (classMatch) {
-          const nums = classMatch[1].match(/\d+/g);
-          if (nums) nclClasses.push(...nums);
-        }
-      }
-
-      const dispatchType = determineDispatchType(dispatchCode, dispatchText);
-
-      processes.push({
-        processNumber: cleanNumber,
-        brandName,
-        holderName,
-        attorneyName: ATTORNEY_NAME,
-        nclClasses,
-        dispatchCode,
-        dispatchText,
-        dispatchType,
-        publicationDate,
-      });
+      byNumber.set(parsed.processNumber, parsed);
+      result.processes.push(parsed);
     }
-    console.log(`Batch ${batchStart}-${batchEnd}: ${processes.length} processes`);
-  }
+  };
 
-  console.log(`Extraction complete: ${processes.length} processes`);
-  return processes;
+  return {
+    scanner,
+    result,
+    feed: (chunk: string) => {
+      result.bytesRead += chunk.length;
+      handleBlocks(scanner.push(chunk));
+    },
+    finish: () => {
+      handleBlocks(scanner.flush());
+      return result;
+    },
+  };
 }
 
-function determineDispatchType(code: string | null, text: string | null): string {
-  const combined = normalizeText(`${code || ''} ${text || ''}`);
-  if (combined.includes('deferimento') || combined.includes('deferido')) return 'Deferimento';
-  if (combined.includes('indeferimento') || combined.includes('indeferido')) return 'Indeferimento';
-  if (combined.includes('exigencia') || combined.includes('exigência')) return 'Exigência';
-  if (combined.includes('oposicao') || combined.includes('oposição')) return 'Oposição';
-  if (combined.includes('certificado') || combined.includes('concessao')) return 'Certificado';
-  if (combined.includes('recurso')) return 'Recurso';
-  if (combined.includes('arquivamento') || combined.includes('arquivado')) return 'Arquivamento';
-  if (combined.includes('publicacao') || combined.includes('publicação')) return 'Publicação';
-  if (combined.includes('sobrestamento') || combined.includes('sobrestado')) return 'Sobrestamento';
-  if (combined.includes('anulacao') || combined.includes('anulação')) return 'Anulação';
-  return 'Outro';
-}
 
 // Try multiple URLs to download the RPI XML, with session
 async function tryDownloadRpiXml(rpiNumber: number, sessionCookies: string | null): Promise<string | null> {
