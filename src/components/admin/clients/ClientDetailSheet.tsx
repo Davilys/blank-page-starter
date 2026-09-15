@@ -3221,7 +3221,11 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                                 <p className="text-sm font-medium truncate">{inv.description}</p>
                                 <p className="text-[10px] text-muted-foreground">
                                   Vence: {format(new Date(inv.due_date), 'dd/MM/yyyy', { locale: ptBR })}
-                                  {canceladaPorAcordo && ' · Cancelada por acordo'}
+                                  {canceladaPorAcordo
+                                    ? ' · Cancelada por acordo'
+                                    : inv.status === 'cancelled' && (inv as any).cancelado_em
+                                      ? ` · Cancelada manualmente${(inv as any).cancelamento_motivo ? `: ${(inv as any).cancelamento_motivo}` : ''}`
+                                      : ''}
                                 </p>
                               </div>
                               <div className="text-right flex-shrink-0">
