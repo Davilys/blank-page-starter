@@ -1,0 +1,222 @@
+import { useEffect, useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, ExternalLink, Send, Handshake, AlertTriangle, RefreshCw, Lock } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
+import { FazerAcordoDialog } from "./FazerAcordoDialog";
+
+export interface InvoiceLike {
+  id: string;
+  description: string | null;
+  amount: number;
+  status: string;
+  due_date: string;
+  invoice_url?: string | null;
+  asaas_invoice_id?: string | null;
+  acordo_id?: string | null;
+}
+
+interface Props {
+  invoice: InvoiceLike | null;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  canManageFinance: boolean;
+  onChanged: () => void;
+}
+
+const brl = (v: number) => Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const fmt = (iso: string) => { const [y, m, d] = (iso || "").split("-"); return d ? `${d}/${m}/${y}` : "—"; };
+
+const ABERTAS = ["pending", "overdue"];
+
+export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFinance, onChanged }: Props) {
+  const [asaas, setAsaas] = useState<{ status: string; link: string | null } | null>(null);
+  const [loadingAsaas, setLoadingAsaas] = useState(false);
+  const [cobrando, setCobrando] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [acordo, setAcordo] = useState<any>(null);
+  const [showAcordo, setShowAcordo] = useState(false);
+
+  const busy = cobrando || retrying;
+  const isOpenInvoice = !!invoice && ABERTAS.includes(invoice.status);
+  const diasAtraso = invoice
+    ? Math.max(0, Math.floor((Date.now() - new Date(invoice.due_date + "T00:00:00").getTime()) / 86400000))
+    : 0;
+
+  useEffect(() => {
+    if (!open || !invoice) { setAsaas(null); setAcordo(null); return; }
+    let cancelled = false;
+    (async () => {
+      if (canManageFinance && invoice.asaas_invoice_id) {
+        setLoadingAsaas(true);
+        const { data } = await supabase.functions.invoke("criar-acordo-cliente", {
+          body: { action: "consultar", invoice_id: invoice.id },
+        });
+        if (!cancelled) {
+          setAsaas((data as any)?.asaas ? { status: (data as any).asaas.status, link: (data as any).link } : null);
+          setLoadingAsaas(false);
+        }
+      }
+      if (canManageFinance) {
+        const { data: ac } = await supabase
+          .from("acordos_cliente" as any)
+          .select("*")
+          .eq("invoice_original_id", invoice.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!cancelled) setAcordo(ac || null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, invoice?.id, canManageFinance]);
+
+  const link = asaas?.link || invoice?.invoice_url || null;
+
+  const handleCobrar = async () => {
+    if (!invoice || cobrando) return;
+    setCobrando(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("cobrar-fatura-vencida", {
+        body: { invoice_id: invoice.id, channels: ["whatsapp", "email"], force: true },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) { toast.error((data as any).error); return; }
+      const canais: string[] = (data as any)?.channels || [];
+      toast.success("Cobrança enviada", {
+        description: `WhatsApp: ${canais.includes("whatsapp") ? "enviado" : "cliente sem telefone"} · E-mail: ${canais.includes("email") ? "enviado" : "cliente sem e-mail"}`,
+      });
+      onChanged();
+    } catch (e) {
+      toast.error("Não foi possível enviar a cobrança", { description: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setCobrando(false);
+    }
+  };
+
+  const handleRetryCancel = async () => {
+    if (!acordo || retrying) return;
+    setRetrying(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("criar-acordo-cliente", {
+        body: { action: "retry-cancelamento", acordo_id: acordo.id },
+      });
+      if (error) throw error;
+      if ((data as any)?.success) { toast.success("Cobrança original cancelada no Asaas."); onChanged(); onOpenChange(false); }
+      else toast.error((data as any)?.message || (data as any)?.error || "O Asaas ainda não permitiu o cancelamento.");
+    } catch (e) {
+      toast.error("Falha ao tentar cancelar novamente", { description: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  if (!invoice) return null;
+
+  const statusCls = invoice.status === "overdue"
+    ? "bg-red-500/15 text-red-500 border-red-500/30"
+    : invoice.status === "pending"
+      ? "bg-amber-500/15 text-amber-600 border-amber-500/30"
+      : invoice.status === "paid"
+        ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
+        : "bg-muted text-muted-foreground border-border";
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={(v) => { if (!busy) onOpenChange(v); }}>
+        <DialogContent className="max-w-md" onInteractOutside={(e) => busy && e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="text-base">Detalhes da cobrança</DialogTitle>
+            <DialogDescription className="line-clamp-2">{invoice.description || "Sem descrição"}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
+              {[
+                { l: "Valor", v: brl(invoice.amount) },
+                { l: "Vencimento", v: fmt(invoice.due_date) },
+                ...(invoice.status === "overdue" ? [{ l: "Dias em atraso", v: `${diasAtraso} dia${diasAtraso !== 1 ? "s" : ""}` }] : []),
+              ].map((x) => (
+                <div key={x.l} className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">{x.l}</span>
+                  <span className="font-medium">{x.v}</span>
+                </div>
+              ))}
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Situação no CRM</span>
+                <Badge variant="outline" className={cn("h-5 text-[10px]", statusCls)}>{invoice.status}</Badge>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Situação no Asaas</span>
+                <span className="font-medium">
+                  {!canManageFinance ? "—" : loadingAsaas ? <Loader2 className="h-3 w-3 animate-spin" /> : (asaas?.status || "indisponível")}
+                </span>
+              </div>
+            </div>
+
+            {!canManageFinance && (
+              <div className="flex gap-2 rounded-xl border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+                <Lock className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <p>Somente administradores com permissão financeira podem cobrar ou gerar acordos.</p>
+              </div>
+            )}
+
+            {acordo?.bloqueado_por_pendencia && canManageFinance && (
+              <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs space-y-2">
+                <p className="flex gap-2 text-red-600 dark:text-red-400">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                  Existe um acordo com pendência: a cobrança original não foi cancelada no Asaas.
+                </p>
+                <Button size="sm" variant="outline" className="h-8 text-xs w-full" disabled={retrying} onClick={handleRetryCancel}>
+                  {retrying ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
+                  Tentar cancelar novamente
+                </Button>
+              </div>
+            )}
+
+            {canManageFinance && isOpenInvoice && !acordo?.bloqueado_por_pendencia && (
+              <div className="grid grid-cols-2 gap-2">
+                <Button size="sm" className="h-9 text-xs" disabled={cobrando} onClick={handleCobrar}>
+                  {cobrando ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />Enviando...</> : <><Send className="h-3.5 w-3.5 mr-1" />Cobrar cliente</>}
+                </Button>
+                <Button size="sm" variant="outline" className="h-9 text-xs border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10"
+                  disabled={busy} onClick={() => setShowAcordo(true)}>
+                  <Handshake className="h-3.5 w-3.5 mr-1" />Fazer acordo
+                </Button>
+              </div>
+            )}
+
+            {!isOpenInvoice && (
+              <p className="text-[11px] text-muted-foreground text-center">
+                Cobrança {invoice.status} — disponível apenas para consulta.
+              </p>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 sm:justify-between">
+            {link ? (
+              <Button variant="ghost" size="sm" className="h-9 text-xs" asChild>
+                <a href={link} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-3.5 w-3.5 mr-1" />Abrir no Asaas
+                </a>
+              </Button>
+            ) : <span />}
+            <Button variant="outline" size="sm" className="h-9 text-xs" disabled={busy} onClick={() => onOpenChange(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {showAcordo && (
+        <FazerAcordoDialog
+          open={showAcordo}
+          onOpenChange={setShowAcordo}
+          invoice={invoice}
+          onCreated={() => { onChanged(); onOpenChange(false); }}
+        />
+      )}
+    </>
+  );
+}
