@@ -313,6 +313,15 @@ export default function RevistaINPI() {
   const [confirmDedup, setConfirmDedup] = useState(false);
   const [dedupRunning, setDedupRunning] = useState(false);
   const [historicoPage, setHistoricoPage] = useState(1);
+  const lookupController = useProcessLookup();
+
+  // Recarrega um único registro após o enriquecimento gravar campos vazios.
+  const refreshEntryFromDb = useCallback(async (entryId: string) => {
+    const { data } = await supabase.from('rpi_entries').select('*').eq('id', entryId).maybeSingle();
+    if (!data) return;
+    setEntries(prev => prev.map(e => (e.id === entryId ? { ...e, ...(data as any) } : e)));
+  }, []);
+
   const HISTORICO_PAGE_SIZE = 10;
 
   type UploadStatusKind = 'done' | 'partial' | 'pending' | 'error' | 'processing';
