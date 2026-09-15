@@ -1,14 +1,21 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import JSZip from 'https://esm.sh/jszip@3.10.1';
+import {
+  ProcessBlockScanner,
+  parseProcessBlock,
+  sha256Hex,
+  type ParsedProcess,
+} from '../_shared/rpiXml.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const ATTORNEY_NAME = 'Davilys Danques Oliveira Cunha';
+const ATTORNEY_NAME = 'DAVILYS DANQUES DE OLIVEIRA CUNHA';
 const ATTORNEY_SEARCH_TERM = 'davilys';
+const ATTORNEY_SEARCH_TERMS = ['davilys', 'danques'];
 
 const INPI_BASE_URL = 'https://revistas.inpi.gov.br';
 
@@ -342,157 +349,83 @@ async function fetchAvailableRpis(sessionCookies: string | null): Promise<{ late
   }
 }
 
-interface ExtractedProcess {
-  processNumber: string;
-  brandName: string | null;
-  holderName: string | null;
-  attorneyName: string | null;
-  nclClasses: string[];
-  dispatchCode: string | null;
-  dispatchText: string | null;
-  dispatchType: string | null;
-  publicationDate: string | null;
+// ========== LEITURA ESTRUTURAL E INCREMENTAL DO XML ==========
+
+interface ScanResult {
+  processes: ParsedProcess[];
+  totalBlocks: number;
+  totalMentions: number;
+  bytesRead: number;
 }
 
-// Parse INPI XML - memory-efficient
-function parseRpiXml(xmlContent: string, rpiNumber: number): ExtractedProcess[] {
-  const processes: ExtractedProcess[] = [];
-  const MAX_PROCESSES = 300;
-  const BATCH_SIZE = 500;
+function createScanner(): { scanner: ProcessBlockScanner; result: ScanResult; feed: (chunk: string) => void; finish: () => ScanResult } {
+  const scanner = new ProcessBlockScanner();
+  const result: ScanResult = { processes: [], totalBlocks: 0, totalMentions: 0, bytesRead: 0 };
+  const byNumber = new Map<string, ParsedProcess>();
 
-  console.log(`Parsing XML content, size: ${xmlContent.length} bytes`);
-
-  const searchTerm = ATTORNEY_SEARCH_TERM.toLowerCase();
-  const searchRegex = new RegExp(searchTerm, 'i');
-
-  if (!searchRegex.test(xmlContent)) {
-    console.log('Attorney name not found in XML content');
-    return [];
-  }
-
-  console.log('Attorney name found! Extracting processes...');
-
-  const extractTagContent = (xml: string, tagName: string): string | null => {
-    const startTag = `<${tagName}`;
-    const endTag = `</${tagName}>`;
-    const startIdx = xml.indexOf(startTag);
-    if (startIdx === -1) return null;
-    const endIdx = xml.indexOf(endTag, startIdx);
-    if (endIdx === -1) return null;
-    const tagEndIdx = xml.indexOf('>', startIdx);
-    if (tagEndIdx === -1 || tagEndIdx > endIdx) return null;
-    let content = xml.substring(tagEndIdx + 1, endIdx).trim();
-    content = content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    return content || null;
-  };
-
-  const extractAttribute = (xml: string, tagName: string, attrName: string): string | null => {
-    const tagStart = xml.indexOf(`<${tagName}`);
-    if (tagStart === -1) return null;
-    const tagEnd = xml.indexOf('>', tagStart);
-    if (tagEnd === -1) return null;
-    const tagContent = xml.substring(tagStart, tagEnd);
-    const attrMatch = tagContent.match(new RegExp(`${attrName}\\s*=\\s*["']([^"']+)["']`, 'i'));
-    return attrMatch ? attrMatch[1].trim() : null;
-  };
-
-  const headerSection = xmlContent.slice(0, 2000);
-  const revistaMatch = headerSection.match(/<revista[^>]*data[^>]*=["']([^"']+)["']/i);
-  const publicationDate = revistaMatch ? revistaMatch[1] : null;
-
-  const processoEndTag = '</processo>';
-  const chunks = xmlContent.split(processoEndTag);
-  const totalChunks = chunks.length;
-
-  console.log(`Split into ${totalChunks} chunks`);
-  xmlContent = '';
-
-  for (let batchStart = 0; batchStart < totalChunks && processes.length < MAX_PROCESSES; batchStart += BATCH_SIZE) {
-    const batchEnd = Math.min(batchStart + BATCH_SIZE, totalChunks - 1);
-    for (let i = batchStart; i < batchEnd && processes.length < MAX_PROCESSES; i++) {
-      const chunk = chunks[i];
-      if (!chunk || chunk.length < 50) continue;
-      if (!searchRegex.test(chunk)) continue;
-
-      const processoStart = chunk.lastIndexOf('<processo');
-      if (processoStart === -1) continue;
-      const block = chunk.substring(processoStart) + processoEndTag;
-
-      let processNumber: string | null = null;
-      const numAttrMatch = block.match(/numero\s*=\s*["'](\d+)["']/i);
-      if (numAttrMatch) {
-        processNumber = numAttrMatch[1];
-      } else {
-        const numMatch = block.match(/(\d{9,12})/);
-        if (numMatch) processNumber = numMatch[1];
+  const handleBlocks = (blocks: string[]) => {
+    for (const block of blocks) {
+      result.totalBlocks++;
+      const parsed = parseProcessBlock(block, ATTORNEY_SEARCH_TERMS, ATTORNEY_NAME);
+      if (!parsed) continue;
+      result.totalMentions += parsed.occurrences.length;
+      const existing = byNumber.get(parsed.processNumber);
+      if (existing) {
+        // Mesmo processo em outro bloco da mesma revista: uma única linha,
+        // mas todas as ocorrências são preservadas para auditoria.
+        existing.occurrences.push(
+          ...parsed.occurrences.map((o, i) => ({ ...o, order: existing.occurrences.length + i + 1 })),
+        );
+        existing.relationTypes = Array.from(new Set([...existing.relationTypes, ...parsed.relationTypes]));
+        existing.isDestituicao = existing.isDestituicao || parsed.isDestituicao;
+        existing.isNomeacao = existing.isNomeacao || parsed.isNomeacao;
+        existing.isSubstituicao = existing.isSubstituicao || parsed.isSubstituicao;
+        existing.dispatches.push(...parsed.dispatches);
+        continue;
       }
-      if (!processNumber) continue;
-
-      const cleanNumber = processNumber.replace(/\D/g, '');
-
-      let isDuplicate = false;
-      for (const p of processes) {
-        if (p.processNumber === cleanNumber) { isDuplicate = true; break; }
-      }
-      if (isDuplicate) continue;
-
-      let brandName = extractTagContent(block, 'marca') || extractTagContent(block, 'nome') || extractTagContent(block, 'denominacao') || extractAttribute(block, 'marca', 'nome') || extractAttribute(block, 'marca', 'apresentacao');
-      if (brandName) brandName = brandName.replace(/<[^>]+>/g, '').trim();
-
-      const holderName = extractAttribute(block, 'titular', 'nome-razao-social') || extractTagContent(block, 'titular') || extractTagContent(block, 'requerente') || extractTagContent(block, 'depositante');
-      const dispatchCode = extractAttribute(block, 'despacho', 'codigo') || extractTagContent(block, 'codigo') || extractTagContent(block, 'cod-despacho');
-      const dispatchText = extractTagContent(block, 'texto-complementar') || extractTagContent(block, 'descricao') || extractTagContent(block, 'texto');
-
-      const nclClasses: string[] = [];
-      const nclRegex = /classe-nice[^>]*codigo[^>]*=["'](\d+)["']/gi;
-      let nclMatch;
-      while ((nclMatch = nclRegex.exec(block)) !== null) nclClasses.push(nclMatch[1]);
-      if (nclClasses.length === 0) {
-        const classMatch = block.match(/classe[s]?\s*:?\s*([\d,\s]+)/i);
-        if (classMatch) {
-          const nums = classMatch[1].match(/\d+/g);
-          if (nums) nclClasses.push(...nums);
-        }
-      }
-
-      const dispatchType = determineDispatchType(dispatchCode, dispatchText);
-
-      processes.push({
-        processNumber: cleanNumber,
-        brandName,
-        holderName,
-        attorneyName: ATTORNEY_NAME,
-        nclClasses,
-        dispatchCode,
-        dispatchText,
-        dispatchType,
-        publicationDate,
-      });
+      byNumber.set(parsed.processNumber, parsed);
+      result.processes.push(parsed);
     }
-    console.log(`Batch ${batchStart}-${batchEnd}: ${processes.length} processes`);
-  }
+  };
 
-  console.log(`Extraction complete: ${processes.length} processes`);
-  return processes;
+  return {
+    scanner,
+    result,
+    feed: (chunk: string) => {
+      result.bytesRead += chunk.length;
+      handleBlocks(scanner.push(chunk));
+    },
+    finish: () => {
+      handleBlocks(scanner.flush());
+      return result;
+    },
+  };
 }
 
 function determineDispatchType(code: string | null, text: string | null): string {
   const combined = normalizeText(`${code || ''} ${text || ''}`);
+  if (combined.includes('destitui')) return 'Destituição de procurador';
   if (combined.includes('deferimento') || combined.includes('deferido')) return 'Deferimento';
   if (combined.includes('indeferimento') || combined.includes('indeferido')) return 'Indeferimento';
-  if (combined.includes('exigencia') || combined.includes('exigência')) return 'Exigência';
-  if (combined.includes('oposicao') || combined.includes('oposição')) return 'Oposição';
+  if (combined.includes('exigencia')) return 'Exigência';
+  if (combined.includes('oposicao')) return 'Oposição';
   if (combined.includes('certificado') || combined.includes('concessao')) return 'Certificado';
   if (combined.includes('recurso')) return 'Recurso';
   if (combined.includes('arquivamento') || combined.includes('arquivado')) return 'Arquivamento';
-  if (combined.includes('publicacao') || combined.includes('publicação')) return 'Publicação';
-  if (combined.includes('sobrestamento') || combined.includes('sobrestado')) return 'Sobrestamento';
-  if (combined.includes('anulacao') || combined.includes('anulação')) return 'Anulação';
+  if (combined.includes('publicacao')) return 'Publicação';
+  if (combined.includes('sobrestamento')) return 'Sobrestamento';
+  if (combined.includes('anulacao')) return 'Anulação';
   return 'Outro';
 }
 
-// Try multiple URLs to download the RPI XML, with session
-async function tryDownloadRpiXml(rpiNumber: number, sessionCookies: string | null): Promise<string | null> {
+
+
+// Baixa o XML da RPI e entrega o conteúdo em pedaços para o scanner
+async function downloadAndScanRpiXml(
+  rpiNumber: number,
+  sessionCookies: string | null,
+  feed: (chunk: string) => void,
+): Promise<{ ok: boolean; sourceUrl: string | null }> {
   const urls = [
     `${INPI_BASE_URL}/txt/RM${rpiNumber}.zip`,
     `${INPI_BASE_URL}/xml/RM${rpiNumber}.zip`,
@@ -550,18 +483,33 @@ async function tryDownloadRpiXml(rpiNumber: number, sessionCookies: string | nul
         const zip = await JSZip.loadAsync(arrayBuffer);
         const xmlFiles = Object.keys(zip.files).filter(name => name.toLowerCase().endsWith('.xml'));
         if (xmlFiles.length > 0) {
-          const xmlContent = await zip.files[xmlFiles[0]].async('string');
-          console.log(`Extracted XML from ${xmlFiles[0]}, size: ${xmlContent.length} bytes`);
-          return xmlContent;
+          // Leitura incremental: o XML nunca existe inteiro em memória.
+          await new Promise<void>((resolve, reject) => {
+            (zip.files[xmlFiles[0]] as any)
+              .internalStream('string')
+              .on('data', (chunk: string) => feed(chunk))
+              .on('error', (err: unknown) => reject(err))
+              .on('end', () => resolve())
+              .resume();
+          });
+          console.log(`Streamed XML from ${xmlFiles[0]}`);
+          return { ok: true, sourceUrl: url };
         }
         console.log('No XML files in ZIP');
       } else if (bytes[0] === 0x3C) {
-        const text = new TextDecoder().decode(bytes);
-        if (text.includes('<?xml') || text.includes('<revista') || text.includes('<processo')) {
+        const decoder = new TextDecoder();
+        const head = decoder.decode(bytes.slice(0, 2000));
+        if (head.includes('<?xml') || head.includes('<revista') || head.includes('<processo')) {
           console.log('Got XML directly');
-          return text;
+          const CHUNK = 1 << 20;
+          const streamDecoder = new TextDecoder();
+          for (let off = 0; off < bytes.length; off += CHUNK) {
+            feed(streamDecoder.decode(bytes.subarray(off, Math.min(off + CHUNK, bytes.length)), { stream: true }));
+          }
+          feed(streamDecoder.decode());
+          return { ok: true, sourceUrl: url };
         }
-        if (text.includes('login') || text.includes('id_username')) {
+        if (head.includes('login') || head.includes('id_username')) {
           console.log('Got login page - not authenticated');
         }
       } else {
@@ -577,8 +525,9 @@ async function tryDownloadRpiXml(rpiNumber: number, sessionCookies: string | nul
     }
   }
 
-  return null;
+  return { ok: false, sourceUrl: null };
 }
+
 
 // ========== MAIN HANDLER ==========
 
@@ -588,7 +537,8 @@ serve(async (req) => {
   }
 
   try {
-    const { rpiNumber, mode, force } = await req.json();
+    const { rpiNumber, mode, force, preview } = await req.json();
+    const isPreview = preview === true;
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -659,10 +609,11 @@ serve(async (req) => {
 
     console.log(`Fetching RPI ${targetRpi}...`);
 
-    // Try to download with session
-    const xmlContent = await tryDownloadRpiXml(targetRpi, sessionCookies);
+    const t0 = Date.now();
+    const { feed, finish } = createScanner();
+    const download = await downloadAndScanRpiXml(targetRpi, sessionCookies, feed);
 
-    if (!xmlContent) {
+    if (!download.ok) {
       const latestWithXml = withXml.length > 0 ? withXml[0] : null;
       return new Response(
         JSON.stringify({
@@ -679,21 +630,27 @@ serve(async (req) => {
       );
     }
 
-    // Parse and process
-    const extractedProcesses = parseRpiXml(xmlContent, targetRpi);
-    console.log(`Found ${extractedProcesses.length} processes`);
+    const scan = finish();
+    const elapsedMs = Date.now() - t0;
+    console.log(
+      `Scan: ${scan.totalBlocks} blocos, ${scan.processes.length} processos únicos, ${scan.totalMentions} menções, ${scan.bytesRead} caracteres em ${elapsedMs}ms`,
+    );
 
-    if (extractedProcesses.length === 0) {
+    if (scan.processes.length === 0) {
       const { data: rpiUpload } = await supabase
         .from('rpi_uploads')
         .insert({
           file_name: `RPI_${targetRpi}_auto.xml`,
           file_path: `remote/RPI_${targetRpi}.xml`,
+          source_file_url: download.sourceUrl,
           rpi_number: targetRpi.toString(),
           rpi_date: new Date().toISOString().split('T')[0],
           status: 'completed',
+          is_preview: isPreview,
           total_processes_found: 0,
           total_clients_matched: 0,
+          total_mentions: 0,
+          parse_stats: { blocks: scan.totalBlocks, chars: scan.bytesRead, elapsed_ms: elapsedMs },
           summary: `RPI ${targetRpi} analisada. Nenhum processo do procurador ${ATTORNEY_NAME} foi publicado nesta edição.`,
           processed_at: new Date().toISOString(),
         })
@@ -705,6 +662,7 @@ serve(async (req) => {
           success: true,
           rpiNumber: targetRpi,
           totalProcesses: 0,
+          totalMentions: 0,
           matchedClients: 0,
           uploadId: rpiUpload?.id,
           message: `RPI ${targetRpi} processada. Nenhum processo do procurador encontrado.`,
@@ -718,57 +676,188 @@ serve(async (req) => {
       .insert({
         file_name: `RPI_${targetRpi}_auto.xml`,
         file_path: `remote/RPI_${targetRpi}.xml`,
+        source_file_url: download.sourceUrl,
         rpi_number: targetRpi.toString(),
         rpi_date: new Date().toISOString().split('T')[0],
         status: 'processing',
+        is_preview: isPreview,
       })
       .select()
       .single();
 
     if (uploadError) throw uploadError;
 
+    // ── vinculação segura ao cliente ───────────────────────────
     const { data: existingProcesses } = await supabase
       .from('brand_processes')
       .select('id, process_number, user_id, brand_name');
 
     const processMap = new Map(
-      (existingProcesses || []).map(p => [p.process_number?.replace(/\D/g, ''), p])
+      (existingProcesses || []).map((p: any) => [String(p.process_number || '').replace(/\D/g, ''), p]),
     );
 
     let matchedClients = 0;
-    const entries = extractedProcesses.map(proc => {
-      const cleanNumber = proc.processNumber.replace(/\D/g, '');
-      const existingProcess = processMap.get(cleanNumber);
-      if (existingProcess?.user_id) matchedClients++;
+    let ambiguous = 0;
+    const entries: any[] = [];
 
-      return {
+    for (const proc of scan.processes) {
+      const cleanNumber = proc.processNumber;
+      const existingProcess = processMap.get(cleanNumber);
+
+      let matchedClientId: string | null = existingProcess?.user_id ?? null;
+      let matchedProcessId: string | null = existingProcess?.id ?? null;
+      const candidates: any[] = [];
+
+      // Sem processo no CRM: tenta CPF/CNPJ exato do titular
+      if (!matchedClientId) {
+        const docs = proc.holders
+          .map((h) => (h.name.match(/\d{11,14}/) || [])[0])
+          .filter(Boolean) as string[];
+        for (const doc of docs) {
+          const { data: found } = await supabase.rpc('profiles_by_doc_digits', { p_doc: doc });
+          if (found && found.length === 1) {
+            matchedClientId = found[0].id;
+            candidates.push({ tipo: 'cpf_cnpj_exato', doc, profile_id: found[0].id });
+            break;
+          }
+          if (found && found.length > 1) {
+            ambiguous++;
+            candidates.push({ tipo: 'cpf_cnpj_ambiguo', doc, quantidade: found.length });
+          }
+        }
+      }
+
+      // Marca nunca vincula sozinha: entra apenas como candidato auxiliar
+      if (!matchedClientId && proc.brandName) {
+        const alvo = proc.brandName.toLowerCase();
+        const porMarca = (existingProcesses || []).filter(
+          (p: any) => (p.brand_name || '').toLowerCase().trim() === alvo,
+        );
+        if (porMarca.length > 0) {
+          ambiguous++;
+          for (const p of porMarca.slice(0, 5)) {
+            candidates.push({ tipo: 'marca_semelhante', process_id: p.id, user_id: p.user_id, brand_name: p.brand_name });
+          }
+        }
+      }
+
+      if (matchedClientId) matchedClients++;
+
+      const needsReview =
+        proc.isDestituicao || proc.isNomeacao || proc.isSubstituicao || (!matchedClientId && candidates.length > 0);
+
+      const holderName = proc.holders[0]?.name ?? proc.requerentes[0]?.name ?? null;
+
+      const fieldSources: Record<string, string> = {};
+      const mark = (field: string, value: unknown) => {
+        if (value !== null && value !== undefined && value !== '') fieldSources[field] = 'rpi_xml';
+      };
+      mark('brand_name', proc.brandName);
+      mark('holder_name', holderName);
+      mark('dispatch_code', proc.primaryDispatchCode);
+      mark('deposit_date', proc.depositDate);
+      mark('ncl_classes', proc.nclClasses.length ? proc.nclClasses : null);
+
+      entries.push({
         rpi_upload_id: rpiUpload.id,
         process_number: cleanNumber,
         brand_name: proc.brandName,
-        holder_name: proc.holderName,
-        attorney_name: proc.attorneyName || ATTORNEY_NAME,
+        holder_name: holderName,
+        attorney_name: ATTORNEY_NAME,
         ncl_classes: proc.nclClasses.length > 0 ? proc.nclClasses : null,
-        dispatch_code: proc.dispatchCode,
-        dispatch_text: proc.dispatchText,
-        dispatch_type: proc.dispatchType,
-        publication_date: convertBrazilianDateToISO(proc.publicationDate),
-        matched_client_id: existingProcess?.user_id || null,
-        matched_process_id: existingProcess?.id || null,
+        dispatch_code: proc.primaryDispatchCode,
+        dispatch_text: proc.primaryDispatchText,
+        dispatch_type: proc.primaryDispatchName || determineDispatchType(proc.primaryDispatchCode, proc.primaryDispatchText),
+        publication_date: null,
+        matched_client_id: matchedClientId,
+        matched_process_id: matchedProcessId,
         update_status: 'pending',
-      };
-    });
+        occurrences_count: proc.occurrences.length,
+        occurrences: proc.occurrences,
+        relation_types: proc.occurrences.length > 1
+          ? Array.from(new Set([...proc.relationTypes, 'multiplas_ocorrencias']))
+          : proc.relationTypes,
+        relation_primary: proc.relationPrimary,
+        relation_confidence: proc.relationConfidence,
+        is_destituicao: proc.isDestituicao,
+        is_nomeacao: proc.isNomeacao,
+        is_substituicao: proc.isSubstituicao,
+        procurador_anterior: proc.procuradorAnterior,
+        procurador_novo: proc.procuradorNovo,
+        needs_human_review: needsReview,
+        review_reason: proc.isDestituicao
+          ? 'Procurador destituído nesta publicação'
+          : (!matchedClientId && candidates.length > 0 ? 'Vínculo ambíguo — confirmar cliente' : null),
+        deposit_date: proc.depositDate,
+        concession_date: proc.concessionDate,
+        validity_date: proc.validityDate,
+        natureza: proc.natureza,
+        apresentacao: proc.apresentacao,
+        apostila: proc.apostila,
+        titulares: proc.holders,
+        requerentes: proc.requerentes,
+        procuradores: proc.procuradores,
+        dispatches: proc.dispatches,
+        protocols: proc.protocols,
+        ncl_specifications: proc.nclSpecifications,
+        vienna_classes: proc.viennaClasses,
+        field_sources: fieldSources,
+        match_candidates: candidates,
+        process_block_hash: await sha256Hex(`${targetRpi}:${cleanNumber}:${proc.occurrences.length}`),
+        source_file_ref: download.sourceUrl,
+        enrichment_status: proc.brandName && holderName ? 'completo' : 'pendente',
+      });
+    }
 
-    const { error: entriesError } = await supabase.from('rpi_entries').insert(entries);
+    const { data: insertedEntries, error: entriesError } = await supabase
+      .from('rpi_entries')
+      .upsert(entries, { onConflict: 'rpi_upload_id,process_number' })
+      .select('id, process_number, enrichment_status');
     if (entriesError) throw entriesError;
 
-    const summary = `RPI ${targetRpi} processada. ${extractedProcesses.length} publicações do procurador encontradas, ${matchedClients} correspondem a clientes WebMarcas.`;
+    // Fila de complementação: só o que ficou incompleto
+    const pendentes = (insertedEntries || []).filter((e: any) => e.enrichment_status === 'pendente');
+    if (pendentes.length > 0) {
+      await supabase.from('rpi_enrichment_queue').upsert(
+        pendentes.map((e: any) => ({
+          rpi_entry_id: e.id,
+          process_number: e.process_number,
+          status: 'pendente',
+          next_attempt_at: new Date().toISOString(),
+        })),
+        { onConflict: 'rpi_entry_id' },
+      );
+    }
+
+    const stats = {
+      blocks: scan.totalBlocks,
+      chars: scan.bytesRead,
+      elapsed_ms: elapsedMs,
+      mentions: scan.totalMentions,
+      unique_processes: scan.processes.length,
+      with_brand_xml: scan.processes.filter((p) => !!p.brandName).length,
+      with_holder_xml: scan.processes.filter((p) => p.holders.length > 0).length,
+      with_dispatch_code: scan.processes.filter((p) => !!p.primaryDispatchCode).length,
+      destituicoes: scan.processes.filter((p) => p.isDestituicao).length,
+      nomeacoes: scan.processes.filter((p) => p.isNomeacao).length,
+      substituicoes: scan.processes.filter((p) => p.isSubstituicao).length,
+      peticoes: scan.processes.filter((p) => p.relationTypes.includes('procurador_protocolo')).length,
+      ambiguos: ambiguous,
+      pendentes_enriquecimento: pendentes.length,
+    };
+
+    const summary = isPreview
+      ? `Prévia da RPI ${targetRpi}: ${scan.totalMentions} menções, ${scan.processes.length} processos únicos, ${matchedClients} vinculados a clientes. Nenhuma automação disparada.`
+      : `RPI ${targetRpi} processada. ${scan.processes.length} publicações do procurador encontradas, ${matchedClients} correspondem a clientes WebMarcas.`;
 
     await supabase
       .from('rpi_uploads')
       .update({
         status: 'completed',
-        total_processes_found: extractedProcesses.length,
+        total_processes_found: scan.processes.length,
         total_clients_matched: matchedClients,
+        total_mentions: scan.totalMentions,
+        parse_stats: stats,
         summary,
         processed_at: new Date().toISOString(),
       })
@@ -778,19 +867,27 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         rpiNumber: targetRpi,
-        totalProcesses: extractedProcesses.length,
+        preview: isPreview,
+        totalProcesses: scan.processes.length,
+        totalMentions: scan.totalMentions,
         matchedClients,
         uploadId: rpiUpload.id,
         message: summary,
-        processes: extractedProcesses.map(p => ({
+        stats,
+        processes: scan.processes.map((p) => ({
           processNumber: p.processNumber,
           brandName: p.brandName,
-          dispatchType: p.dispatchType,
-          holderName: p.holderName,
+          holderName: p.holders[0]?.name ?? null,
+          dispatchCode: p.primaryDispatchCode,
+          dispatchName: p.primaryDispatchName,
+          relationPrimary: p.relationPrimary,
+          occurrences: p.occurrences.length,
+          isDestituicao: p.isDestituicao,
         })),
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+
 
   } catch (error: unknown) {
     console.error('Error:', error);
