@@ -4587,6 +4587,8 @@ export type Database = {
           apostila: string | null
           apresentacao: string | null
           attorney_name: string | null
+          auto_link_source: string | null
+          auto_linked_at: string | null
           brand_name: string | null
           concession_date: string | null
           created_at: string
@@ -4640,6 +4642,8 @@ export type Database = {
           apostila?: string | null
           apresentacao?: string | null
           attorney_name?: string | null
+          auto_link_source?: string | null
+          auto_linked_at?: string | null
           brand_name?: string | null
           concession_date?: string | null
           created_at?: string
@@ -4693,6 +4697,8 @@ export type Database = {
           apostila?: string | null
           apresentacao?: string | null
           attorney_name?: string | null
+          auto_link_source?: string | null
+          auto_linked_at?: string | null
           brand_name?: string | null
           concession_date?: string | null
           created_at?: string
