@@ -32,7 +32,7 @@ serve(async (req) => {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${SERVICE_KEY}`,
         },
-        body: JSON.stringify({ account_id: acc.id }),
+        body: JSON.stringify({ account_id: acc.id, trigger_source: "cron" }),
       });
       const j = await r.json().catch(() => ({}));
       results.push({ account: acc.email_address, ok: r.ok, summary: j?.results?.[0]?.folders });
