@@ -3030,7 +3030,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                     {asaasPayments.length > 0 && (() => {
                       const groups: Array<{ key: 'vencido'|'aberto'|'pago'; label: string; tone: string }> = [
                         { key: 'vencido', label: 'Vencidas', tone: 'text-red-500' },
-                        { key: 'aberto', label: 'Em aberto', tone: 'text-amber-500' },
+                        { key: 'aberto', label: 'A vencer', tone: 'text-amber-500' },
                         { key: 'pago', label: 'Pagas', tone: 'text-emerald-500' },
                       ];
                       return groups.map(g => {
