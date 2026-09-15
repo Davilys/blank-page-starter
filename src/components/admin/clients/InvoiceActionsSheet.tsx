@@ -122,6 +122,28 @@ export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFina
     }
   };
 
+  const handleExcluir = async () => {
+    if (!invoice || excluindo) return;
+    if (motivo.trim().length < 3) { toast.error("Informe o motivo do cancelamento"); return; }
+    setExcluindo(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("criar-acordo-cliente", {
+        body: { action: "excluir", invoice_id: invoice.id, motivo: motivo.trim(), crm_action_id: `excluir:${invoice.id}` },
+      });
+      if (error) throw error;
+      if (!(data as any)?.success) { toast.error((data as any)?.error || "Não foi possível excluir a cobrança"); return; }
+      toast.success("Cobrança cancelada", { description: "Ela continua no histórico como cancelada." });
+      setConfirmExcluir(false);
+      setMotivo("");
+      onChanged();
+      onOpenChange(false);
+    } catch (e) {
+      toast.error("Falha ao excluir a cobrança", { description: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setExcluindo(false);
+    }
+  };
+
   if (!invoice) return null;
 
   const statusCls = invoice.status === "overdue"
