@@ -41,6 +41,10 @@ interface INPIResourcePDFPreviewProps {
   content: string;
   resourceType?: string;
   debugEvidenceOverride?: ResourceEvidence[];
+  /** Anexos convertidos do dossiê (pacote completo). */
+  annexes?: NativeAnnexDoc[];
+  /** Carimbo diagonal aplicado em todas as páginas. */
+  draftStamp?: string | null;
 }
 
 type SupabaseTableClient = typeof supabase & {
