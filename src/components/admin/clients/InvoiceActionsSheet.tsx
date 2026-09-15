@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ExternalLink, Send, Handshake, AlertTriangle, RefreshCw, Lock } from "lucide-react";
+import { Loader2, ExternalLink, Send, Handshake, AlertTriangle, RefreshCw, Lock, Trash2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -39,8 +44,11 @@ export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFina
   const [retrying, setRetrying] = useState(false);
   const [acordo, setAcordo] = useState<any>(null);
   const [showAcordo, setShowAcordo] = useState(false);
+  const [confirmExcluir, setConfirmExcluir] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  const [excluindo, setExcluindo] = useState(false);
 
-  const busy = cobrando || retrying;
+  const busy = cobrando || retrying || excluindo;
   const isOpenInvoice = !!invoice && ABERTAS.includes(invoice.status);
   const diasAtraso = invoice
     ? Math.max(0, Math.floor((Date.now() - new Date(invoice.due_date + "T00:00:00").getTime()) / 86400000))
@@ -111,6 +119,28 @@ export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFina
       toast.error("Falha ao tentar cancelar novamente", { description: e instanceof Error ? e.message : String(e) });
     } finally {
       setRetrying(false);
+    }
+  };
+
+  const handleExcluir = async () => {
+    if (!invoice || excluindo) return;
+    if (motivo.trim().length < 3) { toast.error("Informe o motivo do cancelamento"); return; }
+    setExcluindo(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("criar-acordo-cliente", {
+        body: { action: "excluir", invoice_id: invoice.id, motivo: motivo.trim(), crm_action_id: `excluir:${invoice.id}` },
+      });
+      if (error) throw error;
+      if (!(data as any)?.success) { toast.error((data as any)?.error || "Não foi possível excluir a cobrança"); return; }
+      toast.success("Cobrança cancelada", { description: "Ela continua no histórico como cancelada." });
+      setConfirmExcluir(false);
+      setMotivo("");
+      onChanged();
+      onOpenChange(false);
+    } catch (e) {
+      toast.error("Falha ao excluir a cobrança", { description: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setExcluindo(false);
     }
   };
 
@@ -186,6 +216,10 @@ export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFina
                   disabled={busy} onClick={() => setShowAcordo(true)}>
                   <Handshake className="h-3.5 w-3.5 mr-1" />Fazer acordo
                 </Button>
+                <Button size="sm" variant="outline" className="h-9 text-xs col-span-2 border-red-500/40 text-red-600 hover:bg-red-500/10"
+                  disabled={busy} onClick={() => setConfirmExcluir(true)}>
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />Excluir cobrança
+                </Button>
               </div>
             )}
 
@@ -217,6 +251,37 @@ export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFina
           onCreated={() => { onChanged(); onOpenChange(false); }}
         />
       )}
+
+      <AlertDialog open={confirmExcluir} onOpenChange={(v) => { if (!excluindo) setConfirmExcluir(v); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir esta cobrança?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A cobrança será cancelada no Asaas e ficará no histórico como <strong>cancelada</strong>. O cliente deixa de poder pagá-la.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground">Motivo do cancelamento</label>
+            <Textarea
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              placeholder="Ex.: cobrança gerada em duplicidade"
+              className="min-h-[72px] text-sm"
+              disabled={excluindo}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={excluindo}>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={excluindo || motivo.trim().length < 3}
+              onClick={(e) => { e.preventDefault(); handleExcluir(); }}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {excluindo ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />Excluindo...</> : "Excluir cobrança"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -2350,6 +2350,9 @@ export type Database = {
           asaas_customer_id: string | null
           asaas_invoice_id: string | null
           boleto_code: string | null
+          cancelado_em: string | null
+          cancelado_por: string | null
+          cancelamento_motivo: string | null
           cobranca_origem_id: string | null
           contract_id: string | null
           created_at: string | null
@@ -2378,6 +2381,9 @@ export type Database = {
           asaas_customer_id?: string | null
           asaas_invoice_id?: string | null
           boleto_code?: string | null
+          cancelado_em?: string | null
+          cancelado_por?: string | null
+          cancelamento_motivo?: string | null
           cobranca_origem_id?: string | null
           contract_id?: string | null
           created_at?: string | null
@@ -2406,6 +2412,9 @@ export type Database = {
           asaas_customer_id?: string | null
           asaas_invoice_id?: string | null
           boleto_code?: string | null
+          cancelado_em?: string | null
+          cancelado_por?: string | null
+          cancelamento_motivo?: string | null
           cobranca_origem_id?: string | null
           contract_id?: string | null
           created_at?: string | null

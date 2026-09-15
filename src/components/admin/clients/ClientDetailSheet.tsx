@@ -27,7 +27,7 @@ import {
   CheckCircle, TrendingUp, Receipt, Trash2, UserCheck,
   Bell, Send, MapPin, Hash, Globe, Briefcase, Shield,
   ChevronRight, Activity, RefreshCw, Eye, Copy, Edit2,
-  Package, BarChart3, Wallet, FileCheck, Lock, Video, KeyRound, Handshake
+  Package, BarChart3, Wallet, FileCheck, Lock, Video, KeyRound, Handshake, FilePlus2
 } from 'lucide-react';
 import type { ClientWithProcess } from './ClientKanbanBoard';
 import { PIPELINE_STAGES, COMMERCIAL_PIPELINE_STAGES } from './ClientKanbanBoard';
@@ -47,6 +47,7 @@ import { Newspaper, Gavel, Award, BellRing, Activity as ActivityIcon, ChevronDow
 import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
 import { DataEnrichmentDialog } from './DataEnrichmentDialog';
 import { InvoiceActionsSheet, type InvoiceLike } from './InvoiceActionsSheet';
+import { NovaFaturaDialog } from './NovaFaturaDialog';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 
 const MASTER_ADMIN_EMAIL = 'davillys@gmail.com';
@@ -209,6 +210,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
   const [acordoParcelas, setAcordoParcelas] = useState<any[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceLike | null>(null);
   const [invoiceSheetOpen, setInvoiceSheetOpen] = useState(false);
+  const [novaFaturaOpen, setNovaFaturaOpen] = useState(false);
   const [asaasOverdue, setAsaasOverdue] = useState<any[]>([]);
   const [asaasRenegs, setAsaasRenegs] = useState<any[]>([]);
   const [asaasRenegParcelas, setAsaasRenegParcelas] = useState<any[]>([]);
@@ -3133,9 +3135,16 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
 
                   {/* Summary card */}
                   <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <BarChart3 className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-semibold">Resumo Financeiro</span>
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <div className="flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-semibold">Resumo Financeiro</span>
+                      </div>
+                      {canManageFinance && (
+                        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setNovaFaturaOpen(true)}>
+                          <FilePlus2 className="h-3.5 w-3.5 mr-1" />Nova fatura
+                        </Button>
+                      )}
                     </div>
                     {(() => {
                       // Faturas canceladas (inclusive as substituídas por acordo) não entram no resumo;
@@ -3212,7 +3221,11 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                                 <p className="text-sm font-medium truncate">{inv.description}</p>
                                 <p className="text-[10px] text-muted-foreground">
                                   Vence: {format(new Date(inv.due_date), 'dd/MM/yyyy', { locale: ptBR })}
-                                  {canceladaPorAcordo && ' · Cancelada por acordo'}
+                                  {canceladaPorAcordo
+                                    ? ' · Cancelada por acordo'
+                                    : inv.status === 'cancelled' && (inv as any).cancelado_em
+                                      ? ` · Cancelada manualmente${(inv as any).cancelamento_motivo ? `: ${(inv as any).cancelamento_motivo}` : ''}`
+                                      : ''}
                                 </p>
                               </div>
                               <div className="text-right flex-shrink-0">
@@ -4107,6 +4120,17 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         canManageFinance={canManageFinance}
         onChanged={async () => { await fetchClientData(); onUpdate(); }}
       />
+
+      {/* ─── NOVA FATURA ─── */}
+      {client && (
+        <NovaFaturaDialog
+          open={novaFaturaOpen}
+          onOpenChange={setNovaFaturaOpen}
+          userId={client.id}
+          clientName={client.full_name}
+          onCreated={async () => { await fetchClientData(); onUpdate(); }}
+        />
+      )}
 
 
 
