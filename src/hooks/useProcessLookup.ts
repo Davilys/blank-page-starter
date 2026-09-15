@@ -124,6 +124,7 @@ export function useProcessLookup() {
             lookup?: ProcessLookup | null;
             applied?: string[];
             divergences?: LookupDivergence[];
+            link?: LinkResult | null;
             error?: { code: string; message: string };
           };
 
@@ -134,6 +135,7 @@ export function useProcessLookup() {
             divergences: res?.divergences ?? [],
             saved: res?.saved === true,
             fromCache: res?.from_cache === true,
+            link: res?.link ?? null,
             error: res?.error ?? null,
           };
         } catch {
