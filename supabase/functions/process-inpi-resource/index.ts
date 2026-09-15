@@ -1701,11 +1701,11 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     const shouldRunPass2Now = requestedPass !== 'pass1';
     console.time('ai_generation');
     const [extractionResult, pass1Result, pass2Result] = await Promise.all([
-      callOpenAI(OPENAI_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, 800, 0.1, 60000),
-      callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 9000, 0.25),
+      callOpenAI(OPENAI_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, 800, 0.1, 60000, makeCtx('extracao')),
+      callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 9000, 0.25, 120000, makeCtx('pass1')),
       shouldRunPass2Now
-        ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25)
-        : Promise.resolve({ content: '', error: undefined as string | undefined, status: undefined as number | undefined }),
+        ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25, 120000, makeCtx('pass2'))
+        : Promise.resolve({ content: '', error: undefined as string | undefined, status: undefined as number | undefined, errorKind: undefined as string | undefined }),
     ]);
     console.timeEnd('ai_generation');
 
@@ -1723,8 +1723,15 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
 
     if (pass1Result.error) {
       console.error('PASS 1 failed:', pass1Result.status, pass1Result.error?.substring(0, 300));
-      return new Response(JSON.stringify({ error: `Erro na geração (Parte 1): ${pass1Result.status}` }), { status: pass1Result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      const cfg = modelFailureResponse(pass1Result);
+      if (cfg) return cfg;
+      return new Response(JSON.stringify({
+        error: `Erro na geração (Parte 1): ${pass1Result.error.substring(0, 300)}`,
+        error_kind: pass1Result.errorKind || 'http',
+        correlation_id: correlationId,
+      }), { status: pass1Result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
+
 
     const pass1Content = cleanAIContent(pass1Result.content);
     console.log('PASS 1 complete:', pass1Content.length, 'chars');
