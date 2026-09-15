@@ -1,0 +1,2 @@
+ALTER TABLE public.documents DROP CONSTRAINT IF EXISTS documents_document_type_check;
+ALTER TABLE public.documents ADD CONSTRAINT documents_document_type_check CHECK (document_type = ANY (ARRAY['contract','signed_contract','contrato','anexo','outro','procuracao','invoice','receipt','identity','power_of_attorney','other','distrato','distrato_multa','distrato_sem_multa','taxa','busca_inpi','certificado','rpi','parecer','comprovante']));
