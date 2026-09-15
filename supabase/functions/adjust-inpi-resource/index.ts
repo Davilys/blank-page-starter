@@ -348,6 +348,9 @@ ${formattingRules}`;
     return new Response(
       JSON.stringify({
         success: true,
+        model: modelConfig.model,
+        correlation_id: correlationId,
+
         adjusted_content: trimmed,
         unchanged,
       }),
