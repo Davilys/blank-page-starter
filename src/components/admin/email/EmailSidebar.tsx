@@ -28,7 +28,17 @@ interface EmailSidebarProps {
   selectedAccountId?: string | null;
   onAccountChange?: (accountId: string) => void;
   unreadByAccount?: Record<string, number>;
+  syncByAccount?: Record<string, AccountSyncInfo>;
 }
+
+const STATUS_DOT: Record<string, string> = {
+  syncing: 'bg-primary animate-pulse',
+  ok: 'bg-emerald-500',
+  delayed: 'bg-amber-500',
+  error: 'bg-destructive',
+  auth_required: 'bg-destructive',
+  unknown: 'bg-muted-foreground/50',
+};
 
 const mainFolders: { id: EmailFolder; label: string; icon: React.ComponentType<{ className?: string }>; badge?: keyof EmailSidebarProps['stats'] }[] = [
   { id: 'inbox', label: 'Caixa de Entrada', icon: Inbox, badge: 'unread' },
