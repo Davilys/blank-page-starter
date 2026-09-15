@@ -28,6 +28,7 @@ interface EmailAccount {
   imap_port: number | null;
   is_default: boolean;
   assigned_to: string | null;
+  auto_reply_enabled?: boolean | null;
 }
 
 interface AdminProfile {
