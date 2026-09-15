@@ -403,22 +403,6 @@ export function EmailView({
             {/* Subject */}
             <h2 className="text-base md:text-lg font-bold leading-tight mb-2 md:mb-3">{email.subject}</h2>
 
-            {/* Tracking Bar */}
-            <div className="hidden md:flex items-center gap-3 py-2 px-3 bg-muted/30 rounded-xl border border-border/30 text-[10px] text-muted-foreground mb-3">
-              <div className="flex items-center gap-1.5">
-                <Eye className="h-3 w-3 text-primary" />
-                <span className="font-semibold text-foreground">{TRACKING_MOCK.opens}x</span> aberto
-              </div>
-              <div className="w-px h-3 bg-border" />
-              <div className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                Última: {TRACKING_MOCK.lastOpen}
-              </div>
-              <div className="w-px h-3 bg-border" />
-              <span>{TRACKING_MOCK.device}</span>
-              <div className="w-px h-3 bg-border" />
-              <span>{TRACKING_MOCK.location}</span>
-            </div>
           </CardHeader>
 
           <Separator />
