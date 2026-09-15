@@ -117,6 +117,190 @@ serve(async (req) => {
       }
     }
 
+    // ══════════════════════ EXCLUSÃO (CANCELAMENTO) DA FATURA ══════════════
+    if (action === "excluir") {
+      const invoiceId: string = body.invoice_id;
+      const motivo: string = String(body.motivo || "").trim();
+      if (!invoiceId) return json({ error: "invoice_id é obrigatório" }, 400);
+      if (motivo.length < 3) return json({ error: "Informe o motivo do cancelamento" }, 400);
+
+      const { data: inv } = await admin.from("invoices").select("*").eq("id", invoiceId).maybeSingle();
+      if (!inv) return json({ error: "Fatura não encontrada" }, 404);
+      if (["cancelled", "refunded", "paid", "received"].includes(String(inv.status))) {
+        return json({ error: "Esta cobrança não está mais em aberto no CRM" }, 409);
+      }
+
+      // Acordo ativo vinculado bloqueia a exclusão manual
+      const { data: acordoVinc } = await admin.from("acordos_cliente")
+        .select("id, status").eq("invoice_original_id", invoiceId)
+        .in("status", ["ativo", "processando"]).maybeSingle();
+      if (acordoVinc) return json({ error: "Esta cobrança tem um acordo vinculado — gerencie pelo acordo" }, 409);
+
+      let cancel: any = { status: "nao_aplicavel", asaas_status: null, http_status: null, response: null, message: "Fatura sem vínculo com o Asaas" };
+      if (inv.asaas_invoice_id) {
+        // Reconsulta o status real antes de agir
+        try {
+          const p = await asaas(`/payments/${inv.asaas_invoice_id}`);
+          const st = String(p?.status || "").toUpperCase();
+          if (PAID_STATUSES.includes(st)) {
+            await admin.from("invoices").update({ status: "paid", payment_date: p.paymentDate || new Date().toISOString() }).eq("id", invoiceId);
+            return json({ error: "A cobrança já foi paga no Asaas — não pode ser excluída. O status local foi atualizado.", asaas_status: st }, 409);
+          }
+          if (["REFUNDED", "REFUND_REQUESTED", "CHARGEBACK_REQUESTED"].includes(st)) {
+            return json({ error: `A cobrança está como ${st} no Asaas e não pode ser excluída`, asaas_status: st }, 409);
+          }
+        } catch (_e) { /* segue para o cancelamento, que reconsulta novamente */ }
+
+        cancel = await cancelarCobrancaAsaas(ASAAS_BASE, ASAAS_API_KEY, inv.asaas_invoice_id);
+        const ok = cancel.status === "cancelado" || cancel.status === "ja_cancelado";
+        if (!ok) {
+          return json({
+            success: false,
+            error: cancel.message || "Não foi possível cancelar a cobrança no Asaas",
+            cancelamento_status: cancel.status,
+            asaas_status: cancel.asaas_status,
+          }, 409);
+        }
+      }
+
+      const agora = new Date().toISOString();
+      await admin.from("invoices").update({
+        status: "cancelled",
+        cancelado_em: agora,
+        cancelado_por: user.id,
+        cancelamento_motivo: motivo.slice(0, 500),
+      }).eq("id", invoiceId);
+
+      if (inv.asaas_invoice_id) {
+        await registrarTratamento(admin, {
+          crm_action_id: body.crm_action_id || `excluir:${invoiceId}`,
+          tipo_acao: "cancelamento_manual",
+          motivo: MOTIVOS.outra,
+          cliente_user_id: inv.user_id,
+          asaas_customer_id: inv.asaas_customer_id || null,
+          invoice_original_id: inv.id,
+          asaas_payment_id_original: inv.asaas_invoice_id,
+          valor_original: inv.amount,
+          vencimento_original: inv.due_date,
+          cancelamento_status: cancel.status,
+          cancelamento_resposta: { message: cancel.message, asaas_status: cancel.asaas_status, http_status: cancel.http_status },
+          cancelamento_em: agora,
+          responsavel_id: user.id,
+          observacao: `Cancelamento manual: ${motivo.slice(0, 300)}`,
+        });
+      }
+
+      if (inv.user_id) {
+        await admin.from("client_activities").insert({
+          user_id: inv.user_id, admin_id: user.id, activity_type: "fatura_cancelada",
+          description: `Cobrança cancelada manualmente — ${motivo.slice(0, 200)}`,
+          metadata: { invoice_id: invoiceId, asaas_payment_id: inv.asaas_invoice_id, cancelamento: cancel.status, ...sessionInfo },
+        });
+      }
+
+      return json({ success: true, cancelamento_status: cancel.status, message: cancel.message });
+    }
+
+    // ══════════════════════════ NOVA FATURA ════════════════════════════════
+    if (action === "criar-fatura") {
+      const crmActionId: string = body.crm_action_id;
+      const userId: string = body.user_id;
+      const descricao: string = String(body.description || "").trim();
+      const valor = Number(body.amount);
+      const vencimento: string = String(body.due_date || "");
+      const metodo: string = String(body.payment_method || "boleto");
+      const avisar: boolean = !!body.notify;
+
+      if (!crmActionId) return json({ error: "crm_action_id é obrigatório" }, 400);
+      if (!userId) return json({ error: "Cliente não identificado" }, 400);
+      if (descricao.length < 3) return json({ error: "Informe a descrição do serviço" }, 400);
+      if (!(valor > 0)) return json({ error: "Informe um valor maior que zero" }, 400);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(vencimento)) return json({ error: "Informe uma data de vencimento válida" }, 400);
+      const hoje = new Date().toISOString().slice(0, 10);
+      if (vencimento < hoje) return json({ error: "O vencimento não pode ser anterior a hoje" }, 400);
+      if (!["boleto", "pix", "cartao"].includes(metodo)) return json({ error: "Forma de cobrança inválida" }, 400);
+
+      // Idempotência: mesma requisição devolve a fatura já criada
+      const { data: existente } = await admin.from("invoices")
+        .select("id, invoice_url, status").eq("crm_action_id", crmActionId).maybeSingle();
+      if (existente) return json({ success: true, already: true, invoice_id: existente.id, invoice_url: existente.invoice_url });
+
+      const { data: criada, error: criarErr } = await admin.functions.invoke("create-admin-invoice", {
+        body: {
+          user_id: userId,
+          description: descricao,
+          payment_method: metodo,
+          payment_type: "avista",
+          total_value: valor,
+          due_date: vencimento,
+        },
+      });
+      if (criarErr || !(criada as any)?.success) {
+        return json({ error: (criada as any)?.error || criarErr?.message || "Não foi possível criar a fatura" }, 502);
+      }
+
+      const novaId = (criada as any).invoice_id;
+      await admin.from("invoices").update({ crm_action_id: crmActionId, originado_pelo_crm: true }).eq("id", novaId);
+
+      let envio: any = null;
+      if (avisar) {
+        const { data: prof } = await admin.from("profiles").select("full_name,email,phone").eq("id", userId).maybeSingle();
+        const nome = prof?.full_name || "Cliente";
+        const email = prof?.email || "";
+        const phone = prof?.phone || "";
+        const link = (criada as any).invoice_url || (criada as any).bank_slip_url || null;
+        const channels: string[] = [];
+        if (phone) channels.push("whatsapp");
+        if (email) channels.push("email");
+
+        if (channels.length > 0) {
+          const valorTxt = brl(Math.round(valor * 100));
+          const waMsg = `Olá, *${nome.split(" ")[0]}*!\n\nUma nova cobrança foi gerada para você:\n\n📄 ${descricao}\n💰 Valor: *${valorTxt}*\n🗓️ Vencimento: *${fmtDate(vencimento)}*${link ? `\n\n🔗 Pagar: ${link}` : ""}\n\nQualquer dúvida é só responder por aqui.\n\nAtenciosamente,\nEquipe WebMarcas`;
+          const emailHtml = `
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;line-height:1.6">
+  <h2 style="color:#0a3d62">Nova cobrança — WebMarcas</h2>
+  <p>Olá, <strong>${nome.split(" ")[0]}</strong>!</p>
+  <p><strong>Serviço:</strong> ${descricao}<br>
+     <strong>Valor:</strong> ${valorTxt}<br>
+     <strong>Vencimento:</strong> ${fmtDate(vencimento)}</p>
+  ${link ? `<p><a href="${link}" target="_blank" rel="noopener" style="background:#005fe6;color:#fff;padding:12px 20px;border-radius:6px;text-decoration:none;display:inline-block">Acessar cobrança</a></p>` : ""}
+  <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
+  <p style="font-size:13px;color:#666">Atenciosamente,<br><strong>Equipe WebMarcas</strong><br>🌐 www.webmarcas.net · 📧 ola@webmarcas.net</p>
+</div>`;
+          const { error: notifErr } = await admin.functions.invoke("send-multichannel-notification", {
+            body: {
+              event_type: "manual", channels,
+              recipient: { nome, email, phone },
+              custom_message: waMsg, custom_html: emailHtml,
+              custom_subject: `Nova cobrança — ${valorTxt} — WebMarcas`,
+              data: { marca: "sua cobrança" },
+              whatsapp_webhook_override: FINANCEIRO_WEBHOOK,
+            },
+          });
+          envio = {
+            whatsapp: channels.includes("whatsapp") ? (notifErr ? "falhou" : "enviado") : "sem telefone cadastrado",
+            email: channels.includes("email") ? (notifErr ? "falhou" : "enviado") : "sem e-mail cadastrado",
+          };
+        } else {
+          envio = { whatsapp: "sem telefone cadastrado", email: "sem e-mail cadastrado" };
+        }
+      }
+
+      await admin.from("client_activities").insert({
+        user_id: userId, admin_id: user.id, activity_type: "fatura_criada",
+        description: `Nova cobrança criada — ${descricao.slice(0, 120)}`,
+        metadata: { invoice_id: novaId, valor, vencimento, metodo, envio, ...sessionInfo },
+      });
+
+      return json({
+        success: true,
+        invoice_id: novaId,
+        invoice_url: (criada as any).invoice_url || null,
+        warning: (criada as any).warning || null,
+        envio,
+      });
+    }
+
     // ══════════════════════════ RETRY DO CANCELAMENTO ══════════════════════
     if (action === "retry-cancelamento") {
       const acordoId: string = body.acordo_id;
