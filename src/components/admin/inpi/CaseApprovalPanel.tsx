@@ -289,13 +289,30 @@ export default function CaseApprovalPanel({
 
   /* ── Aprovações ───────────────────────────────────────────────────────── */
   const approve = async (kind: 'texto_interno' | 'conferencia_protocolo') => {
-    if (kind === 'conferencia_protocolo' && !textApproval) {
-      toast.error('Aprove o texto internamente antes de liberar para protocolo.');
-      return;
-    }
-    if (kind === 'conferencia_protocolo' && !summary) {
-      toast.error('Prepare o pacote de anexos antes da conferência para protocolo.');
-      return;
+    if (approving) return; // clique repetido
+    if (kind === 'conferencia_protocolo') {
+      if (!textApproval) {
+        toast.error('Aprove o texto internamente antes de liberar para protocolo.');
+        return;
+      }
+      if (!summary) {
+        toast.error('Prepare o pacote de anexos antes da conferência para protocolo.');
+        return;
+      }
+      if (!packageComplete) {
+        toast.error(
+          'Há anexo não incluído no pacote. A conferência para protocolo fica bloqueada; só é possível baixar a prévia.',
+        );
+        return;
+      }
+      if (!currentReview) {
+        toast.error('Execute a revisão jurídica desta versão antes da conferência para protocolo.');
+        return;
+      }
+      if (currentReview.has_blocking) {
+        toast.error('A revisão apontou problemas bloqueantes. Corrija antes de conferir para protocolo.');
+        return;
+      }
     }
     setApproving(kind);
     try {
