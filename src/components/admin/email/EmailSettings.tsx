@@ -500,6 +500,11 @@ export function EmailSettings() {
             )}
           </CardContent>
         </Card>
+
+        <EmailRepairPanel
+          accounts={(accounts || []).map((a) => ({ id: a.id, email_address: a.email_address, imap_host: a.imap_host }))}
+          isAdmin={isMaster || hasPermission('emails', 'can_view')}
+        />
       </div>
     </ScrollArea>
   );
