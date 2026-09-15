@@ -733,7 +733,28 @@ export default function AdminContratos() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, signatureFilter, dateFilter, activeTab, selectedMonth]);
+  }, [search, signatureFilter, statFilter, dateFilter, activeTab, selectedMonth]);
+
+  // Base list (search + tab + date) used for stable card counts,
+  // independent of signature/stat quick filters
+  const baseFiltered = contracts.filter(contract => {
+    const clientName = contract.profile?.full_name || '';
+    const matchesSearch =
+      contract.contract_number?.toLowerCase().includes(search.toLowerCase()) ||
+      contract.subject?.toLowerCase().includes(search.toLowerCase()) ||
+      clientName.toLowerCase().includes(search.toLowerCase());
+    const matchesTab = getContractTabMatch(contract, activeTab);
+    let matchesDate = true;
+    if (dateFilter !== 'all' && contract.created_at) {
+      const contractDate = new Date(contract.created_at);
+      if (dateFilter === 'today') matchesDate = isToday(contractDate);
+      else if (dateFilter === 'week') matchesDate = isThisWeek(contractDate, { locale: ptBR });
+      else if (dateFilter === 'month')
+        matchesDate = contractDate.getMonth() === selectedMonth.getMonth() &&
+                      contractDate.getFullYear() === selectedMonth.getFullYear();
+    }
+    return matchesSearch && matchesTab && matchesDate;
+  });
 
   const totalPages = Math.max(1, Math.ceil(filteredContracts.length / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
