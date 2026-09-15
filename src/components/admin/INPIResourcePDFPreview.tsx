@@ -379,7 +379,20 @@ type NativeEvidence = {
   height?: number;
 };
 
-interface NativePDFOptions {
+/** Anexo já convertido em páginas imprimíveis (ver src/lib/inpi/packageBuilder.ts). */
+export interface NativeAnnexDoc {
+  id: string;
+  docNumber: number;
+  title: string;
+  categoryLabel: string;
+  fileName: string;
+  images: { dataUrl: string; width: number; height: number }[];
+  textBlocks: string[];
+  status: 'pendente' | 'convertido' | 'parcial' | 'falha';
+  notes: string | null;
+}
+
+export interface NativePDFOptions {
   pdfFileName: string;
   bodyContent: string;
   evidences: NativeEvidence[];
@@ -391,6 +404,12 @@ interface NativePDFOptions {
   approvalDate: string;
   isExtrajudicialDoc: boolean;
   isProcuradorPetition: boolean;
+  /** Anexos do pacote completo: índice + páginas, na ordem aprovada. */
+  annexes?: NativeAnnexDoc[];
+  /** Carimbo diagonal em todas as páginas (minuta / homologação). */
+  draftStamp?: string | null;
+  /** Quando true, devolve o Blob em vez de baixar o arquivo. */
+  returnBlob?: boolean;
 }
 
 const A4_W_MM = 210;
