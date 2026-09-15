@@ -573,22 +573,23 @@ export default function AdminLeads() {
     const q = search.toLowerCase();
     const matchQ = !q || lead.full_name?.toLowerCase().includes(q) || lead.email?.toLowerCase().includes(q) || lead.company_name?.toLowerCase().includes(q) || lead.phone?.includes(q);
     const matchS = statusFilter === 'all' || lead.status === statusFilter;
-    return matchQ && matchS;
-  }), [leads, search, statusFilter]);
+    const matchCard = statFilter === 'total' || lead.status === statFilter;
+    return matchQ && matchS && matchCard;
+  }), [leads, search, statusFilter, statFilter]);
 
   // KPI data
   const kpis = [
-    { title: 'Total de Leads', value: leads.length, icon: Target, gradient: 'from-blue-500 to-cyan-400', glow: '#3b82f6', accent: '#60a5fa' },
-    { title: 'Leads Novos', value: leads.filter(l => l.status === 'novo').length, icon: Sparkles, gradient: 'from-violet-500 to-purple-400', glow: '#8b5cf6', accent: '#a78bfa' },
-    { title: 'Em Negociação', value: leads.filter(l => l.status === 'negociacao').length, icon: Activity, gradient: 'from-orange-500 to-amber-400', glow: '#f97316', accent: '#fb923c' },
-    { title: 'Convertidos', value: leads.filter(l => l.status === 'convertido').length, icon: CheckCircle2, gradient: 'from-emerald-500 to-green-400', glow: '#10b981', accent: '#34d399' },
+    { key: 'total' as const,      title: 'Total de Leads',  value: leads.length, icon: Target, gradient: 'from-blue-500 to-cyan-400', glow: '#3b82f6', accent: '#60a5fa', clickable: true },
+    { key: 'novo' as const,       title: 'Leads Novos',     value: leads.filter(l => l.status === 'novo').length, icon: Sparkles, gradient: 'from-violet-500 to-purple-400', glow: '#8b5cf6', accent: '#a78bfa', clickable: true },
+    { key: 'negociacao' as const, title: 'Em Negociação',   value: leads.filter(l => l.status === 'negociacao').length, icon: Activity, gradient: 'from-orange-500 to-amber-400', glow: '#f97316', accent: '#fb923c', clickable: true },
+    { key: 'convertido' as const,title: 'Convertidos',     value: leads.filter(l => l.status === 'convertido').length, icon: CheckCircle2, gradient: 'from-emerald-500 to-green-400', glow: '#10b981', accent: '#34d399', clickable: true },
     {
-      title: 'Receita Potencial', value: Math.round(leads.reduce((s, l) => s + (l.estimated_value || 0), 0)),
-      prefix: 'R$ ', icon: TrendingUp, gradient: 'from-emerald-600 to-teal-400', glow: '#059669', accent: '#10b981'
+      key: 'receita' as const, title: 'Receita Potencial', value: Math.round(leads.reduce((s, l) => s + (l.estimated_value || 0), 0)),
+      prefix: 'R$ ', icon: TrendingUp, gradient: 'from-emerald-600 to-teal-400', glow: '#059669', accent: '#10b981', clickable: false
     },
     {
-      title: 'Taxa de Conversão', value: leads.length > 0 ? Math.round((leads.filter(l => l.status === 'convertido').length / leads.length) * 100) : 0,
-      icon: Zap, gradient: 'from-rose-500 to-pink-400', glow: '#f43f5e', accent: '#fb7185'
+      key: 'conversao' as const, title: 'Taxa de Conversão', value: leads.length > 0 ? Math.round((leads.filter(l => l.status === 'convertido').length / leads.length) * 100) : 0,
+      icon: Zap, gradient: 'from-rose-500 to-pink-400', glow: '#f43f5e', accent: '#fb7185', clickable: false
     },
   ];
 
@@ -653,7 +654,14 @@ export default function AdminLeads() {
 
           {/* ── KPI CARDS ─────────────────────── */}
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-            {kpis.map(kpi => <KpiCard key={kpi.title} {...kpi} />)}
+            {kpis.map(kpi => (
+              <KpiCard
+                key={kpi.title}
+                {...kpi}
+                active={kpi.clickable && statFilter === kpi.key}
+                onClick={kpi.clickable ? () => setStatFilter(prev => (prev === kpi.key ? 'total' : kpi.key)) : undefined}
+              />
+            ))}
           </div>
 
           {/* ── PIPELINE BAR ─────────────────── */}
