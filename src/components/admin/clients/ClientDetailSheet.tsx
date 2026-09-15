@@ -654,7 +654,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         description: `${d.contas_consultadas ?? 0} conta(s) Asaas · ${d.cobrancas_encontradas ?? 0} cobrança(s) · ${d.criadas ?? 0} nova(s), ${d.atualizadas ?? 0} atualizada(s), ${d.removidas ?? 0} removida(s)`,
       });
       setUltimaSync(new Date());
-      await fetchClientData(client.id);
+      await fetchClientData();
       await loadAsaasPayments(client.id);
       void dep;
     } catch (e: any) {
