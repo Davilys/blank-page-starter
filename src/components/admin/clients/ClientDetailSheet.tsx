@@ -180,6 +180,8 @@ function fmtBytes(b?: number | null) {
 export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUpdate, extraActions, initialShowProcessDetails, focusProcessId }: ClientDetailSheetProps) {
   const SERVICE_PRICING_OPTIONS = useServicePricingOptions();
   const { isMasterAdmin } = useCanViewFinancialValues();
+  const { hasPermission, isMasterAdmin: isMasterPerm } = useAdminPermissions();
+  const canManageFinance = isMasterPerm || hasPermission('financial', 'can_view');
   const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
 
@@ -503,6 +505,28 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         }));
       setDocuments([...docs, ...virtualContractDocs] as any);
       setInvoices(invoicesRes.data || []);
+      // Acordos de parcelamento do cliente (somente com permissão financeira; RLS também bloqueia)
+      try {
+        const { data: acs } = await supabase
+          .from('acordos_cliente' as any)
+          .select('*')
+          .eq('user_id', client.id)
+          .order('created_at', { ascending: false });
+        setAcordos((acs as any[]) || []);
+        const ids = ((acs as any[]) || []).map((a: any) => a.id);
+        if (ids.length > 0) {
+          const { data: pcs } = await supabase
+            .from('acordo_parcelas' as any)
+            .select('*')
+            .in('acordo_id', ids)
+            .order('numero_parcela', { ascending: true });
+          setAcordoParcelas((pcs as any[]) || []);
+        } else {
+          setAcordoParcelas([]);
+        }
+      } catch {
+        setAcordos([]); setAcordoParcelas([]);
+      }
       setProfileData(profileRes.data);
       // ── Asaas: cobranças vencidas + renegociações + parcelas
       try {
