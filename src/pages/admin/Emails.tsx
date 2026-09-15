@@ -269,9 +269,13 @@ export default function Emails() {
         onSelectEmail={handleSelectEmail}
         accountId={selectedAccountId}
         accountEmail={selectedAccount?.email_address}
+        externalSearch={search}
+        selectedEmailId={selectedEmail?.id || null}
       />
     );
   };
+
+  const showSyncBar = !['templates', 'settings', 'automations', 'campaigns', 'sequences'].includes(currentFolder);
 
   const getFolderLabel = () => {
     const map: Record<string, string> = {
