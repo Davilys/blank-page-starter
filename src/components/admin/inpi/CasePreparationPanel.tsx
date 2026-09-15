@@ -59,6 +59,7 @@ export default function CasePreparationPanel({
   const [caseId, setCaseId] = useState<string | null>(null);
   const [docs, setDocs] = useState<CaseDoc[]>([]);
   const [busyCategory, setBusyCategory] = useState<CaseCategory | null>(null);
+  const [visionBusy, setVisionBusy] = useState<Set<string>>(new Set());
   const [orientation, setOrientation] = useState<OrientationRow | null>(null);
   const [orientationText, setOrientationText] = useState('');
   const [generating, setGenerating] = useState(false);
