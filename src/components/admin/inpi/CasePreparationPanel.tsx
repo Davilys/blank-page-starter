@@ -359,8 +359,23 @@ export default function CasePreparationPanel({
                       <p className="text-[11px] text-muted-foreground truncate">
                         {((d.byte_size || 0) / 1024).toFixed(1)} KB
                         {d.extraction_notes ? ` • ${d.extraction_notes}` : ''}
+                        {(d.vision_read_pages || 0) > 0
+                          ? ` • ${d.vision_read_pages} página(s) lidas visualmente pela IA`
+                          : ''}
                       </p>
                     </div>
+                    {(d.unreadable_pages || 0) > 0 && localFiles.current.has(d.id) && (
+                      <Button
+                        variant="outline" size="sm" className="h-7 text-[11px] shrink-0"
+                        disabled={visionBusy.has(d.id)}
+                        onClick={() => runVisionRead(d.id, localFiles.current.get(d.id) as File)}
+                      >
+                        {visionBusy.has(d.id)
+                          ? <Loader2 className="h-3 w-3 animate-spin" />
+                          : <Eye className="h-3 w-3" />}
+                        <span className="ml-1">Ler páginas com IA</span>
+                      </Button>
+                    )}
                     {statusBadge(d.extraction_status)}
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeDoc(d.id)}>
                       <X className="h-4 w-4" />
