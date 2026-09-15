@@ -143,7 +143,7 @@ function KpiCard({ title, value, prefix = '', icon: Icon, gradient, glow, accent
 function TypeDistBar({ documents }: { documents: Document[] }) {
   const total = documents.length || 1;
   const types = Object.entries(DOC_CONFIG)
-    .filter(([k]) => k !== 'contract')
+    .filter(([k]) => !['contract', 'anexo', 'distrato', 'distrato_multa', 'distrato_sem_multa'].includes(k))
     .sort((a, b) => a[1].order - b[1].order)
     .map(([key, cfg]) => ({
       key, cfg,
@@ -191,7 +191,7 @@ function TypeDistBar({ documents }: { documents: Document[] }) {
 // ─── Type Filter Chips ────────────────────────────
 const FILTER_TABS = [
   { value: 'todos',      label: 'Todos',          icon: FolderOpen, types: [] as string[] },
-  { value: 'contrato',   label: 'Contrato',        icon: Shield,     types: ['contrato', 'contract'] },
+  { value: 'contrato',   label: 'Contrato',        icon: Shield,     types: ['contrato', 'contract', 'distrato', 'distrato_multa', 'distrato_sem_multa'] },
   { value: 'procuracao', label: 'Procuração',      icon: Scale,      types: ['procuracao'] },
   { value: 'taxa',       label: 'Taxa',            icon: Receipt,    types: ['taxa'] },
   { value: 'busca_inpi', label: 'Busca INPI',      icon: Landmark,   types: ['busca_inpi'] },
@@ -199,7 +199,7 @@ const FILTER_TABS = [
   { value: 'rpi',        label: 'RPI',             icon: Newspaper,  types: ['rpi'] },
   { value: 'parecer',    label: 'Parecer',         icon: MessageSquare, types: ['parecer'] },
   { value: 'comprovante',label: 'Comprovantes',    icon: Package,    types: ['comprovante'] },
-  { value: 'outro',      label: 'Outros',          icon: FileIcon,   types: ['outro'] },
+  { value: 'outro',      label: 'Outros',          icon: FileIcon,   types: ['outro', 'anexo'] },
 ];
 
 // ─── File icon helper ─────────────────────────────
@@ -610,7 +610,7 @@ function UploadDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-card/95 backdrop-blur-xl border-border/50">
-                  {Object.entries(DOC_CONFIG).filter(([k]) => k !== 'contract').map(([k, v]) => (
+                  {Object.entries(DOC_CONFIG).filter(([k]) => !['contract', 'anexo', 'distrato', 'distrato_multa', 'distrato_sem_multa'].includes(k)).map(([k, v]) => (
                     <SelectItem key={k} value={k}>{v.label}</SelectItem>
                   ))}
                 </SelectContent>
@@ -699,7 +699,7 @@ export default function AdminDocumentos() {
   // ─── Derived stats ─────────────────────────────
   const stats = useMemo(() => {
     const totalSize = documents.reduce((acc, d) => acc + (d.file_size || 0), 0);
-    const contratos = documents.filter(d => ['contrato', 'contract'].includes(d.document_type || '')).length;
+    const contratos = documents.filter(d => ['contrato', 'contract', 'distrato', 'distrato_multa', 'distrato_sem_multa'].includes(d.document_type || '')).length;
     const thisMonth = documents.filter(d => {
       if (!d.created_at) return false;
       const now = new Date();
