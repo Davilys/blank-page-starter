@@ -1222,13 +1222,6 @@ serve(async (req) => {
     const body = await req.json();
     const { resourceType, agentStrategy, agentName } = body;
 
-    if (!resourceType) {
-      return new Response(
-        JSON.stringify({ error: 'Tipo de recurso não informado' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     if (!OPENAI_API_KEY) {
       return new Response(
@@ -1236,6 +1229,63 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // ── Verificação de disponibilidade do modelo dedicado (sem conteúdo de cliente).
+    if (body?.action === 'model_probe') {
+      const probe = await probeRecursosInpiModel(OPENAI_API_KEY);
+      return new Response(JSON.stringify({
+        success: probe.ok,
+        model: probe.model,
+        duration_ms: probe.durationMs,
+        error: probe.ok ? undefined : modelConfigErrorMessage(probe.model, probe.detail),
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    if (!resourceType) {
+      return new Response(
+        JSON.stringify({ error: 'Tipo de recurso não informado' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ── Modelo resolvido NO SERVIDOR pela modalidade validada.
+    // Só as três modalidades desta entrega recebem o modelo dedicado;
+    // as demais mantêm exatamente o modelo que já usavam (gpt-5-mini).
+    const modelConfig = resolveModelConfig(resourceType, 'gpt-5-mini', 'minimal');
+    const isDedicatedFlow = isRecursosInpiModality(resourceType);
+    const correlationId = crypto.randomUUID();
+    const caseId = typeof body?.caseId === 'string' ? body.caseId : null;
+
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY')!,
+    );
+    const logger = (entry: AiCallLogEntry) => logAiCall(supabaseAdmin as never, { ...entry, case_id: caseId });
+    const makeCtx = (operation: string): CallContext => ({
+      modelConfig,
+      operation,
+      resourceType,
+      correlationId,
+      promptVersion: PROMPT_VERSION,
+      logger,
+    });
+
+    // Falha de configuração do modelo dedicado → preserva o trabalho e avisa
+    // o administrador. Nunca cai em outro modelo silenciosamente.
+    const modelFailureResponse = (result: { status?: number; error?: string; errorKind?: string }) => {
+      if (isDedicatedFlow && (result.errorKind === 'model_access' || isModelAccessError(result.status, result.error))) {
+        return new Response(JSON.stringify({
+          error: modelConfigErrorMessage(modelConfig.model),
+          error_kind: 'model_config',
+          model: modelConfig.model,
+          correlation_id: correlationId,
+        }), { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      return null;
+    };
+
+    console.log(`[recursos-inpi] type=${resourceType} model=${modelConfig.model} dedicated=${modelConfig.dedicated} corr=${correlationId}`);
+
 
     const currentDate = new Date().toLocaleDateString('pt-BR', {
       day: 'numeric', month: 'long', year: 'numeric'
