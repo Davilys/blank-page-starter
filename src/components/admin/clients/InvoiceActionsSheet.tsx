@@ -154,13 +154,16 @@ export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFina
 
   if (!invoice) return null;
 
-  const statusCls = invoice.status === "overdue"
+  const statusCls = classificacao === "vencido"
     ? "bg-red-500/15 text-red-500 border-red-500/30"
-    : invoice.status === "pending"
+    : classificacao === "a_vencer"
       ? "bg-amber-500/15 text-amber-600 border-amber-500/30"
-      : invoice.status === "paid"
+      : classificacao === "pago"
         ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
         : "bg-muted text-muted-foreground border-border";
+  const removida = !!invoice.sync_status && invoice.sync_status !== "ativa";
+  const statusLabel = removida ? "Removida do Asaas" : LABEL_CLASSIFICACAO[classificacao];
+
 
   return (
     <>
