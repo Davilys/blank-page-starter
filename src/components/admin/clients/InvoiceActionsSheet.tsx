@@ -44,8 +44,11 @@ export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFina
   const [retrying, setRetrying] = useState(false);
   const [acordo, setAcordo] = useState<any>(null);
   const [showAcordo, setShowAcordo] = useState(false);
+  const [confirmExcluir, setConfirmExcluir] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  const [excluindo, setExcluindo] = useState(false);
 
-  const busy = cobrando || retrying;
+  const busy = cobrando || retrying || excluindo;
   const isOpenInvoice = !!invoice && ABERTAS.includes(invoice.status);
   const diasAtraso = invoice
     ? Math.max(0, Math.floor((Date.now() - new Date(invoice.due_date + "T00:00:00").getTime()) / 86400000))
