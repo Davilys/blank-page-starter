@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { FazerAcordoDialog } from "./FazerAcordoDialog";
+import { classificarCobranca, permiteAcoesFinanceiras, LABEL_ORIGEM, LABEL_CLASSIFICACAO, type OrigemCobranca } from "@/lib/financeiro/statusCobranca";
 
 export interface InvoiceLike {
   id: string;
