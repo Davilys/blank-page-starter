@@ -105,18 +105,24 @@ interface EmailViewProps {
   onReply: () => void;
   onForward?: (email: Email) => void;
   onUseDraftFromAI?: (text: string) => void;
+  /** When true the AI panel lives outside this component (docked column). */
+  aiDocked?: boolean;
+  aiOpen?: boolean;
+  onToggleAI?: () => void;
+  /** Hide the back arrow when the list stays visible beside the reading pane. */
+  hideBack?: boolean;
 }
 
-const TRACKING_MOCK = {
-  opens: 3,
-  lastOpen: '14:22',
-  device: 'Desktop · Chrome',
-  location: 'São Paulo, SP',
-  clicks: 1,
-};
-
-export function EmailView({ email, onBack, onReply, onForward, onUseDraftFromAI }: EmailViewProps) {
-  const [showAI, setShowAI] = useState(false);
+export function EmailView({
+  email, onBack, onReply, onForward, onUseDraftFromAI,
+  aiDocked = false, aiOpen = false, onToggleAI, hideBack = false,
+}: EmailViewProps) {
+  const [showAIDialog, setShowAIDialog] = useState(false);
+  const showAI = aiDocked ? aiOpen : showAIDialog;
+  const setShowAI = (next: boolean | ((prev: boolean) => boolean)) => {
+    if (aiDocked) { onToggleAI?.(); return; }
+    setShowAIDialog(next as never);
+  };
   const [isStarred, setIsStarred] = useState(email.is_starred);
   const [draftText, setDraftText] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
