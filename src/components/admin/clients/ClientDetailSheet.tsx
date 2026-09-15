@@ -46,6 +46,8 @@ import { Separator } from '@/components/ui/separator';
 import { Newspaper, Gavel, Award, BellRing, Activity as ActivityIcon, ChevronDown, History } from 'lucide-react';
 import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
 import { DataEnrichmentDialog } from './DataEnrichmentDialog';
+import { InvoiceActionsSheet, type InvoiceLike } from './InvoiceActionsSheet';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 
 const MASTER_ADMIN_EMAIL = 'davillys@gmail.com';
 
@@ -201,6 +203,10 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
   const [appointments, setAppointments] = useState<ClientAppointment[]>([]);
   const [documents, setDocuments] = useState<ClientDocument[]>([]);
   const [invoices, setInvoices] = useState<ClientInvoice[]>([]);
+  const [acordos, setAcordos] = useState<any[]>([]);
+  const [acordoParcelas, setAcordoParcelas] = useState<any[]>([]);
+  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceLike | null>(null);
+  const [invoiceSheetOpen, setInvoiceSheetOpen] = useState(false);
   const [asaasOverdue, setAsaasOverdue] = useState<any[]>([]);
   const [asaasRenegs, setAsaasRenegs] = useState<any[]>([]);
   const [asaasRenegParcelas, setAsaasRenegParcelas] = useState<any[]>([]);
