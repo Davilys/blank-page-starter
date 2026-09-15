@@ -173,11 +173,40 @@ export default function CaseApprovalPanel({
   const summary = useMemo(() => (annexes ? summarizePackage(annexes) : null), [annexes]);
   const packageComplete = !!summary?.isComplete;
 
+  /* Revisão jurídica válida apenas para esta versão exata de texto e anexos. */
+  const currentReview =
+    review && review.content_hash === contentHash && review.documents_hash === documentsHash
+      ? review
+      : null;
+
   const draftStamp = useMemo(() => {
+    if (!packageComplete) return 'PRÉVIA — PACOTE INCOMPLETO, NÃO PROTOCOLAR';
     if (!protocolApproval) return 'MINUTA — PENDENTE DE CONFERÊNCIA';
-    if (!packageComplete) return 'PACOTE INCOMPLETO — NÃO PROTOCOLAR';
     return null;
   }, [protocolApproval, packageComplete]);
+
+  /* ── Revisão jurídica automática ─────────────────────────────────────── */
+  const runReview = async () => {
+    if (reviewing) return; // clique repetido
+    setReviewing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('review-inpi-draft', {
+        body: { caseId, resourceId, content, contentHash, documentsHash },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Falha na revisão');
+      setReview(data.review as ReviewRow);
+      toast[(data.review as ReviewRow).has_blocking ? 'warning' : 'success'](
+        (data.review as ReviewRow).has_blocking
+          ? 'Revisão concluída com apontamentos bloqueantes.'
+          : 'Revisão concluída sem apontamentos bloqueantes.',
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Falha na revisão jurídica.');
+    } finally {
+      setReviewing(false);
+    }
+  };
 
   /* ── Conversão dos anexos para o PDF final ───────────────────────────── */
   const buildPackage = async () => {
