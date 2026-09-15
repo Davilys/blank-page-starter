@@ -143,3 +143,6 @@ verify_jwt = false
 
 [functions.sync-asaas-all]
 verify_jwt = false
+
+[functions.inpi-process-lookup]
+verify_jwt = true
