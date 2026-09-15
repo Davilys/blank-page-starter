@@ -28,6 +28,7 @@ import { DatePeriodFilter, type DateFilterType } from '@/components/admin/client
 import { motion } from 'framer-motion';
 import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
 import { EyeOff } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { exportContractsZip, importContractsZip, downloadBlob } from '@/lib/zipExportImport';
 import {
   Pagination,
