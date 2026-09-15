@@ -483,10 +483,25 @@ export default function CaseApprovalPanel({
               {approving === 'texto_interno' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
               {textApproval ? 'Texto aprovado' : 'Aprovar texto (interno)'}
             </Button>
-            <Button size="sm" variant={protocolApproval ? 'outline' : 'default'} disabled={!!protocolApproval || approving !== null} onClick={() => approve('conferencia_protocolo')}>
+            <Button
+              size="sm"
+              variant={protocolApproval ? 'outline' : 'default'}
+              disabled={
+                !!protocolApproval || approving !== null || !packageComplete ||
+                !currentReview || currentReview.has_blocking
+              }
+              onClick={() => approve('conferencia_protocolo')}
+            >
               {approving === 'conferencia_protocolo' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
               {protocolApproval ? 'Conferido para protocolo' : 'Conferir para protocolo'}
             </Button>
+          </div>
+          {!packageComplete && summary && (
+            <div className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
+              Há anexo não incluído. A conferência para protocolo está bloqueada — só é possível baixar uma
+              prévia carimbada.
+            </div>
+          )}
           </div>
           {approvals.some((a) => a.invalidated_at) && (
             <>
