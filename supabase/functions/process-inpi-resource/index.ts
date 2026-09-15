@@ -1638,10 +1638,17 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
       ];
 
       console.log('PASS 2 only: Generating Sections V-VIII...');
-      const pass2Result = await callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25);
+      const pass2Result = await callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25, 120000, makeCtx('pass2'));
       if (pass2Result.error) {
-        return new Response(JSON.stringify({ error: `Erro na geração (Parte 2): ${pass2Result.status}` }), { status: pass2Result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        const cfg = modelFailureResponse(pass2Result);
+        if (cfg) return cfg;
+        return new Response(JSON.stringify({
+          error: `Erro na geração (Parte 2): ${pass2Result.error.substring(0, 300)}`,
+          error_kind: pass2Result.errorKind || 'http',
+          correlation_id: correlationId,
+        }), { status: pass2Result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
+
 
       const pass2Content = cleanAIContent(pass2Result.content);
       const rawFullContent = `${basePass1Content}\n\n${pass2Content}`;
