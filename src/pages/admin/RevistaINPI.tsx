@@ -1308,86 +1308,21 @@ export default function RevistaINPI() {
                           exit={{ opacity: 0, scale: 0.95 }}
                           transition={{ delay: Math.min(index * 0.04, 0.4), duration: 0.35 }}
                         >
-                          <Card
-                            className={`group cursor-pointer transition-all duration-300 overflow-hidden ${
-                              isExpanded
-                                ? 'border-primary/40 shadow-lg shadow-primary/5 ring-1 ring-primary/10'
-                                : 'hover:border-primary/20 hover:shadow-md'
-                            }`}
-                            onClick={() => setExpandedEntryId(isExpanded ? null : entry.id)}
-                          >
-                            {/* Card Header Row */}
-                            <div className="px-5 py-4 flex items-center gap-4">
-                              {/* Status indicator */}
-                              <div className={`relative flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center ${
-                                entry.update_status === 'updated'
-                                  ? 'bg-emerald-500/10'
-                                  : entry.matched_client_id
-                                  ? 'bg-primary/10'
-                                  : 'bg-muted'
-                              }`}>
-                                {entry.update_status === 'updated' ? (
-                                  <CheckCircle className="h-5 w-5 text-emerald-600" />
-                                ) : (
-                                  <FileText className="h-5 w-5 text-primary" />
-                                )}
-                                {entry.matched_client_id && entry.update_status !== 'updated' && (
-                                  <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 border-2 border-card animate-pulse" />
-                                )}
+                          <div className="overflow-hidden rounded-xl">
+                            <ProcessoIdentificadoRow
+                              entry={entry as any}
+                              expanded={isExpanded}
+                              onOpen={() => setExpandedEntryId(isExpanded ? null : entry.id)}
+                              onAssign={(_e, ev) => handleOpenAssignDialog(entry, ev)}
+                            />
+                            {tagOption && (
+                              <div className="px-4 pt-2">
+                                <Badge className={`${tagOption.color} text-[10px] border-0`}>
+                                  {tagOption.label}
+                                </Badge>
                               </div>
+                            )}
 
-                              {/* Brand & Process */}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-bold text-foreground truncate max-w-[200px]">
-                                    {entry.brand_name || 'Marca não identificada'}
-                                  </span>
-                                  <code className="text-[11px] font-mono bg-muted/70 px-2 py-0.5 rounded-md text-muted-foreground">
-                                    {entry.process_number}
-                                  </code>
-                                  {entry.ncl_classes && entry.ncl_classes.length > 0 && (
-                                    <Badge variant="secondary" className="font-mono text-[10px] h-5">
-                                      NCL {entry.ncl_classes.join(', ')}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                                  {entry.dispatch_text || entry.dispatch_type || 'Sem descrição do despacho'}
-                                </p>
-                              </div>
-
-                              {/* Right side badges */}
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                {getDispatchBadge(entry.dispatch_type)}
-                                {tagOption && (
-                                  <Badge className={`${tagOption.color} text-[10px] border-0`}>
-                                    {tagOption.label}
-                                  </Badge>
-                                )}
-                                {entry.matched_client_id ? (
-                                  <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] gap-1">
-                                    <Users className="h-3 w-3" />
-                                    {entry.client?.full_name?.split(' ')[0] || 'Cliente'}
-                                  </Badge>
-                                ) : (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 text-xs gap-1.5 rounded-lg border-primary/30 text-primary hover:bg-primary/10"
-                                    onClick={(e) => handleOpenAssignDialog(entry, e)}
-                                  >
-                                    <UserPlus className="h-3 w-3" />
-                                    Vincular
-                                  </Button>
-                                )}
-                                <motion.div
-                                  animate={{ rotate: isExpanded ? 90 : 0 }}
-                                  transition={{ duration: 0.2 }}
-                                >
-                                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                                </motion.div>
-                              </div>
-                            </div>
 
                             {/* Expanded Detail Panel */}
                             <AnimatePresence>
