@@ -256,6 +256,40 @@ export function BillingSituationSection({
               </Card>
             );
           })}
+
+          {/* Cartão de acesso à Central de Vencidos (no lugar de Confirmadas) */}
+          <Card
+            className="group cursor-pointer overflow-hidden border border-billing-overdue/25 bg-billing-overdue/5 transition-all hover:-translate-y-0.5 hover:shadow-lg"
+          >
+            <CardContent className="flex h-full flex-col p-5">
+              <button
+                type="button"
+                className="flex h-full w-full flex-col text-left"
+                onClick={() => navigate('/admin/financeiro/vencidos')}
+                aria-label="Abrir Central de Vencidos"
+              >
+                <div className="flex min-h-6 items-start justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <AlertTriangle className="h-4 w-4 text-billing-overdue" />
+                    <h3 className="text-sm font-semibold text-foreground">Central de Vencidos</h3>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-billing-overdue" />
+                </div>
+
+                <div className="mt-5 flex flex-1 items-center">
+                  <p className="text-sm text-muted-foreground">
+                    Faturas vencidas e devedores 30/60+ dias em um único lugar.
+                  </p>
+                </div>
+
+                <div className="mt-4">
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-billing-overdue px-3 py-1.5 text-xs font-semibold text-white">
+                    <AlertTriangle className="h-3.5 w-3.5" /> Abrir Central de Vencidos
+                  </span>
+                </div>
+              </button>
+            </CardContent>
+          </Card>
         </div>
       )}
 
