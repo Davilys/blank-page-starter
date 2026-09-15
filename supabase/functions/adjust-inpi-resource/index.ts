@@ -223,8 +223,12 @@ ${formattingRules}`;
         aiResponse = await callAdjust(attempt);
         if (aiResponse.ok) break;
         const status = aiResponse.status;
-        if (status !== 429 && status < 500) break; // non-retryable
+        if (status !== 429 && status < 500) {
+          lastError = await aiResponse.text().catch(() => '');
+          break; // non-retryable
+        }
         lastError = await aiResponse.text();
+
         console.warn(`Adjust attempt ${attempt + 1} failed: ${status}`);
         await new Promise((r) => setTimeout(r, 1500 * Math.pow(2, attempt)));
       } catch (err) {
