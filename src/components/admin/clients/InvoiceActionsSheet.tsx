@@ -189,7 +189,7 @@ export function InvoiceActionsSheet({ invoice, open, onOpenChange, canManageFina
               ))}
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Situação no CRM</span>
-                <Badge variant="outline" className={cn("h-5 text-[10px]", statusCls)}>{invoice.status}</Badge>
+                <Badge variant="outline" className={cn("h-5 text-[10px]", statusCls)}>{statusLabel}</Badge>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Situação no Asaas</span>
