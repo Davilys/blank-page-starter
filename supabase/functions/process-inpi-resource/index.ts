@@ -1770,7 +1770,11 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
         resource_content: normalizedPartial,
         resource_type: resourceType,
         resource_type_label: resourceTypeLabel,
-        partial: true
+        partial: true,
+        partial_reason: pass2Result.errorKind || 'http',
+        partial_detail: (pass2Result.error || '').substring(0, 300),
+        correlation_id: correlationId
+
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
