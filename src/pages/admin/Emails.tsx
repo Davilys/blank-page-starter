@@ -12,6 +12,8 @@ import { EmailAutomations } from '@/components/admin/email/EmailAutomations';
 import { EmailCampaigns } from '@/components/admin/email/EmailCampaigns';
 import { EmailSequences } from '@/components/admin/email/EmailSequences';
 import { EmailMetricsBar } from '@/components/admin/email/EmailMetricsBar';
+import { EmailSyncBar } from '@/components/admin/email/EmailSyncBar';
+import { useEmailSync } from '@/hooks/useEmailSync';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
