@@ -2520,6 +2520,10 @@ export type Database = {
           updated_at: string
           uploaded_by: string | null
           version: number
+          vision_model: string | null
+          vision_notes: string | null
+          vision_read_at: string | null
+          vision_read_pages: number
         }
         Insert: {
           byte_size?: number | null
@@ -2551,6 +2555,10 @@ export type Database = {
           updated_at?: string
           uploaded_by?: string | null
           version?: number
+          vision_model?: string | null
+          vision_notes?: string | null
+          vision_read_at?: string | null
+          vision_read_pages?: number
         }
         Update: {
           byte_size?: number | null
@@ -2582,6 +2590,10 @@ export type Database = {
           updated_at?: string
           uploaded_by?: string | null
           version?: number
+          vision_model?: string | null
+          vision_notes?: string | null
+          vision_read_at?: string | null
+          vision_read_pages?: number
         }
         Relationships: [
           {
@@ -2649,6 +2661,62 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "inpi_case_orientations_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "inpi_resource_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inpi_draft_reviews: {
+        Row: {
+          case_id: string
+          content_hash: string
+          created_at: string
+          documents_hash: string | null
+          findings: Json
+          has_blocking: boolean
+          id: string
+          model: string | null
+          prompt_version: string | null
+          resource_id: string | null
+          reviewed_by: string | null
+          summary: string | null
+          updated_at: string
+        }
+        Insert: {
+          case_id: string
+          content_hash: string
+          created_at?: string
+          documents_hash?: string | null
+          findings?: Json
+          has_blocking?: boolean
+          id?: string
+          model?: string | null
+          prompt_version?: string | null
+          resource_id?: string | null
+          reviewed_by?: string | null
+          summary?: string | null
+          updated_at?: string
+        }
+        Update: {
+          case_id?: string
+          content_hash?: string
+          created_at?: string
+          documents_hash?: string | null
+          findings?: Json
+          has_blocking?: boolean
+          id?: string
+          model?: string | null
+          prompt_version?: string | null
+          resource_id?: string | null
+          reviewed_by?: string | null
+          summary?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inpi_draft_reviews_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "inpi_resource_cases"
