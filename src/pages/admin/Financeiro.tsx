@@ -69,6 +69,12 @@ interface Client {
   asaas_customer_id: string | null;
 }
 
+interface AsaasAccount {
+  asaas_customer_id: string;
+  cliente_nome: string;
+  cobrancas: number;
+}
+
 interface Process {
   id: string;
   brand_name: string;
@@ -117,6 +123,7 @@ const EMPTY_BILLING_DATA: BillingSituationData = {
 export default function AdminFinanceiro() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [asaasAccounts, setAsaasAccounts] = useState<AsaasAccount[]>([]);
   const [processes, setProcesses] = useState<Process[]>([]);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -384,6 +391,12 @@ export default function AdminFinanceiro() {
   useEffect(() => {
     if (currentUserId !== null) { fetchTotals(); }
   }, [currentUserId, fetchTotals]);
+
+  useEffect(() => {
+    if (currentUserId === null) return;
+    supabase.rpc('admin_asaas_accounts', { p_owner: ownerFilter })
+      .then(({ data, error }) => { if (!error) setAsaasAccounts((data || []) as AsaasAccount[]); });
+  }, [currentUserId, ownerFilter]);
 
   useEffect(() => {
     if (currentUserId !== null) { fetchClients(); fetchProcesses(); }
@@ -781,6 +794,7 @@ export default function AdminFinanceiro() {
           filters={billingFilters}
           activeSituation={filterStatus}
           clients={clients}
+          accounts={asaasAccounts}
           onPeriodChange={(value) => { setBillingPeriod(value); setPage(1); }}
           onCustomFromChange={(value) => { setCustomFrom(value); setPage(1); }}
           onCustomToChange={(value) => { setCustomTo(value); setPage(1); }}

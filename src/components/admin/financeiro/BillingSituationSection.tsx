@@ -45,11 +45,16 @@ export interface BillingFilters {
   paymentTo: string;
 }
 
+interface AsaasAccountOption {
+  asaas_customer_id: string;
+  cliente_nome: string;
+  cobrancas: number;
+}
+
 interface ClientOption {
   id: string;
   full_name: string | null;
   email: string;
-  asaas_customer_id?: string | null;
 }
 
 interface BillingSituationSectionProps {
@@ -62,6 +67,7 @@ interface BillingSituationSectionProps {
   filters: BillingFilters;
   activeSituation: string;
   clients: ClientOption[];
+  accounts: AsaasAccountOption[];
   onPeriodChange: (period: BillingPeriod) => void;
   onCustomFromChange: (value: string) => void;
   onCustomToChange: (value: string) => void;
@@ -98,7 +104,7 @@ const money = (value: number) => `R$ ${Number(value || 0).toLocaleString('pt-BR'
 
 export function BillingSituationSection({
   data, loading, canViewValues, period, customFrom, customTo, filters, activeSituation,
-  clients, onPeriodChange, onCustomFromChange, onCustomToChange, onFiltersChange, onSituationChange,
+  clients, accounts, onPeriodChange, onCustomFromChange, onCustomToChange, onFiltersChange, onSituationChange,
 }: BillingSituationSectionProps) {
   const [graphView, setGraphView] = React.useState(false);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
@@ -267,7 +273,7 @@ export function BillingSituationSection({
           <DialogHeader><DialogTitle>Filtros das cobranças</DialogTitle></DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5"><Label>Status</Label><Select value={activeSituation} onValueChange={(value) => onSituationChange(value as BillingSituationKey | 'all')}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem>{CARD_CONFIG.map((item) => <SelectItem key={item.key} value={item.key}>{item.title}</SelectItem>)}<SelectItem value="inativas">Canceladas e inativas</SelectItem></SelectContent></Select></div>
-            <div className="space-y-1.5"><Label>Conta Asaas</Label><Select value={filters.account || 'all'} onValueChange={(value) => onFiltersChange({ ...filters, account: value === 'all' ? '' : value })}><SelectTrigger><SelectValue placeholder="Todas as contas" /></SelectTrigger><SelectContent><SelectItem value="all">Todas as contas</SelectItem>{clients.filter((client) => client.asaas_customer_id).map((client) => <SelectItem key={client.asaas_customer_id} value={client.asaas_customer_id || ''}>{client.full_name || client.email}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-1.5"><Label>Conta Asaas</Label><Select value={filters.account || 'all'} onValueChange={(value) => onFiltersChange({ ...filters, account: value === 'all' ? '' : value })}><SelectTrigger><SelectValue placeholder="Todas as contas" /></SelectTrigger><SelectContent><SelectItem value="all">Todas as contas</SelectItem>{accounts.map((account) => <SelectItem key={account.asaas_customer_id} value={account.asaas_customer_id}>{account.cliente_nome} ({account.cobrancas})</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-1.5"><Label>Forma de pagamento</Label><Select value={filters.paymentMethod || 'all'} onValueChange={(value) => onFiltersChange({ ...filters, paymentMethod: value === 'all' ? '' : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todas</SelectItem><SelectItem value="pix">Pix</SelectItem><SelectItem value="boleto">Boleto</SelectItem><SelectItem value="credit_card">Cartão</SelectItem></SelectContent></Select></div>
             <div className="space-y-1.5"><Label>Cliente</Label><Select value={filters.client || 'all'} onValueChange={(value) => onFiltersChange({ ...filters, client: value === 'all' ? '' : value })}><SelectTrigger><SelectValue placeholder="Todos os clientes" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os clientes</SelectItem>{clients.map((client) => <SelectItem key={client.id} value={client.id}>{client.full_name || client.email}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-1.5"><Label>Origem da cobrança</Label><Select value={filters.origin || 'all'} onValueChange={(value) => onFiltersChange({ ...filters, origin: value === 'all' ? '' : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todas</SelectItem><SelectItem value="asaas">Asaas</SelectItem><SelectItem value="interna">Fatura interna</SelectItem><SelectItem value="acordo">Acordo</SelectItem></SelectContent></Select></div>
