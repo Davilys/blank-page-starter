@@ -1787,6 +1787,7 @@ export type Database = {
       email_accounts: {
         Row: {
           assigned_to: string | null
+          auto_reply_enabled: boolean
           created_at: string | null
           display_name: string | null
           email_address: string
@@ -1804,6 +1805,7 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          auto_reply_enabled?: boolean
           created_at?: string | null
           display_name?: string | null
           email_address: string
@@ -1821,6 +1823,7 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          auto_reply_enabled?: boolean
           created_at?: string | null
           display_name?: string | null
           email_address?: string
@@ -1900,14 +1903,23 @@ export type Database = {
           has_attachments: boolean | null
           id: string
           imap_uid: number | null
+          in_reply_to: string | null
           is_alias: boolean | null
           is_archived: boolean | null
           is_read: boolean | null
           is_starred: boolean | null
           message_id: string | null
+          original_backup: Json | null
+          parse_error: string | null
+          parse_status: string
+          parser_version: number
+          raw_source: string | null
           received_at: string | null
+          references_ids: string | null
+          reprocessed_at: string | null
           snippet: string | null
           subject: string | null
+          thread_id: string | null
           to_email: string
           to_name: string | null
         }
@@ -1924,14 +1936,23 @@ export type Database = {
           has_attachments?: boolean | null
           id?: string
           imap_uid?: number | null
+          in_reply_to?: string | null
           is_alias?: boolean | null
           is_archived?: boolean | null
           is_read?: boolean | null
           is_starred?: boolean | null
           message_id?: string | null
+          original_backup?: Json | null
+          parse_error?: string | null
+          parse_status?: string
+          parser_version?: number
+          raw_source?: string | null
           received_at?: string | null
+          references_ids?: string | null
+          reprocessed_at?: string | null
           snippet?: string | null
           subject?: string | null
+          thread_id?: string | null
           to_email: string
           to_name?: string | null
         }
@@ -1948,14 +1969,23 @@ export type Database = {
           has_attachments?: boolean | null
           id?: string
           imap_uid?: number | null
+          in_reply_to?: string | null
           is_alias?: boolean | null
           is_archived?: boolean | null
           is_read?: boolean | null
           is_starred?: boolean | null
           message_id?: string | null
+          original_backup?: Json | null
+          parse_error?: string | null
+          parse_status?: string
+          parser_version?: number
+          raw_source?: string | null
           received_at?: string | null
+          references_ids?: string | null
+          reprocessed_at?: string | null
           snippet?: string | null
           subject?: string | null
+          thread_id?: string | null
           to_email?: string
           to_name?: string | null
         }
@@ -2054,30 +2084,148 @@ export type Database = {
           },
         ]
       }
+      email_reprocess_queue: {
+        Row: {
+          account_id: string
+          attempts: number
+          created_at: string
+          folder: string
+          id: string
+          imap_uid: number
+          last_error: string | null
+          next_attempt_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          attempts?: number
+          created_at?: string
+          folder: string
+          id?: string
+          imap_uid: number
+          last_error?: string | null
+          next_attempt_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          attempts?: number
+          created_at?: string
+          folder?: string
+          id?: string
+          imap_uid?: number
+          last_error?: string | null
+          next_attempt_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_reprocess_queue_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_sync_runs: {
+        Row: {
+          account_id: string
+          created_at: string
+          error_code: string | null
+          error_summary: string | null
+          failed_count: number
+          finished_at: string | null
+          folders: Json
+          id: string
+          new_count: number
+          recommended_action: string | null
+          result: string
+          started_at: string
+          trigger_source: string
+          updated_count: number
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          error_code?: string | null
+          error_summary?: string | null
+          failed_count?: number
+          finished_at?: string | null
+          folders?: Json
+          id?: string
+          new_count?: number
+          recommended_action?: string | null
+          result?: string
+          started_at?: string
+          trigger_source?: string
+          updated_count?: number
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          error_code?: string | null
+          error_summary?: string | null
+          failed_count?: number
+          finished_at?: string | null
+          folders?: Json
+          id?: string
+          new_count?: number
+          recommended_action?: string | null
+          result?: string
+          started_at?: string
+          trigger_source?: string
+          updated_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_sync_runs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_sync_state: {
         Row: {
           account_id: string
           consecutive_errors: number | null
           folder: string
           last_error: string | null
+          last_success_at: string | null
           last_synced_at: string
           last_uid: number
+          locked_at: string | null
+          status: string
+          uidvalidity: number | null
         }
         Insert: {
           account_id: string
           consecutive_errors?: number | null
           folder: string
           last_error?: string | null
+          last_success_at?: string | null
           last_synced_at?: string
           last_uid?: number
+          locked_at?: string | null
+          status?: string
+          uidvalidity?: number | null
         }
         Update: {
           account_id?: string
           consecutive_errors?: number | null
           folder?: string
           last_error?: string | null
+          last_success_at?: string | null
           last_synced_at?: string
           last_uid?: number
+          locked_at?: string | null
+          status?: string
+          uidvalidity?: number | null
         }
         Relationships: []
       }
