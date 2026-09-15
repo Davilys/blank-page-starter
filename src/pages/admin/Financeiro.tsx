@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -37,16 +38,24 @@ interface Invoice {
   amount: number;
   due_date: string;
   status: string | null;
+  classificacao: string;
   payment_date: string | null;
   user_id: string | null;
-  process_id: string | null;
   created_at: string | null;
   invoice_url: string | null;
   pix_code: string | null;
   payment_method: string | null;
-  profiles?: { full_name: string | null; email: string } | null;
-  brand_processes?: { brand_name: string } | null;
+  sync_status: string | null;
+  origem: string | null;
+  asaas_invoice_id: string | null;
+  cliente_nome: string | null;
+  cliente_email: string | null;
+  total_count?: number;
 }
+
+type SortKey = 'cliente' | 'descricao' | 'valor' | 'metodo' | 'vencimento' | 'status';
+
+const PAGE_SIZE = 50;
 
 interface Client {
   id: string;
@@ -64,24 +73,18 @@ interface Process {
 type PaymentMethod = 'pix' | 'boleto' | 'cartao';
 type PaymentType = 'avista' | 'parcelado';
 
-// Status normalization: Asaas sends 'confirmed'/'received' → treat as paid
-const PAID_STATUSES = ['paid', 'confirmed', 'received', 'RECEIVED', 'CONFIRMED'];
-const PENDING_STATUSES = ['pending', 'PENDING'];
-const OVERDUE_STATUSES = ['overdue', 'OVERDUE'];
-
-const normalizeStatus = (status: string | null): string => {
-  if (!status) return 'pending';
-  if (PAID_STATUSES.includes(status)) return 'paid';
-  if (OVERDUE_STATUSES.includes(status)) return 'overdue';
-  if (status === 'cancelled' || status === 'CANCELLED') return 'cancelled';
-  return 'pending';
+// Classificação vinda do banco (regra única: pago | a_vencer | vencido | inativo)
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; dot: string; glow: string }> = {
+  pago:     { label: 'Pago',      color: 'text-emerald-400', bg: 'bg-emerald-500/10 border border-emerald-500/20', dot: 'bg-emerald-400', glow: 'shadow-emerald-500/20' },
+  a_vencer: { label: 'A vencer',  color: 'text-amber-400',   bg: 'bg-amber-500/10 border border-amber-500/20',     dot: 'bg-amber-400',   glow: 'shadow-amber-500/20'   },
+  vencido:  { label: 'Vencida',   color: 'text-red-400',     bg: 'bg-red-500/10 border border-red-500/20',         dot: 'bg-red-400',     glow: 'shadow-red-500/20'     },
+  inativo:  { label: 'Cancelada', color: 'text-muted-foreground', bg: 'bg-muted/40 border border-border',          dot: 'bg-muted-foreground', glow: '' },
 };
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; dot: string; glow: string }> = {
-  paid:      { label: 'Pago',      color: 'text-emerald-400', bg: 'bg-emerald-500/10 border border-emerald-500/20', dot: 'bg-emerald-400', glow: 'shadow-emerald-500/20' },
-  pending:   { label: 'Pendente',  color: 'text-amber-400',   bg: 'bg-amber-500/10 border border-amber-500/20',     dot: 'bg-amber-400',   glow: 'shadow-amber-500/20'   },
-  overdue:   { label: 'Vencida',   color: 'text-red-400',     bg: 'bg-red-500/10 border border-red-500/20',         dot: 'bg-red-400',     glow: 'shadow-red-500/20'     },
-  cancelled: { label: 'Cancelada', color: 'text-muted-foreground', bg: 'bg-muted/40 border border-border',          dot: 'bg-muted-foreground', glow: '' },
+const ORIGEM_LABEL: Record<string, string> = {
+  asaas: 'Asaas',
+  interna: 'Fatura interna',
+  acordo: 'Acordo',
 };
 
 const PAYMENT_OPTIONS = {
@@ -155,56 +158,107 @@ export default function AdminFinanceiro() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const [stats, setStats] = useState({ total: 0, pending: 0, paid: 0, overdue: 0, pendingCount: 0, paidCount: 0, overdueCount: 0 });
+  const [totals, setTotals] = useState({
+    total: 0, pago: 0, a_vencer: 0, vencido: 0,
+    count_total: 0, count_pago: 0, count_a_vencer: 0, count_vencido: 0,
+  });
   const [syncing, setSyncing] = useState(false);
+  const [syncRun, setSyncRun] = useState<any | null>(null);
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
   const [selectedMonth, setSelectedMonth] = useState(new Date());
-  const [negotiatedInvoiceIds, setNegotiatedInvoiceIds] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [sortKey, setSortKey] = useState<SortKey>('cliente');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  // IDs (invoices.id) de faturas que vieram de parcela de negociação/renegociação.
-  // Essas faturas não devem entrar no card "Vencidos 30d" — pertencem ao Histórico.
   useEffect(() => {
-    (async () => {
-      try {
-        const [{ data: pd }, { data: pr }] = await Promise.all([
-          supabase.from('parcelas_devedor').select('asaas_payment_id').not('asaas_payment_id', 'is', null),
-          supabase.from('parcelas_renegociadas').select('asaas_payment_id').not('asaas_payment_id', 'is', null),
-        ]);
-        const payIds = [
-          ...((pd || []).map((r: any) => r.asaas_payment_id).filter(Boolean)),
-          ...((pr || []).map((r: any) => r.asaas_payment_id).filter(Boolean)),
-        ];
-        if (payIds.length === 0) { setNegotiatedInvoiceIds(new Set()); return; }
-        const { data: invs } = await supabase
-          .from('invoices')
-          .select('id')
-          .in('asaas_invoice_id', payIds);
-        setNegotiatedInvoiceIds(new Set((invs || []).map((r: any) => r.id)));
-      } catch (e) { console.warn('negotiated set load failed', e); }
-    })();
+    const t = setTimeout(() => { setDebouncedSearch(search.trim()); setPage(1); }, 400);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const dateRange = useMemo(() => {
+    const today = new Date();
+    if (dateFilter === 'today') {
+      const d = format(startOfDay(today), 'yyyy-MM-dd');
+      return { from: d, to: d };
+    }
+    if (dateFilter === 'week') {
+      return {
+        from: format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
+        to: format(endOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
+      };
+    }
+    if (dateFilter === 'month') {
+      return { from: format(startOfMonth(selectedMonth), 'yyyy-MM-dd'), to: format(endOfMonth(selectedMonth), 'yyyy-MM-dd') };
+    }
+    return { from: null as string | null, to: null as string | null };
+  }, [dateFilter, selectedMonth]);
+
+  // ── Sincronização geral com o Asaas (em blocos, retomável) ──────────────
+  const runSyncLoop = useCallback(async (runInicial: any) => {
+    let run = runInicial;
+    setSyncing(true);
+    setSyncRun(run);
+    try {
+      let guarda = 0;
+      while (run && run.status === 'em_andamento' && guarda < 10000) {
+        guarda++;
+        const { data, error } = await supabase.functions.invoke('sync-asaas-all', {
+          body: { action: 'block', sync_run_id: run.sync_run_id, offset: run.cursor_offset },
+        });
+        if (error) throw error;
+        if (data?.retry) {
+          setSyncRun({ ...run, etapa: 'Aguardando o Asaas responder...' });
+          await new Promise((r) => setTimeout(r, Math.min((data.retry_after || 5), 60) * 1000));
+          continue;
+        }
+        if (data?.error) throw new Error(data.error);
+        run = data.run || run;
+        setSyncRun(run);
+        if (data.concluido) break;
+      }
+      toast.success(
+        `Sincronização concluída — ${run?.clientes_criados || 0} cliente(s) criado(s), ${run?.criadas || 0} cobrança(s) criada(s), ${run?.atualizadas || 0} atualizada(s)`
+      );
+    } catch (err: any) {
+      toast.error(err?.message || 'Falha na sincronização. O progresso foi salvo, clique em Continuar.');
+    } finally {
+      setSyncing(false);
+      fetchInvoices();
+      fetchTotals();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSyncAsaas = async () => {
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('sync-asaas-invoices');
+      const { data, error } = await supabase.functions.invoke('sync-asaas-all', { body: { action: 'start' } });
       if (error) throw error;
-      if (data?.success) {
-        if (data.synced > 0) {
-          toast.success(`${data.synced} fatura(s) sincronizada(s) com o Asaas`);
-        } else {
-          toast.info(data.message || 'Todas as faturas já estão atualizadas');
-        }
-        fetchInvoices();
-      } else {
-        throw new Error(data?.error || 'Erro na sincronização');
+      if (data?.error) throw new Error(data.error);
+      if (data?.retry) {
+        toast.error('O Asaas não respondeu agora. Tente novamente em instantes.');
+        setSyncing(false);
+        return;
       }
+      await runSyncLoop(data.run);
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao sincronizar com Asaas');
-    } finally {
+      toast.error(err?.message || 'Erro ao sincronizar com Asaas');
       setSyncing(false);
     }
   };
+
+  // Retomada: ao abrir a tela, verifica se existe sincronização em andamento
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.functions.invoke('sync-asaas-all', { body: { action: 'status' } });
+        if (data?.run) setSyncRun(data.run);
+        else if (data?.ultima) setSyncRun(data.ultima);
+      } catch { /* silencioso */ }
+    })();
+  }, []);
 
   // Helper: get client IDs owned by current admin (assigned_to or created_by)
   const getMyClientIds = async (uid: string): Promise<string[]> => {
@@ -215,55 +269,73 @@ export default function AdminFinanceiro() {
     return data?.map(c => c.id) || [];
   };
 
-  useEffect(() => {
-    if (currentUserId !== null) {
-      fetchInvoices(); fetchClients(); fetchProcesses();
-    }
-  }, [currentUserId, isMasterAdmin]);
+  // Filtros, ordenação, busca e paginação são resolvidos no banco (RPC), nunca no navegador.
+  const ownerFilter = !isMasterAdmin && currentUserId ? currentUserId : null;
 
-  const fetchInvoices = async () => {
+  const fetchInvoices = useCallback(async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from('invoices')
-        .select('*, profiles(full_name, email), brand_processes(brand_name)')
-        .order('created_at', { ascending: false });
-
-      // Non-master admins only see invoices from their own clients
-      if (!isMasterAdmin && currentUserId) {
-        const clientIds = await getMyClientIds(currentUserId);
-        if (clientIds.length > 0) {
-          query = query.in('user_id', clientIds);
-        } else {
-          // No clients assigned → no invoices
-          setInvoices([]);
-          setStats({ total: 0, pending: 0, paid: 0, overdue: 0, pendingCount: 0, paidCount: 0, overdueCount: 0 });
-          setLoading(false);
-          return;
-        }
-      }
-
-      const { data, error } = await query;
-      if (error) {
-        toast.error('Erro ao carregar faturas');
-      } else {
-        const inv = data || [];
-        setInvoices(inv);
-        setStats({
-          total:        inv.reduce((s, i) => s + Number(i.amount), 0),
-          pending:      inv.filter(i => normalizeStatus(i.status) === 'pending').reduce((s, i) => s + Number(i.amount), 0),
-          paid:         inv.filter(i => normalizeStatus(i.status) === 'paid').reduce((s, i) => s + Number(i.amount), 0),
-          overdue:      inv.filter(i => normalizeStatus(i.status) === 'overdue').reduce((s, i) => s + Number(i.amount), 0),
-          pendingCount: inv.filter(i => normalizeStatus(i.status) === 'pending').length,
-          paidCount:    inv.filter(i => normalizeStatus(i.status) === 'paid').length,
-          overdueCount: inv.filter(i => normalizeStatus(i.status) === 'overdue').length,
-        });
-      }
-    } catch {
-      toast.error('Erro ao carregar faturas');
+      const { data, error } = await supabase.rpc('admin_invoices_list', {
+        p_search: debouncedSearch || null,
+        p_status: filterStatus,
+        p_from: dateRange.from,
+        p_to: dateRange.to,
+        p_owner: ownerFilter,
+        p_sort: sortKey,
+        p_dir: sortDir,
+        p_limit: PAGE_SIZE,
+        p_offset: (page - 1) * PAGE_SIZE,
+      });
+      if (error) throw error;
+      const rows = (data || []) as unknown as Invoice[];
+      setInvoices(rows);
+      const total = rows.length > 0 ? Number(rows[0].total_count || 0) : 0;
+      setTotalCount(total);
+      // Se a página atual deixou de existir, volta para a última válida
+      const maxPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      if (rows.length === 0 && page > 1 && total > 0) setPage(maxPage);
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao carregar faturas');
+      setInvoices([]);
+      setTotalCount(0);
     }
     setLoading(false);
-  };
+  }, [debouncedSearch, filterStatus, dateRange.from, dateRange.to, ownerFilter, sortKey, sortDir, page]);
+
+  const fetchTotals = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.rpc('admin_invoices_totals', {
+        p_from: dateRange.from,
+        p_to: dateRange.to,
+        p_owner: ownerFilter,
+      });
+      if (error) throw error;
+      const t = (data || {}) as any;
+      setTotals({
+        total: Number(t.total || 0),
+        pago: Number(t.pago || 0),
+        a_vencer: Number(t.a_vencer || 0),
+        vencido: Number(t.vencido || 0),
+        count_total: Number(t.count_total || 0),
+        count_pago: Number(t.count_pago || 0),
+        count_a_vencer: Number(t.count_a_vencer || 0),
+        count_vencido: Number(t.count_vencido || 0),
+      });
+    } catch (e) { console.warn('totais indisponíveis', e); }
+  }, [dateRange.from, dateRange.to, ownerFilter]);
+
+  useEffect(() => {
+    if (currentUserId !== null) { fetchInvoices(); }
+  }, [currentUserId, fetchInvoices]);
+
+  useEffect(() => {
+    if (currentUserId !== null) { fetchTotals(); }
+  }, [currentUserId, fetchTotals]);
+
+  useEffect(() => {
+    if (currentUserId !== null) { fetchClients(); fetchProcesses(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId, isMasterAdmin]);
 
   const fetchClients = async () => {
     let allClients: Client[] = [];
@@ -353,77 +425,21 @@ export default function AdminFinanceiro() {
   const handleDialogClose = (open: boolean) => { setDialogOpen(open); if (!open) resetForm(); };
   const copyToClipboard = (text: string) => { navigator.clipboard.writeText(text); toast.success('Código copiado!'); };
 
-  const filteredInvoices = invoices.filter(i => {
-    const q = search.toLowerCase().replace(/[.\-\/]/g, '');
-    const clientName = (i.profiles as any)?.full_name?.toLowerCase() || '';
-    const clientEmail = (i.profiles as any)?.email?.toLowerCase() || '';
-    // Find CPF/CNPJ from clients list
-    const clientRecord = clients.find(c => c.id === i.user_id);
-    const clientCpfCnpj = (clientRecord?.cpf_cnpj || '').replace(/[.\-\/]/g, '').toLowerCase();
-    const matchSearch = !q || i.description.toLowerCase().includes(q) ||
-      clientName.includes(q) || clientEmail.includes(q) || clientCpfCnpj.includes(q);
-    const matchStatus = filterStatus === 'all' || normalizeStatus(i.status) === filterStatus;
+  const paidPct = totals.total > 0 ? (totals.pago / totals.total) * 100 : 0;
+  const pendingPct = totals.total > 0 ? (totals.a_vencer / totals.total) * 100 : 0;
+  const overduePct = totals.total > 0 ? (totals.vencido / totals.total) * 100 : 0;
 
-    // Date filter
-    let matchDate = true;
-    if (dateFilter !== 'all') {
-      const invoiceDate = new Date(i.created_at || i.due_date);
-      const today = new Date();
-      if (dateFilter === 'today') {
-        matchDate = startOfDay(invoiceDate).getTime() === startOfDay(today).getTime();
-      } else if (dateFilter === 'week') {
-        matchDate = isWithinInterval(invoiceDate, { start: startOfWeek(today, { weekStartsOn: 1 }), end: endOfWeek(today, { weekStartsOn: 1 }) });
-      } else if (dateFilter === 'month') {
-        matchDate = isWithinInterval(invoiceDate, { start: startOfMonth(selectedMonth), end: endOfMonth(selectedMonth) });
-      }
-    }
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const inicioFaixa = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const fimFaixa = Math.min(page * PAGE_SIZE, totalCount);
 
-    return matchSearch && matchStatus && matchDate;
-  });
-
-  // Date-only filtered invoices for stats (no search/status filter)
-  const dateFilteredInvoices = invoices.filter(i => {
-    if (dateFilter === 'all') return true;
-    const invoiceDate = new Date(i.created_at || i.due_date);
-    const today = new Date();
-    if (dateFilter === 'today') return startOfDay(invoiceDate).getTime() === startOfDay(today).getTime();
-    if (dateFilter === 'week') return isWithinInterval(invoiceDate, { start: startOfWeek(today, { weekStartsOn: 1 }), end: endOfWeek(today, { weekStartsOn: 1 }) });
-    if (dateFilter === 'month') return isWithinInterval(invoiceDate, { start: startOfMonth(selectedMonth), end: endOfMonth(selectedMonth) });
-    return true;
-  });
-
-  const filteredStats = {
-    total:        dateFilteredInvoices.reduce((s, i) => s + Number(i.amount), 0),
-    pending:      dateFilteredInvoices.filter(i => normalizeStatus(i.status) === 'pending').reduce((s, i) => s + Number(i.amount), 0),
-    paid:         dateFilteredInvoices.filter(i => normalizeStatus(i.status) === 'paid').reduce((s, i) => s + Number(i.amount), 0),
-    overdue:      dateFilteredInvoices.filter(i => normalizeStatus(i.status) === 'overdue').reduce((s, i) => s + Number(i.amount), 0),
-    pendingCount: dateFilteredInvoices.filter(i => normalizeStatus(i.status) === 'pending').length,
-    paidCount:    dateFilteredInvoices.filter(i => normalizeStatus(i.status) === 'paid').length,
-    overdueCount: dateFilteredInvoices.filter(i => normalizeStatus(i.status) === 'overdue').length,
-    totalCount:   dateFilteredInvoices.length,
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+    setPage(1);
   };
 
-  const paidPct = filteredStats.total > 0 ? (filteredStats.paid / filteredStats.total) * 100 : 0;
-  const pendingPct = filteredStats.total > 0 ? (filteredStats.pending / filteredStats.total) * 100 : 0;
-
-  // Total vencido dos últimos 30 dias (independente do filtro de data atual)
-  const overdue30d = useMemo(() => {
-    const since = startOfDay(subDays(new Date(), 30));
-    const today = startOfDay(new Date());
-    let value = 0;
-    let count = 0;
-    for (const i of invoices) {
-      const ns = normalizeStatus(i.status);
-      if (ns === 'paid' || ns === 'cancelled') continue;
-      if (negotiatedInvoiceIds.has(i.id)) continue;
-      const due = new Date((i.due_date || '').length === 10 ? i.due_date + 'T00:00:00' : i.due_date);
-      if (due >= since && due <= today && (ns === 'overdue' || due < today)) {
-        value += Number(i.amount || 0);
-        count += 1;
-      }
-    }
-    return { value, count };
-  }, [invoices, negotiatedInvoiceIds]);
+  const sortArrow = (key: SortKey) => (sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '');
 
   const clientProcesses = processes.filter(p => p.user_id === formData.user_id);
   const getInstallmentValue = () => {
@@ -674,13 +690,45 @@ export default function AdminFinanceiro() {
           </div>
         </motion.div>
 
+        {/* ── PROGRESSO DA SINCRONIZAÇÃO ─────────── */}
+        {syncRun && (syncing || syncRun.status === 'em_andamento') && (
+          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-emerald-600 flex items-center gap-2">
+                {syncing && <Loader2 className="h-4 w-4 animate-spin" />}
+                {syncRun.etapa || 'Sincronizando com o Asaas'}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Conta {syncRun.clientes_processados || 0}
+                {syncRun.total_clientes_asaas ? ` de ${syncRun.total_clientes_asaas}` : ''} — {syncRun.cobrancas_encontradas || 0} cobranças processadas
+              </span>
+            </div>
+            <Progress
+              value={syncRun.total_clientes_asaas
+                ? Math.min(100, ((syncRun.clientes_processados || 0) / syncRun.total_clientes_asaas) * 100)
+                : 0}
+            />
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                {syncRun.clientes_criados || 0} cliente(s) criado(s) · {syncRun.criadas || 0} cobrança(s) criada(s) · {syncRun.atualizadas || 0} atualizada(s) · {syncRun.removidas || 0} removida(s)
+              </span>
+              {!syncing && syncRun.status === 'em_andamento' && (
+                <Button size="sm" variant="outline" className="h-7 text-xs border-emerald-500/30 text-emerald-600"
+                  onClick={() => runSyncLoop(syncRun)}>
+                  Continuar sincronização
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── STAT CARDS ─────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { title: 'Total Faturado', value: filteredStats.total, icon: TrendingUp, color: 'text-primary', accent: 'from-primary/20 to-primary/5', border: 'border-primary/20', ring: 'bg-primary/15', count: filteredStats.totalCount, countLabel: 'faturas' },
-            { title: 'Aguardando',     value: filteredStats.pending, icon: Clock,       color: 'text-amber-500', accent: 'from-amber-500/20 to-amber-500/5', border: 'border-amber-500/20', ring: 'bg-amber-500/15', count: filteredStats.pendingCount, countLabel: 'faturas' },
-            { title: 'Recebido',       value: filteredStats.paid,    icon: CheckCircle, color: 'text-emerald-500', accent: 'from-emerald-500/20 to-emerald-500/5', border: 'border-emerald-500/20', ring: 'bg-emerald-500/15', count: filteredStats.paidCount, countLabel: 'pagas' },
-            { title: 'Vencido',        value: overdue30d.value, icon: AlertTriangle, color: 'text-red-500', accent: 'from-red-500/20 to-red-500/5', border: 'border-red-500/20', ring: 'bg-red-500/15', count: overdue30d.count, countLabel: 'últ. 30 dias' },
+            { title: 'Total Faturado', value: totals.total, icon: TrendingUp, color: 'text-primary', accent: 'from-primary/20 to-primary/5', border: 'border-primary/20', ring: 'bg-primary/15', count: totals.count_total, countLabel: 'faturas' },
+            { title: 'Aguardando',     value: totals.a_vencer, icon: Clock,       color: 'text-amber-500', accent: 'from-amber-500/20 to-amber-500/5', border: 'border-amber-500/20', ring: 'bg-amber-500/15', count: totals.count_a_vencer, countLabel: 'a vencer' },
+            { title: 'Recebido',       value: totals.pago,    icon: CheckCircle, color: 'text-emerald-500', accent: 'from-emerald-500/20 to-emerald-500/5', border: 'border-emerald-500/20', ring: 'bg-emerald-500/15', count: totals.count_pago, countLabel: 'pagas' },
+            { title: 'Vencido',        value: totals.vencido, icon: AlertTriangle, color: 'text-red-500', accent: 'from-red-500/20 to-red-500/5', border: 'border-red-500/20', ring: 'bg-red-500/15', count: totals.count_vencido, countLabel: 'vencidas' },
           ].map((stat, i) => (
             <motion.div key={stat.title} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
               <Card
@@ -724,12 +772,12 @@ export default function AdminFinanceiro() {
         </div>
 
         {/* ── PROGRESS BAR ───────────────────────── */}
-        {filteredStats.total > 0 && canViewFinancialValues && (
+        {totals.total > 0 && canViewFinancialValues && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
             className="rounded-2xl border border-border/60 bg-muted/20 p-4 space-y-3">
             <div className="flex items-center justify-between text-sm">
               <span className="font-medium text-muted-foreground">Composição do Faturamento</span>
-              <span className="text-xs text-muted-foreground">R$ {fmt(filteredStats.total)} total</span>
+              <span className="text-xs text-muted-foreground">R$ {fmt(totals.total)} total</span>
             </div>
             <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted/60 gap-0.5">
               <motion.div initial={{ width: 0 }} animate={{ width: `${paidPct}%` }} transition={{ duration: 1, ease: 'easeOut', delay: 0.4 }} className="h-full bg-emerald-500 rounded-l-full" />
@@ -739,7 +787,7 @@ export default function AdminFinanceiro() {
             <div className="flex gap-5 text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />Recebido {paidPct.toFixed(0)}%</span>
               <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-500 inline-block" />Pendente {pendingPct.toFixed(0)}%</span>
-              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-red-500/60 inline-block" />Vencido {filteredStats.total > 0 ? ((filteredStats.overdue / filteredStats.total) * 100).toFixed(0) : 0}%</span>
+              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-red-500/60 inline-block" />Vencido {overduePct.toFixed(0)}%</span>
             </div>
           </motion.div>
         )}
@@ -828,12 +876,12 @@ export default function AdminFinanceiro() {
           <Table>
             <TableHeader>
               <TableRow className="border-border/60 bg-muted/30 hover:bg-muted/30">
-                <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Descrição</TableHead>
-                <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Cliente</TableHead>
-                <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold hidden md:table-cell">Valor</TableHead>
-                <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold hidden md:table-cell">Método</TableHead>
-                <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold hidden lg:table-cell">Vencimento</TableHead>
-                <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Status</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold cursor-pointer select-none" onClick={() => toggleSort('descricao')}>Descrição{sortArrow('descricao')}</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold cursor-pointer select-none" onClick={() => toggleSort('cliente')}>Cliente{sortArrow('cliente')}</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold hidden md:table-cell cursor-pointer select-none" onClick={() => toggleSort('valor')}>Valor{sortArrow('valor')}</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold hidden md:table-cell cursor-pointer select-none" onClick={() => toggleSort('metodo')}>Método{sortArrow('metodo')}</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold hidden lg:table-cell cursor-pointer select-none" onClick={() => toggleSort('vencimento')}>Vencimento{sortArrow('vencimento')}</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold cursor-pointer select-none" onClick={() => toggleSort('status')}>Status{sortArrow('status')}</TableHead>
                 <TableHead className="text-right text-xs uppercase tracking-wider text-muted-foreground font-semibold">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -847,7 +895,7 @@ export default function AdminFinanceiro() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : filteredInvoices.length === 0 ? (
+              ) : invoices.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-16">
                     <div className="flex flex-col items-center gap-2">
@@ -858,10 +906,10 @@ export default function AdminFinanceiro() {
                 </TableRow>
               ) : (
                 <AnimatePresence>
-                  {filteredInvoices.map((invoice, idx) => {
-                    const ns = normalizeStatus(invoice.status);
-                    const sc = STATUS_CONFIG[ns] || STATUS_CONFIG.pending;
-                    const isOverdue = ns === 'overdue';
+                  {invoices.map((invoice, idx) => {
+                    const ns = (invoice.classificacao || 'a_vencer') as keyof typeof STATUS_CONFIG;
+                    const sc = STATUS_CONFIG[ns] || STATUS_CONFIG.a_vencer;
+                    const isOverdue = ns === 'vencido';
 
                     return (
                       <motion.tr
@@ -886,11 +934,11 @@ export default function AdminFinanceiro() {
                               disabled={loadingClientId === invoice.user_id}
                             >
                               {loadingClientId === invoice.user_id && <Loader2 className="h-3 w-3 animate-spin" />}
-                              {(invoice.profiles as any)?.full_name || (invoice.profiles as any)?.email || '—'}
+                              {invoice.cliente_nome || invoice.cliente_email || '—'}
                             </button>
                           ) : (
                             <span className="text-sm text-muted-foreground">
-                              {(invoice.profiles as any)?.full_name || (invoice.profiles as any)?.email || '—'}
+                              {invoice.cliente_nome || invoice.cliente_email || '—'}
                             </span>
                           )}
                         </TableCell>
@@ -913,7 +961,7 @@ export default function AdminFinanceiro() {
                         </TableCell>
                         <TableCell className="py-3.5">
                           <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium', sc.bg, sc.color)}>
-                            <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', sc.dot, ns === 'pending' && 'animate-pulse')} />
+                            <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', sc.dot, ns === 'a_vencer' && 'animate-pulse')} />
                             {sc.label}
                           </span>
                         </TableCell>
@@ -929,7 +977,7 @@ export default function AdminFinanceiro() {
                                 <Copy className="h-3.5 w-3.5 text-emerald-500" />
                               </Button>
                             )}
-                            {ns !== 'paid' && ns !== 'cancelled' && (
+                            {ns !== 'pago' && ns !== 'inativo' && (
                               <Button variant="ghost" size="sm" className="h-7 text-xs text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10 px-2"
                                 onClick={() => updateStatus(invoice.id, 'paid')}>
                                 <CheckCircle className="h-3.5 w-3.5 mr-1" /> Pago
@@ -945,14 +993,16 @@ export default function AdminFinanceiro() {
             </TableBody>
           </Table>
 
-          {filteredInvoices.length > 0 && (
-            <div className="px-4 py-3 border-t border-border/60 bg-muted/10 flex items-center justify-between text-xs text-muted-foreground">
-              <span>{filteredInvoices.length} fatura{filteredInvoices.length !== 1 ? 's' : ''} exibida{filteredInvoices.length !== 1 ? 's' : ''}</span>
-              {canViewFinancialValues && (
-                <span className="font-medium">
-                  Total filtrado: R$ {fmt(filteredInvoices.reduce((s, i) => s + Number(i.amount), 0))}
-                </span>
-              )}
+          {totalCount > 0 && (
+            <div className="px-4 py-3 border-t border-border/60 bg-muted/10 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>Exibindo {inicioFaixa}–{fimFaixa} de {totalCount}</span>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page <= 1 || loading}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}>Anterior</Button>
+                <span>Página {page} de {totalPages}</span>
+                <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page >= totalPages || loading}
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}>Próximo</Button>
+              </div>
             </div>
           )}
         </motion.div>

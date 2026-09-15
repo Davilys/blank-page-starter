@@ -140,3 +140,6 @@ verify_jwt = false
 
 [functions.sync-asaas-client-invoices]
 verify_jwt = false
+
+[functions.sync-asaas-all]
+verify_jwt = false

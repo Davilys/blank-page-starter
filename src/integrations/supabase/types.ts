@@ -270,6 +270,75 @@ export type Database = {
         }
         Relationships: []
       }
+      asaas_full_sync_runs: {
+        Row: {
+          ambiguidades: Json
+          atualizadas: number
+          clientes_criados: number
+          clientes_processados: number
+          clientes_vinculados: number
+          cobrancas_encontradas: number
+          criadas: number
+          cursor_offset: number
+          erro: string | null
+          etapa: string | null
+          executed_by: string | null
+          finished_at: string | null
+          id: string
+          removidas: number
+          started_at: string
+          status: string
+          sync_run_id: string
+          total_clientes_asaas: number | null
+          ultimo_bloco_aplicado: number
+          updated_at: string
+        }
+        Insert: {
+          ambiguidades?: Json
+          atualizadas?: number
+          clientes_criados?: number
+          clientes_processados?: number
+          clientes_vinculados?: number
+          cobrancas_encontradas?: number
+          criadas?: number
+          cursor_offset?: number
+          erro?: string | null
+          etapa?: string | null
+          executed_by?: string | null
+          finished_at?: string | null
+          id?: string
+          removidas?: number
+          started_at?: string
+          status?: string
+          sync_run_id?: string
+          total_clientes_asaas?: number | null
+          ultimo_bloco_aplicado?: number
+          updated_at?: string
+        }
+        Update: {
+          ambiguidades?: Json
+          atualizadas?: number
+          clientes_criados?: number
+          clientes_processados?: number
+          clientes_vinculados?: number
+          cobrancas_encontradas?: number
+          criadas?: number
+          cursor_offset?: number
+          erro?: string | null
+          etapa?: string | null
+          executed_by?: string | null
+          finished_at?: string | null
+          id?: string
+          removidas?: number
+          started_at?: string
+          status?: string
+          sync_run_id?: string
+          total_clientes_asaas?: number | null
+          ultimo_bloco_aplicado?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       asaas_sync_logs: {
         Row: {
           ambiguous_customer_ids: string[]
@@ -4810,7 +4879,48 @@ export type Database = {
     }
     Functions: {
       add_admin_role: { Args: { target_user_id: string }; Returns: undefined }
+      admin_invoices_list: {
+        Args: {
+          p_dir?: string
+          p_from?: string
+          p_limit?: number
+          p_offset?: number
+          p_owner?: string
+          p_search?: string
+          p_sort?: string
+          p_status?: string
+          p_to?: string
+        }
+        Returns: {
+          amount: number
+          asaas_invoice_id: string
+          classificacao: string
+          cliente_email: string
+          cliente_nome: string
+          created_at: string
+          description: string
+          due_date: string
+          id: string
+          invoice_url: string
+          origem: string
+          payment_date: string
+          payment_method: string
+          pix_code: string
+          status: string
+          sync_status: string
+          total_count: number
+          user_id: string
+        }[]
+      }
+      admin_invoices_totals: {
+        Args: { p_from?: string; p_owner?: string; p_to?: string }
+        Returns: Json
+      }
       calculate_predictive_score: { Args: { p_classe?: string }; Returns: Json }
+      classificar_cobranca: {
+        Args: { p_due_date: string; p_status: string; p_sync_status: string }
+        Returns: string
+      }
       get_annual_evolution: { Args: never; Returns: Json }
       get_auth_user_id_by_email: {
         Args: { lookup_email: string }
@@ -4845,7 +4955,14 @@ export type Database = {
         Args: { keep_id: string; merge_id: string }
         Returns: undefined
       }
+      nome_ordenavel: { Args: { p: string }; Returns: string }
       only_digits: { Args: { s: string }; Returns: string }
+      profiles_by_doc_digits: {
+        Args: { p_doc: string }
+        Returns: {
+          id: string
+        }[]
+      }
       recalculate_upsell_weights: { Args: never; Returns: Json }
       recheck_cobranca_reentry: { Args: never; Returns: number }
       resolve_contract_user_id: {
