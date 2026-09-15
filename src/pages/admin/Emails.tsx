@@ -66,6 +66,7 @@ export default function Emails() {
   const [aiDraftBody, setAiDraftBody] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
   const isMobile = useIsMobile();
   const { isMasterAdmin, userId, hasPermission } = useAdminPermissions();
   const canSeeAllEmails = isMasterAdmin || hasPermission('emails', 'can_view');
