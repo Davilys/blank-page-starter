@@ -302,16 +302,18 @@ export function EmailView({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* AI Assistant as Dialog/Modal */}
-      <Dialog open={showAI} onOpenChange={setShowAI}>
-        <DialogContent className="max-w-2xl w-full p-0 gap-0 overflow-hidden max-h-[90vh]">
-          <AIEmailAssistant
-            email={email}
-            onUseDraft={handleUseDraft}
-            onClose={() => setShowAI(false)}
-          />
-        </DialogContent>
-      </Dialog>
+      {/* AI Assistant as Dialog/Modal (only when the AI column is not docked) */}
+      {!aiDocked && (
+        <Dialog open={showAIDialog} onOpenChange={setShowAIDialog}>
+          <DialogContent className="max-w-2xl w-full p-0 gap-0 overflow-hidden max-h-[90vh]">
+            <AIEmailAssistant
+              email={email}
+              onUseDraft={handleUseDraft}
+              onClose={() => setShowAIDialog(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Main Email View */}
       <div className="h-full flex flex-col w-full">
@@ -319,9 +321,11 @@ export function EmailView({
           {/* Top Toolbar */}
           <CardHeader className="pb-0 pt-2 md:pt-3 px-3 md:px-4 flex-shrink-0">
             <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3">
-              <Button variant="ghost" size="icon" onClick={onBack} className="h-9 w-9 md:h-8 md:w-8 hover:bg-muted">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
+              {!hideBack && (
+                <Button variant="ghost" size="icon" onClick={onBack} className="h-9 w-9 md:h-8 md:w-8 hover:bg-muted">
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              )}
               <div className="flex-1" />
               <div className="flex items-center gap-0.5 md:gap-1">
                 <Button
