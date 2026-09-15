@@ -572,11 +572,11 @@ export default function AdminClientes() {
               onValueChange={(v) => v && setFunnelType(v as FunnelType)}
               className="border rounded-lg p-0.5 bg-muted/40 shrink-0"
             >
-              <ToggleGroupItem value="comercial" aria-label="Funil Comercial" className="text-xs px-3 h-8 data-[state=on]:bg-background data-[state=on]:shadow-sm">
+              <ToggleGroupItem value="comercial" aria-label="Funil Comercial" className="text-xs px-3 h-8 text-muted-foreground hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm">
                 <Briefcase className="h-3.5 w-3.5 mr-1.5" />
                 Comercial
               </ToggleGroupItem>
-              <ToggleGroupItem value="juridico" aria-label="Funil Jurídico" className="text-xs px-3 h-8 data-[state=on]:bg-background data-[state=on]:shadow-sm">
+              <ToggleGroupItem value="juridico" aria-label="Funil Jurídico" className="text-xs px-3 h-8 text-muted-foreground hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm">
                 <Scale className="h-3.5 w-3.5 mr-1.5" />
                 Jurídico
               </ToggleGroupItem>
