@@ -2383,9 +2383,9 @@ export default function RecursosINPI() {
                       <div className="flex items-start gap-3">
                         <Brain className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
                         <div className="flex-1">
-                          <p className="font-semibold text-sm">Orientações para o Agente <span className="text-muted-foreground font-normal">(opcional)</span></p>
+                          <p className="font-semibold text-sm">Orientações para o {agent.name} <span className="text-muted-foreground font-normal">(opcional)</span></p>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            Descreva como o Agente Mazzola deve elaborar o cumprimento desta exigência: pontos a enfatizar, especificação corrigida sugerida, tom desejado, extensão preferida, argumentos específicos, etc. O agente seguirá estas orientações com prioridade.
+                            Descreva como o {agent.name} deve elaborar {ORIENTATION_PIECE_LABELS[resourceType] || 'esta peça'}: pontos a enfatizar, tom desejado, extensão preferida, argumentos específicos, etc. O agente seguirá estas orientações com prioridade.
                           </p>
                         </div>
                       </div>
@@ -2393,9 +2393,10 @@ export default function RecursosINPI() {
                         value={userOrientation}
                         onChange={(e) => setUserOrientation(e.target.value)}
                         rows={6}
-                        placeholder="Ex.: A exigência pede detalhamento da especificação na classe 35. Apresentar a redação: 'serviços de comércio varejista de vestuário e acessórios de moda...'. Manter peça enxuta (3 a 5 páginas), sem teses de oposição. Reforçar boa-fé e aderência ao Manual de Marcas."
+                        placeholder={ORIENTATION_PLACEHOLDERS[resourceType] || 'Descreva os pontos que o agente deve priorizar nesta peça.'}
                         className="resize-y text-sm"
                       />
+
                       <p className="text-xs text-muted-foreground text-right">{userOrientation.length} caracteres</p>
                     </div>
                   )}
