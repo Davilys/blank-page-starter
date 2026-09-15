@@ -672,6 +672,19 @@ export default function RecursosINPI() {
       if (insertError) throw insertError;
       setCurrentResourceId(insertedResource.id);
 
+      // Vincula a peça ao caso preparado (documentos + orientação confirmada).
+      if (override?.caseId) {
+        await supabase
+          .from('inpi_resource_cases')
+          .update({
+            resource_id: insertedResource.id,
+            status: 'minuta',
+            process_number: partialExtracted.process_number || null,
+            brand_name: partialExtracted.brand_name || null,
+          })
+          .eq('id', override.caseId);
+      }
+
       const { data: pass2Data, error: pass2Error } = await supabase.functions.invoke('process-inpi-resource', {
         body: {
           resourceType,
@@ -680,7 +693,7 @@ export default function RecursosINPI() {
           generationPass: 'pass2',
           pass1Content: pass1Data.pass1_content || partialContent,
           extractedData: partialExtracted,
-          userOrientation: userOrientation.trim() || undefined,
+          userOrientation: orientationToSend || undefined,
         }
       });
 
