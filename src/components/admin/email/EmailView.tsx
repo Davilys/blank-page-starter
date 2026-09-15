@@ -454,7 +454,15 @@ export function EmailView({ email, onBack, onReply, onForward, onUseDraftFromAI 
                 ) : (
                   <div className="prose prose-sm max-w-none dark:prose-invert">
                     {displayBodyHtml ? (
-                      <div dangerouslySetInnerHTML={{ __html: displayBodyHtml }} className="leading-relaxed" />
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: DOMPurify.sanitize(displayBodyHtml, {
+                            FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'link', 'meta'],
+                            FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'srcdoc', 'formaction'],
+                          }),
+                        }}
+                        className="leading-relaxed"
+                      />
                     ) : displayBodyText ? (
                       <p className="whitespace-pre-wrap leading-relaxed text-sm text-foreground/90">{displayBodyText}</p>
                     ) : (
