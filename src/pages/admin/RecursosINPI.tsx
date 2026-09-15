@@ -2838,6 +2838,8 @@ export default function RecursosINPI() {
                 resource={selectedResource}
                 content={selectedResource.final_content || selectedResource.draft_content || draftContent}
                 resourceType={selectedResource.resource_type}
+                annexes={exportPackage?.annexes}
+                draftStamp={exportPackage?.draftStamp ?? 'MINUTA — PENDENTE DE CONFERÊNCIA'}
               />
             )}
           </DialogContent>
