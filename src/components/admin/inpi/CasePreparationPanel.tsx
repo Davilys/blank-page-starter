@@ -12,9 +12,10 @@ import {
 } from 'lucide-react';
 import {
   CASE_CATEGORIES, ACCEPTED_EXTENSIONS, MAX_FILE_BYTES, EXTRACTION_LABEL,
-  extractContent, sha256Hex, documentsFingerprint,
+  extractContent, sha256Hex, documentsFingerprint, fileExtension, isImageExt,
   type CaseCategory, type ExtractionStatus,
 } from '@/lib/inpi/caseDocuments';
+import { rasterizePdfPages, imageToDataUrl } from '@/lib/inpi/packageBuilder';
 
 interface CaseDoc {
   id: string;
