@@ -424,6 +424,49 @@ export default function CaseApprovalPanel({
         </CardContent>
       </Card>
 
+      {/* Revisão jurídica do conteúdo */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            <h3 className="font-semibold text-sm">Revisão jurídica do conteúdo</h3>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Confere se cada fato tem lastro nos documentos, se as referências foram conferidas, se todos os
+            fundamentos foram respondidos e se não há informação inventada.
+          </p>
+          <Button size="sm" variant="outline" onClick={runReview} disabled={reviewing || !content?.trim()}>
+            {reviewing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+            {currentReview ? 'Revisar novamente' : 'Revisar conteúdo jurídico'}
+          </Button>
+          {review && !currentReview && (
+            <div className="rounded-md bg-amber-500/10 p-2 text-xs text-amber-700">
+              A revisão existente é de outra versão do texto ou dos anexos. Execute a revisão novamente.
+            </div>
+          )}
+          {currentReview && (
+            <div className="space-y-2">
+              <div className={`rounded-md p-2 text-xs ${currentReview.has_blocking ? 'bg-destructive/10 text-destructive' : 'bg-emerald-500/10 text-emerald-700'}`}>
+                {currentReview.summary || (currentReview.has_blocking
+                  ? 'Há apontamentos bloqueantes nesta versão.'
+                  : 'Nenhum apontamento bloqueante nesta versão.')}
+              </div>
+              {(currentReview.findings || []).map((f, i) => (
+                <div key={i} className="rounded-md border p-2 text-[11px] space-y-1">
+                  <p className="font-medium">
+                    {f.bloqueante ? '🔴' : '🟡'} {f.tipo?.replace(/_/g, ' ')}
+                    {f.fontes?.length ? ` · ${f.fontes.join(', ')}` : ''}
+                  </p>
+                  {f.trecho && <p className="italic text-muted-foreground">“{f.trecho}”</p>}
+                  {f.problema && <p>{f.problema}</p>}
+                  {f.sugestao && <p className="text-muted-foreground">Sugestão: {f.sugestao}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Aprovações vinculadas à versão */}
       <Card>
         <CardContent className="p-4 space-y-3">
