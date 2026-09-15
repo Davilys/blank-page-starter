@@ -143,6 +143,8 @@ export default function CasePreparationPanel({
             extraction_notes: result.notes,
             extracted_text: result.text,
             page_count: result.pageCount,
+            interpreted_pages: result.interpretedPages,
+            unreadable_pages: result.unreadablePages,
             sheet_names: result.sheetNames,
           })
           .eq('id', row.id);
@@ -251,6 +253,8 @@ export default function CasePreparationPanel({
     const map: Record<ExtractionStatus, string> = {
       pendente: 'bg-muted text-muted-foreground',
       lendo: 'bg-primary/10 text-primary',
+      recebido: 'bg-primary/10 text-primary',
+      parcial: 'bg-amber-500/10 text-amber-600',
       lido: 'bg-emerald-500/10 text-emerald-600',
       nativo: 'bg-primary/10 text-primary',
       falha: 'bg-destructive/10 text-destructive',

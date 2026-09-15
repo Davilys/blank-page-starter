@@ -25,6 +25,7 @@ import { INPIResourcePDFPreview } from '@/components/admin/INPIResourcePDFPrevie
 import { INPILegalChatDialog } from '@/components/admin/inpi/INPILegalChatDialog';
 import { EvidenceGallery, type EvidenceRow } from '@/components/admin/inpi/EvidenceGallery';
 import CasePreparationPanel from '@/components/admin/inpi/CasePreparationPanel';
+import CaseApprovalPanel, { type ExportPackageState } from '@/components/admin/inpi/CaseApprovalPanel';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface ExtractedData {
@@ -379,6 +380,8 @@ export default function RecursosINPI() {
   const [adjustmentNotes, setAdjustmentNotes] = useState('');
   const [isAdjusting, setIsAdjusting] = useState(false);
   const [currentResourceId, setCurrentResourceId] = useState<string | null>(null);
+  const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
+  const [exportPackage, setExportPackage] = useState<ExportPackageState | null>(null);
   const [resources, setResources] = useState<INPIResource[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showPDFPreview, setShowPDFPreview] = useState(false);
@@ -2433,6 +2436,8 @@ export default function RecursosINPI() {
                 onProceed={({ caseId, files, orientation }) => {
                   setMultipleFiles(files);
                   setUserOrientation(orientation);
+                  setActiveCaseId(caseId);
+                  setExportPackage(null);
                   processDocument({ files, orientation, caseId });
                 }}
               />
@@ -2628,6 +2633,15 @@ export default function RecursosINPI() {
           {/* REVIEW */}
           {step === 'review' && (
             <motion.div key="review" {...fadeIn} className="space-y-4">
+              {activeCaseId && UPGRADED_MODALITIES.includes(resourceType) && (
+                <CaseApprovalPanel
+                  caseId={activeCaseId}
+                  resourceId={currentResourceId}
+                  resourceType={resourceType}
+                  content={draftContent}
+                  onPackageReady={setExportPackage}
+                />
+              )}
               {extractedData && (
                 <Card className="border-primary/10">
                   <CardHeader className="pb-3">
@@ -2824,6 +2838,16 @@ export default function RecursosINPI() {
                 resource={selectedResource}
                 content={selectedResource.final_content || selectedResource.draft_content || draftContent}
                 resourceType={selectedResource.resource_type}
+                annexes={
+                  activeCaseId && selectedResource.id === currentResourceId ? exportPackage?.annexes : undefined
+                }
+                draftStamp={
+                  activeCaseId &&
+                  selectedResource.id === currentResourceId &&
+                  UPGRADED_MODALITIES.includes(selectedResource.resource_type)
+                    ? (exportPackage?.draftStamp ?? 'MINUTA — PENDENTE DE CONFERÊNCIA')
+                    : null
+                }
               />
             )}
           </DialogContent>

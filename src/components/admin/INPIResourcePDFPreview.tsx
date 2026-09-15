@@ -41,6 +41,10 @@ interface INPIResourcePDFPreviewProps {
   content: string;
   resourceType?: string;
   debugEvidenceOverride?: ResourceEvidence[];
+  /** Anexos convertidos do dossiê (pacote completo). */
+  annexes?: NativeAnnexDoc[];
+  /** Carimbo diagonal aplicado em todas as páginas. */
+  draftStamp?: string | null;
 }
 
 type SupabaseTableClient = typeof supabase & {
@@ -379,7 +383,20 @@ type NativeEvidence = {
   height?: number;
 };
 
-interface NativePDFOptions {
+/** Anexo já convertido em páginas imprimíveis (ver src/lib/inpi/packageBuilder.ts). */
+export interface NativeAnnexDoc {
+  id: string;
+  docNumber: number;
+  title: string;
+  categoryLabel: string;
+  fileName: string;
+  images: { dataUrl: string; width: number; height: number }[];
+  textBlocks: string[];
+  status: 'pendente' | 'convertido' | 'parcial' | 'falha';
+  notes: string | null;
+}
+
+export interface NativePDFOptions {
   pdfFileName: string;
   bodyContent: string;
   evidences: NativeEvidence[];
@@ -391,6 +408,12 @@ interface NativePDFOptions {
   approvalDate: string;
   isExtrajudicialDoc: boolean;
   isProcuradorPetition: boolean;
+  /** Anexos do pacote completo: índice + páginas, na ordem aprovada. */
+  annexes?: NativeAnnexDoc[];
+  /** Carimbo diagonal em todas as páginas (minuta / homologação). */
+  draftStamp?: string | null;
+  /** Quando true, devolve o Blob em vez de baixar o arquivo. */
+  returnBlob?: boolean;
 }
 
 const A4_W_MM = 210;
@@ -404,11 +427,12 @@ const CONTENT_W_MM = A4_W_MM - MARGIN_L - MARGIN_R;
 const stripInlineMd = (t: string) =>
   t.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*\n]+)\*/g, '$1').replace(/`([^`]+)`/g, '$1');
 
-async function generateNativePDF(opts: NativePDFOptions): Promise<void> {
+export async function generateNativePDF(opts: NativePDFOptions): Promise<Blob | void> {
   const {
     pdfFileName, bodyContent, evidences, evidenceByNum, findEvidenceBySlug,
     uncitedEvidences, documentTitleUpper, resource, approvalDate,
     isExtrajudicialDoc, isProcuradorPetition,
+    annexes = [], draftStamp = null, returnBlob = false,
   } = opts;
 
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -755,17 +779,116 @@ async function generateNativePDF(opts: NativePDFOptions): Promise<void> {
   pdf.setTextColor(85, 85, 85);
   pdf.text('Procurador', A4_W_MM / 2, y, { align: 'center' });
 
-  // ============ FOOTERS on every page ============
+  // ============ ÍNDICE DE ANEXOS + ANEXOS ============
+  if (annexes.length > 0) {
+    addPage();
+    y = MARGIN_TOP + 4;
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(12);
+    pdf.setTextColor(30, 58, 95);
+    pdf.text('ÍNDICE DE ANEXOS', A4_W_MM / 2, y, { align: 'center' });
+    y += 3;
+    pdf.setDrawColor(200, 175, 55);
+    pdf.setLineWidth(0.4);
+    pdf.line(MARGIN_L, y, A4_W_MM - MARGIN_R, y);
+    y += 6;
+
+    autoTable(pdf, {
+      head: [['Doc.', 'Documento', 'Finalidade', 'Páginas', 'Situação']],
+      body: annexes.map((a) => [
+        String(a.docNumber).padStart(2, '0'),
+        a.fileName,
+        a.categoryLabel,
+        a.status === 'falha' ? '—' : String(a.images.length || Math.max(1, Math.ceil(a.textBlocks.length / 45))),
+        a.status === 'convertido' ? 'Incluído' : a.status === 'parcial' ? 'Incluído em parte' : 'NÃO INCLUÍDO',
+      ]),
+      startY: y,
+      margin: { left: MARGIN_L, right: MARGIN_R, bottom: MARGIN_BOTTOM },
+      styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 1.8, lineColor: [210, 210, 210], lineWidth: 0.15, overflow: 'linebreak' },
+      headStyles: { fillColor: [30, 58, 95], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [247, 249, 252] },
+      didDrawPage: () => { drawHeaderBars(); },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const idxY = (pdf as any).lastAutoTable?.finalY;
+    if (typeof idxY === 'number') y = idxY + 5;
+
+    const missing = annexes.filter((a) => a.status === 'falha' || a.status === 'parcial');
+    if (missing.length > 0) {
+      drawParagraph(
+        `Ressalva: ${missing.length} documento(s) não puderam ser convertidos integralmente e estão indicados acima. Este pacote NÃO está completo e não deve ser protocolado sem a substituição desses arquivos.`,
+        { size: 9.5, color: [170, 60, 30], lineHeight: 4.8 },
+      );
+    }
+
+    for (const annex of annexes) {
+      if (annex.status === 'falha') continue;
+      addPage();
+      y = MARGIN_TOP + 2;
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(10.5);
+      pdf.setTextColor(30, 58, 95);
+      pdf.text(annex.title, MARGIN_L, y);
+      y += 3;
+      pdf.setDrawColor(200, 175, 55);
+      pdf.setLineWidth(0.3);
+      pdf.line(MARGIN_L, y, A4_W_MM - MARGIN_R, y);
+      y += 5;
+
+      if (annex.images.length > 0) {
+        let first = true;
+        for (const img of annex.images) {
+          if (!first) { addPage(); y = MARGIN_TOP; }
+          first = false;
+          const availH = A4_H_MM - MARGIN_BOTTOM - y;
+          const ratio = Math.min(CONTENT_W_MM / img.width, availH / img.height);
+          const w = img.width * ratio;
+          const h = img.height * ratio;
+          try {
+            pdf.addImage(img.dataUrl, 'JPEG', MARGIN_L + (CONTENT_W_MM - w) / 2, y, w, h, undefined, 'FAST');
+          } catch (err) {
+            console.warn('Falha ao inserir página de anexo:', err);
+          }
+          y += h + 2;
+        }
+      } else {
+        for (const block of annex.textBlocks) {
+          const isSheet = block.startsWith('## Aba:');
+          drawParagraph(isSheet ? block.replace('## ', '') : block, {
+            size: isSheet ? 10 : 9,
+            bold: isSheet,
+            color: isSheet ? [30, 58, 95] : [26, 26, 26],
+            lineHeight: isSheet ? 5.4 : 4.4,
+          });
+        }
+      }
+    }
+  }
+
+  // ============ FOOTERS + CARIMBO ============
   const totalPages = pdf.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     pdf.setPage(i);
     drawFooter(i, totalPages);
+    if (draftStamp) {
+      pdf.saveGraphicsState();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const gs = (pdf as any).GState ? (pdf as any).GState({ opacity: 0.12 }) : null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (gs) (pdf as any).setGState(gs);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(draftStamp.length > 24 ? 17 : 26);
+      pdf.setTextColor(200, 40, 40);
+      pdf.text(draftStamp, A4_W_MM / 2, A4_H_MM / 2, { align: 'center', angle: 38 });
+      pdf.restoreGraphicsState();
+    }
   }
 
+  if (returnBlob) return pdf.output('blob');
   pdf.save(pdfFileName);
 }
 
-export function INPIResourcePDFPreview({ resource, content, resourceType, debugEvidenceOverride }: INPIResourcePDFPreviewProps) {
+export function INPIResourcePDFPreview({ resource, content, resourceType, debugEvidenceOverride, annexes, draftStamp }: INPIResourcePDFPreviewProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [evidences, setEvidences] = useState<ResourceEvidence[]>([]);
@@ -1037,6 +1160,8 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
         approvalDate,
         isExtrajudicialDoc,
         isProcuradorPetition,
+        annexes,
+        draftStamp,
       });
     } catch (error) {
       console.error('Error generating PDF:', error);
