@@ -60,6 +60,28 @@ export interface ExportPackageState {
   annexes: NativeAnnexDoc[];
   isComplete: boolean;
   draftStamp: string | null;
+  /** Pacote incompleto ou sem conferência: só prévia, nunca protocolo. */
+  previewOnly: boolean;
+}
+
+interface ReviewFinding {
+  tipo?: string;
+  trecho?: string;
+  problema?: string;
+  sugestao?: string;
+  bloqueante?: boolean;
+  fontes?: string[];
+}
+
+interface ReviewRow {
+  id: string;
+  content_hash: string;
+  documents_hash: string | null;
+  findings: ReviewFinding[];
+  summary: string | null;
+  has_blocking: boolean;
+  model: string | null;
+  created_at: string;
 }
 
 interface Props {
@@ -82,9 +104,11 @@ export default function CaseApprovalPanel({
   const [annexes, setAnnexes] = useState<AnnexDoc[] | null>(null);
   const [converting, setConverting] = useState(false);
   const [approving, setApproving] = useState<string | null>(null);
+  const [review, setReview] = useState<ReviewRow | null>(null);
+  const [reviewing, setReviewing] = useState(false);
 
   const reload = useCallback(async () => {
-    const [{ data: d }, { data: a }, { data: o }] = await Promise.all([
+    const [{ data: d }, { data: a }, { data: o }, { data: r }] = await Promise.all([
       supabase
         .from('inpi_case_documents')
         .select('id, category, file_name, storage_path, sha256, extraction_status, extraction_notes, page_count, interpreted_pages, unreadable_pages, conversion_status, conversion_notes, display_order')
@@ -97,10 +121,15 @@ export default function CaseApprovalPanel({
         .from('inpi_case_orientations')
         .select('editable_text, version')
         .eq('case_id', caseId).order('version', { ascending: false }).limit(1),
+      supabase
+        .from('inpi_draft_reviews')
+        .select('id, content_hash, documents_hash, findings, summary, has_blocking, model, created_at')
+        .eq('case_id', caseId).order('created_at', { ascending: false }).limit(1),
     ]);
     setDocs((d || []) as unknown as CaseDocRow[]);
     setApprovals((a || []) as unknown as ApprovalRow[]);
     setOrientationText(((o || [])[0]?.editable_text as string) || '');
+    setReview(((r || [])[0] as unknown as ReviewRow) || null);
   }, [caseId]);
 
   useEffect(() => { void reload(); }, [reload]);
@@ -151,11 +180,40 @@ export default function CaseApprovalPanel({
   const summary = useMemo(() => (annexes ? summarizePackage(annexes) : null), [annexes]);
   const packageComplete = !!summary?.isComplete;
 
+  /* Revisão jurídica válida apenas para esta versão exata de texto e anexos. */
+  const currentReview =
+    review && review.content_hash === contentHash && review.documents_hash === documentsHash
+      ? review
+      : null;
+
   const draftStamp = useMemo(() => {
+    if (!packageComplete) return 'PRÉVIA — PACOTE INCOMPLETO, NÃO PROTOCOLAR';
     if (!protocolApproval) return 'MINUTA — PENDENTE DE CONFERÊNCIA';
-    if (!packageComplete) return 'PACOTE INCOMPLETO — NÃO PROTOCOLAR';
     return null;
   }, [protocolApproval, packageComplete]);
+
+  /* ── Revisão jurídica automática ─────────────────────────────────────── */
+  const runReview = async () => {
+    if (reviewing) return; // clique repetido
+    setReviewing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('review-inpi-draft', {
+        body: { caseId, resourceId, content, contentHash, documentsHash },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Falha na revisão');
+      setReview(data.review as ReviewRow);
+      toast[(data.review as ReviewRow).has_blocking ? 'warning' : 'success'](
+        (data.review as ReviewRow).has_blocking
+          ? 'Revisão concluída com apontamentos bloqueantes.'
+          : 'Revisão concluída sem apontamentos bloqueantes.',
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Falha na revisão jurídica.');
+    } finally {
+      setReviewing(false);
+    }
+  };
 
   /* ── Conversão dos anexos para o PDF final ───────────────────────────── */
   const buildPackage = async () => {
@@ -196,9 +254,12 @@ export default function CaseApprovalPanel({
           status: a.status, notes: a.notes,
         })),
         isComplete: sum.isComplete,
-        draftStamp: !protocolApproval
-          ? 'MINUTA — PENDENTE DE CONFERÊNCIA'
-          : sum.isComplete ? null : 'PACOTE INCOMPLETO — NÃO PROTOCOLAR',
+        previewOnly: !protocolApproval || !sum.isComplete,
+        draftStamp: !sum.isComplete
+          ? 'PRÉVIA — PACOTE INCOMPLETO, NÃO PROTOCOLAR'
+          : !protocolApproval
+            ? 'MINUTA — PENDENTE DE CONFERÊNCIA'
+            : null,
       });
       await supabase.from('inpi_export_packages').insert({
         case_id: caseId,
@@ -228,13 +289,30 @@ export default function CaseApprovalPanel({
 
   /* ── Aprovações ───────────────────────────────────────────────────────── */
   const approve = async (kind: 'texto_interno' | 'conferencia_protocolo') => {
-    if (kind === 'conferencia_protocolo' && !textApproval) {
-      toast.error('Aprove o texto internamente antes de liberar para protocolo.');
-      return;
-    }
-    if (kind === 'conferencia_protocolo' && !summary) {
-      toast.error('Prepare o pacote de anexos antes da conferência para protocolo.');
-      return;
+    if (approving) return; // clique repetido
+    if (kind === 'conferencia_protocolo') {
+      if (!textApproval) {
+        toast.error('Aprove o texto internamente antes de liberar para protocolo.');
+        return;
+      }
+      if (!summary) {
+        toast.error('Prepare o pacote de anexos antes da conferência para protocolo.');
+        return;
+      }
+      if (!packageComplete) {
+        toast.error(
+          'Há anexo não incluído no pacote. A conferência para protocolo fica bloqueada; só é possível baixar a prévia.',
+        );
+        return;
+      }
+      if (!currentReview) {
+        toast.error('Execute a revisão jurídica desta versão antes da conferência para protocolo.');
+        return;
+      }
+      if (currentReview.has_blocking) {
+        toast.error('A revisão apontou problemas bloqueantes. Corrija antes de conferir para protocolo.');
+        return;
+      }
     }
     setApproving(kind);
     try {
@@ -346,6 +424,49 @@ export default function CaseApprovalPanel({
         </CardContent>
       </Card>
 
+      {/* Revisão jurídica do conteúdo */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            <h3 className="font-semibold text-sm">Revisão jurídica do conteúdo</h3>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Confere se cada fato tem lastro nos documentos, se as referências foram conferidas, se todos os
+            fundamentos foram respondidos e se não há informação inventada.
+          </p>
+          <Button size="sm" variant="outline" onClick={runReview} disabled={reviewing || !content?.trim()}>
+            {reviewing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+            {currentReview ? 'Revisar novamente' : 'Revisar conteúdo jurídico'}
+          </Button>
+          {review && !currentReview && (
+            <div className="rounded-md bg-amber-500/10 p-2 text-xs text-amber-700">
+              A revisão existente é de outra versão do texto ou dos anexos. Execute a revisão novamente.
+            </div>
+          )}
+          {currentReview && (
+            <div className="space-y-2">
+              <div className={`rounded-md p-2 text-xs ${currentReview.has_blocking ? 'bg-destructive/10 text-destructive' : 'bg-emerald-500/10 text-emerald-700'}`}>
+                {currentReview.summary || (currentReview.has_blocking
+                  ? 'Há apontamentos bloqueantes nesta versão.'
+                  : 'Nenhum apontamento bloqueante nesta versão.')}
+              </div>
+              {(currentReview.findings || []).map((f, i) => (
+                <div key={i} className="rounded-md border p-2 text-[11px] space-y-1">
+                  <p className="font-medium">
+                    {f.bloqueante ? '🔴' : '🟡'} {f.tipo?.replace(/_/g, ' ')}
+                    {f.fontes?.length ? ` · ${f.fontes.join(', ')}` : ''}
+                  </p>
+                  {f.trecho && <p className="italic text-muted-foreground">“{f.trecho}”</p>}
+                  {f.problema && <p>{f.problema}</p>}
+                  {f.sugestao && <p className="text-muted-foreground">Sugestão: {f.sugestao}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Aprovações vinculadas à versão */}
       <Card>
         <CardContent className="p-4 space-y-3">
@@ -362,11 +483,25 @@ export default function CaseApprovalPanel({
               {approving === 'texto_interno' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
               {textApproval ? 'Texto aprovado' : 'Aprovar texto (interno)'}
             </Button>
-            <Button size="sm" variant={protocolApproval ? 'outline' : 'default'} disabled={!!protocolApproval || approving !== null} onClick={() => approve('conferencia_protocolo')}>
+            <Button
+              size="sm"
+              variant={protocolApproval ? 'outline' : 'default'}
+              disabled={
+                !!protocolApproval || approving !== null || !packageComplete ||
+                !currentReview || currentReview.has_blocking
+              }
+              onClick={() => approve('conferencia_protocolo')}
+            >
               {approving === 'conferencia_protocolo' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
               {protocolApproval ? 'Conferido para protocolo' : 'Conferir para protocolo'}
             </Button>
           </div>
+          {!packageComplete && summary && (
+            <div className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
+              Há anexo não incluído. A conferência para protocolo está bloqueada — só é possível baixar uma
+              prévia carimbada.
+            </div>
+          )}
           {approvals.some((a) => a.invalidated_at) && (
             <>
               <Separator />

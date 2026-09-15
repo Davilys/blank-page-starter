@@ -8,13 +8,14 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import {
   Upload, FileText, X, Loader2, CheckCircle2, AlertTriangle, Brain, Save, RefreshCw,
-  ClipboardList, Zap,
+  ClipboardList, Zap, Eye,
 } from 'lucide-react';
 import {
   CASE_CATEGORIES, ACCEPTED_EXTENSIONS, MAX_FILE_BYTES, EXTRACTION_LABEL,
-  extractContent, sha256Hex, documentsFingerprint,
+  extractContent, sha256Hex, documentsFingerprint, fileExtension, isImageExt,
   type CaseCategory, type ExtractionStatus,
 } from '@/lib/inpi/caseDocuments';
+import { rasterizePdfPages, imageToDataUrl } from '@/lib/inpi/packageBuilder';
 
 interface CaseDoc {
   id: string;
@@ -25,6 +26,10 @@ interface CaseDoc {
   extraction_status: ExtractionStatus;
   extraction_notes: string | null;
   review_status: string;
+  page_count: number | null;
+  interpreted_pages: number | null;
+  unreadable_pages: number | null;
+  vision_read_pages: number | null;
 }
 
 interface OrientationRow {
@@ -54,6 +59,7 @@ export default function CasePreparationPanel({
   const [caseId, setCaseId] = useState<string | null>(null);
   const [docs, setDocs] = useState<CaseDoc[]>([]);
   const [busyCategory, setBusyCategory] = useState<CaseCategory | null>(null);
+  const [visionBusy, setVisionBusy] = useState<Set<string>>(new Set());
   const [orientation, setOrientation] = useState<OrientationRow | null>(null);
   const [orientationText, setOrientationText] = useState('');
   const [generating, setGenerating] = useState(false);
@@ -87,7 +93,7 @@ export default function CasePreparationPanel({
   const reloadDocs = useCallback(async (id: string) => {
     const { data } = await supabase
       .from('inpi_case_documents')
-      .select('id, category, file_name, byte_size, sha256, extraction_status, extraction_notes, review_status')
+      .select('id, category, file_name, byte_size, sha256, extraction_status, extraction_notes, review_status, page_count, interpreted_pages, unreadable_pages, vision_read_pages')
       .eq('case_id', id)
       .eq('is_active', true)
       .order('created_at', { ascending: true });
@@ -148,11 +154,52 @@ export default function CasePreparationPanel({
             sheet_names: result.sheetNames,
           })
           .eq('id', row.id);
+
+        // PDF sem texto ou imagem não é documento ilegível: as páginas vão
+        // para a leitura visual da IA e só o que for realmente interpretado
+        // é registrado.
+        if (result.status === 'recebido' || result.status === 'parcial') {
+          await runVisionRead(row.id, file);
+        }
       }
       await reloadDocs(caseId);
       if (orientation) markStale();
     } finally {
       setBusyCategory(null);
+    }
+  };
+
+  /** Envia as páginas digitalizadas para leitura visual da IA. */
+  const runVisionRead = async (docId: string, file: File) => {
+    if (!caseId) return;
+    if (visionBusy.has(docId)) return; // protege contra clique repetido
+    setVisionBusy((s) => new Set(s).add(docId));
+    try {
+      const ext = fileExtension(file.name);
+      let pages: { page: number; dataUrl: string }[] = [];
+      if (ext === 'pdf') {
+        const all = await rasterizePdfPages(file, Array.from({ length: 12 }, (_, i) => i + 1));
+        pages = all;
+      } else if (isImageExt(ext)) {
+        pages = [{ page: 1, dataUrl: await imageToDataUrl(file) }];
+      }
+      if (!pages.length) return;
+      const { data, error } = await supabase.functions.invoke('read-inpi-scanned-pages', {
+        body: { caseId, documentId: docId, pages },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Falha na leitura visual');
+      toast.success(
+        `${file.name}: ${data.pages_interpreted} página(s) interpretada(s) por leitura visual.`,
+      );
+    } catch (e) {
+      toast.warning(
+        `${file.name}: leitura visual não concluída (${e instanceof Error ? e.message : 'erro'}). ` +
+          'As páginas seguem como não conferidas.',
+      );
+    } finally {
+      setVisionBusy((s) => { const n = new Set(s); n.delete(docId); return n; });
+      await reloadDocs(caseId);
     }
   };
 
@@ -312,8 +359,23 @@ export default function CasePreparationPanel({
                       <p className="text-[11px] text-muted-foreground truncate">
                         {((d.byte_size || 0) / 1024).toFixed(1)} KB
                         {d.extraction_notes ? ` • ${d.extraction_notes}` : ''}
+                        {(d.vision_read_pages || 0) > 0
+                          ? ` • ${d.vision_read_pages} página(s) lidas visualmente pela IA`
+                          : ''}
                       </p>
                     </div>
+                    {(d.unreadable_pages || 0) > 0 && localFiles.current.has(d.id) && (
+                      <Button
+                        variant="outline" size="sm" className="h-7 text-[11px] shrink-0"
+                        disabled={visionBusy.has(d.id)}
+                        onClick={() => runVisionRead(d.id, localFiles.current.get(d.id) as File)}
+                      >
+                        {visionBusy.has(d.id)
+                          ? <Loader2 className="h-3 w-3 animate-spin" />
+                          : <Eye className="h-3 w-3" />}
+                        <span className="ml-1">Ler páginas com IA</span>
+                      </Button>
+                    )}
                     {statusBadge(d.extraction_status)}
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeDoc(d.id)}>
                       <X className="h-4 w-4" />

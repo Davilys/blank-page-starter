@@ -64,6 +64,43 @@ async function rasterizePdf(blob: Blob): Promise<{ images: AnnexPageImage[]; tot
   return { images, total: doc.numPages };
 }
 
+/**
+ * Rasteriza apenas as páginas indicadas — usado para mandar páginas
+ * digitalizadas (sem texto) à leitura visual da IA.
+ */
+export async function rasterizePdfPages(
+  blob: Blob,
+  pageNumbers: number[],
+): Promise<{ page: number; dataUrl: string }[]> {
+  const pdfjs = await loadPdfJs();
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const doc = await pdfjs.getDocument({ data: bytes }).promise;
+  const out: { page: number; dataUrl: string }[] = [];
+  for (const p of pageNumbers) {
+    if (p < 1 || p > doc.numPages) continue;
+    const page = await doc.getPage(p);
+    let viewport = page.getViewport({ scale: RASTER_SCALE });
+    if (viewport.width > MAX_RASTER_W) {
+      viewport = page.getViewport({ scale: (RASTER_SCALE * MAX_RASTER_W) / viewport.width });
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) continue;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: ctx, viewport, canvas } as unknown as Parameters<typeof page.render>[0]).promise;
+    out.push({ page: p, dataUrl: canvas.toDataURL('image/jpeg', 0.82) });
+  }
+  return out;
+}
+
+/** Converte uma imagem em data URL para a leitura visual. */
+export async function imageToDataUrl(blob: Blob): Promise<string> {
+  return (await rasterizeImage(blob)).dataUrl;
+}
+
 async function rasterizeImage(blob: Blob): Promise<AnnexPageImage> {
   const url = URL.createObjectURL(blob);
   try {
