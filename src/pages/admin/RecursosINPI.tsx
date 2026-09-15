@@ -2838,8 +2838,16 @@ export default function RecursosINPI() {
                 resource={selectedResource}
                 content={selectedResource.final_content || selectedResource.draft_content || draftContent}
                 resourceType={selectedResource.resource_type}
-                annexes={exportPackage?.annexes}
-                draftStamp={exportPackage?.draftStamp ?? 'MINUTA — PENDENTE DE CONFERÊNCIA'}
+                annexes={
+                  activeCaseId && selectedResource.id === currentResourceId ? exportPackage?.annexes : undefined
+                }
+                draftStamp={
+                  activeCaseId &&
+                  selectedResource.id === currentResourceId &&
+                  UPGRADED_MODALITIES.includes(selectedResource.resource_type)
+                    ? (exportPackage?.draftStamp ?? 'MINUTA — PENDENTE DE CONFERÊNCIA')
+                    : null
+                }
               />
             )}
           </DialogContent>
