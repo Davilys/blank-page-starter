@@ -190,20 +190,26 @@ export function EmailList({
     );
   }
 
+  const tabs: { id: typeof tab; label: string }[] = [
+    { id: 'all', label: 'Todos' },
+    { id: 'unread', label: 'Não lidos' },
+    { id: 'attachments', label: 'Com anexo' },
+  ];
+
   return (
     <Card className="h-full flex flex-col border-0 md:border shadow-none md:shadow-sm">
-      <CardHeader className="pb-3 flex-shrink-0 px-3 md:px-6">
+      <CardHeader className="pb-2 flex-shrink-0 px-3 md:px-4 pt-3">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-            <Mail className="h-4 w-4 md:h-5 md:w-5" aria-hidden />
+          <CardTitle className="flex items-center gap-2 text-sm md:text-base">
+            <Mail className="h-4 w-4" aria-hidden />
             {title}
           </CardTitle>
-          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             {search ? (
               <Badge variant="secondary" className="text-[10px]">{counts?.filtered ?? 0} no filtro</Badge>
             ) : (
               <>
-                <Badge variant="secondary" className="text-[10px]">{counts?.folder ?? 0} na pasta</Badge>
+                <Badge variant="secondary" className="text-[10px]">{counts?.folder ?? 0}</Badge>
                 {(counts?.unread ?? 0) > 0 && (
                   <Badge className="text-[10px]">{counts?.unread} não lidos</Badge>
                 )}
@@ -211,14 +217,34 @@ export function EmailList({
             )}
           </div>
         </div>
+
+        <div className="mt-2 flex items-center gap-1 rounded-lg bg-muted/60 p-0.5" role="tablist">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                'flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+                tab === t.id
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
         {externalSearch === undefined && (
-          <div className="relative mt-2 md:mt-3">
+          <div className="relative mt-2">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
             <Input
               placeholder="Buscar emails..."
               value={internalSearch}
               onChange={(e) => setInternalSearch(e.target.value)}
-              className="pl-9 h-9 md:h-10"
+              className="pl-9 h-9"
               aria-label="Buscar emails"
             />
           </div>
