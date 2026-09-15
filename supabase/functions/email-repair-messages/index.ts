@@ -60,10 +60,11 @@ serve(async (req) => {
   try {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const body = await req.json().catch(() => ({}));
-    const mode: "preview" | "apply" | "revert" = body.mode || "preview";
+    const mode: "preview" | "apply" | "revert" | "status" = body.mode || "preview";
     const accountId: string | undefined = body.account_id;
     const limit = Math.min(Number(body.limit) || 30, 100);
     const ids: string[] | undefined = body.email_ids;
+    const runId: string | undefined = body.run_id;
 
     // Caller must be an authenticated admin.
     const authHeader = req.headers.get("Authorization") || "";
