@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { AlertTriangle, BarChart3, ChevronRight, Filter, Info, LayoutGrid, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, ChevronRight, Filter, Info, LayoutGrid, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
@@ -252,6 +252,22 @@ export function BillingSituationSection({
                       <span className="text-xs text-muted-foreground">Cobranças</span>
                     </button>
                   </div>
+
+                  {config.key === 'aguardando' && (
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          navigate('/admin/financeiro/aguardando');
+                        }}
+                        aria-label="Abrir notificações de faturas aguardando pagamento"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-billing-awaiting px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                      >
+                        <Bell className="h-3.5 w-3.5" /> Notificações
+                      </button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );
