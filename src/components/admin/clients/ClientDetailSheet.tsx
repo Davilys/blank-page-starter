@@ -27,7 +27,7 @@ import {
   CheckCircle, TrendingUp, Receipt, Trash2, UserCheck,
   Bell, Send, MapPin, Hash, Globe, Briefcase, Shield,
   ChevronRight, Activity, RefreshCw, Eye, Copy, Edit2,
-  Package, BarChart3, Wallet, FileCheck, Lock, Video, KeyRound
+  Package, BarChart3, Wallet, FileCheck, Lock, Video, KeyRound, Handshake
 } from 'lucide-react';
 import type { ClientWithProcess } from './ClientKanbanBoard';
 import { PIPELINE_STAGES, COMMERCIAL_PIPELINE_STAGES } from './ClientKanbanBoard';
@@ -46,6 +46,8 @@ import { Separator } from '@/components/ui/separator';
 import { Newspaper, Gavel, Award, BellRing, Activity as ActivityIcon, ChevronDown, History } from 'lucide-react';
 import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
 import { DataEnrichmentDialog } from './DataEnrichmentDialog';
+import { InvoiceActionsSheet, type InvoiceLike } from './InvoiceActionsSheet';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 
 const MASTER_ADMIN_EMAIL = 'davillys@gmail.com';
 
@@ -178,6 +180,8 @@ function fmtBytes(b?: number | null) {
 export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUpdate, extraActions, initialShowProcessDetails, focusProcessId }: ClientDetailSheetProps) {
   const SERVICE_PRICING_OPTIONS = useServicePricingOptions();
   const { isMasterAdmin } = useCanViewFinancialValues();
+  const { hasPermission, isMasterAdmin: isMasterPerm } = useAdminPermissions();
+  const canManageFinance = isMasterPerm || hasPermission('financial', 'can_view');
   const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
 
@@ -201,6 +205,10 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
   const [appointments, setAppointments] = useState<ClientAppointment[]>([]);
   const [documents, setDocuments] = useState<ClientDocument[]>([]);
   const [invoices, setInvoices] = useState<ClientInvoice[]>([]);
+  const [acordos, setAcordos] = useState<any[]>([]);
+  const [acordoParcelas, setAcordoParcelas] = useState<any[]>([]);
+  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceLike | null>(null);
+  const [invoiceSheetOpen, setInvoiceSheetOpen] = useState(false);
   const [asaasOverdue, setAsaasOverdue] = useState<any[]>([]);
   const [asaasRenegs, setAsaasRenegs] = useState<any[]>([]);
   const [asaasRenegParcelas, setAsaasRenegParcelas] = useState<any[]>([]);
@@ -497,6 +505,28 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         }));
       setDocuments([...docs, ...virtualContractDocs] as any);
       setInvoices(invoicesRes.data || []);
+      // Acordos de parcelamento do cliente (somente com permissão financeira; RLS também bloqueia)
+      try {
+        const { data: acs } = await supabase
+          .from('acordos_cliente' as any)
+          .select('*')
+          .eq('user_id', client.id)
+          .order('created_at', { ascending: false });
+        setAcordos((acs as any[]) || []);
+        const ids = ((acs as any[]) || []).map((a: any) => a.id);
+        if (ids.length > 0) {
+          const { data: pcs } = await supabase
+            .from('acordo_parcelas' as any)
+            .select('*')
+            .in('acordo_id', ids)
+            .order('numero_parcela', { ascending: true });
+          setAcordoParcelas((pcs as any[]) || []);
+        } else {
+          setAcordoParcelas([]);
+        }
+      } catch {
+        setAcordos([]); setAcordoParcelas([]);
+      }
       setProfileData(profileRes.data);
       // ── Asaas: cobranças vencidas + renegociações + parcelas
       try {
@@ -3107,20 +3137,39 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                       <BarChart3 className="h-4 w-4 text-primary" />
                       <span className="text-sm font-semibold">Resumo Financeiro</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      {[
-                        { label: 'Total', value: invoices.reduce((a, i) => a + Number(i.amount), 0), color: 'text-foreground' },
-                        { label: 'Pago', value: invoices.filter(i => i.status === 'paid').reduce((a, i) => a + Number(i.amount), 0), color: 'text-emerald-500' },
-                        { label: 'Pendente', value: invoices.filter(i => i.status !== 'paid').reduce((a, i) => a + Number(i.amount), 0), color: 'text-amber-500' },
-                      ].map(item => (
-                        <div key={item.label} className="text-center">
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">{item.label}</p>
-                          <p className={cn('font-bold text-sm', item.color)}>
-                            {item.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          </p>
+                    {(() => {
+                      // Faturas canceladas (inclusive as substituídas por acordo) não entram no resumo;
+                      // as parcelas do acordo entram no lugar da cobrança original, sem duplicar valor.
+                      const hoje = new Date().toISOString().slice(0, 10);
+                      const PAGO_ASAAS = ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'];
+                      const acordosAtivos = new Set(acordos.filter(a => a.status === 'ativo').map(a => a.id));
+                      const parcelasAtivas = acordoParcelas.filter(p => acordosAtivos.has(p.acordo_id) && p.status !== 'CANCELLED');
+                      const ignoradas = ['cancelled', 'refunded'];
+                      const vivas = invoices.filter(i => !ignoradas.includes(i.status));
+                      const pago = vivas.filter(i => i.status === 'paid').reduce((a, i) => a + Number(i.amount), 0)
+                        + parcelasAtivas.filter(p => PAGO_ASAAS.includes(p.status)).reduce((a, p) => a + Number(p.valor_centavos) / 100, 0);
+                      const vencido = vivas.filter(i => i.status === 'overdue').reduce((a, i) => a + Number(i.amount), 0)
+                        + parcelasAtivas.filter(p => !PAGO_ASAAS.includes(p.status) && p.data_vencimento < hoje).reduce((a, p) => a + Number(p.valor_centavos) / 100, 0);
+                      const pendente = vivas.filter(i => i.status !== 'paid' && i.status !== 'overdue').reduce((a, i) => a + Number(i.amount), 0)
+                        + parcelasAtivas.filter(p => !PAGO_ASAAS.includes(p.status) && p.data_vencimento >= hoje).reduce((a, p) => a + Number(p.valor_centavos) / 100, 0);
+                      return (
+                        <div className="grid grid-cols-4 gap-3">
+                          {[
+                            { label: 'Total', value: pago + pendente + vencido, color: 'text-foreground' },
+                            { label: 'Pago', value: pago, color: 'text-emerald-500' },
+                            { label: 'Pendente', value: pendente, color: 'text-amber-500' },
+                            { label: 'Vencido', value: vencido, color: 'text-red-500' },
+                          ].map(item => (
+                            <div key={item.label} className="text-center">
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">{item.label}</p>
+                              <p className={cn('font-bold text-sm', item.color)}>
+                                {item.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              </p>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })()}
                   </div>
 
                   {loading ? (
@@ -3135,14 +3184,26 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                             paid: { label: 'Paga', cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
                             pending: { label: 'Pendente', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
                             overdue: { label: 'Vencida', cls: 'bg-red-500/15 text-red-400 border-red-500/30' },
+                            cancelled: { label: 'Cancelada', cls: 'bg-muted text-muted-foreground border-border' },
                           }[inv.status] || { label: inv.status, cls: 'bg-muted text-muted-foreground' };
+                          const temAcordo = !!(inv as any).acordo_id;
+                          const canceladaPorAcordo = temAcordo && inv.status === 'cancelled';
                           return (
                             <motion.div
                               key={inv.id}
                               initial={{ opacity: 0, y: -6 }}
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ delay: i * 0.04 }}
-                              className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card"
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => { setSelectedInvoice(inv as any); setInvoiceSheetOpen(true); }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') { setSelectedInvoice(inv as any); setInvoiceSheetOpen(true); } }}
+                              className={cn(
+                                'flex items-center gap-3 p-3 rounded-xl border bg-card cursor-pointer transition-all hover:shadow-md',
+                                inv.status === 'overdue' ? 'border-red-500/30 hover:border-red-500/60'
+                                  : inv.status === 'pending' ? 'border-amber-500/30 hover:border-amber-500/60'
+                                  : 'border-border hover:border-primary/40'
+                              )}
                             >
                               <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                                 <Receipt className="h-4 w-4 text-muted-foreground" />
@@ -3151,6 +3212,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                                 <p className="text-sm font-medium truncate">{inv.description}</p>
                                 <p className="text-[10px] text-muted-foreground">
                                   Vence: {format(new Date(inv.due_date), 'dd/MM/yyyy', { locale: ptBR })}
+                                  {canceladaPorAcordo && ' · Cancelada por acordo'}
                                 </p>
                               </div>
                               <div className="text-right flex-shrink-0">
@@ -3163,6 +3225,69 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                       </AnimatePresence>
                     </div>
                   )}
+
+                  {/* ───── PARCELAS DE ACORDO ───── */}
+                  {acordos.filter(a => a.status === 'ativo' || a.bloqueado_por_pendencia).map((ac) => {
+                    const pcs = acordoParcelas.filter(p => p.acordo_id === ac.id);
+                    const PAGO_ASAAS = ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'];
+                    const pagoCents = pcs.filter(p => PAGO_ASAAS.includes(p.status)).reduce((a, p) => a + Number(p.valor_centavos), 0);
+                    const saldo = Number(ac.total_centavos) - pagoCents;
+                    return (
+                      <div key={ac.id} className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className="text-sm font-semibold flex items-center gap-2">
+                            <Handshake className="h-4 w-4 text-emerald-600" />
+                            {ac.bloqueado_por_pendencia ? 'Acordo com pendência' : 'Acordo ativo'}
+                          </span>
+                          <Badge className="text-[10px] h-5 border bg-emerald-500/15 text-emerald-600 border-emerald-500/30">
+                            {ac.num_parcelas}x · juros {Number(ac.juros_percentual)}%
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                          {[
+                            { l: 'Total', v: Number(ac.total_centavos) / 100 },
+                            { l: 'Pago', v: pagoCents / 100 },
+                            { l: 'Saldo', v: saldo / 100 },
+                          ].map(x => (
+                            <div key={x.l} className="rounded-lg bg-background/60 p-2">
+                              <p className="text-[10px] text-muted-foreground uppercase">{x.l}</p>
+                              <p className="font-bold text-sm">{x.v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="space-y-1.5">
+                          {pcs.map((p) => {
+                            const pago = PAGO_ASAAS.includes(p.status);
+                            const vencida = !pago && p.data_vencimento < new Date().toISOString().slice(0, 10);
+                            return (
+                              <div key={p.id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2">
+                                <div className="min-w-0">
+                                  <p className="text-xs font-medium">Parcela {p.numero_parcela} de {ac.num_parcelas}</p>
+                                  <p className="text-[10px] text-muted-foreground">
+                                    Vence {format(new Date(p.data_vencimento + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR })}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <span className="text-xs font-bold">{(Number(p.valor_centavos) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                  <Badge className={cn('border text-[9px] h-4 px-1',
+                                    pago ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30'
+                                      : vencida ? 'bg-red-500/15 text-red-500 border-red-500/30'
+                                      : 'bg-amber-500/15 text-amber-600 border-amber-500/30')}>
+                                    {pago ? 'Paga' : vencida ? 'Vencida' : 'Em aberto'}
+                                  </Badge>
+                                  {p.invoice_url && (
+                                    <a href={p.invoice_url} target="_blank" rel="noopener noreferrer" className="text-primary" aria-label="Abrir boleto">
+                                      <ExternalLink className="h-3.5 w-3.5" />
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </TabsContent>
 
                 {/* ─── BRANDS TAB ──────────────────────────────────────── */}
@@ -3973,6 +4098,17 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         onUpdated={async () => { await fetchClientData(); onUpdate(); }}
         onEditRegistration={() => setEditingContacts(true)}
       />
+
+      {/* ─── AÇÕES DA COBRANÇA (cobrar / acordo) ─── */}
+      <InvoiceActionsSheet
+        invoice={selectedInvoice}
+        open={invoiceSheetOpen}
+        onOpenChange={setInvoiceSheetOpen}
+        canManageFinance={canManageFinance}
+        onChanged={async () => { await fetchClientData(); onUpdate(); }}
+      />
+
+
 
 
 
