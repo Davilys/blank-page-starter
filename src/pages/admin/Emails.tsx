@@ -227,64 +227,75 @@ export default function Emails() {
     setSelectedEmail(null);
   };
 
-  const renderContent = () => {
+  const isToolScreen = ['templates', 'settings', 'automations', 'campaigns', 'sequences'].includes(currentFolder);
+
+  const renderToolScreen = () => {
     if (currentFolder === 'templates') return <EmailTemplates />;
     if (currentFolder === 'settings') return <EmailSettings />;
     if (currentFolder === 'automations') return <EmailAutomations />;
     if (currentFolder === 'campaigns') return <EmailCampaigns onCompose={handleCompose} />;
     if (currentFolder === 'sequences') return <EmailSequences />;
-
-    if (isComposing) {
-      return (
-        <EmailCompose
-          onClose={handleCloseCompose}
-          replyTo={replyTo}
-          initialTo={initialTo}
-          initialName={initialName}
-          initialBody={aiDraftBody || undefined}
-          accountId={selectedAccountId}
-          accountEmail={selectedAccount?.email_address}
-        />
-      );
-    }
-
-    if (selectedEmail) {
-      return (
-        <EmailView
-          email={selectedEmail}
-          onBack={handleBack}
-          onReply={() => handleReply(selectedEmail)}
-          onForward={(email) => {
-            setIsComposing(true);
-            setSelectedEmail(null);
-            setReplyTo(null);
-            setInitialTo('');
-            setInitialName('');
-            setAiDraftBody(`\n\n--- Encaminhado ---\nDe: ${email.from_name || email.from_email}\nAssunto: ${email.subject}\n\n${email.body_text || ''}`);
-          }}
-          onUseDraftFromAI={(text) => handleAiDraft(text, selectedEmail)}
-        />
-      );
-    }
-
-    const listFolder = currentFolder.startsWith('filter-') ? 'inbox' : currentFolder;
-    const validListFolders = ['inbox', 'sent', 'drafts', 'spam', 'starred', 'archived', 'trash', 'scheduled', 'automated'] as const;
-    type ValidFolder = typeof validListFolders[number];
-    const folderToShow: ValidFolder = validListFolders.includes(listFolder as ValidFolder) ? listFolder as ValidFolder : 'inbox';
-
-    return (
-      <EmailList
-        folder={folderToShow}
-        onSelectEmail={handleSelectEmail}
-        accountId={selectedAccountId}
-        accountEmail={selectedAccount?.email_address}
-        externalSearch={search}
-        selectedEmailId={selectedEmail?.id || null}
-      />
-    );
+    return null;
   };
 
-  const showSyncBar = !['templates', 'settings', 'automations', 'campaigns', 'sequences'].includes(currentFolder);
+  const listFolder = currentFolder.startsWith('filter-') ? 'inbox' : currentFolder;
+  const validListFolders = ['inbox', 'sent', 'drafts', 'spam', 'starred', 'archived', 'trash', 'scheduled', 'automated'] as const;
+  type ValidFolder = typeof validListFolders[number];
+  const folderToShow: ValidFolder = validListFolders.includes(listFolder as ValidFolder) ? listFolder as ValidFolder : 'inbox';
+
+  const listPane = (
+    <EmailList
+      folder={folderToShow}
+      onSelectEmail={handleSelectEmail}
+      accountId={selectedAccountId}
+      accountEmail={selectedAccount?.email_address}
+      externalSearch={search}
+      selectedEmailId={selectedEmail?.id || null}
+    />
+  );
+
+  const composePane = (
+    <EmailCompose
+      onClose={handleCloseCompose}
+      replyTo={replyTo}
+      initialTo={initialTo}
+      initialName={initialName}
+      initialBody={aiDraftBody || undefined}
+      accountId={selectedAccountId}
+      accountEmail={selectedAccount?.email_address}
+    />
+  );
+
+  const handleForwardEmail = (email: Email) => {
+    setIsComposing(true);
+    setSelectedEmail(null);
+    setReplyTo(null);
+    setInitialTo('');
+    setInitialName('');
+    setAiDraftBody(`\n\n--- Encaminhado ---\nDe: ${email.from_name || email.from_email}\nAssunto: ${email.subject}\n\n${email.body_text || ''}`);
+  };
+
+  const readingPane = (docked: boolean) => selectedEmail ? (
+    <EmailView
+      email={selectedEmail}
+      onBack={handleBack}
+      onReply={() => handleReply(selectedEmail)}
+      onForward={handleForwardEmail}
+      onUseDraftFromAI={(text) => handleAiDraft(text, selectedEmail)}
+      aiDocked={docked}
+      aiOpen={aiOpen}
+      onToggleAI={() => setAiOpen((v) => !v)}
+      hideBack={docked}
+    />
+  ) : (
+    <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
+      <Inbox className="h-10 w-10 opacity-40" aria-hidden />
+      <p className="text-sm font-medium text-foreground">Nenhuma mensagem aberta</p>
+      <p className="text-xs">Selecione uma mensagem na lista ao lado para ler aqui.</p>
+    </div>
+  );
+
+  const showSyncBar = !isToolScreen;
 
   const getFolderLabel = () => {
     const map: Record<string, string> = {
@@ -313,98 +324,106 @@ export default function Emails() {
     />
   );
 
+  const mainArea = () => {
+    if (isToolScreen) {
+      return <div className="h-full overflow-hidden p-2 md:p-4">{renderToolScreen()}</div>;
+    }
+    if (isComposing) {
+      return <div className="h-full overflow-hidden p-2 md:p-4">{composePane}</div>;
+    }
+    // Mobile: one pane at a time.
+    if (isMobile) {
+      return (
+        <div className="h-full overflow-hidden p-2">
+          {selectedEmail ? readingPane(false) : listPane}
+        </div>
+      );
+    }
+    // Desktop: list + reading pane (+ docked AI column).
+    return (
+      <div className="flex h-full min-w-0 overflow-hidden">
+        <div className="w-[320px] xl:w-[360px] flex-shrink-0 border-r border-border/50 bg-card overflow-hidden">
+          {listPane}
+        </div>
+        <div className="flex-1 min-w-0 overflow-hidden bg-card">
+          {readingPane(true)}
+        </div>
+        {selectedEmail && aiOpen && (
+          <div className="hidden xl:block w-[320px] flex-shrink-0 border-l border-border/50 bg-card overflow-hidden">
+            <AIEmailAssistant
+              email={selectedEmail}
+              onUseDraft={(text) => handleAiDraft(text, selectedEmail)}
+              onClose={() => setAiOpen(false)}
+            />
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <>
       <div className="flex flex-col h-[calc(100vh-4rem)] gap-0 -mx-4 -mt-4">
-        {/* Hero Header */}
-        <div className="relative overflow-hidden bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-b border-border/50 px-4 md:px-6 pt-4 md:pt-5 pb-3 md:pb-4 flex-shrink-0">
-          <div className="absolute inset-0 bg-grid-white/5 [mask-image:linear-gradient(0deg,transparent,rgba(255,255,255,0.1))]" />
-          <div className="relative flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              {isMobile && (
-                <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-                  <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-10 w-10 flex-shrink-0 md:hidden">
-                      <Menu className="h-5 w-5" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="left" className="w-72 p-4 pt-8">
-                    {sidebarContent}
-                  </SheetContent>
-                </Sheet>
-              )}
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="h-10 w-10 md:h-12 md:w-12 rounded-xl md:rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-xl shadow-primary/30 flex-shrink-0"
-              >
-                <Mail className="h-5 w-5 md:h-6 md:w-6 text-primary-foreground" />
-              </motion.div>
-              <div className="min-w-0">
-                <motion.h1
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-lg md:text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text truncate"
-                >
-                  Central de Email
-                </motion.h1>
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1, transition: { delay: 0.1 } }}
-                  className="text-xs md:text-sm text-muted-foreground truncate"
-                >
+        {/* Compact top bar */}
+        <div className="flex-shrink-0 border-b border-border/50 bg-card px-3 md:px-4 py-2">
+          <div className="flex items-center gap-2">
+            {isMobile && (
+              <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 md:hidden">
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-72 p-4 pt-8">
+                  {sidebarContent}
+                </SheetContent>
+              </Sheet>
+            )}
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
+                <Mail className="h-4 w-4 text-primary-foreground" aria-hidden />
+              </div>
+              <div className="min-w-0 hidden sm:block">
+                <h1 className="text-sm font-semibold leading-tight truncate">Central de Email</h1>
+                <p className="text-[11px] text-muted-foreground truncate">
                   {selectedAccount ? selectedAccount.email_address : getFolderLabel()}
-                </motion.p>
+                </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {isMobile && (
-                <Button
-                  onClick={handleCompose}
-                  size="icon"
-                  className="h-10 w-10 rounded-xl bg-gradient-to-r from-primary to-primary/80 shadow-lg shadow-primary/20 md:hidden"
-                >
-                  <PenSquare className="h-5 w-5" />
-                </Button>
-              )}
-            </div>
+
+            {showSyncBar ? (
+              <div className="flex-1 min-w-0">
+                <EmailSyncBar
+                  accountEmail={selectedAccount?.email_address}
+                  info={selectedAccountId ? syncByAccount[selectedAccountId] : undefined}
+                  runs={syncRuns}
+                  onSyncNow={() => selectedAccountId && syncNow(selectedAccountId)}
+                  onCompose={handleCompose}
+                  search={search}
+                  onSearchChange={setSearch}
+                />
+              </div>
+            ) : (
+              <div className="flex-1" />
+            )}
+
+            {isMobile && (
+              <Button onClick={handleCompose} size="icon" className="h-9 w-9 flex-shrink-0 md:hidden">
+                <PenSquare className="h-4 w-4" />
+              </Button>
+            )}
           </div>
-          <EmailMetricsBar stats={stats} />
-          {showSyncBar && (
-            <div className="mt-3">
-              <EmailSyncBar
-                accountEmail={selectedAccount?.email_address}
-                info={selectedAccountId ? syncByAccount[selectedAccountId] : undefined}
-                runs={syncRuns}
-                onSyncNow={() => selectedAccountId && syncNow(selectedAccountId)}
-                onCompose={handleCompose}
-                search={search}
-                onSearchChange={setSearch}
-              />
-            </div>
-          )}
         </div>
 
         {/* Main Layout */}
         <div className="flex flex-1 overflow-hidden">
           {!isMobile && (
-            <div className="w-64 flex-shrink-0 border-r border-border/50 bg-background/50 overflow-y-auto p-3">
+            <div className="w-56 xl:w-60 flex-shrink-0 border-r border-border/50 bg-background/50 overflow-y-auto p-3">
               {sidebarContent}
             </div>
           )}
-          <div className="flex-1 overflow-hidden bg-muted/20">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={currentFolder + (isComposing ? '-compose' : '') + (selectedEmail?.id || '') + (selectedAccountId || '')}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.18 }}
-                className="h-full p-2 md:p-4"
-              >
-                {renderContent()}
-              </motion.div>
-            </AnimatePresence>
+          <div className="flex-1 min-w-0 overflow-hidden bg-muted/20">
+            {mainArea()}
           </div>
         </div>
       </div>
