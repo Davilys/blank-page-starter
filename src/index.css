@@ -36,6 +36,12 @@
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
+    /* Financial situation roles */
+    --billing-received: 158 64% 40%;
+    --billing-confirmed: 217 91% 60%;
+    --billing-awaiting: 38 92% 50%;
+    --billing-overdue: 0 84% 60%;
+
     /* Borders */
     --border: 214 32% 91%;
     --input: 214 32% 91%;

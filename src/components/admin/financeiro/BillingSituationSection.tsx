@@ -49,6 +49,7 @@ interface ClientOption {
   id: string;
   full_name: string | null;
   email: string;
+  asaas_customer_id?: string | null;
 }
 
 interface BillingSituationSectionProps {
@@ -82,10 +83,10 @@ const CARD_CONFIG: Array<{
   bar: string;
   chart: string;
 }> = [
-  { key: 'recebidas', title: 'Recebidas', tone: 'text-emerald-500', border: 'border-emerald-500/25', surface: 'bg-emerald-500/5', bar: 'bg-emerald-500', chart: 'hsl(158 64% 40%)' },
-  { key: 'confirmadas', title: 'Confirmadas', tone: 'text-blue-500', border: 'border-blue-500/25', surface: 'bg-blue-500/5', bar: 'bg-blue-500', chart: 'hsl(217 91% 60%)' },
-  { key: 'aguardando', title: 'Aguardando pagamento', tone: 'text-amber-500', border: 'border-amber-500/25', surface: 'bg-amber-500/5', bar: 'bg-amber-500', chart: 'hsl(38 92% 50%)' },
-  { key: 'vencidas', title: 'Vencidas', tone: 'text-red-500', border: 'border-red-500/25', surface: 'bg-red-500/5', bar: 'bg-red-500', chart: 'hsl(0 84% 60%)' },
+  { key: 'recebidas', title: 'Recebidas', tone: 'text-billing-received', border: 'border-billing-received/25', surface: 'bg-billing-received/5', bar: 'bg-billing-received', chart: 'hsl(var(--billing-received))' },
+  { key: 'confirmadas', title: 'Confirmadas', tone: 'text-billing-confirmed', border: 'border-billing-confirmed/25', surface: 'bg-billing-confirmed/5', bar: 'bg-billing-confirmed', chart: 'hsl(var(--billing-confirmed))' },
+  { key: 'aguardando', title: 'Aguardando pagamento', tone: 'text-billing-awaiting', border: 'border-billing-awaiting/25', surface: 'bg-billing-awaiting/5', bar: 'bg-billing-awaiting', chart: 'hsl(var(--billing-awaiting))' },
+  { key: 'vencidas', title: 'Vencidas', tone: 'text-billing-overdue', border: 'border-billing-overdue/25', surface: 'bg-billing-overdue/5', bar: 'bg-billing-overdue', chart: 'hsl(var(--billing-overdue))' },
 ];
 
 const PERIOD_LABELS: Record<BillingPeriod, string> = {
@@ -265,8 +266,8 @@ export function BillingSituationSection({
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Filtros das cobranças</DialogTitle></DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5"><Label>Status</Label><Select value={activeSituation} onValueChange={(value) => onSituationChange(value as BillingSituationKey | 'all')}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem>{CARD_CONFIG.map((item) => <SelectItem key={item.key} value={item.key}>{item.title}</SelectItem>)}</SelectContent></Select></div>
-            <div className="space-y-1.5"><Label>Conta Asaas</Label><Input value={filters.account} onChange={(event) => onFiltersChange({ ...filters, account: event.target.value })} placeholder="ID da conta no Asaas" /></div>
+            <div className="space-y-1.5"><Label>Status</Label><Select value={activeSituation} onValueChange={(value) => onSituationChange(value as BillingSituationKey | 'all')}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem>{CARD_CONFIG.map((item) => <SelectItem key={item.key} value={item.key}>{item.title}</SelectItem>)}<SelectItem value="inativas">Canceladas e inativas</SelectItem></SelectContent></Select></div>
+            <div className="space-y-1.5"><Label>Conta Asaas</Label><Select value={filters.account || 'all'} onValueChange={(value) => onFiltersChange({ ...filters, account: value === 'all' ? '' : value })}><SelectTrigger><SelectValue placeholder="Todas as contas" /></SelectTrigger><SelectContent><SelectItem value="all">Todas as contas</SelectItem>{clients.filter((client) => client.asaas_customer_id).map((client) => <SelectItem key={client.asaas_customer_id} value={client.asaas_customer_id || ''}>{client.full_name || client.email}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-1.5"><Label>Forma de pagamento</Label><Select value={filters.paymentMethod || 'all'} onValueChange={(value) => onFiltersChange({ ...filters, paymentMethod: value === 'all' ? '' : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todas</SelectItem><SelectItem value="pix">Pix</SelectItem><SelectItem value="boleto">Boleto</SelectItem><SelectItem value="credit_card">Cartão</SelectItem></SelectContent></Select></div>
             <div className="space-y-1.5"><Label>Cliente</Label><Select value={filters.client || 'all'} onValueChange={(value) => onFiltersChange({ ...filters, client: value === 'all' ? '' : value })}><SelectTrigger><SelectValue placeholder="Todos os clientes" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os clientes</SelectItem>{clients.map((client) => <SelectItem key={client.id} value={client.id}>{client.full_name || client.email}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-1.5"><Label>Origem da cobrança</Label><Select value={filters.origin || 'all'} onValueChange={(value) => onFiltersChange({ ...filters, origin: value === 'all' ? '' : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todas</SelectItem><SelectItem value="asaas">Asaas</SelectItem><SelectItem value="interna">Fatura interna</SelectItem><SelectItem value="acordo">Acordo</SelectItem></SelectContent></Select></div>

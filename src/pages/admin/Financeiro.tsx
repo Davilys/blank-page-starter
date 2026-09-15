@@ -66,6 +66,7 @@ interface Client {
   full_name: string | null;
   email: string;
   cpf_cnpj: string | null;
+  asaas_customer_id: string | null;
 }
 
 interface Process {
@@ -396,7 +397,7 @@ export default function AdminFinanceiro() {
 
     // Non-master admins only see their own clients
     const buildQuery = () => {
-      let q = supabase.from('profiles').select('id, full_name, email, cpf_cnpj');
+      let q = supabase.from('profiles').select('id, full_name, email, cpf_cnpj, asaas_customer_id');
       if (!isMasterAdmin && currentUserId) {
         q = q.or(`assigned_to.eq.${currentUserId},created_by.eq.${currentUserId}`);
       }
