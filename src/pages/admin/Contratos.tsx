@@ -1013,21 +1013,25 @@ export default function AdminContratos() {
           <StatCard
             icon={FileText}
             label="Total"
-            value={filteredContracts.length}
+            value={baseFiltered.length}
             subtitle="contratos encontrados"
             color="hsl(210, 100%, 40%)"
             gradient="bg-gradient-to-br from-primary to-primary/70"
             delay={0.1}
+            onClick={() => { setStatFilter(prev => prev === 'total' ? 'total' : 'total'); setSignatureFilter('all'); }}
+            active={statFilter === 'total'}
           />
           <StatCard
             icon={CheckCircle}
             label="Assinados"
             value={signedCount}
-            subtitle={`de ${filteredContracts.length} contratos`}
+            subtitle={`de ${baseFiltered.length} contratos`}
             color="hsl(152, 76%, 45%)"
             gradient="bg-gradient-to-br from-emerald-500 to-emerald-600"
             delay={0.2}
             ring={signedPct}
+            onClick={() => { setStatFilter(prev => prev === 'signed' ? 'total' : 'signed'); setSignatureFilter('all'); }}
+            active={statFilter === 'signed'}
           />
           <StatCard
             icon={PenTool}
@@ -1038,6 +1042,8 @@ export default function AdminContratos() {
             gradient="bg-gradient-to-br from-destructive to-red-600"
             delay={0.3}
             ring={pendingPct}
+            onClick={() => { setStatFilter(prev => prev === 'pending' ? 'total' : 'pending'); setSignatureFilter('all'); }}
+            active={statFilter === 'pending'}
           />
           <StatCard
             icon={BadgeCheck}
@@ -1048,6 +1054,8 @@ export default function AdminContratos() {
             gradient="bg-gradient-to-br from-teal-500 to-emerald-600"
             delay={0.35}
             ring={paidPct}
+            onClick={() => { setStatFilter(prev => prev === 'paid' ? 'total' : 'paid'); setSignatureFilter('all'); }}
+            active={statFilter === 'paid'}
           />
           <StatCard
             icon={canViewFinancialValues ? DollarSign : EyeOff}
