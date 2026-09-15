@@ -146,6 +146,3 @@ verify_jwt = false
 
 [functions.inpi-process-lookup]
 verify_jwt = true
-
-[functions.tmp-inpi-lookup-check]
-verify_jwt = false
