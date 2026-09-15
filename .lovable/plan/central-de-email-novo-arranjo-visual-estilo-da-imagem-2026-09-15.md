@@ -33,4 +33,18 @@ Telas internas (Templates, Campanhas, Sequências, Automações, Configurações
 - `renderContent` deixa de alternar lista/leitura no desktop: passa a renderizar lista e leitura em paralelo, mantendo o comportamento atual de troca em mobile.
 - Nenhuma cor nova fora dos tokens existentes (`--primary`, `--accent`, `--muted`, etc.); nada de cores fixas em componentes.
 - Sem alteração em consultas, Edge Functions, paginação, contadores, realtime, permissões ou no painel de reparo de mensagens.
-- Verificação: `bunx tsgo --noEmit` e conferência visual em desktop, tablet e celular.
+- Verificação: `bunx tsgo --noEmit` e conferência visual em desktop, tablet e celular. **Aprovo esse plano visual.** Ele respeita a proposta e mantém a alteração dentro da aba Emails. Envie ao Lovable:
+  > Pode implementar com estes cuidados:
+  >
+  > - As quatro colunas ficam **dentro de** `/admin/emails`. Não substituir o menu principal do CRM pela barra de ícones da imagem.
+  > - Usar as cores atuais da WebMarcas e estilos locais, sem mudanças no tema global.
+  > - Adaptar as colunas à largura disponível, considerando o menu principal aberto. Recolher a IA antes de comprimir a leitura ou gerar rolagem horizontal na página.
+  > - Preservar mensagem selecionada, filtros, rolagem e rascunho ao alternar painéis ou redimensionar a tela.
+  > - Reutilizar o editor e as ações existentes na resposta rápida. Não criar outro mecanismo de envio.
+  > - Renderizar lista e leitura simultaneamente sem duplicar consultas, assinaturas de atualização ou chamadas à IA.
+  > - Manter acessíveis Histórico, Configurações, resposta automática por conta e reparo piloto.
+  > - Não copiar dados fictícios, contagens ou o selo “Sincronizado” da imagem: tudo deve refletir os dados reais.
+  >
+  > Além da checagem de tipos, testar abertura de mensagens, troca de conta, resposta em rascunho, anexos e painel de IA nos três tamanhos de tela, sem enviar emails.
+  >
+  > Apresente a prévia final e os arquivos alterados. Esta etapa é exclusivamente visual e não substitui a validação pendente do recebimento automático.
