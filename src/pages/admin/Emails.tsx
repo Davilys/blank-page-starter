@@ -101,6 +101,12 @@ export default function Emails() {
   // Get selected account email for filtering sent emails
   const selectedAccount = emailAccounts.find(a => a.id === selectedAccountId);
 
+  // Real, per-account sync state + run history
+  const { byAccount: syncByAccount, runs: syncRuns, syncNow } = useEmailSync(
+    emailAccounts.map(a => a.id),
+    selectedAccountId,
+  );
+
   // Read URL params to auto-open compose with client data
   useEffect(() => {
     const compose = searchParams.get('compose');
