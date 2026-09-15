@@ -108,7 +108,7 @@ export default function CaseApprovalPanel({
   const [reviewing, setReviewing] = useState(false);
 
   const reload = useCallback(async () => {
-    const [{ data: d }, { data: a }, { data: o }] = await Promise.all([
+    const [{ data: d }, { data: a }, { data: o }, { data: r }] = await Promise.all([
       supabase
         .from('inpi_case_documents')
         .select('id, category, file_name, storage_path, sha256, extraction_status, extraction_notes, page_count, interpreted_pages, unreadable_pages, conversion_status, conversion_notes, display_order')
@@ -121,10 +121,15 @@ export default function CaseApprovalPanel({
         .from('inpi_case_orientations')
         .select('editable_text, version')
         .eq('case_id', caseId).order('version', { ascending: false }).limit(1),
+      supabase
+        .from('inpi_draft_reviews')
+        .select('id, content_hash, documents_hash, findings, summary, has_blocking, model, created_at')
+        .eq('case_id', caseId).order('created_at', { ascending: false }).limit(1),
     ]);
     setDocs((d || []) as unknown as CaseDocRow[]);
     setApprovals((a || []) as unknown as ApprovalRow[]);
     setOrientationText(((o || [])[0]?.editable_text as string) || '');
+    setReview(((r || [])[0] as unknown as ReviewRow) || null);
   }, [caseId]);
 
   useEffect(() => { void reload(); }, [reload]);
