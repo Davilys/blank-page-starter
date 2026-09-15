@@ -33,4 +33,17 @@ Nova configuração isolada `RECURSOS_INPI_MODEL` (valor `gpt-5.6-sol`), lida so
 
 ## Entrega
 
-Ao final de cada fase: arquivos, funções e migrações alterados, causa das falhas encontradas, testes executados, PDFs de homologação, limitações e caminho de reversão isolada. Nada vai a produção nem reprocessa histórico antes da sua aprovação.
+Ao final de cada fase: arquivos, funções e migrações alterados, causa das falhas encontradas, testes executados, PDFs de homologação, limitações e caminho de reversão isolada. Nada vai a produção nem reprocessa histórico antes da sua aprovação. APROVADO MAIS; **a implementação em preview, com estes ajustes obrigatórios**:
+
+> **Plano aprovado para desenvolvimento em preview. Incorpore os ajustes abaixo:**
+>
+> 1. **Isolamento também no backend:** o GPT-5.6 deve ser selecionado pela modalidade validada no servidor. Alterar uma função compartilhada não pode mudar o modelo das demais modalidades. Confirme também que a consultoria, os ajustes e a revisão automática das três modalidades usam o modelo dedicado.
+> 2. **Segurança e controle de versões desde a Fase 1:** permissões, armazenamento privado, proteção contra mistura de casos, idempotência e controle de concorrência devem acompanhar a implementação desde o início. Na Fase 7, serão testados integralmente.
+> 3. **Documentação parcial permite minuta:** lacunas não impedem iniciar o trabalho, mas não autorizam conclusões inventadas. Falha na leitura de um documento deve ficar explícita. Distinguir “arquivo recebido”, “arquivo lido” e “conteúdo conferido”.
+> 4. **Fontes verificadas precisam de mecanismo real:** implementar consulta ou recuperação de fontes oficiais com registro da origem, data e trecho utilizado. O modelo afirmar que verificou uma citação não é comprovação.
+> 5. **Aprovação vinculada ao conjunto completo:** a versão aprovada deve identificar texto, orientação e documentos por seus identificadores e hashes. Qualquer alteração nesses elementos exige reconferência. Preservar a aprovação histórica da versão anterior.
+> 6. **Anexos assinados e limites do protocolo:** preservar os originais. Quando algum documento precisar ser apresentado separadamente, entregar um manifesto claro do pacote completo. Validar os limites atuais aplicáveis ao e-Marcas; nunca omitir anexos silenciosamente.
+> 7. **Preview realmente isolado:** confirmar se o ambiente compartilha banco, funções ou armazenamento com produção. Não considerar a alteração segura apenas porque a interface está em preview. Mudanças compartilhadas devem permanecer desativadas para os usuários reais até aprovação.
+> 8. **Entrega proporcional por fase:** apresentar testes e evidências correspondentes ao que foi implementado; PDFs completos são exigidos quando a exportação estiver pronta. Avançar entre fases após os critérios técnicos passarem, registrando os resultados. A publicação em produção permanece dependente de aprovação.
+>
+> **Preservar integralmente a identidade atual do papel timbrado WebMarcas. Não alterar outros módulos nem reprocessar documentos históricos. Iniciar pela Fase 1.**
