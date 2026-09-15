@@ -2008,7 +2008,7 @@ export default function RecursosINPI() {
               <div className="flex gap-3 pt-2">
                 <Button variant="outline" onClick={() => setStep('select-agent')} className="rounded-xl">Voltar</Button>
                 <Button 
-                  onClick={processDocument}
+                  onClick={() => processDocument()}
                   disabled={!notificanteData.nome || !notificadoData.nome}
                   size="lg" 
                   className={`flex-1 gap-3 rounded-xl h-14 text-base shadow-xl bg-gradient-to-r ${agent.color} hover:opacity-90 transition-opacity`}
@@ -2276,7 +2276,7 @@ export default function RecursosINPI() {
               <div className="flex gap-3 pt-2">
                 <Button variant="outline" onClick={() => setStep('select-agent')} className="rounded-xl">Voltar</Button>
                 <Button 
-                  onClick={processDocument}
+                  onClick={() => processDocument()}
                   disabled={!procuradorData.titular || !procuradorData.marca}
                   size="lg" 
                   className={`flex-1 gap-3 rounded-xl h-14 text-base shadow-xl bg-gradient-to-r ${agent.color} hover:opacity-90 transition-opacity`}
@@ -2391,7 +2391,7 @@ export default function RecursosINPI() {
               <div className="flex gap-3 pt-2">
                 <Button variant="outline" onClick={() => setStep('select-agent')} className="rounded-xl">Voltar</Button>
                 <Button 
-                  onClick={processDocument}
+                  onClick={() => processDocument()}
                   disabled={multipleFiles.length === 0}
                   size="lg" 
                   className={`flex-1 gap-3 rounded-xl h-14 text-base shadow-xl bg-gradient-to-r ${agent.color} hover:opacity-90 transition-opacity`}
@@ -2515,7 +2515,7 @@ export default function RecursosINPI() {
                   <div className="flex gap-3">
                     <Button variant="outline" onClick={() => { setMultipleFiles([]); setUserOrientation(''); setStep('select-agent'); }} className="rounded-xl">Voltar</Button>
                     <Button 
-                      onClick={processDocument} 
+                      onClick={() => processDocument()} 
                       disabled={multipleFiles.length === 0}
                       className={`flex-1 gap-2 rounded-xl h-12 text-base shadow-lg bg-gradient-to-r ${agent.color} hover:opacity-90`}
                     >
