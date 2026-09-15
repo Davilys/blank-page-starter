@@ -1,5 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import {
+  isModelAccessError,
+  isRecursosInpiModality,
+  logAiCall,
+  modelConfigErrorMessage,
+  resolveModelConfig,
+} from "../_shared/recursosInpiModel.ts";
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -65,7 +73,34 @@ serve(async (req) => {
       );
     }
 
+    // Modelo resolvido no SERVIDOR pela modalidade validada: só as três
+    // modalidades desta entrega usam o modelo dedicado; as demais seguem
+    // exatamente com o modelo anterior (gpt-5-mini).
+    const modelConfig = resolveModelConfig(resourceType, 'gpt-5-mini', 'minimal');
+    const isDedicatedFlow = isRecursosInpiModality(resourceType);
+    const correlationId = crypto.randomUUID();
+    const startedAt = Date.now();
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY')!,
+    );
+    const logAdjust = (status: string, httpStatus?: number | null, errorKind?: string | null) =>
+      logAiCall(supabaseAdmin as never, {
+        resource_type: typeof resourceType === 'string' ? resourceType : 'desconhecido',
+        operation: 'ajuste',
+        model: modelConfig.model,
+        dedicated_model: modelConfig.dedicated,
+        reasoning_effort: modelConfig.reasoningEffort,
+        prompt_version: 'recursos-inpi-2026-09-fase1',
+        duration_ms: Date.now() - startedAt,
+        status,
+        http_status: httpStatus ?? null,
+        error_kind: errorKind ?? null,
+        correlation_id: correlationId,
+      });
+
     const hasEvidences = Array.isArray(evidences) && evidences.length > 0;
+
 
     const systemPrompt = `Você é um ADVOGADO ESPECIALISTA EM PROPRIEDADE INDUSTRIAL de ELITE da WEBMARCAS.
 
@@ -166,13 +201,13 @@ ${formattingRules}`;
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'gpt-5-mini',
+            model: modelConfig.model,
             input: [
               { role: 'system', content: systemPrompt },
               { role: 'user', content: [{ type: 'input_text', text: userPrompt }] },
             ],
             max_output_tokens: 12000,
-            reasoning: { effort: 'minimal' },
+            reasoning: { effort: modelConfig.reasoningEffort },
             text: { verbosity: 'high' },
           }),
         });
@@ -188,8 +223,12 @@ ${formattingRules}`;
         aiResponse = await callAdjust(attempt);
         if (aiResponse.ok) break;
         const status = aiResponse.status;
-        if (status !== 429 && status < 500) break; // non-retryable
+        if (status !== 429 && status < 500) {
+          lastError = await aiResponse.text().catch(() => '');
+          break; // non-retryable
+        }
         lastError = await aiResponse.text();
+
         console.warn(`Adjust attempt ${attempt + 1} failed: ${status}`);
         await new Promise((r) => setTimeout(r, 1500 * Math.pow(2, attempt)));
       } catch (err) {
@@ -204,17 +243,38 @@ ${formattingRules}`;
     if (!aiResponse || !aiResponse.ok) {
       const status = aiResponse?.status || 504;
       console.error('AI API error after retries:', status, lastError.substring(0, 500));
+      if (isDedicatedFlow && isModelAccessError(status, lastError)) {
+        await logAdjust('error', status, 'model_access');
+        return new Response(
+          JSON.stringify({
+            error: modelConfigErrorMessage(modelConfig.model, lastError.substring(0, 300)),
+            error_kind: 'model_config',
+            model: modelConfig.model,
+            correlation_id: correlationId,
+            retryable: false,
+          }),
+          { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       if (status === 429) {
+        await logAdjust('error', status, 'rate_limit');
         return new Response(
           JSON.stringify({ error: 'Limite de requisições excedido. Tente novamente em alguns minutos.', retryable: true }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+      await logAdjust('error', status, 'http');
       return new Response(
-        JSON.stringify({ error: 'Erro ao ajustar recurso com IA', retryable: true }),
+        JSON.stringify({
+          error: `Erro ao ajustar recurso com IA: ${lastError.substring(0, 300) || status}`,
+          error_kind: 'http',
+          correlation_id: correlationId,
+          retryable: true,
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
 
     const aiData = await aiResponse.json();
     // Extract text from Responses API output
@@ -285,9 +345,14 @@ ${formattingRules}`;
       }
     }
 
+    await logAdjust('success', 200, null);
+
     return new Response(
       JSON.stringify({
         success: true,
+        model: modelConfig.model,
+        correlation_id: correlationId,
+
         adjusted_content: trimmed,
         unchanged,
       }),

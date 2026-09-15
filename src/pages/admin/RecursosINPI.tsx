@@ -88,6 +88,36 @@ const RESOURCE_TYPE_LABELS: Record<string, string> = {
   nomeacao_procurador: 'Nomeação de Procurador'
 };
 
+// Textos da tela por modalidade — nunca fixos em uma modalidade/agente.
+const ORIENTATION_PIECE_LABELS: Record<string, string> = {
+  indeferimento: 'o recurso contra o indeferimento',
+  exigencia_merito: 'o cumprimento desta exigência de mérito',
+  oposicao: 'a manifestação à oposição',
+  notificacao_extrajudicial: 'a notificação extrajudicial',
+  resposta_notificacao_extrajudicial: 'a resposta à notificação extrajudicial',
+  troca_procurador: 'a petição de troca de procurador',
+  nomeacao_procurador: 'a petição de nomeação de procurador'
+};
+
+const ORIENTATION_PLACEHOLDERS: Record<string, string> = {
+  indeferimento:
+    "Ex.: Enfrentar cada fundamento do indeferimento e a anterioridade apontada. Destacar distinções gráficas e fonéticas comprovadas nos anexos. Manter peça objetiva.",
+  exigencia_merito:
+    "Ex.: A exigência pede detalhamento da especificação na classe 35. Apresentar a redação corrigida sem ampliar o escopo original. Manter peça enxuta (3 a 5 páginas).",
+  oposicao:
+    "Ex.: Atuar pelo depositante e responder aos argumentos da oposição. Não assumir a posição do oponente. Indicar as provas de uso anexadas.",
+  notificacao_extrajudicial:
+    "Ex.: Tom firme e objetivo, prazo de resposta de 10 dias, indicar os direitos violados com base nos documentos anexados.",
+  resposta_notificacao_extrajudicial:
+    "Ex.: Responder ponto a ponto à notificação recebida, sem admitir fatos não comprovados.",
+  troca_procurador:
+    "Ex.: Indicar os dados do novo procurador e a procuração anexada.",
+  nomeacao_procurador:
+    "Ex.: Indicar os dados do procurador nomeado e a procuração anexada."
+};
+
+
+
 const RESOURCE_TYPE_CONFIG: Record<string, { icon: typeof Gavel; color: string; gradient: string; description: string }> = {
   indeferimento: {
     icon: XCircle,
@@ -307,6 +337,35 @@ export default function RecursosINPI() {
   const [step, setStep] = useState<Step>('list');
   const [resourceType, setResourceType] = useState('');
   const [selectedAgent, setSelectedAgent] = useState<AgentId>('mazzola');
+  // Verificação de disponibilidade do modelo dedicado (sem conteúdo de cliente).
+  const [checkingModel, setCheckingModel] = useState(false);
+  const [modelStatus, setModelStatus] = useState<{ ok: boolean; model?: string; error?: string } | null>(null);
+
+  const handleCheckModel = async () => {
+    setCheckingModel(true);
+    setModelStatus(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('process-inpi-resource', {
+        body: { action: 'model_probe' },
+      });
+      if (error) throw error;
+      const ok = Boolean(data?.success);
+      setModelStatus({ ok, model: data?.model, error: data?.error });
+      if (ok) {
+        toast.success(`Modelo disponível: ${data?.model}`);
+      } else {
+        toast.error(data?.error || 'Modelo indisponível nesta conta.');
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Falha ao verificar o modelo.';
+      setModelStatus({ ok: false, error: msg });
+      toast.error(msg);
+    } finally {
+      setCheckingModel(false);
+    }
+  };
+
+
   const [file, setFile] = useState<File | null>(null);
   const [multipleFiles, setMultipleFiles] = useState<File[]>([]);
   const [userOrientation, setUserOrientation] = useState('');
@@ -1132,8 +1191,29 @@ export default function RecursosINPI() {
                 </p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {step === 'list' && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleCheckModel}
+                    disabled={checkingModel}
+                    className="gap-2 rounded-xl"
+                  >
+                    <Brain className="h-4 w-4" />
+                    {checkingModel ? 'Verificando modelo…' : 'Verificar modelo de IA'}
+                  </Button>
+                  {modelStatus && (
+                    <span
+                      className={`text-xs max-w-[280px] ${modelStatus.ok ? 'text-emerald-600' : 'text-destructive'}`}
+                    >
+                      {modelStatus.ok ? `Disponível: ${modelStatus.model}` : modelStatus.error}
+                    </span>
+                  )}
+                </div>
+              )}
               {step === 'list' ? (
+
                 <Button onClick={() => setStep('select-type')} size="lg" className="gap-2 shadow-lg shadow-primary/20 rounded-xl">
                   <Sparkles className="h-4 w-4" />
                   Criar Recurso com IA
@@ -2383,9 +2463,9 @@ export default function RecursosINPI() {
                       <div className="flex items-start gap-3">
                         <Brain className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
                         <div className="flex-1">
-                          <p className="font-semibold text-sm">Orientações para o Agente <span className="text-muted-foreground font-normal">(opcional)</span></p>
+                          <p className="font-semibold text-sm">Orientações para o {agent.name} <span className="text-muted-foreground font-normal">(opcional)</span></p>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            Descreva como o Agente Mazzola deve elaborar o cumprimento desta exigência: pontos a enfatizar, especificação corrigida sugerida, tom desejado, extensão preferida, argumentos específicos, etc. O agente seguirá estas orientações com prioridade.
+                            Descreva como o {agent.name} deve elaborar {ORIENTATION_PIECE_LABELS[resourceType] || 'esta peça'}: pontos a enfatizar, tom desejado, extensão preferida, argumentos específicos, etc. O agente seguirá estas orientações com prioridade.
                           </p>
                         </div>
                       </div>
@@ -2393,9 +2473,10 @@ export default function RecursosINPI() {
                         value={userOrientation}
                         onChange={(e) => setUserOrientation(e.target.value)}
                         rows={6}
-                        placeholder="Ex.: A exigência pede detalhamento da especificação na classe 35. Apresentar a redação: 'serviços de comércio varejista de vestuário e acessórios de moda...'. Manter peça enxuta (3 a 5 páginas), sem teses de oposição. Reforçar boa-fé e aderência ao Manual de Marcas."
+                        placeholder={ORIENTATION_PLACEHOLDERS[resourceType] || 'Descreva os pontos que o agente deve priorizar nesta peça.'}
                         className="resize-y text-sm"
                       />
+
                       <p className="text-xs text-muted-foreground text-right">{userOrientation.length} caracteres</p>
                     </div>
                   )}

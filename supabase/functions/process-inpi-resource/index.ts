@@ -1,5 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import {
+  type AiCallLogEntry,
+  isModelAccessError,
+  isRecursosInpiModality,
+  logAiCall,
+  type ModelConfig,
+  modelConfigErrorMessage,
+  probeRecursosInpiModel,
+  resolveModelConfig,
+} from "../_shared/recursosInpiModel.ts";
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -60,22 +71,62 @@ function sanitizeExtracted(raw: any) {
 
 // ═══════════════════════════════════════════════════════════
 // HELPER: Call OpenAI Responses API
+// O modelo NUNCA é escolhido pelo cliente: vem de `ctx.modelConfig`,
+// resolvido no servidor a partir da modalidade validada.
 // ═══════════════════════════════════════════════════════════
+interface CallContext {
+  modelConfig: ModelConfig;
+  operation: string;
+  resourceType: string;
+  correlationId: string;
+  promptVersion: string;
+  logger?: (entry: AiCallLogEntry) => Promise<void>;
+}
+
+const PROMPT_VERSION = 'recursos-inpi-2026-09-fase1';
+
 async function callOpenAI(
   apiKey: string,
   systemPrompt: string,
   userParts: any[],
   maxTokens: number = 16000,
-  temperature?: number,
-  timeoutMs: number = 120000
-): Promise<{ content: string; error?: string; status?: number }> {
+  _temperature?: number,
+  timeoutMs: number = 120000,
+  ctx?: CallContext,
+): Promise<{ content: string; error?: string; status?: number; errorKind?: string }> {
   const inputMessages = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userParts },
   ];
 
+  const modelConfig: ModelConfig = ctx?.modelConfig ?? { model: 'gpt-5-mini', reasoningEffort: 'minimal', dedicated: false };
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const started = Date.now();
+
+  const finish = async (
+    result: { content: string; error?: string; status?: number; errorKind?: string },
+    usage?: { input_tokens?: number; output_tokens?: number },
+  ) => {
+    if (ctx?.logger) {
+      await ctx.logger({
+        resource_type: ctx.resourceType,
+        operation: ctx.operation,
+        model: modelConfig.model,
+        dedicated_model: modelConfig.dedicated,
+        reasoning_effort: modelConfig.reasoningEffort,
+        prompt_version: ctx.promptVersion,
+        duration_ms: Date.now() - started,
+        status: result.error ? 'error' : 'ok',
+        http_status: result.status ?? null,
+        error_kind: result.errorKind ?? null,
+        input_tokens: usage?.input_tokens ?? null,
+        output_tokens: usage?.output_tokens ?? null,
+        correlation_id: ctx.correlationId,
+      });
+    }
+    return result;
+  };
 
   try {
     const response = await fetch('https://api.openai.com/v1/responses', {
@@ -86,13 +137,10 @@ async function callOpenAI(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini',
+        model: modelConfig.model,
         input: inputMessages,
         max_output_tokens: maxTokens,
-        // reasoning "minimal" + verbosity "high" = resposta começa quase imediatamente
-        // e mantém texto longo e detalhado. Sem isso, o modelo gasta 60-120s só em
-        // reasoning tokens internos antes de escrever, estourando o limite de 150s.
-        reasoning: { effort: 'minimal' },
+        reasoning: { effort: modelConfig.reasoningEffort },
         text: { verbosity: 'high' },
       }),
     });
@@ -100,33 +148,57 @@ async function callOpenAI(
     if (!response.ok) {
       const errorText = await response.text();
       console.error('OpenAI API error:', response.status, errorText.substring(0, 500));
-      return { content: '', error: errorText, status: response.status };
+      const errorKind = isModelAccessError(response.status, errorText) ? 'model_access' : 'http';
+      return await finish({ content: '', error: errorText, status: response.status, errorKind });
     }
 
     const data = await response.json();
     let content = '';
+    let refusal = '';
     if (data.output && Array.isArray(data.output)) {
       for (const item of data.output) {
         if (item.type === 'message' && item.content) {
           for (const part of item.content) {
-            if (part.type === 'output_text') {
-              content += part.text;
-            }
+            if (part.type === 'output_text') content += part.text;
+            if (part.type === 'refusal') refusal += part.refusal || '';
           }
         }
       }
     }
 
-    return { content };
+    const usage = { input_tokens: data?.usage?.input_tokens, output_tokens: data?.usage?.output_tokens };
+
+    if (refusal && !content) {
+      return await finish({ content: '', error: `Recusa do modelo: ${refusal.slice(0, 300)}`, status: 422, errorKind: 'refusal' }, usage);
+    }
+
+    // Truncamento: a Responses API devolve status "incomplete" com o motivo.
+    if (data?.status === 'incomplete') {
+      const reason = data?.incomplete_details?.reason || 'desconhecido';
+      return await finish({
+        content,
+        error: `Resposta incompleta da IA (motivo: ${reason}). O conteúdo não foi considerado final.`,
+        status: 502,
+        errorKind: 'truncated',
+      }, usage);
+    }
+
+    return await finish({ content }, usage);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erro desconhecido na IA';
     const isTimeout = error instanceof Error && error.name === 'AbortError';
     console.error('OpenAI request failed:', isTimeout ? 'timeout' : message);
-    return { content: '', error: isTimeout ? 'Tempo limite da IA atingido' : message, status: isTimeout ? 408 : 500 };
+    return await finish({
+      content: '',
+      error: isTimeout ? 'Tempo limite da IA atingido' : message,
+      status: isTimeout ? 408 : 500,
+      errorKind: isTimeout ? 'timeout' : 'exception',
+    });
   } finally {
     clearTimeout(timeout);
   }
 }
+
 
 // ═══════════════════════════════════════════════════════════
 // HELPER: Convert file parts to Responses API format
@@ -1150,13 +1222,6 @@ serve(async (req) => {
     const body = await req.json();
     const { resourceType, agentStrategy, agentName } = body;
 
-    if (!resourceType) {
-      return new Response(
-        JSON.stringify({ error: 'Tipo de recurso não informado' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     if (!OPENAI_API_KEY) {
       return new Response(
@@ -1164,6 +1229,63 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // ── Verificação de disponibilidade do modelo dedicado (sem conteúdo de cliente).
+    if (body?.action === 'model_probe') {
+      const probe = await probeRecursosInpiModel(OPENAI_API_KEY);
+      return new Response(JSON.stringify({
+        success: probe.ok,
+        model: probe.model,
+        duration_ms: probe.durationMs,
+        error: probe.ok ? undefined : modelConfigErrorMessage(probe.model, probe.detail),
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    if (!resourceType) {
+      return new Response(
+        JSON.stringify({ error: 'Tipo de recurso não informado' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ── Modelo resolvido NO SERVIDOR pela modalidade validada.
+    // Só as três modalidades desta entrega recebem o modelo dedicado;
+    // as demais mantêm exatamente o modelo que já usavam (gpt-5-mini).
+    const modelConfig = resolveModelConfig(resourceType, 'gpt-5-mini', 'minimal');
+    const isDedicatedFlow = isRecursosInpiModality(resourceType);
+    const correlationId = crypto.randomUUID();
+    const caseId = typeof body?.caseId === 'string' ? body.caseId : null;
+
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY')!,
+    );
+    const logger = (entry: AiCallLogEntry) => logAiCall(supabaseAdmin as never, { ...entry, case_id: caseId });
+    const makeCtx = (operation: string): CallContext => ({
+      modelConfig,
+      operation,
+      resourceType,
+      correlationId,
+      promptVersion: PROMPT_VERSION,
+      logger,
+    });
+
+    // Falha de configuração do modelo dedicado → preserva o trabalho e avisa
+    // o administrador. Nunca cai em outro modelo silenciosamente.
+    const modelFailureResponse = (result: { status?: number; error?: string; errorKind?: string }) => {
+      if (isDedicatedFlow && (result.errorKind === 'model_access' || isModelAccessError(result.status, result.error))) {
+        return new Response(JSON.stringify({
+          error: modelConfigErrorMessage(modelConfig.model),
+          error_kind: 'model_config',
+          model: modelConfig.model,
+          correlation_id: correlationId,
+        }), { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      return null;
+    };
+
+    console.log(`[recursos-inpi] type=${resourceType} model=${modelConfig.model} dedicated=${modelConfig.dedicated} corr=${correlationId}`);
+
 
     const currentDate = new Date().toLocaleDateString('pt-BR', {
       day: 'numeric', month: 'long', year: 'numeric'
@@ -1193,7 +1315,7 @@ serve(async (req) => {
         ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
       ];
       if (body) body.files = undefined;
-      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25);
+      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25, 120000, makeCtx('notificacao'));
       if (result.error) {
         return new Response(JSON.stringify({ error: `Erro IA: ${result.status}` }), { status: result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
@@ -1308,7 +1430,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
         ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
       ];
       if (body) body.files = undefined;
-      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000);
+      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, undefined, 120000, makeCtx('resposta_notificacao'));
       
       if (result.error) {
         console.error('OpenAI error for resposta_notificacao:', result.status, result.error.substring(0, 300));
@@ -1352,7 +1474,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
         ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
       ];
       if (body) body.files = undefined;
-      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25);
+      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25, 120000, makeCtx('procurador'));
       if (result.error) {
         return new Response(JSON.stringify({ error: `Erro IA: ${result.status}` }), { status: result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
@@ -1516,10 +1638,17 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
       ];
 
       console.log('PASS 2 only: Generating Sections V-VIII...');
-      const pass2Result = await callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25);
+      const pass2Result = await callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25, 120000, makeCtx('pass2'));
       if (pass2Result.error) {
-        return new Response(JSON.stringify({ error: `Erro na geração (Parte 2): ${pass2Result.status}` }), { status: pass2Result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        const cfg = modelFailureResponse(pass2Result);
+        if (cfg) return cfg;
+        return new Response(JSON.stringify({
+          error: `Erro na geração (Parte 2): ${pass2Result.error.substring(0, 300)}`,
+          error_kind: pass2Result.errorKind || 'http',
+          correlation_id: correlationId,
+        }), { status: pass2Result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
+
 
       const pass2Content = cleanAIContent(pass2Result.content);
       const rawFullContent = `${basePass1Content}\n\n${pass2Content}`;
@@ -1572,11 +1701,11 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     const shouldRunPass2Now = requestedPass !== 'pass1';
     console.time('ai_generation');
     const [extractionResult, pass1Result, pass2Result] = await Promise.all([
-      callOpenAI(OPENAI_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, 800, 0.1, 60000),
-      callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 9000, 0.25),
+      callOpenAI(OPENAI_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, 800, 0.1, 60000, makeCtx('extracao')),
+      callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 9000, 0.25, 120000, makeCtx('pass1')),
       shouldRunPass2Now
-        ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25)
-        : Promise.resolve({ content: '', error: undefined as string | undefined, status: undefined as number | undefined }),
+        ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25, 120000, makeCtx('pass2'))
+        : Promise.resolve({ content: '', error: undefined as string | undefined, status: undefined as number | undefined, errorKind: undefined as string | undefined }),
     ]);
     console.timeEnd('ai_generation');
 
@@ -1594,8 +1723,15 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
 
     if (pass1Result.error) {
       console.error('PASS 1 failed:', pass1Result.status, pass1Result.error?.substring(0, 300));
-      return new Response(JSON.stringify({ error: `Erro na geração (Parte 1): ${pass1Result.status}` }), { status: pass1Result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      const cfg = modelFailureResponse(pass1Result);
+      if (cfg) return cfg;
+      return new Response(JSON.stringify({
+        error: `Erro na geração (Parte 1): ${pass1Result.error.substring(0, 300)}`,
+        error_kind: pass1Result.errorKind || 'http',
+        correlation_id: correlationId,
+      }), { status: pass1Result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
+
 
     const pass1Content = cleanAIContent(pass1Result.content);
     console.log('PASS 1 complete:', pass1Content.length, 'chars');
@@ -1622,7 +1758,10 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
 
     if (pass2Result.error) {
       console.error('PASS 2 failed:', pass2Result.status, pass2Result.error?.substring(0, 300));
+      const cfg = modelFailureResponse(pass2Result);
+      if (cfg) return cfg;
       // Return pass 1 content with enforced header
+
       const enriched = enrichExtractedData(extractedData, pass1Content);
       const normalizedPartial = enforceMandatoryOpening(pass1Content, resourceTypeLabel, enriched);
       return new Response(JSON.stringify({
@@ -1631,7 +1770,11 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
         resource_content: normalizedPartial,
         resource_type: resourceType,
         resource_type_label: resourceTypeLabel,
-        partial: true
+        partial: true,
+        partial_reason: pass2Result.errorKind || 'http',
+        partial_detail: (pass2Result.error || '').substring(0, 300),
+        correlation_id: correlationId
+
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
