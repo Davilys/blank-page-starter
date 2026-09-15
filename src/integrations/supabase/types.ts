@@ -4879,6 +4879,14 @@ export type Database = {
     }
     Functions: {
       add_admin_role: { Args: { target_user_id: string }; Returns: undefined }
+      admin_asaas_accounts: {
+        Args: { p_owner?: string }
+        Returns: {
+          asaas_customer_id: string
+          cliente_nome: string
+          cobrancas: number
+        }[]
+      }
       admin_billing_situation: {
         Args: {
           p_account?: string
