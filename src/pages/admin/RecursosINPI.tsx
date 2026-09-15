@@ -88,6 +88,36 @@ const RESOURCE_TYPE_LABELS: Record<string, string> = {
   nomeacao_procurador: 'Nomeação de Procurador'
 };
 
+// Textos da tela por modalidade — nunca fixos em uma modalidade/agente.
+const ORIENTATION_PIECE_LABELS: Record<string, string> = {
+  indeferimento: 'o recurso contra o indeferimento',
+  exigencia_merito: 'o cumprimento desta exigência de mérito',
+  oposicao: 'a manifestação à oposição',
+  notificacao_extrajudicial: 'a notificação extrajudicial',
+  resposta_notificacao_extrajudicial: 'a resposta à notificação extrajudicial',
+  troca_procurador: 'a petição de troca de procurador',
+  nomeacao_procurador: 'a petição de nomeação de procurador'
+};
+
+const ORIENTATION_PLACEHOLDERS: Record<string, string> = {
+  indeferimento:
+    "Ex.: Enfrentar cada fundamento do indeferimento e a anterioridade apontada. Destacar distinções gráficas e fonéticas comprovadas nos anexos. Manter peça objetiva.",
+  exigencia_merito:
+    "Ex.: A exigência pede detalhamento da especificação na classe 35. Apresentar a redação corrigida sem ampliar o escopo original. Manter peça enxuta (3 a 5 páginas).",
+  oposicao:
+    "Ex.: Atuar pelo depositante e responder aos argumentos da oposição. Não assumir a posição do oponente. Indicar as provas de uso anexadas.",
+  notificacao_extrajudicial:
+    "Ex.: Tom firme e objetivo, prazo de resposta de 10 dias, indicar os direitos violados com base nos documentos anexados.",
+  resposta_notificacao_extrajudicial:
+    "Ex.: Responder ponto a ponto à notificação recebida, sem admitir fatos não comprovados.",
+  troca_procurador:
+    "Ex.: Indicar os dados do novo procurador e a procuração anexada.",
+  nomeacao_procurador:
+    "Ex.: Indicar os dados do procurador nomeado e a procuração anexada."
+};
+
+
+
 const RESOURCE_TYPE_CONFIG: Record<string, { icon: typeof Gavel; color: string; gradient: string; description: string }> = {
   indeferimento: {
     icon: XCircle,
