@@ -212,6 +212,9 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceLike | null>(null);
   const [invoiceSheetOpen, setInvoiceSheetOpen] = useState(false);
   const [novaFaturaOpen, setNovaFaturaOpen] = useState(false);
+  const [mostrarHistoricoFin, setMostrarHistoricoFin] = useState(false);
+  const [sincronizando, setSincronizando] = useState(false);
+  const [ultimaSync, setUltimaSync] = useState<Date | null>(null);
   const [asaasOverdue, setAsaasOverdue] = useState<any[]>([]);
   const [asaasRenegs, setAsaasRenegs] = useState<any[]>([]);
   const [asaasRenegParcelas, setAsaasRenegParcelas] = useState<any[]>([]);
