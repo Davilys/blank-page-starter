@@ -243,17 +243,38 @@ ${formattingRules}`;
     if (!aiResponse || !aiResponse.ok) {
       const status = aiResponse?.status || 504;
       console.error('AI API error after retries:', status, lastError.substring(0, 500));
+      if (isDedicatedFlow && isModelAccessError(status, lastError)) {
+        await logAdjust('error', status, 'model_access');
+        return new Response(
+          JSON.stringify({
+            error: modelConfigErrorMessage(modelConfig.model, lastError.substring(0, 300)),
+            error_kind: 'model_config',
+            model: modelConfig.model,
+            correlation_id: correlationId,
+            retryable: false,
+          }),
+          { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       if (status === 429) {
+        await logAdjust('error', status, 'rate_limit');
         return new Response(
           JSON.stringify({ error: 'Limite de requisições excedido. Tente novamente em alguns minutos.', retryable: true }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+      await logAdjust('error', status, 'http');
       return new Response(
-        JSON.stringify({ error: 'Erro ao ajustar recurso com IA', retryable: true }),
+        JSON.stringify({
+          error: `Erro ao ajustar recurso com IA: ${lastError.substring(0, 300) || status}`,
+          error_kind: 'http',
+          correlation_id: correlationId,
+          retryable: true,
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
 
     const aiData = await aiResponse.json();
     // Extract text from Responses API output
