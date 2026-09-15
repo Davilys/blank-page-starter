@@ -268,45 +268,53 @@ export function EmailList({
             </div>
           ) : list.length > 0 ? (
             <>
-              <div className="divide-y">
-                {list.map((email) => (
-                  <button
-                    key={email.id}
-                    onClick={() => onSelectEmail(email)}
-                    aria-current={selectedEmailId === email.id ? 'true' : undefined}
-                    className={cn(
-                      'w-full text-left p-4 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
-                      !email.is_read && 'bg-primary/5',
-                      selectedEmailId === email.id && 'bg-muted',
-                    )}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 mt-1">
-                        <Star className={cn('h-4 w-4', email.is_starred ? 'fill-primary text-primary' : 'text-muted-foreground')} aria-hidden />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className={cn('truncate', !email.is_read && 'font-semibold')}>
-                            {folder === 'sent' ? email.to_email : (email.from_name || email.from_email)}
-                          </p>
-                          <span className="text-xs text-muted-foreground flex items-center gap-1 flex-shrink-0">
-                            <Clock className="h-3 w-3" aria-hidden />
-                            {formatListDate(email.received_at || email.sent_at)}
-                          </span>
+              <div className="divide-y divide-border/60">
+                {list.map((email) => {
+                  const who = folder === 'sent' ? email.to_email : (email.from_name || email.from_email);
+                  const initial = (who || '?').trim().charAt(0).toUpperCase();
+                  const isSelected = selectedEmailId === email.id;
+                  return (
+                    <button
+                      key={email.id}
+                      onClick={() => onSelectEmail(email)}
+                      aria-current={isSelected ? 'true' : undefined}
+                      className={cn(
+                        'relative w-full text-left px-3 py-3 transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+                        isSelected && 'bg-primary/10',
+                      )}
+                    >
+                      {!email.is_read && (
+                        <span className="absolute left-0 top-0 h-full w-[3px] bg-primary" aria-hidden />
+                      )}
+                      <div className="flex items-start gap-2.5">
+                        <div className={cn(
+                          'mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold',
+                          email.is_read ? 'bg-muted text-muted-foreground' : 'bg-primary/15 text-primary',
+                        )} aria-hidden>
+                          {initial}
                         </div>
-                        <p className={cn('text-sm truncate', !email.is_read ? 'text-foreground' : 'text-muted-foreground')}>
-                          {email.subject}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate mt-1 flex items-center gap-1">
-                          {email.has_attachments && <Paperclip className="h-3 w-3 flex-shrink-0" aria-label="Com anexo" />}
-                          {email.snippet?.slice(0, 120)
-                            || email.body_text?.slice(0, 120)
-                            || (email.body_fetched_at ? '(Mensagem sem texto)' : 'Conteúdo ainda não carregado')}
-                        </p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className={cn('truncate text-sm', !email.is_read && 'font-semibold')}>{who}</p>
+                            <span className="flex-shrink-0 text-[11px] text-muted-foreground">
+                              {formatListDate(email.received_at || email.sent_at)}
+                            </span>
+                          </div>
+                          <p className={cn('truncate text-sm', !email.is_read ? 'text-foreground font-medium' : 'text-muted-foreground')}>
+                            {email.subject}
+                          </p>
+                          <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
+                            {email.is_starred && <Star className="h-3 w-3 flex-shrink-0 fill-accent text-accent" aria-label="Favorito" />}
+                            {email.has_attachments && <Paperclip className="h-3 w-3 flex-shrink-0" aria-label="Com anexo" />}
+                            {email.snippet?.slice(0, 120)
+                              || email.body_text?.slice(0, 120)
+                              || (email.body_fetched_at ? '(Mensagem sem texto)' : 'Conteúdo ainda não carregado')}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
               {(counts?.filtered ?? 0) > (page + 1) * PAGE_SIZE && (
                 <div className="p-3 flex justify-center">
