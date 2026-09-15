@@ -69,7 +69,7 @@ const quickFilters: { id: EmailFolder; label: string; icon: React.ComponentType<
   { id: 'filter-support', label: 'Suporte', icon: HeadphonesIcon, color: 'text-rose-500' },
 ];
 
-export function EmailSidebar({ currentFolder, onFolderChange, onCompose, stats, isMasterAdmin = false, emailAccounts, selectedAccountId, onAccountChange, unreadByAccount }: EmailSidebarProps) {
+export function EmailSidebar({ currentFolder, onFolderChange, onCompose, stats, isMasterAdmin = false, emailAccounts, selectedAccountId, onAccountChange, unreadByAccount, syncByAccount }: EmailSidebarProps) {
   const [showFilters, setShowFilters] = useState(true);
   const [showTools, setShowTools] = useState(true);
   const [showAccounts, setShowAccounts] = useState(true);
