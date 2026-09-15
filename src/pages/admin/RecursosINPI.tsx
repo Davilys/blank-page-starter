@@ -2436,6 +2436,8 @@ export default function RecursosINPI() {
                 onProceed={({ caseId, files, orientation }) => {
                   setMultipleFiles(files);
                   setUserOrientation(orientation);
+                  setActiveCaseId(caseId);
+                  setExportPackage(null);
                   processDocument({ files, orientation, caseId });
                 }}
               />
@@ -2631,6 +2633,15 @@ export default function RecursosINPI() {
           {/* REVIEW */}
           {step === 'review' && (
             <motion.div key="review" {...fadeIn} className="space-y-4">
+              {activeCaseId && UPGRADED_MODALITIES.includes(resourceType) && (
+                <CaseApprovalPanel
+                  caseId={activeCaseId}
+                  resourceId={currentResourceId}
+                  resourceType={resourceType}
+                  content={draftContent}
+                  onPackageReady={setExportPackage}
+                />
+              )}
               {extractedData && (
                 <Card className="border-primary/10">
                   <CardHeader className="pb-3">
