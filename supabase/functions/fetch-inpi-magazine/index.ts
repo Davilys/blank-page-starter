@@ -455,18 +455,33 @@ async function tryDownloadRpiXml(rpiNumber: number, sessionCookies: string | nul
         const zip = await JSZip.loadAsync(arrayBuffer);
         const xmlFiles = Object.keys(zip.files).filter(name => name.toLowerCase().endsWith('.xml'));
         if (xmlFiles.length > 0) {
-          const xmlContent = await zip.files[xmlFiles[0]].async('string');
-          console.log(`Extracted XML from ${xmlFiles[0]}, size: ${xmlContent.length} bytes`);
-          return xmlContent;
+          // Leitura incremental: o XML nunca existe inteiro em memória.
+          await new Promise<void>((resolve, reject) => {
+            (zip.files[xmlFiles[0]] as any)
+              .internalStream('string')
+              .on('data', (chunk: string) => feed(chunk))
+              .on('error', (err: unknown) => reject(err))
+              .on('end', () => resolve())
+              .resume();
+          });
+          console.log(`Streamed XML from ${xmlFiles[0]}`);
+          return { ok: true, sourceUrl: url };
         }
         console.log('No XML files in ZIP');
       } else if (bytes[0] === 0x3C) {
-        const text = new TextDecoder().decode(bytes);
-        if (text.includes('<?xml') || text.includes('<revista') || text.includes('<processo')) {
+        const decoder = new TextDecoder();
+        const head = decoder.decode(bytes.slice(0, 2000));
+        if (head.includes('<?xml') || head.includes('<revista') || head.includes('<processo')) {
           console.log('Got XML directly');
-          return text;
+          const CHUNK = 1 << 20;
+          const streamDecoder = new TextDecoder();
+          for (let off = 0; off < bytes.length; off += CHUNK) {
+            feed(streamDecoder.decode(bytes.subarray(off, Math.min(off + CHUNK, bytes.length)), { stream: true }));
+          }
+          feed(streamDecoder.decode());
+          return { ok: true, sourceUrl: url };
         }
-        if (text.includes('login') || text.includes('id_username')) {
+        if (head.includes('login') || head.includes('id_username')) {
           console.log('Got login page - not authenticated');
         }
       } else {
@@ -482,8 +497,9 @@ async function tryDownloadRpiXml(rpiNumber: number, sessionCookies: string | nul
     }
   }
 
-  return null;
+  return { ok: false, sourceUrl: null };
 }
+
 
 // ========== MAIN HANDLER ==========
 
