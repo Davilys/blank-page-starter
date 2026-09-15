@@ -105,18 +105,24 @@ interface EmailViewProps {
   onReply: () => void;
   onForward?: (email: Email) => void;
   onUseDraftFromAI?: (text: string) => void;
+  /** When true the AI panel lives outside this component (docked column). */
+  aiDocked?: boolean;
+  aiOpen?: boolean;
+  onToggleAI?: () => void;
+  /** Hide the back arrow when the list stays visible beside the reading pane. */
+  hideBack?: boolean;
 }
 
-const TRACKING_MOCK = {
-  opens: 3,
-  lastOpen: '14:22',
-  device: 'Desktop · Chrome',
-  location: 'São Paulo, SP',
-  clicks: 1,
-};
-
-export function EmailView({ email, onBack, onReply, onForward, onUseDraftFromAI }: EmailViewProps) {
-  const [showAI, setShowAI] = useState(false);
+export function EmailView({
+  email, onBack, onReply, onForward, onUseDraftFromAI,
+  aiDocked = false, aiOpen = false, onToggleAI, hideBack = false,
+}: EmailViewProps) {
+  const [showAIDialog, setShowAIDialog] = useState(false);
+  const showAI = aiDocked ? aiOpen : showAIDialog;
+  const setShowAI = (next: boolean | ((prev: boolean) => boolean)) => {
+    if (aiDocked) { onToggleAI?.(); return; }
+    setShowAIDialog(next as never);
+  };
   const [isStarred, setIsStarred] = useState(email.is_starred);
   const [draftText, setDraftText] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -296,16 +302,18 @@ export function EmailView({ email, onBack, onReply, onForward, onUseDraftFromAI 
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* AI Assistant as Dialog/Modal */}
-      <Dialog open={showAI} onOpenChange={setShowAI}>
-        <DialogContent className="max-w-2xl w-full p-0 gap-0 overflow-hidden max-h-[90vh]">
-          <AIEmailAssistant
-            email={email}
-            onUseDraft={handleUseDraft}
-            onClose={() => setShowAI(false)}
-          />
-        </DialogContent>
-      </Dialog>
+      {/* AI Assistant as Dialog/Modal (only when the AI column is not docked) */}
+      {!aiDocked && (
+        <Dialog open={showAIDialog} onOpenChange={setShowAIDialog}>
+          <DialogContent className="max-w-2xl w-full p-0 gap-0 overflow-hidden max-h-[90vh]">
+            <AIEmailAssistant
+              email={email}
+              onUseDraft={handleUseDraft}
+              onClose={() => setShowAIDialog(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Main Email View */}
       <div className="h-full flex flex-col w-full">
@@ -313,9 +321,11 @@ export function EmailView({ email, onBack, onReply, onForward, onUseDraftFromAI 
           {/* Top Toolbar */}
           <CardHeader className="pb-0 pt-2 md:pt-3 px-3 md:px-4 flex-shrink-0">
             <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3">
-              <Button variant="ghost" size="icon" onClick={onBack} className="h-9 w-9 md:h-8 md:w-8 hover:bg-muted">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
+              {!hideBack && (
+                <Button variant="ghost" size="icon" onClick={onBack} className="h-9 w-9 md:h-8 md:w-8 hover:bg-muted">
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              )}
               <div className="flex-1" />
               <div className="flex items-center gap-0.5 md:gap-1">
                 <Button
@@ -397,22 +407,6 @@ export function EmailView({ email, onBack, onReply, onForward, onUseDraftFromAI 
             {/* Subject */}
             <h2 className="text-base md:text-lg font-bold leading-tight mb-2 md:mb-3">{email.subject}</h2>
 
-            {/* Tracking Bar */}
-            <div className="hidden md:flex items-center gap-3 py-2 px-3 bg-muted/30 rounded-xl border border-border/30 text-[10px] text-muted-foreground mb-3">
-              <div className="flex items-center gap-1.5">
-                <Eye className="h-3 w-3 text-primary" />
-                <span className="font-semibold text-foreground">{TRACKING_MOCK.opens}x</span> aberto
-              </div>
-              <div className="w-px h-3 bg-border" />
-              <div className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                Última: {TRACKING_MOCK.lastOpen}
-              </div>
-              <div className="w-px h-3 bg-border" />
-              <span>{TRACKING_MOCK.device}</span>
-              <div className="w-px h-3 bg-border" />
-              <span>{TRACKING_MOCK.location}</span>
-            </div>
           </CardHeader>
 
           <Separator />

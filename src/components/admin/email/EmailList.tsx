@@ -63,9 +63,10 @@ export function EmailList({
   const [internalSearch, setInternalSearch] = useState('');
   const search = (externalSearch ?? internalSearch).trim();
   const [page, setPage] = useState(0);
+  const [tab, setTab] = useState<'all' | 'unread' | 'attachments'>('all');
   const queryClient = useQueryClient();
 
-  useEffect(() => { setPage(0); }, [folder, accountId, search]);
+  useEffect(() => { setPage(0); }, [folder, accountId, search, tab]);
 
   const buildQuery = (countOnly: boolean) => {
     let q = supabase
@@ -77,6 +78,9 @@ export function EmailList({
     else if (folder === 'archived') q = q.eq('is_archived', true);
     else q = q.eq('folder', folder).eq('is_archived', false);
 
+    if (tab === 'unread') q = q.eq('is_read', false);
+    if (tab === 'attachments') q = q.eq('has_attachments', true);
+
     if (search) {
       const term = `%${search.replace(/[%_]/g, '')}%`;
       q = q.or(`subject.ilike.${term},from_email.ilike.${term},from_name.ilike.${term},to_email.ilike.${term},snippet.ilike.${term}`);
@@ -85,7 +89,7 @@ export function EmailList({
   };
 
   const { data: emails, isLoading, isError, isFetching } = useQuery({
-    queryKey: ['emails', folder, accountId, accountEmail, search, page],
+    queryKey: ['emails', folder, accountId, accountEmail, search, page, tab],
     queryFn: async () => {
       if (!accountId) return [] as Email[];
       if (folder === 'scheduled' || folder === 'automated') return [] as Email[];
@@ -131,7 +135,7 @@ export function EmailList({
 
   // Counters come from the database, never from the loaded page.
   const { data: counts } = useQuery({
-    queryKey: ['email-counts', folder, accountId, search],
+    queryKey: ['email-counts', folder, accountId, search, tab],
     queryFn: async () => {
       if (!accountId) return { folder: 0, filtered: 0, unread: 0 };
       const [{ count: filtered }, { count: total }, { count: unread }] = await Promise.all([
@@ -186,20 +190,26 @@ export function EmailList({
     );
   }
 
+  const tabs: { id: typeof tab; label: string }[] = [
+    { id: 'all', label: 'Todos' },
+    { id: 'unread', label: 'Não lidos' },
+    { id: 'attachments', label: 'Com anexo' },
+  ];
+
   return (
     <Card className="h-full flex flex-col border-0 md:border shadow-none md:shadow-sm">
-      <CardHeader className="pb-3 flex-shrink-0 px-3 md:px-6">
+      <CardHeader className="pb-2 flex-shrink-0 px-3 md:px-4 pt-3">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-            <Mail className="h-4 w-4 md:h-5 md:w-5" aria-hidden />
+          <CardTitle className="flex items-center gap-2 text-sm md:text-base">
+            <Mail className="h-4 w-4" aria-hidden />
             {title}
           </CardTitle>
-          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             {search ? (
               <Badge variant="secondary" className="text-[10px]">{counts?.filtered ?? 0} no filtro</Badge>
             ) : (
               <>
-                <Badge variant="secondary" className="text-[10px]">{counts?.folder ?? 0} na pasta</Badge>
+                <Badge variant="secondary" className="text-[10px]">{counts?.folder ?? 0}</Badge>
                 {(counts?.unread ?? 0) > 0 && (
                   <Badge className="text-[10px]">{counts?.unread} não lidos</Badge>
                 )}
@@ -207,14 +217,34 @@ export function EmailList({
             )}
           </div>
         </div>
+
+        <div className="mt-2 flex items-center gap-1 rounded-lg bg-muted/60 p-0.5" role="tablist">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                'flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+                tab === t.id
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
         {externalSearch === undefined && (
-          <div className="relative mt-2 md:mt-3">
+          <div className="relative mt-2">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
             <Input
               placeholder="Buscar emails..."
               value={internalSearch}
               onChange={(e) => setInternalSearch(e.target.value)}
-              className="pl-9 h-9 md:h-10"
+              className="pl-9 h-9"
               aria-label="Buscar emails"
             />
           </div>
@@ -238,45 +268,53 @@ export function EmailList({
             </div>
           ) : list.length > 0 ? (
             <>
-              <div className="divide-y">
-                {list.map((email) => (
-                  <button
-                    key={email.id}
-                    onClick={() => onSelectEmail(email)}
-                    aria-current={selectedEmailId === email.id ? 'true' : undefined}
-                    className={cn(
-                      'w-full text-left p-4 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
-                      !email.is_read && 'bg-primary/5',
-                      selectedEmailId === email.id && 'bg-muted',
-                    )}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 mt-1">
-                        <Star className={cn('h-4 w-4', email.is_starred ? 'fill-primary text-primary' : 'text-muted-foreground')} aria-hidden />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className={cn('truncate', !email.is_read && 'font-semibold')}>
-                            {folder === 'sent' ? email.to_email : (email.from_name || email.from_email)}
-                          </p>
-                          <span className="text-xs text-muted-foreground flex items-center gap-1 flex-shrink-0">
-                            <Clock className="h-3 w-3" aria-hidden />
-                            {formatListDate(email.received_at || email.sent_at)}
-                          </span>
+              <div className="divide-y divide-border/60">
+                {list.map((email) => {
+                  const who = folder === 'sent' ? email.to_email : (email.from_name || email.from_email);
+                  const initial = (who || '?').trim().charAt(0).toUpperCase();
+                  const isSelected = selectedEmailId === email.id;
+                  return (
+                    <button
+                      key={email.id}
+                      onClick={() => onSelectEmail(email)}
+                      aria-current={isSelected ? 'true' : undefined}
+                      className={cn(
+                        'relative w-full text-left px-3 py-3 transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+                        isSelected && 'bg-primary/10',
+                      )}
+                    >
+                      {!email.is_read && (
+                        <span className="absolute left-0 top-0 h-full w-[3px] bg-primary" aria-hidden />
+                      )}
+                      <div className="flex items-start gap-2.5">
+                        <div className={cn(
+                          'mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold',
+                          email.is_read ? 'bg-muted text-muted-foreground' : 'bg-primary/15 text-primary',
+                        )} aria-hidden>
+                          {initial}
                         </div>
-                        <p className={cn('text-sm truncate', !email.is_read ? 'text-foreground' : 'text-muted-foreground')}>
-                          {email.subject}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate mt-1 flex items-center gap-1">
-                          {email.has_attachments && <Paperclip className="h-3 w-3 flex-shrink-0" aria-label="Com anexo" />}
-                          {email.snippet?.slice(0, 120)
-                            || email.body_text?.slice(0, 120)
-                            || (email.body_fetched_at ? '(Mensagem sem texto)' : 'Conteúdo ainda não carregado')}
-                        </p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className={cn('truncate text-sm', !email.is_read && 'font-semibold')}>{who}</p>
+                            <span className="flex-shrink-0 text-[11px] text-muted-foreground">
+                              {formatListDate(email.received_at || email.sent_at)}
+                            </span>
+                          </div>
+                          <p className={cn('truncate text-sm', !email.is_read ? 'text-foreground font-medium' : 'text-muted-foreground')}>
+                            {email.subject}
+                          </p>
+                          <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
+                            {email.is_starred && <Star className="h-3 w-3 flex-shrink-0 fill-accent text-accent" aria-label="Favorito" />}
+                            {email.has_attachments && <Paperclip className="h-3 w-3 flex-shrink-0" aria-label="Com anexo" />}
+                            {email.snippet?.slice(0, 120)
+                              || email.body_text?.slice(0, 120)
+                              || (email.body_fetched_at ? '(Mensagem sem texto)' : 'Conteúdo ainda não carregado')}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
               {(counts?.filtered ?? 0) > (page + 1) * PAGE_SIZE && (
                 <div className="p-3 flex justify-center">
