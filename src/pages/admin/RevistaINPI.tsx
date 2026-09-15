@@ -1675,6 +1675,14 @@ export default function RevistaINPI() {
                                           </div>
                                         </div>
                                       </div>
+
+                                      {/* Consulta sob demanda no INPI (rota WebMarcas) */}
+                                      <InpiLookupPanel
+                                        entry={entry as any}
+                                        controller={lookupController}
+                                        onApplied={() => { void refreshEntryFromDb(entry.id); }}
+                                      />
+
                                     </div>
                                   </div>
                                 </motion.div>
