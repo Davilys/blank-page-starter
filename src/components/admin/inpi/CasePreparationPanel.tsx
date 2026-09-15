@@ -143,6 +143,8 @@ export default function CasePreparationPanel({
             extraction_notes: result.notes,
             extracted_text: result.text,
             page_count: result.pageCount,
+            interpreted_pages: result.interpretedPages,
+            unreadable_pages: result.unreadablePages,
             sheet_names: result.sheetNames,
           })
           .eq('id', row.id);
