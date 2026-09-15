@@ -14,6 +14,157 @@ export type Database = {
   }
   public: {
     Tables: {
+      acordo_parcelas: {
+        Row: {
+          acordo_id: string
+          asaas_payment_id: string | null
+          compensacao_resposta: Json | null
+          compensacao_status: string | null
+          created_at: string
+          data_vencimento: string
+          id: string
+          invoice_url: string | null
+          link_boleto: string | null
+          numero_parcela: number
+          status: string
+          updated_at: string
+          valor_centavos: number
+        }
+        Insert: {
+          acordo_id: string
+          asaas_payment_id?: string | null
+          compensacao_resposta?: Json | null
+          compensacao_status?: string | null
+          created_at?: string
+          data_vencimento: string
+          id?: string
+          invoice_url?: string | null
+          link_boleto?: string | null
+          numero_parcela: number
+          status?: string
+          updated_at?: string
+          valor_centavos: number
+        }
+        Update: {
+          acordo_id?: string
+          asaas_payment_id?: string | null
+          compensacao_resposta?: Json | null
+          compensacao_status?: string | null
+          created_at?: string
+          data_vencimento?: string
+          id?: string
+          invoice_url?: string | null
+          link_boleto?: string | null
+          numero_parcela?: number
+          status?: string
+          updated_at?: string
+          valor_centavos?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "acordo_parcelas_acordo_id_fkey"
+            columns: ["acordo_id"]
+            isOneToOne: false
+            referencedRelation: "acordos_cliente"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      acordos_cliente: {
+        Row: {
+          asaas_customer_id: string | null
+          asaas_payment_id_original: string | null
+          auditoria: Json
+          billing_type: string
+          bloqueado_por_pendencia: boolean
+          cancelamento_em: string | null
+          cancelamento_resposta: Json | null
+          cancelamento_status: string
+          cliente_nome: string | null
+          compensacao_resultado: Json | null
+          created_at: string
+          created_by: string | null
+          crm_action_id: string
+          enviado_canais: string[] | null
+          enviado_em: string | null
+          id: string
+          invoice_original_id: string | null
+          juros_centavos: number
+          juros_percentual: number
+          num_parcelas: number
+          primeira_parcela_data: string
+          status: string
+          total_centavos: number
+          updated_at: string
+          user_id: string | null
+          valor_original_centavos: number
+        }
+        Insert: {
+          asaas_customer_id?: string | null
+          asaas_payment_id_original?: string | null
+          auditoria?: Json
+          billing_type?: string
+          bloqueado_por_pendencia?: boolean
+          cancelamento_em?: string | null
+          cancelamento_resposta?: Json | null
+          cancelamento_status?: string
+          cliente_nome?: string | null
+          compensacao_resultado?: Json | null
+          created_at?: string
+          created_by?: string | null
+          crm_action_id: string
+          enviado_canais?: string[] | null
+          enviado_em?: string | null
+          id?: string
+          invoice_original_id?: string | null
+          juros_centavos?: number
+          juros_percentual?: number
+          num_parcelas: number
+          primeira_parcela_data: string
+          status?: string
+          total_centavos: number
+          updated_at?: string
+          user_id?: string | null
+          valor_original_centavos: number
+        }
+        Update: {
+          asaas_customer_id?: string | null
+          asaas_payment_id_original?: string | null
+          auditoria?: Json
+          billing_type?: string
+          bloqueado_por_pendencia?: boolean
+          cancelamento_em?: string | null
+          cancelamento_resposta?: Json | null
+          cancelamento_status?: string
+          cliente_nome?: string | null
+          compensacao_resultado?: Json | null
+          created_at?: string
+          created_by?: string | null
+          crm_action_id?: string
+          enviado_canais?: string[] | null
+          enviado_em?: string | null
+          id?: string
+          invoice_original_id?: string | null
+          juros_centavos?: number
+          juros_percentual?: number
+          num_parcelas?: number
+          primeira_parcela_data?: string
+          status?: string
+          total_centavos?: number
+          updated_at?: string
+          user_id?: string | null
+          valor_original_centavos?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "acordos_cliente_invoice_original_id_fkey"
+            columns: ["invoice_original_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_permissions: {
         Row: {
           can_delete: boolean | null
@@ -2194,6 +2345,7 @@ export type Database = {
       }
       invoices: {
         Row: {
+          acordo_id: string | null
           amount: number
           asaas_customer_id: string | null
           asaas_invoice_id: string | null
@@ -2221,6 +2373,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          acordo_id?: string | null
           amount: number
           asaas_customer_id?: string | null
           asaas_invoice_id?: string | null
@@ -2248,6 +2401,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          acordo_id?: string | null
           amount?: number
           asaas_customer_id?: string | null
           asaas_invoice_id?: string | null
@@ -2275,6 +2429,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "invoices_acordo_id_fkey"
+            columns: ["acordo_id"]
+            isOneToOne: false
+            referencedRelation: "acordos_cliente"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "invoices_contract_id_fkey"
             columns: ["contract_id"]
@@ -4576,6 +4737,7 @@ export type Database = {
         Args: { _role: Database["public"]["Enums"]["app_role"] }
         Returns: boolean
       }
+      has_financial_permission: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
