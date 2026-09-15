@@ -1,5 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import {
+  type AiCallLogEntry,
+  isModelAccessError,
+  isRecursosInpiModality,
+  logAiCall,
+  type ModelConfig,
+  modelConfigErrorMessage,
+  probeRecursosInpiModel,
+  resolveModelConfig,
+} from "../_shared/recursosInpiModel.ts";
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
