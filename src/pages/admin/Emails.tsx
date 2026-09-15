@@ -13,6 +13,7 @@ import { EmailCampaigns } from '@/components/admin/email/EmailCampaigns';
 import { EmailSequences } from '@/components/admin/email/EmailSequences';
 import { EmailMetricsBar } from '@/components/admin/email/EmailMetricsBar';
 import { EmailSyncBar } from '@/components/admin/email/EmailSyncBar';
+import { AIEmailAssistant } from '@/components/admin/email/AIEmailAssistant';
 import { useEmailSync } from '@/hooks/useEmailSync';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -68,6 +69,7 @@ export default function Emails() {
   const [aiDraftBody, setAiDraftBody] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [aiOpen, setAiOpen] = useState(false);
   const [search, setSearch] = useState('');
   const isMobile = useIsMobile();
   const { isMasterAdmin, userId, hasPermission } = useAdminPermissions();
