@@ -25,6 +25,7 @@ import { INPIResourcePDFPreview } from '@/components/admin/INPIResourcePDFPrevie
 import { INPILegalChatDialog } from '@/components/admin/inpi/INPILegalChatDialog';
 import { EvidenceGallery, type EvidenceRow } from '@/components/admin/inpi/EvidenceGallery';
 import CasePreparationPanel from '@/components/admin/inpi/CasePreparationPanel';
+import CaseApprovalPanel, { type ExportPackageState } from '@/components/admin/inpi/CaseApprovalPanel';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface ExtractedData {
@@ -379,6 +380,8 @@ export default function RecursosINPI() {
   const [adjustmentNotes, setAdjustmentNotes] = useState('');
   const [isAdjusting, setIsAdjusting] = useState(false);
   const [currentResourceId, setCurrentResourceId] = useState<string | null>(null);
+  const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
+  const [exportPackage, setExportPackage] = useState<ExportPackageState | null>(null);
   const [resources, setResources] = useState<INPIResource[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showPDFPreview, setShowPDFPreview] = useState(false);
