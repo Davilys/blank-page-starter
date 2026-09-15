@@ -106,6 +106,7 @@ export function BillingSituationSection({
   data, loading, canViewValues, period, customFrom, customTo, filters, activeSituation,
   clients, accounts, onPeriodChange, onCustomFromChange, onCustomToChange, onFiltersChange, onSituationChange,
 }: BillingSituationSectionProps) {
+  const navigate = useNavigate();
   const [graphView, setGraphView] = React.useState(false);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
   const activeFilters = Object.values(filters).filter(Boolean).length;
