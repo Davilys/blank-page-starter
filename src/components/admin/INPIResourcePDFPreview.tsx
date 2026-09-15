@@ -877,7 +877,7 @@ export async function generateNativePDF(opts: NativePDFOptions): Promise<Blob | 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (gs) (pdf as any).setGState(gs);
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(30);
+      pdf.setFontSize(draftStamp.length > 24 ? 17 : 26);
       pdf.setTextColor(200, 40, 40);
       pdf.text(draftStamp, A4_W_MM / 2, A4_H_MM / 2, { align: 'center', angle: 38 });
       pdf.restoreGraphicsState();
