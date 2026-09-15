@@ -88,6 +88,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   vencido:  { label: 'Vencida',   color: 'text-red-400',     bg: 'bg-red-500/10 border border-red-500/20',         dot: 'bg-red-400',     glow: 'shadow-red-500/20'     },
   vencidas: { label: 'Vencida',   color: 'text-red-400',     bg: 'bg-red-500/10 border border-red-500/20',         dot: 'bg-red-400',     glow: 'shadow-red-500/20'     },
   inativo:  { label: 'Cancelada', color: 'text-muted-foreground', bg: 'bg-muted/40 border border-border',          dot: 'bg-muted-foreground', glow: '' },
+  inativas: { label: 'Cancelada', color: 'text-muted-foreground', bg: 'bg-muted/40 border border-border',          dot: 'bg-muted-foreground', glow: '' },
 };
 
 const PAYMENT_OPTIONS = {
@@ -537,7 +538,7 @@ export default function AdminFinanceiro() {
                 {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
                 {syncing ? 'Sincronizando...' : 'Sincronizar Asaas'}
               </Button>
-              <Button variant="outline" size="sm" onClick={fetchInvoices} className="gap-2 border-border/60">
+              <Button variant="outline" size="sm" onClick={() => { fetchInvoices(); fetchTotals(); }} className="gap-2 border-border/60">
                 <RefreshCw className="h-4 w-4" /> Atualizar
               </Button>
               <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
