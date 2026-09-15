@@ -52,6 +52,7 @@ class RouteErrorBoundary extends Component<{ children: ReactNode }, { error: Err
 }
 
 const PDFTestHarness = lazyWithRetry(() => import("./pages/dev/PDFTestHarness"));
+const INPIPackageTestHarness = lazyWithRetry(() => import("./pages/dev/INPIPackageTestHarness"));
 
 const SectionRedirect = ({ section }: { section: string }) => {
   const navigate = useNavigate();
@@ -219,6 +220,9 @@ const App = () => (
               <Route path="/" element={<Index />} />
               {import.meta.env.DEV && (
                 <Route path="/__pdf-test" element={<PDFTestHarness />} />
+              )}
+              {import.meta.env.DEV && (
+                <Route path="/__inpi-package-test" element={<INPIPackageTestHarness />} />
               )}
               <Route path="/registro" element={<Navigate to="/registrar" replace />} />
               <Route path="/registrar" element={<Registrar />} />
