@@ -1087,12 +1087,30 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
 
   const getEvidenceSrc = (ev?: ResourceEvidence) => ev?.dataUrl || ev?.signedUrl || '';
 
-  const findEvidenceBySlug = (slug: string) =>
-    evidences.find((e) => {
-      const cap = (e.caption || '').toLowerCase();
-      const src = (e.source_file_name || '').toLowerCase();
-      return cap.includes(slug.replace(/_/g, ' ')) || src.includes(slug);
-    });
+  // Vinculação estrita: [IMG:docNN] / [IMG:docNN_pM] resolvem pelo ID do
+  // documento e pela página. Nada é escolhido por semelhança de nome.
+  const findEvidenceBySlug = (slug: string): ResourceEvidence | undefined => {
+    if (!hasInventory) return undefined;
+    const res = resolveMarker(`[IMG:${slug}]`, null, slug, inventoryItems);
+    if (res.kind !== 'doc') return undefined;
+    return activeEvidences.find((e) => e.id === res.item.id);
+  };
+
+  const markerPendencies: string[] = (() => {
+    const out: string[] = [];
+    const re = /\[(DOC:(\d{1,3})|IMG:([a-z0-9_\-]+))\]/gi;
+    const seen = new Set<string>();
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(bodyContent)) !== null) {
+      if (seen.has(m[0].toLowerCase())) continue;
+      seen.add(m[0].toLowerCase());
+      if (!hasInventory) continue;
+      const res = resolveMarker(m[0], m[2] ? parseInt(m[2], 10) : null, m[3] ? m[3].toLowerCase() : null, inventoryItems);
+      if (res.kind === 'unresolved') out.push(`${m[0]} — ${res.reason}`);
+    }
+    return out;
+  })();
+
 
   type EvidenceMarker = { type: 'doc' | 'img'; n?: number; slug?: string };
 
