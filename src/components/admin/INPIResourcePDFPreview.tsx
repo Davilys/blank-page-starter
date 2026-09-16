@@ -1082,7 +1082,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
   const isProcuradorPetition = resourceType === 'troca_procurador' || resourceType === 'nomeacao_procurador';
   const isOposicao = resourceType === 'oposicao';
   const isExigenciaMerito = resourceType === 'exigencia_merito';
-  const cleanedContent = stripOpeningMarkers(softCleanMarkdown(liveContent));
+  const cleanedContent = normalizeMarkers(stripOpeningMarkers(softCleanMarkdown(liveContent)));
   const bodyContent = stripClosingFromContent(cleanedContent, resourceType);
 
   const getEvidenceSrc = (ev?: ResourceEvidence) => ev?.dataUrl || ev?.signedUrl || '';
