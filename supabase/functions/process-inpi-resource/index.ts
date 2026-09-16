@@ -1034,13 +1034,13 @@ ${resourceTypeLabel}
 MARCA: [NOME DA MARCA EXTRAÍDO DO PDF]
 ═══════════════════════════════════════════════════════════
 
-EXCELENTÍSSIMO SENHOR PRESIDENTE DA DIRETORIA DE MARCAS,
-PATENTES E DESENHOS INDUSTRIAIS DO INSTITUTO NACIONAL
-DA PROPRIEDADE INDUSTRIAL – INPI
+${ADDRESSEE_BY_TYPE.exigencia_merito}
 
 Processo INPI nº: [extraído]
-Marca: [extraído + natureza]
-Classe NCL (12ª Ed.): [extraído + especificação completa]
+Marca: [extraído]
+Apresentação: [nominativa/mista/figurativa conforme o documento oficial; se não constar, "a conferir no espelho oficial"]
+Classe NCL: [classe extraída]
+Especificação do pedido: [transcrição da especificação oficial; nunca a descrição genérica da classe]
 Titular/Requerente: [extraído]
 Examinador(a): [quando identificável]
 Procurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79
