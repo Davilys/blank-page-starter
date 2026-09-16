@@ -18,6 +18,7 @@ import {
 import { rasterizePdfPages, imageToDataUrl } from '@/lib/inpi/packageBuilder';
 
 interface CaseDoc {
+  doc_number: number;
   id: string;
   category: CaseCategory;
   file_name: string;
@@ -81,7 +82,7 @@ export default function CasePreparationPanel({
   const reloadDocs = useCallback(async (id: string) => {
     const { data, error } = await supabase
       .from('inpi_case_documents')
-      .select('id, category, file_name, byte_size, sha256, storage_path, extraction_status, extraction_notes, review_status, page_count, interpreted_pages, unreadable_pages, vision_read_pages')
+      .select('id, doc_number, category, file_name, byte_size, sha256, storage_path, extraction_status, extraction_notes, review_status, page_count, interpreted_pages, unreadable_pages, vision_read_pages')
       .eq('case_id', id)
       .eq('is_active', true)
       .order('created_at', { ascending: true });
@@ -203,7 +204,7 @@ export default function CasePreparationPanel({
           uploaded_by: user.id,
           display_order: docs.length,
         })
-        .select('id, category, file_name, byte_size, sha256, storage_path, extraction_status, extraction_notes, review_status, page_count, interpreted_pages, unreadable_pages, vision_read_pages')
+        .select('id, doc_number, category, file_name, byte_size, sha256, storage_path, extraction_status, extraction_notes, review_status, page_count, interpreted_pages, unreadable_pages, vision_read_pages')
         .single();
       if (insErr) {
         const { error: cleanupError } = await supabase.storage.from(BUCKET).remove([path]);

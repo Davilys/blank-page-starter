@@ -38,6 +38,7 @@ const CATEGORY_LABEL: Record<string, string> = {
 };
 
 interface DocRow {
+  doc_number: number;
   id: string;
   category: string;
   file_name: string;
@@ -54,7 +55,7 @@ function buildDossier(docs: DocRow[]): string {
   return docs
     .map((d, i) => {
       const header =
-        `[DOC:${String(i + 1).padStart(2, '0')}] ${CATEGORY_LABEL[d.category] || d.category} — ` +
+        `[DOC:${String(d.doc_number).padStart(2, '0')}] ${CATEGORY_LABEL[d.category] || d.category} — ` +
         `${d.file_name} (situação da leitura: ${d.extraction_status}` +
         `${d.extraction_notes ? `; ${d.extraction_notes}` : ''})`;
       const body = d.extracted_text
@@ -165,11 +166,13 @@ Deno.serve(async (req) => {
     const { data: docs } = await admin
       .from('inpi_case_documents')
       .select(
-        'id, category, file_name, extraction_status, extraction_notes, extracted_text, sha256, review_status, byte_size',
+        'id, doc_number, category, file_name, extraction_status, extraction_notes, extracted_text, sha256, review_status, byte_size',
       )
       .eq('case_id', caseId)
       .eq('is_active', true)
-      .order('display_order', { ascending: true });
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true });
 
     const documents = (docs || []) as DocRow[];
     if (!documents.length) {
@@ -180,7 +183,7 @@ Deno.serve(async (req) => {
     }
 
     const fingerprint = documents
-      .map((d) => d.sha256 || d.id)
+      .map((d) => JSON.stringify([d.id, d.doc_number, d.category, d.sha256]))
       .sort()
       .join('|');
 

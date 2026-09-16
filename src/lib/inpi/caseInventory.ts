@@ -2,8 +2,8 @@
  * Inventário único de provas por caso — Recursos INPI.
  *
  * Uma só fonte de verdade para consultoria, geração, revisão, prévia e PDF:
- * a lista persistida em `inpi_case_documents`, com número de Doc. estável
- * (ordem de exibição / criação), hash, páginas lidas e a imagem REAL derivada
+ * a lista persistida em `inpi_case_documents`, com doc_number persistente,
+ * hash, páginas lidas e a imagem REAL derivada
  * do arquivo original guardado no armazenamento privado.
  *
  * Regras não negociáveis:
@@ -38,6 +38,8 @@ export interface InventoryItem {
   previewHeight?: number;
   previewPage?: number;
   previewError?: string;
+  /** Assets keyed by actual PDF page; never substitute page 1 for page N. */
+  previewPages?: Record<number, { dataUrl: string; width: number; height: number }>;
 }
 
 export interface CaseInventory {
@@ -48,6 +50,7 @@ export interface CaseInventory {
 }
 
 interface CaseDocRow {
+  doc_number: number;
   id: string;
   case_id: string;
   category: string;
@@ -63,7 +66,7 @@ interface CaseDocRow {
 }
 
 const fingerprint = (rows: CaseDocRow[]) =>
-  rows.map((r) => `${r.id}:${r.sha256 || r.storage_path}`).join('|');
+  rows.map((r) => JSON.stringify([r.id, r.doc_number, r.category, r.sha256 || r.storage_path])).join('|');
 
 /** Localiza o caso vinculado ao recurso e devolve o inventário persistido. */
 export async function loadCaseInventory(resourceId: string): Promise<CaseInventory | null> {
@@ -73,23 +76,30 @@ export async function loadCaseInventory(resourceId: string): Promise<CaseInvento
     .eq('resource_id', resourceId)
     .order('created_at', { ascending: false })
     .limit(1);
-  if (caseErr || !cases?.length) return null;
+  if (caseErr) throw new Error('Não foi possível verificar o vínculo do caso.');
+  if (!cases?.length) return null;
   const caseId = (cases[0] as { id: string }).id;
 
   const { data, error } = await supabase
     .from('inpi_case_documents')
     .select(
-      'id, case_id, category, file_name, storage_path, sha256, page_count, interpreted_pages, extraction_status, conversion_status, display_order, created_at',
+      'id, doc_number, case_id, category, file_name, storage_path, sha256, page_count, interpreted_pages, extraction_status, conversion_status, display_order, created_at',
     )
     .eq('case_id', caseId)
+    .eq('is_active', true)
     .order('display_order', { ascending: true })
-    .order('created_at', { ascending: true });
-  if (error || !data?.length) return null;
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true });
+  if (error) throw new Error('Não foi possível carregar os documentos ativos do caso.');
+  if (!data?.length) throw new Error('O caso vinculado não contém documentos ativos.');
 
   const rows = data as unknown as CaseDocRow[];
-  const items: InventoryItem[] = rows.map((r, i) => ({
+  if (rows.some(r => !Number.isInteger(r.doc_number) || r.doc_number < 1)) {
+    throw new Error('Numeração documental indisponível. Aplique a migração antes de exportar.');
+  }
+  const items: InventoryItem[] = rows.map((r) => ({
     id: r.id,
-    docNumber: i + 1,
+    docNumber: r.doc_number,
     caseId: r.case_id,
     fileName: r.file_name,
     category: r.category,
@@ -114,7 +124,7 @@ async function downloadDoc(path: string): Promise<Blob> {
  * Prepara a imagem de referência de cada documento (página 1 do PDF ou a
  * própria imagem), preservando proporção e resolução do original.
  */
-export async function hydrateInventoryPreviews(items: InventoryItem[]): Promise<InventoryItem[]> {
+export async function hydrateInventoryPreviews(items: InventoryItem[], content = ''): Promise<InventoryItem[]> {
   return Promise.all(
     items.map(async (item) => {
       const ext = fileExtension(item.fileName);
@@ -124,12 +134,24 @@ export async function hydrateInventoryPreviews(items: InventoryItem[]): Promise<
         if (isImageExt(ext)) {
           const dataUrl = await imageToDataUrl(blob);
           const dims = await measure(dataUrl);
-          return { ...item, previewDataUrl: dataUrl, previewPage: 1, ...dims };
+          return { ...item, previewDataUrl: dataUrl, previewPage: 1, ...dims,
+            previewPages: { 1: { dataUrl, width: dims.previewWidth, height: dims.previewHeight } } };
         }
-        const [first] = await rasterizePdfPages(blob, [1]);
+        const requested = new Set([1]);
+        for (const match of content.matchAll(/\[IMG:([a-z0-9_-]+)\]/gi)) {
+          const resolved = resolveMarker(match[0], null, match[1], items);
+          if (resolved.kind === 'doc' && resolved.item.id === item.id) requested.add(resolved.page);
+        }
+        const pages = await rasterizePdfPages(blob, [...requested].sort((a, b) => a - b));
+        const first = pages.find((page) => page.page === 1);
         if (!first) return { ...item, previewError: 'Página 1 não pôde ser renderizada.' };
+        const previewPages: NonNullable<InventoryItem['previewPages']> = {};
+        for (const page of pages) {
+          const size = await measure(page.dataUrl);
+          previewPages[page.page] = { dataUrl: page.dataUrl, width: size.previewWidth, height: size.previewHeight };
+        }
         const dims = await measure(first.dataUrl);
-        return { ...item, previewDataUrl: first.dataUrl, previewPage: first.page, ...dims };
+        return { ...item, previewDataUrl: first.dataUrl, previewPage: first.page, previewPages, ...dims };
       } catch (err) {
         return { ...item, previewError: err instanceof Error ? err.message : 'Arquivo inacessível.' };
       }
@@ -138,10 +160,10 @@ export async function hydrateInventoryPreviews(items: InventoryItem[]): Promise<
 }
 
 async function measure(dataUrl: string): Promise<{ previewWidth: number; previewHeight: number }> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve({ previewWidth: img.naturalWidth, previewHeight: img.naturalHeight });
-    img.onerror = () => resolve({ previewWidth: 800, previewHeight: 1000 });
+    img.onerror = () => reject(new Error('Não foi possível decodificar a imagem da prova.'));
     img.src = dataUrl;
   });
 }
@@ -207,6 +229,9 @@ export function resolveMarker(
     const n = parseInt(m[1], 10);
     const page = m[2] ? parseInt(m[2], 10) : 1;
     const item = items.find((i) => i.docNumber === n);
+    if (!Number.isInteger(page) || page < 1 || (item?.pageCount != null && page > item.pageCount)) {
+      return { kind: 'unresolved', raw, reason: 'Página solicitada não existe no documento.' };
+    }
     return item
       ? { kind: 'doc', item, page }
       : { kind: 'unresolved', raw, reason: `Doc. ${String(n).padStart(2, '0')} não consta no acervo do caso.` };

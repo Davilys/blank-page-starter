@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
 
     const { data: docs } = await admin
       .from('inpi_case_documents')
-      .select('id, category, file_name, extraction_status, extraction_notes, extracted_text, interpreted_pages, unreadable_pages')
+      .select('id, doc_number, category, file_name, extraction_status, extraction_notes, extracted_text, interpreted_pages, unreadable_pages')
       .eq('case_id', caseId)
       .eq('is_active', true)
       .order('display_order', { ascending: true });
@@ -114,7 +114,7 @@ Deno.serve(async (req) => {
       ? documents
           .map((d, i) => {
             const header =
-              `[DOC:${String(i + 1).padStart(2, '0')}] ${CATEGORY_LABEL[d.category] || d.category} — ` +
+              `[DOC:${String(d.doc_number).padStart(2, '0')}] ${CATEGORY_LABEL[d.category] || d.category} — ` +
               `${d.file_name} (leitura: ${d.extraction_status}` +
               `${d.unreadable_pages ? `; ${d.unreadable_pages} página(s) sem conteúdo conferido` : ''})`;
             return (
