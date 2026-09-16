@@ -1227,7 +1227,7 @@ REGRAS OBRIGATÓRIAS:
 // ═══════════════════════════════════════════════════════════
 // MAIN HANDLER
 // ═══════════════════════════════════════════════════════════
-serve(async (req) => {
+const handleRequest = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -1687,7 +1687,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
       ];
 
       console.log('PASS 2 only: Generating Sections V-VIII...');
-      const pass2Result = await callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25, 300000, makeCtx('pass2'));
+      const pass2Result = await callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 20000, 0.25, 300000, makeCtx('pass2'));
       if (pass2Result.error) {
         const cfg = modelFailureResponse(pass2Result);
         if (cfg) return cfg;
@@ -1751,9 +1751,9 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     console.time('ai_generation');
     const [extractionResult, pass1Result, pass2Result] = await Promise.all([
       callOpenAI(OPENAI_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, 800, 0.1, 60000, makeCtx('extracao')),
-      callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 9000, 0.25, 300000, makeCtx('pass1')),
+      callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 20000, 0.25, 300000, makeCtx('pass1')),
       shouldRunPass2Now
-        ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25, 300000, makeCtx('pass2'))
+        ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 20000, 0.25, 300000, makeCtx('pass2'))
         : Promise.resolve({ content: '', error: undefined as string | undefined, status: undefined as number | undefined, errorKind: undefined as string | undefined }),
     ]);
     console.timeEnd('ai_generation');
@@ -1858,4 +1858,48 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
+};
+
+// A geração pode levar vários minutos. O runtime encerra a requisição se ficar
+// 150s sem enviar bytes, então respondemos em streaming: espaços em branco
+// (ignorados pelo JSON.parse do cliente) mantêm a conexão viva até o resultado.
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  const work = handleRequest(req);
+  const encoder = new TextEncoder();
+  let settled: { status: number; body: string } | null = null;
+
+  const ready = work.then(
+    async (res) => {
+      settled = { status: res.status, body: await res.text() };
+    },
+    (err) => {
+      settled = {
+        status: 500,
+        body: JSON.stringify({ error: err instanceof Error ? err.message : 'Erro desconhecido' }),
+      };
+    },
+  );
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      let done = false;
+      ready.then(() => { done = true; });
+      while (!done) {
+        await Promise.race([ready, new Promise((r) => setTimeout(r, 15000))]);
+        if (!done) controller.enqueue(encoder.encode(' '));
+      }
+      controller.enqueue(encoder.encode(settled?.body ?? '{"error":"Erro desconhecido"}'));
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 });
+
