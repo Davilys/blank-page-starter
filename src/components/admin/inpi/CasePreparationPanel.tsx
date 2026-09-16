@@ -258,6 +258,22 @@ export default function CasePreparationPanel({
     })();
   };
 
+  /**
+   * Recupera o arquivo para leitura visual. Depois de recarregar a página o blob
+   * não está mais em memória: baixa do armazenamento privado do caso.
+   */
+  const runVisionReadById = async (doc: CaseDoc) => {
+    if (visionBusy.has(doc.id)) return;
+    const cached = localFiles.current.get(doc.id);
+    if (cached) { await runVisionRead(doc.id, cached); return; }
+    if (!doc.storage_path) { toast.error('Arquivo indisponível para leitura visual.'); return; }
+    const { data, error } = await supabase.storage.from('inpi-recursos-docs').download(doc.storage_path);
+    if (error || !data) { toast.error('Não foi possível recuperar o arquivo do armazenamento.'); return; }
+    const file = new File([data], doc.file_name, { type: data.type || 'application/octet-stream' });
+    localFiles.current.set(doc.id, file);
+    await runVisionRead(doc.id, file);
+  };
+
   /** Envia as páginas digitalizadas para leitura visual da IA. */
   const runVisionRead = async (docId: string, file: File) => {
     if (!caseId) return;
@@ -502,11 +518,11 @@ export default function CasePreparationPanel({
                           : ''}
                       </p>
                     </div>
-                    {(d.unreadable_pages || 0) > 0 && localFiles.current.has(d.id) && (
+                    {(d.unreadable_pages || 0) > 0 && (
                       <Button
                         variant="outline" size="sm" className="h-7 text-[11px] shrink-0"
                         disabled={visionBusy.has(d.id)}
-                        onClick={() => runVisionRead(d.id, localFiles.current.get(d.id) as File)}
+                        onClick={() => void runVisionReadById(d)}
                       >
                         {visionBusy.has(d.id)
                           ? <Loader2 className="h-3 w-3 animate-spin" />

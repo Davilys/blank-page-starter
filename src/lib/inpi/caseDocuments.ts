@@ -286,13 +286,26 @@ export async function extractContent(file: File): Promise<ExtractionResult> {
     return {
       status: 'falha',
       text: null,
-      notes: err instanceof Error ? err.message : 'Falha na leitura do arquivo.',
+      notes: readableFailure(err),
       pageCount: null,
       interpretedPages: null,
       unreadablePages: null,
       sheetNames: null,
     };
   }
+}
+
+/** Traduz falhas técnicas de leitura em motivo compreensível para o usuário. */
+export function readableFailure(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err ?? '');
+  const t = raw.toLowerCase();
+  if (t.includes('password')) {
+    return 'PDF protegido por senha. Remova a proteção e envie novamente.';
+  }
+  if (t.includes('invalid pdf') || t.includes('corrupt') || t.includes('xref')) {
+    return 'Arquivo PDF danificado ou incompleto. Gere o arquivo novamente e reenvie.';
+  }
+  return raw || 'Falha na leitura do arquivo.';
 }
 
 export const EXTRACTION_LABEL: Record<ExtractionStatus, string> = {
