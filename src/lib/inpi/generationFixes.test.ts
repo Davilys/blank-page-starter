@@ -39,3 +39,18 @@ describe('orientação legível', () => {
     expect(orientationItemText({ fontes: [{ segredo: 'não exibir' }] })).not.toContain('segredo');
   });
 });
+
+describe('preparação dos anexos da geração', () => {
+  it('documenta o cenário que causava input_file sem conteúdo', () => {
+    const mixedParts = [
+      { type: 'text', text: 'Inventário' },
+      { type: 'text', text: '[DOC:01]' },
+      { type: 'file', file: { filename: 'decisão.pdf' } },
+      { type: 'text', text: '[DOC:02]' },
+      { type: 'file', file: { filename: 'prova.pdf' } },
+    ];
+    const attachments = mixedParts.filter((part) => part.type === 'file' || part.type === 'image_url');
+    expect(attachments).toHaveLength(2);
+    expect(attachments.map((part) => part.file?.filename)).toEqual(['decisão.pdf', 'prova.pdf']);
+  });
+});

@@ -322,24 +322,31 @@ function convertToResponsesFormat(userContent: any[]): any[] {
     if (part.type === 'text') {
       parts.push({ type: 'input_text', text: part.text });
     } else if (part.type === 'file') {
-      if (part.file.file_id) {
+      if (typeof part.file?.file_id === 'string' && part.file.file_id.trim()) {
         parts.push({ type: 'input_file', file_id: part.file.file_id });
-      } else {
+      } else if (
+        typeof part.file?.filename === 'string' && part.file.filename.trim()
+        && typeof part.file?.file_data === 'string' && part.file.file_data.trim()
+      ) {
         parts.push({
           type: 'input_file',
           filename: part.file.filename,
           file_data: part.file.file_data,
         });
+      } else {
+        throw new Error(`Anexo sem conteúdo preparado: ${part.file?.filename || 'arquivo sem nome'}`);
       }
     } else if (part.type === 'image_url') {
-      if (part.image_url.file_id) {
+      if (typeof part.image_url?.file_id === 'string' && part.image_url.file_id.trim()) {
         parts.push({ type: 'input_image', file_id: part.image_url.file_id, detail: 'high' });
-      } else {
+      } else if (typeof part.image_url?.url === 'string' && part.image_url.url.trim()) {
         parts.push({
           type: 'input_image',
           image_url: part.image_url.url,
           detail: 'high',
         });
+      } else {
+        throw new Error(`Imagem sem conteúdo preparado: ${part.image_url?.filename || 'imagem sem nome'}`);
       }
     }
   }
@@ -404,10 +411,21 @@ async function maybeReplaceFilePartsWithFileIds(
   sourceFiles: SourceFileRef[],
 ): Promise<string[]> {
   const failedFiles: string[] = [];
-  if (fileParts.length === 0 || sourceFiles.length !== fileParts.length) return failedFiles;
+  const attachmentParts = fileParts.filter((part) => part?.type === 'file' || part?.type === 'image_url');
+  if (attachmentParts.length === 0 && sourceFiles.length === 0) return failedFiles;
+  if (attachmentParts.length !== sourceFiles.length) {
+    console.error('inpi_attachment_pairing_failed', {
+      attachmentParts: attachmentParts.length,
+      sourceFiles: sourceFiles.length,
+    });
+    return [
+      ...sourceFiles.map((source, index) => source.name || `arquivo-${index + 1}`),
+      ...(sourceFiles.length === 0 ? ['anexo sem origem'] : []),
+    ];
+  }
 
-  for (let i = 0; i < fileParts.length; i++) {
-    const part = fileParts[i];
+  for (let i = 0; i < attachmentParts.length; i++) {
+    const part = attachmentParts[i];
     const src = sourceFiles[i];
     const filename = src?.name || (part.type === 'file' ? part.file?.filename : 'image');
     if ((!src?.base64 && !src?.bytes) || !src?.type) {
