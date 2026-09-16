@@ -2733,6 +2733,27 @@ export default function RecursosINPI() {
                     </div>
                     <div>
                       <h3 className="text-xl font-bold mb-2">{agent.name} Processando</h3>
+                      {processingStage && !processingError && (
+                        <p className="text-sm font-medium text-primary mb-2">{processingStage}…</p>
+                      )}
+                      {processingError && (
+                        <div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-left">
+                          <p className="text-sm text-destructive font-medium mb-3">{processingError}</p>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => lastJobRequest && startGenerationJob(lastJobRequest.caseId, lastJobRequest.orientation, 'retry')}
+                              disabled={!lastJobRequest}
+                              className="rounded-xl"
+                            >
+                              Tentar de novo
+                            </Button>
+                            <Button size="sm" variant="outline" className="rounded-xl" onClick={() => { setProcessingError(null); setStep('upload'); }}>
+                              Voltar aos documentos
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                       <p className="text-muted-foreground">
                         {resourceType === 'notificacao_extrajudicial' 
                           ? `Elaborando Notificação Extrajudicial com estratégia "${agent.style}" e fundamentação legal completa...`
