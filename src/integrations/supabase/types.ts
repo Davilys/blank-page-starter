@@ -6141,6 +6141,10 @@ export type Database = {
         Returns: boolean
       }
       has_financial_permission: { Args: { _user_id: string }; Returns: boolean }
+      has_inpi_resources_access: {
+        Args: { _need_edit?: boolean; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
