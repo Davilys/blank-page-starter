@@ -352,6 +352,8 @@ function convertToResponsesFormat(userContent: any[]): any[] {
 // pass2) we send the raw bytes once and reference the file_id in
 // every subsequent call.
 // ═══════════════════════════════════════════════════════════
+interface SourceFileRef { base64: string; bytes?: Uint8Array; type: string; name?: string }
+
 function base64ToUint8Array(b64: string): Uint8Array {
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
@@ -398,7 +400,7 @@ async function uploadFileToOpenAI(
 async function maybeReplaceFilePartsWithFileIds(
   apiKey: string,
   fileParts: any[],
-  sourceFiles: Array<{ base64: string; type: string; name?: string }>,
+  sourceFiles: SourceFileRef[],
 ): Promise<string[]> {
   const failedFiles: string[] = [];
   if (fileParts.length === 0 || sourceFiles.length !== fileParts.length) return failedFiles;
@@ -407,13 +409,13 @@ async function maybeReplaceFilePartsWithFileIds(
     const part = fileParts[i];
     const src = sourceFiles[i];
     const filename = src?.name || (part.type === 'file' ? part.file?.filename : 'image');
-    if (!src?.base64 || !src?.type) {
+    if ((!src?.base64 && !src?.bytes) || !src?.type) {
       failedFiles.push(filename || `arquivo-${i + 1}`);
       continue;
     }
 
     try {
-      const bytes = base64ToUint8Array(src.base64);
+      const bytes = src.bytes ?? base64ToUint8Array(src.base64);
       // Drop the request's base64 string before the network request starts;
       // the Uint8Array is the only large buffer alive for this file now.
       src.base64 = '';
@@ -440,25 +442,25 @@ async function maybeReplaceFilePartsWithFileIds(
 
 function appendUploadOnlyFilePart(
   fileParts: any[],
-  sourceFiles: Array<{ base64: string; type: string; name?: string }>,
-  file: { base64?: string; type?: string; name?: string },
+  sourceFiles: SourceFileRef[],
+  file: { base64?: string; type?: string; name?: string; bytes?: Uint8Array },
   fallbackName: string,
 ) {
-  if (!file?.base64 || !file?.type) return;
+  if ((!file?.base64 && !file?.bytes) || !file?.type) return;
   const filename = file.name || fallbackName;
   if (file.type === 'application/pdf') {
     fileParts.push({ type: 'file', file: { filename } });
-    sourceFiles.push({ base64: file.base64, type: 'application/pdf', name: filename });
+    sourceFiles.push({ base64: file.base64 || '', bytes: file.bytes, type: 'application/pdf', name: filename });
   } else if (file.type.startsWith('image/')) {
     fileParts.push({ type: 'image_url', image_url: { filename } });
-    sourceFiles.push({ base64: file.base64, type: file.type, name: filename });
+    sourceFiles.push({ base64: file.base64 || '', bytes: file.bytes, type: file.type, name: filename });
   }
 }
 
 async function uploadAndPrepareFileParts(
   apiKey: string,
   fileParts: any[],
-  sourceFiles: Array<{ base64: string; type: string; name?: string }>,
+  sourceFiles: SourceFileRef[],
   originalFiles?: any[],
 ): Promise<any[]> {
   const failedFiles = await maybeReplaceFilePartsWithFileIds(apiKey, fileParts, sourceFiles);
@@ -1457,7 +1459,7 @@ const handleRequest = async (req: Request): Promise<Response> => {
       const systemPrompt = buildNotificacaoPrompt(currentDate, notificanteData || {}, notificadoData || {}, userInstructions || '', agentStrategy, agentName);
       
       const fileParts: any[] = [];
-      const sourceFilesForUpload: Array<{ base64: string; type: string; name?: string }> = [];
+      const sourceFilesForUpload: SourceFileRef[] = [];
       if (files && Array.isArray(files)) {
         for (const file of files) appendUploadOnlyFilePart(fileParts, sourceFilesForUpload, file, file?.type === 'application/pdf' ? 'doc.pdf' : 'image');
       }
@@ -1571,7 +1573,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
 
       // Build user content parts for OpenAI Responses API
       const fileParts: any[] = [];
-      const sourceFilesForUpload: Array<{ base64: string; type: string; name?: string }> = [];
+      const sourceFilesForUpload: SourceFileRef[] = [];
 
       if (files && Array.isArray(files)) {
         for (const file of files) appendUploadOnlyFilePart(fileParts, sourceFilesForUpload, file, file?.type === 'application/pdf' ? 'notificacao.pdf' : 'image');
@@ -1616,7 +1618,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
       const systemPrompt = buildProcuradorPrompt(currentDate, pData, resourceType, agentStrategy, agentName);
       
       const fileParts: any[] = [];
-      const sourceFilesForUpload: Array<{ base64: string; type: string; name?: string }> = [];
+      const sourceFilesForUpload: SourceFileRef[] = [];
       if (files && Array.isArray(files)) {
         for (const file of files) appendUploadOnlyFilePart(fileParts, sourceFilesForUpload, file, file?.type === 'application/pdf' ? 'doc.pdf' : 'image');
       }
@@ -1701,7 +1703,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
 
     // Build file parts for all calls
     const fileParts: any[] = [];
-    const sourceFilesForUpload: Array<{ base64: string; type: string; name?: string }> = [];
+    const sourceFilesForUpload: SourceFileRef[] = [];
     if (multiFiles && multiFiles.length > 0) {
       for (const file of multiFiles) {
         appendUploadOnlyFilePart(fileParts, sourceFilesForUpload, file, file?.type === 'application/pdf' ? 'doc.pdf' : 'image');
@@ -1748,14 +1750,10 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
           .download(doc.storage_path);
         if (dlErr || !blob) { failedDownloads.push(doc.file_name); continue; }
         const bytes = new Uint8Array(await blob.arrayBuffer());
-        let binary = '';
-        for (let i = 0; i < bytes.length; i += 0x8000) {
-          binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-        }
         appendUploadOnlyFilePart(
           fileParts,
           sourceFilesForUpload,
-          { base64: btoa(binary), type: doc.mime_type, name: doc.file_name },
+          { bytes, type: doc.mime_type, name: doc.file_name },
           doc.mime_type === 'application/pdf' ? 'documento_inpi.pdf' : 'image',
         );
       }
