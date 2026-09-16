@@ -2086,11 +2086,87 @@ function dispatchStep(jobId: string, step: string) {
   return call;
 }
 
+// Uma execução é considerada morta quando o sinal de vida (heartbeat) para.
+// Só então outra execução pode assumir o trabalho.
+export const STALE_RUN_MS = 3 * 60 * 1000;
+const HEARTBEAT_MS = 10000;
+const PREPARE_BATCH = 2;
+
+export const INTERRUPTED_MESSAGE =
+  'A geração foi interrompida antes de terminar. Nenhum documento ou orientação foi perdido — use "Tentar de novo" para retomar da etapa que parou.';
+
+/** Um trabalho sem sinal de vida recente pode ser retomado; com sinal, não. */
+export function isRunStale(job: { status?: string; heartbeat_at?: string | null; updated_at?: string | null; created_at?: string | null }, now = Date.now()): boolean {
+  if (job.status !== 'processing') return false;
+  const ref = job.heartbeat_at || job.updated_at || job.created_at;
+  if (!ref) return true;
+  const ts = Date.parse(ref);
+  if (Number.isNaN(ts)) return true;
+  return now - ts > STALE_RUN_MS;
+}
+
+/** Assinatura da versão exata dos documentos ativos do caso. */
+export function documentsSignature(docs: Array<{ id: string; doc_number: number; storage_path?: string | null; file_name?: string | null }>): string {
+  return docs.map((d) => `${d.id}:${d.doc_number}:${d.storage_path || d.file_name || ''}`).join('|');
+}
+
+async function openAiFileExists(apiKey: string, fileId: string): Promise<boolean> {
+  try {
+    const resp = await fetch(`https://api.openai.com/v1/files/${fileId}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    return resp.ok;
+  } catch {
+    return false;
+  }
+}
+
 async function runStep(jobId: string, step: string) {
   const db = adminClient();
-  const { data: job } = await db.from('inpi_generation_jobs').select('*').eq('id', jobId).maybeSingle();
-  if (!job) return;
-  if (job.status !== 'processing') return;
+  const { data: current } = await db.from('inpi_generation_jobs').select('*').eq('id', jobId).maybeSingle();
+  if (!current) return;
+  if (current.status !== 'processing') return;
+
+  // Trava atômica: só assume o trabalho quem não encontra outra execução viva.
+  const runToken = crypto.randomUUID();
+  const staleIso = new Date(Date.now() - STALE_RUN_MS).toISOString();
+  const { data: claimed } = await db
+    .from('inpi_generation_jobs')
+    .update({ run_token: runToken, heartbeat_at: new Date().toISOString() })
+    .eq('id', jobId)
+    .eq('status', 'processing')
+    .or(`run_token.is.null,heartbeat_at.is.null,heartbeat_at.lt.${staleIso}`)
+    .select()
+    .maybeSingle();
+  if (!claimed) {
+    console.log('inpi_job_claim_skipped', { jobId, step });
+    return;
+  }
+  const job = claimed;
+
+  let alive = true;
+  const beat = setInterval(async () => {
+    const { data } = await db
+      .from('inpi_generation_jobs')
+      .update({ heartbeat_at: new Date().toISOString() })
+      .eq('id', jobId)
+      .eq('run_token', runToken)
+      .select('id')
+      .maybeSingle();
+    if (!data) { alive = false; clearInterval(beat); }
+  }, HEARTBEAT_MS);
+
+  // Escrita só é aceita enquanto esta execução continuar sendo a titular.
+  const write = async (patch: Record<string, unknown>) => {
+    const { data } = await db
+      .from('inpi_generation_jobs')
+      .update(patch)
+      .eq('id', jobId)
+      .eq('run_token', runToken)
+      .select('id')
+      .maybeSingle();
+    return Boolean(data);
+  };
 
   const internalHeaders = {
     'Content-Type': 'application/json',
@@ -2099,9 +2175,9 @@ async function runStep(jobId: string, step: string) {
   };
 
   const fail = async (message: string, code?: string) => {
-    await db.from('inpi_generation_jobs').update({
-      status: 'error', error_message: message.substring(0, 900), error_code: code || 'erro',
-    }).eq('id', jobId);
+    await write({
+      status: 'error', error_message: message.substring(0, 900), error_code: code || 'erro', run_token: null,
+    });
   };
 
   const legacy = async (payload: Record<string, unknown>) => {
@@ -2123,18 +2199,116 @@ async function runStep(jobId: string, step: string) {
   };
 
   try {
+    // ── ETAPA 1: preparar os documentos (lotes pequenos, resultado salvo) ──
+    if (step === 'prepare') {
+      const apiKey = Deno.env.get('OPENAI_API_KEY') || '';
+      if (!apiKey) { await fail('Chave da IA não configurada.', 'config'); return; }
+
+      const { data: caseRow, error: caseErr } = await db
+        .from('inpi_resource_cases').select('id, resource_type').eq('id', job.case_id).maybeSingle();
+      if (caseErr) { await fail('Não foi possível consultar o caso. Os documentos foram preservados.', 'case_read_failed'); return; }
+      if (!caseRow) { await fail('Caso não encontrado.', 'case_not_found'); return; }
+
+      const { data: docs, error: docsErr } = await db
+        .from('inpi_case_documents')
+        .select('id, doc_number, file_name, mime_type, storage_path, category, extracted_text, extraction_status')
+        .eq('case_id', job.case_id)
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true });
+      if (docsErr) { await fail('Não foi possível ler os documentos do caso.', 'docs_read_failed'); return; }
+      const active = docs || [];
+      if (active.length === 0) { await fail('Nenhum documento ativo foi encontrado neste caso.', 'sem_documentos'); return; }
+
+      const signature = documentsSignature(active);
+      const stored = (job.prepared_files || null) as { signature?: string; docs?: any[] } | null;
+      // Acervo mudou → o preparo anterior não vale; nunca reutilizar prova de outra versão.
+      const prepared: { signature: string; docs: any[] } =
+        stored && stored.signature === signature && Array.isArray(stored.docs)
+          ? { signature, docs: [...stored.docs] }
+          : { signature, docs: [] };
+
+      const done = new Set(prepared.docs.map((d: any) => d.doc_id));
+      const pending = active.filter((d) => !done.has(d.id));
+      let processed = 0;
+
+      for (const doc of pending) {
+        if (!alive) return;
+        if (processed >= PREPARE_BATCH) break;
+        if (!Number.isInteger(doc.doc_number) || doc.doc_number < 1) {
+          await fail(`Documento sem numeração válida: ${doc.file_name}`, 'doc_sem_numero'); return;
+        }
+        const isPdf = doc.mime_type === 'application/pdf';
+        const isImage = String(doc.mime_type || '').startsWith('image/');
+
+        if (!isPdf && !isImage) {
+          if (!doc.extracted_text?.trim() || doc.extraction_status === 'falha') {
+            await fail(`Não foi possível aproveitar o texto do documento: ${doc.file_name}`, 'texto_indisponivel'); return;
+          }
+          prepared.docs.push({
+            doc_id: doc.id, doc_number: doc.doc_number, file_name: doc.file_name,
+            category: doc.category, kind: 'text', text: doc.extracted_text,
+          });
+        } else {
+          const { data: blob, error: dlErr } = await db.storage.from('inpi-recursos-docs').download(doc.storage_path);
+          if (dlErr || !blob) { await fail(`Arquivo indisponível no acervo: ${doc.file_name}`, 'arquivo_indisponivel'); return; }
+          const bytes = new Uint8Array(await blob.arrayBuffer());
+          const fileId = await uploadFileToOpenAI(apiKey, bytes, doc.file_name, doc.mime_type);
+          if (!fileId) { await fail(`Não foi possível preparar o anexo para a IA: ${doc.file_name}`, 'upload_falhou'); return; }
+          prepared.docs.push({
+            doc_id: doc.id, doc_number: doc.doc_number, file_name: doc.file_name,
+            category: doc.category, kind: isPdf ? 'file' : 'image',
+            mime_type: doc.mime_type, file_id: fileId,
+          });
+        }
+        processed++;
+        if (!(await write({ prepared_files: prepared, stage: 'prepare' }))) return;
+      }
+
+      const remaining = active.length - prepared.docs.length;
+      if (remaining > 0) {
+        if (!(await write({ run_token: null }))) return;
+        dispatchStep(jobId, 'prepare');
+        return;
+      }
+
+      // Confere que os arquivos continuam disponíveis no provedor antes de gerar.
+      for (const entry of prepared.docs) {
+        if (entry.kind === 'text' || !entry.file_id) continue;
+        if (!(await openAiFileExists(apiKey, entry.file_id))) {
+          prepared.docs = prepared.docs.filter((d: any) => d.doc_id !== entry.doc_id);
+          await write({ prepared_files: prepared, run_token: null });
+          dispatchStep(jobId, 'prepare');
+          return;
+        }
+      }
+
+      if (!(await write({ stage: 'pass1', prepared_files: prepared, run_token: null }))) return;
+      dispatchStep(jobId, 'pass1');
+      return;
+    }
+
+    const preparedDocs = (job.prepared_files as any)?.docs;
+    if ((step === 'pass1' || step === 'pass2') && (!Array.isArray(preparedDocs) || preparedDocs.length === 0)) {
+      if (!(await write({ stage: 'prepare', run_token: null }))) return;
+      dispatchStep(jobId, 'prepare');
+      return;
+    }
+
     if (step === 'pass1') {
-      await db.from('inpi_generation_jobs').update({ stage: 'pass1' }).eq('id', jobId);
-      const r = await legacy({ ...base, generationPass: 'pass1' });
+      if (!(await write({ stage: 'pass1' }))) return;
+      const r = await legacy({ ...base, generationPass: 'pass1', preparedFiles: preparedDocs });
       if (!r.ok) {
         await fail(r.data?.error || 'Falha ao escrever a primeira parte da peça.', r.data?.error_kind);
         return;
       }
-      await db.from('inpi_generation_jobs').update({
+      if (!(await write({
         stage: 'pass2',
         pass1_content: r.data.pass1_content || r.data.resource_content || '',
         extracted_data: r.data.extracted_data || null,
-      }).eq('id', jobId);
+        run_token: null,
+      }))) return;
       dispatchStep(jobId, 'pass2');
       return;
     }
@@ -2143,6 +2317,7 @@ async function runStep(jobId: string, step: string) {
       const r = await legacy({
         ...base,
         generationPass: 'pass2',
+        preparedFiles: preparedDocs,
         pass1Content: job.pass1_content || '',
         extractedData: job.extracted_data || {},
       });
@@ -2150,18 +2325,21 @@ async function runStep(jobId: string, step: string) {
         await fail(r.data?.error || 'Falha ao escrever a segunda parte da peça.', r.data?.error_kind);
         return;
       }
-      await db.from('inpi_generation_jobs').update({
+      await write({
         stage: 'concluido',
         status: 'done',
         result_content: r.data.resource_content || '',
         extracted_data: r.data.extracted_data || job.extracted_data,
-      }).eq('id', jobId);
+        run_token: null,
+      });
       return;
     }
 
     await fail(`Etapa desconhecida: ${step}`, 'etapa_invalida');
   } catch (e) {
     await fail((e as Error).message || 'Erro inesperado durante a geração.', 'excecao');
+  } finally {
+    clearInterval(beat);
   }
 }
 
