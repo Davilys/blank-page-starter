@@ -403,6 +403,8 @@ export default function RecursosINPI() {
   const [processingStage, setProcessingStage] = useState<string>('');
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const generationPollVersion = useRef(0);
+  useEffect(() => () => { generationPollVersion.current++; }, []);
   const [lastJobRequest, setLastJobRequest] = useState<{ caseId: string; orientation: string } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [editingResource, setEditingResource] = useState<INPIResource | null>(null);
@@ -519,6 +521,7 @@ export default function RecursosINPI() {
   };
 
   const handleEditResource = (resource: INPIResource) => {
+    generationPollVersion.current++;
     setEditingResource(resource);
     let content = resource.final_content || resource.draft_content || '';
     const data = {
@@ -622,17 +625,21 @@ export default function RecursosINPI() {
   };
 
   const finalizeJobResult = async (job: any, caseId: string) => {
+    if (job.case_id !== caseId || job.status !== 'done' || !job.result_content?.trim()) {
+      throw new Error('A geração não pertence a este caso ou ainda não foi concluída.');
+    }
     const safeExtracted = sanitizeExtractedData(job.extracted_data);
     const safeContent = toSafeString(job.result_content);
     setExtractedData(safeExtracted);
     setDraftContent(safeContent);
 
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: insertedResource, error: insertError } = await supabase
+    let { data: insertedResource, error: insertError } = await supabase
       .from('inpi_resources')
       .insert({
         user_id: user?.id,
-        resource_type: resourceType,
+        generation_job_id: job.id,
+        resource_type: job.resource_type,
         process_number: safeExtracted.process_number || null,
         brand_name: safeExtracted.brand_name || null,
         ncl_class: safeExtracted.ncl_class || null,
@@ -641,13 +648,19 @@ export default function RecursosINPI() {
         legal_basis: safeExtracted.legal_basis || null,
         draft_content: safeContent,
         status: 'pending_review',
-      })
+      } as any)
       .select()
       .single();
+    if (insertError?.code === '23505') {
+      const existing = await supabase.from('inpi_resources').select('*').eq('generation_job_id', job.id).single();
+      insertedResource = existing.data;
+      insertError = existing.error;
+    }
     if (insertError) throw insertError;
+    if (!insertedResource) throw new Error('Não foi possível recuperar a minuta gerada.');
     setCurrentResourceId(insertedResource.id);
 
-    await supabase
+    const { error: linkError } = await supabase
       .from('inpi_resource_cases')
       .update({
         resource_id: insertedResource.id,
@@ -656,6 +669,7 @@ export default function RecursosINPI() {
         brand_name: safeExtracted.brand_name || null,
       })
       .eq('id', caseId);
+    if (linkError) throw new Error('A minuta foi salva, mas não foi possível vinculá-la ao caso. Tente retomar para concluir o vínculo.');
 
     setProcessingProgress(100);
     setTimeout(() => setStep('review'), 400);
@@ -663,15 +677,18 @@ export default function RecursosINPI() {
   };
 
   const pollGenerationJob = async (jobId: string, caseId: string) => {
+    const pollVersion = ++generationPollVersion.current;
     let delay = 3000;
     const deadline = Date.now() + 30 * 60 * 1000;
     let unconfirmed = 0;
     while (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, delay));
+      if (pollVersion !== generationPollVersion.current) return;
       delay = Math.min(delay * 1.3, 12000);
       const { data, error } = await supabase.functions.invoke('process-inpi-resource', {
         body: { action: 'status', job_id: jobId },
       });
+      if (pollVersion !== generationPollVersion.current) return;
       if (error || !data?.job) {
         // Consulta sem resposta não significa que o servidor parou.
         unconfirmed++;
@@ -688,7 +705,10 @@ export default function RecursosINPI() {
         return;
       }
       if (job.status === 'done') {
-        await finalizeJobResult(job, caseId);
+        try { await finalizeJobResult(job, caseId); }
+        catch (error) {
+          setProcessingError(error instanceof Error ? error.message : 'Falha ao salvar a minuta. O resultado da geração foi preservado.');
+        }
         setIsProcessing(false);
         return;
       }
@@ -1254,6 +1274,13 @@ export default function RecursosINPI() {
   };
 
   const resetFlow = () => {
+    generationPollVersion.current++;
+    setActiveCaseId(null);
+    setActiveJobId(null);
+    setLastJobRequest(null);
+    setExportPackage(null);
+    setProcessingError(null);
+    setIsProcessing(false);
     setStep('list');
     setResourceType('');
     setSelectedAgent('mazzola');
@@ -2583,6 +2610,19 @@ export default function RecursosINPI() {
                 agentName={agent.name}
                 agentStrategy={agent.promptExtra}
                 onBack={() => setStep('select-agent')}
+                onResumeJob={(caseId, jobId, orientation) => {
+                  setActiveCaseId(caseId);
+                  setActiveJobId(jobId);
+                  setLastJobRequest({ caseId, orientation });
+                  setProcessingError(null);
+                  setProcessingStage('Recuperando geração salva');
+                  setIsProcessing(true);
+                  setStep('processing');
+                  void pollGenerationJob(jobId, caseId).catch((error) => {
+                    setProcessingError(error instanceof Error ? error.message : 'Falha ao recuperar a geração.');
+                    setIsProcessing(false);
+                  });
+                }}
                 onProceed={({ caseId, files, orientation }) => {
                   setMultipleFiles(files);
                   setUserOrientation(orientation);

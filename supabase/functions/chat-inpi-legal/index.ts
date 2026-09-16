@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { inpiAdminAccess } from '../_shared/inpiAdminAccess.ts';
 import * as pdfjsLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.mjs";
 
 const corsHeaders = {
@@ -314,7 +315,11 @@ serve(async (req) => {
 
   try {
     const { messages, getMetadata } = await req.json();
-
+    const accessClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: req.headers.get('Authorization') || '' } } });
+    const denied = await inpiAdminAccess(accessClient, req.headers.get('Authorization'), !getMetadata);
+    if (denied) return new Response(JSON.stringify({ error: 'Sessão e permissão para Recursos INPI necessárias.' }), {
+      status: denied, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
     // Endpoint especial para metadados (usado pelo frontend para exibir status)
     if (getMetadata) {
       const { data: lastLog } = await supabaseAdmin

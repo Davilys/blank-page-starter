@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { isTrustedInpiStep } from '../_shared/inpiInternalAuth.ts';
+import { advanceResponse, responseStore } from './durableResponse.ts';
 import { isRunStale, documentsSignature, INTERRUPTED_MESSAGE, STALE_RUN_MS } from './runControl.ts';
 import {
   type AiCallLogEntry,
@@ -83,6 +84,7 @@ interface CallContext {
   correlationId: string;
   promptVersion: string;
   logger?: (entry: AiCallLogEntry) => Promise<void>;
+  jobId?: string;
 }
 
 const PROMPT_VERSION = 'recursos-inpi-2026-09-fase1';
@@ -102,6 +104,21 @@ async function callOpenAI(
   ];
 
   const modelConfig: ModelConfig = ctx?.modelConfig ?? { model: 'gpt-5-mini', reasoningEffort: 'minimal', dedicated: false };
+  if (ctx?.jobId && modelConfig.dedicated) {
+    const started = Date.now();
+    const result = await advanceResponse(apiKey, {
+      model: modelConfig.model, input: inputMessages, max_output_tokens: maxTokens,
+      reasoning: { effort: modelConfig.reasoningEffort }, text: { verbosity: 'high' },
+    }, responseStore(adminClient(), ctx.jobId, ctx.operation));
+    if (result.errorKind !== 'provider_pending' && ctx.logger) await ctx.logger({
+      resource_type: ctx.resourceType, operation: ctx.operation, model: modelConfig.model,
+      dedicated_model: true, reasoning_effort: modelConfig.reasoningEffort,
+      prompt_version: ctx.promptVersion, duration_ms: Date.now() - started,
+      status: result.error ? 'error' : 'ok', http_status: result.status ?? 200,
+      error_kind: result.errorKind ?? null, correlation_id: ctx.jobId,
+    });
+    return result;
+  }
   const controller = new AbortController();
   // Modelos de raciocínio levam minutos. O corte é por INATIVIDADE (nenhum byte
   // recebido), não por duração total: a resposta é lida em streaming.
@@ -291,6 +308,10 @@ async function callOpenAI(
         status: 502,
         errorKind: 'truncated',
       }, usage);
+    }
+
+    if (modelConfig.dedicated && finalStatus !== 'completed') {
+      return await finish({ content, error: 'A IA não confirmou a conclusão da resposta.', status: 502, errorKind: 'provider_failed' }, usage);
     }
 
     if (!content) {
@@ -1442,6 +1463,7 @@ const handleRequest = async (req: Request): Promise<Response> => {
       correlationId,
       promptVersion: PROMPT_VERSION,
       logger,
+      jobId: isInternalStep && isDedicatedFlow && typeof body.internalJobId === 'string' ? body.internalJobId : undefined,
     });
 
     // Falha de configuração do modelo dedicado → preserva o trabalho e avisa
@@ -1461,7 +1483,7 @@ const handleRequest = async (req: Request): Promise<Response> => {
     console.log(`[recursos-inpi] type=${resourceType} model=${modelConfig.model} dedicated=${modelConfig.dedicated} corr=${correlationId}`);
 
 
-    const currentDate = new Date().toLocaleDateString('pt-BR', {
+    const currentDate = new Date(isInternalStep && body.internalJobCreatedAt ? body.internalJobCreatedAt : Date.now()).toLocaleDateString('pt-BR', {
       day: 'numeric', month: 'long', year: 'numeric'
     });
 
@@ -1897,10 +1919,11 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
 
 SEÇÕES I A IV JÁ GERADAS:
 ---
-${basePass1Content.substring(0, 6000)}
+${basePass1Content}
 ---
 
 Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo e nível de profundidade. ${resourceType === 'exigencia_merito' ? 'O texto total desta parte deve ter entre 800 e 1.400 palavras — SEJA OBJETIVO.' : 'Priorize fundamentação completa e sem repetição; não alongue o texto artificialmente.'}${userOrientationBlock}${evidenceBlock}` },
+        ...fileResponseParts,
       ];
 
       console.log('PASS 2 only: Generating Sections V-VIII...');
@@ -1967,13 +1990,19 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     const shouldRunPass2Now = requestedPass !== 'pass1';
     console.time('ai_generation');
     const [extractionResult, pass1Result, pass2Result] = await Promise.all([
-      callOpenAI(OPENAI_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, 800, 0.1, 60000, makeCtx('extracao')),
+      callOpenAI(OPENAI_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, isDedicatedFlow ? 8000 : 800, 0.1, 60000, makeCtx('extracao')),
       callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 32000, 0.25, 300000, makeCtx('pass1')),
       shouldRunPass2Now
         ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 32000, 0.25, 300000, makeCtx('pass2'))
         : Promise.resolve({ content: '', error: undefined as string | undefined, status: undefined as number | undefined, errorKind: undefined as string | undefined }),
     ]);
     console.timeEnd('ai_generation');
+
+    // Extraction is a required checkpoint in the dedicated flow. Do not turn
+    // a pending/failed extraction into blank case identifiers.
+    if (isDedicatedFlow && extractionResult.error) {
+      return jsonResponse({ error: extractionResult.error, error_kind: extractionResult.errorKind }, extractionResult.status || 502);
+    }
 
     // Parse extracted data
     let extractedData = {
@@ -1984,6 +2013,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
       const jsonStr = extractionResult.content.replace(/```json\s*/g, '').replace(/```/g, '').trim();
       extractedData = JSON.parse(jsonStr);
     } catch {
+      if (isDedicatedFlow) return jsonResponse({ error: 'A extração dos dados do processo não retornou JSON válido.', error_kind: 'extraction_invalid' }, 502);
       console.warn('Could not parse extraction data, continuing...');
     }
 
@@ -2089,8 +2119,8 @@ const adminClient = () => createClient(
 
 const SELF_URL = `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-inpi-resource`;
 
-function dispatchStep(jobId: string, step: string) {
-  const body = JSON.stringify({ action: 'step', job_id: jobId, step });
+function dispatchStep(jobId: string, step: string, attempt: number) {
+  const body = JSON.stringify({ action: 'step', job_id: jobId, step, attempt });
   const call = fetch(SELF_URL, {
     method: 'POST',
     headers: {
@@ -2100,6 +2130,9 @@ function dispatchStep(jobId: string, step: string) {
       'x-job-dispatch': '1',
     },
     body,
+    signal: AbortSignal.timeout(15000),
+  }).then(response => {
+    if (!response.ok) console.error('inpi_dispatch_rejected', { jobId, step, status: response.status });
   }).catch((e) => console.error('dispatchStep falhou:', (e as Error).message));
   // @ts-ignore EdgeRuntime existe no runtime do Supabase
   if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) EdgeRuntime.waitUntil(call);
@@ -2107,24 +2140,29 @@ function dispatchStep(jobId: string, step: string) {
 }
 
 const HEARTBEAT_MS = 10000;
-const PREPARE_BATCH = 2;
+const PREPARE_BATCH = 1;
 
 async function openAiFileExists(apiKey: string, fileId: string): Promise<boolean> {
   try {
     const resp = await fetch(`https://api.openai.com/v1/files/${fileId}`, {
       headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(15000),
     });
-    return resp.ok;
+    if (resp.ok) return true;
+    if (resp.status === 404) return false;
+    throw new Error(`Falha ao conferir arquivo na IA (HTTP ${resp.status}).`);
   } catch {
-    return false;
+    throw new Error('Não foi possível conferir o arquivo na IA. O preparo foi preservado para nova tentativa.');
   }
 }
 
-async function runStep(jobId: string, step: string) {
+async function runStep(jobId: string, step: string, expectedAttempt: number) {
   const db = adminClient();
   const { data: current } = await db.from('inpi_generation_jobs').select('*').eq('id', jobId).maybeSingle();
   if (!current) return;
   if (current.status !== 'processing') return;
+  if (current.stage !== step) return;
+  if (current.attempt !== expectedAttempt) return;
 
   // Trava atômica: só assume o trabalho quem não encontra outra execução viva.
   const runToken = crypto.randomUUID();
@@ -2134,6 +2172,8 @@ async function runStep(jobId: string, step: string) {
     .update({ run_token: runToken, heartbeat_at: new Date().toISOString() })
     .eq('id', jobId)
     .eq('status', 'processing')
+    .eq('stage', step)
+    .eq('attempt', current.attempt)
     .or(`run_token.is.null,heartbeat_at.is.null,heartbeat_at.lt.${staleIso}`)
     .select()
     .maybeSingle();
@@ -2150,6 +2190,7 @@ async function runStep(jobId: string, step: string) {
       .update({ heartbeat_at: new Date().toISOString() })
       .eq('id', jobId)
       .eq('run_token', runToken)
+      .eq('status', 'processing')
       .select('id')
       .maybeSingle();
     if (!data) { alive = false; clearInterval(beat); }
@@ -2162,6 +2203,7 @@ async function runStep(jobId: string, step: string) {
       .update(patch)
       .eq('id', jobId)
       .eq('run_token', runToken)
+      .eq('status', 'processing')
       .select('id')
       .maybeSingle();
     return Boolean(data);
@@ -2195,6 +2237,8 @@ async function runStep(jobId: string, step: string) {
     agentStrategy: job.agent_strategy || undefined,
     userOrientation: job.user_orientation || undefined,
     caseId: job.case_id || undefined,
+    internalJobId: job.id,
+    internalJobCreatedAt: job.created_at,
   };
 
   try {
@@ -2210,7 +2254,7 @@ async function runStep(jobId: string, step: string) {
 
       const { data: docs, error: docsErr } = await db
         .from('inpi_case_documents')
-        .select('id, doc_number, file_name, mime_type, storage_path, category, extracted_text, extraction_status')
+        .select('id, doc_number, file_name, mime_type, storage_path, category, extracted_text, extraction_status, sha256, version')
         .eq('case_id', job.case_id)
         .eq('is_active', true)
         .order('display_order', { ascending: true })
@@ -2268,7 +2312,7 @@ async function runStep(jobId: string, step: string) {
       const remaining = active.length - prepared.docs.length;
       if (remaining > 0) {
         if (!(await write({ run_token: null }))) return;
-        dispatchStep(jobId, 'prepare');
+        dispatchStep(jobId, 'prepare', job.attempt);
         return;
       }
 
@@ -2278,26 +2322,39 @@ async function runStep(jobId: string, step: string) {
         if (!(await openAiFileExists(apiKey, entry.file_id))) {
           prepared.docs = prepared.docs.filter((d: any) => d.doc_id !== entry.doc_id);
           await write({ prepared_files: prepared, run_token: null });
-          dispatchStep(jobId, 'prepare');
+          dispatchStep(jobId, 'prepare', job.attempt);
           return;
         }
       }
 
       if (!(await write({ stage: 'pass1', prepared_files: prepared, run_token: null }))) return;
-      dispatchStep(jobId, 'pass1');
+      dispatchStep(jobId, 'pass1', job.attempt);
       return;
     }
 
     const preparedDocs = (job.prepared_files as any)?.docs;
     if ((step === 'pass1' || step === 'pass2') && (!Array.isArray(preparedDocs) || preparedDocs.length === 0)) {
       if (!(await write({ stage: 'prepare', run_token: null }))) return;
-      dispatchStep(jobId, 'prepare');
+      dispatchStep(jobId, 'prepare', job.attempt);
       return;
+    }
+
+    const { data: currentDocs, error: currentDocsError } = await db.from('inpi_case_documents')
+      .select('id, doc_number, file_name, storage_path, category, extracted_text, extraction_status, sha256, version')
+      .eq('case_id', job.case_id).eq('is_active', true)
+      .order('display_order', { ascending: true }).order('created_at', { ascending: true }).order('id', { ascending: true });
+    if (currentDocsError) { await fail('Não foi possível conferir a versão dos documentos.', 'docs_read_failed'); return; }
+    if (documentsSignature(currentDocs || []) !== (job.prepared_files as any)?.signature) {
+      await fail('Os documentos mudaram após o preparo. Confirme a orientação atual e inicie uma nova geração.', 'version_changed'); return;
     }
 
     if (step === 'pass1') {
       if (!(await write({ stage: 'pass1' }))) return;
       const r = await legacy({ ...base, generationPass: 'pass1', preparedFiles: preparedDocs });
+      if (r.data?.error_kind === 'provider_pending') {
+        await write({ run_token: null });
+        return; // The next authenticated status request advances the checkpoint.
+      }
       if (!r.ok) {
         await fail(r.data?.error || 'Falha ao escrever a primeira parte da peça.', r.data?.error_kind);
         return;
@@ -2308,7 +2365,7 @@ async function runStep(jobId: string, step: string) {
         extracted_data: r.data.extracted_data || null,
         run_token: null,
       }))) return;
-      dispatchStep(jobId, 'pass2');
+      dispatchStep(jobId, 'pass2', job.attempt);
       return;
     }
 
@@ -2320,6 +2377,10 @@ async function runStep(jobId: string, step: string) {
         pass1Content: job.pass1_content || '',
         extractedData: job.extracted_data || {},
       });
+      if (r.data?.error_kind === 'provider_pending') {
+        await write({ run_token: null });
+        return;
+      }
       if (!r.ok) {
         await fail(r.data?.error || 'Falha ao escrever a segunda parte da peça.', r.data?.error_kind);
         return;
@@ -2372,7 +2433,8 @@ async function handleJobAction(req: Request, body: any): Promise<Response> {
     if (!internal) return jsonResponse({ error: 'Não autorizado' }, 401);
     const jobId = String(body.job_id || '');
     const step = String(body.step || '');
-    const work = runStep(jobId, step);
+    if (!Number.isInteger(body.attempt) || !['prepare', 'pass1', 'pass2'].includes(step)) return jsonResponse({ error: 'Etapa inválida.' }, 400);
+    const work = runStep(jobId, step, body.attempt);
     // @ts-ignore EdgeRuntime existe no runtime do Supabase
     if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) EdgeRuntime.waitUntil(work); else await work;
     return jsonResponse({ accepted: true });
@@ -2391,10 +2453,18 @@ async function handleJobAction(req: Request, body: any): Promise<Response> {
     if (!data) return jsonResponse({ job: null });
     // Quem decide se a execução expirou é o servidor: sem sinal de vida por
     // vários minutos, o trabalho é liberado para nova tentativa.
+    if (data.status === 'processing' && !data.run_token) {
+      // Recover a lost dispatch or poll a pending provider response. The claim
+      // in runStep prevents concurrent polls from buying duplicate generations.
+      dispatchStep(data.id, data.stage, data.attempt);
+      return jsonResponse({ job: data });
+    }
     if (isRunStale(data)) {
-      const { data: closed } = await db.from('inpi_generation_jobs').update({
+      let closing = db.from('inpi_generation_jobs').update({
         status: 'error', error_code: 'interrompido', error_message: INTERRUPTED_MESSAGE, run_token: null,
-      }).eq('id', data.id).eq('status', 'processing').select().maybeSingle();
+      }).eq('id', data.id).eq('status', 'processing').eq('run_token', data.run_token).eq('attempt', data.attempt);
+      closing = data.heartbeat_at ? closing.eq('heartbeat_at', data.heartbeat_at) : closing.is('heartbeat_at', null);
+      const { data: closed } = await closing.select().maybeSingle();
       return jsonResponse({ job: closed || data });
     }
     return jsonResponse({ job: data });
@@ -2405,6 +2475,11 @@ async function handleJobAction(req: Request, body: any): Promise<Response> {
     const caseId = typeof body.caseId === 'string' ? body.caseId : null;
     if (!caseId) return jsonResponse({ error: 'Caso não informado.' }, 400);
     if (!body.resourceType) return jsonResponse({ error: 'Modalidade não informada.' }, 400);
+    if (!isRecursosInpiModality(body.resourceType)) return jsonResponse({ error: 'Modalidade não atendida por este fluxo.' }, 400);
+    const { data: sourceCase, error: sourceError } = await db.from('inpi_resource_cases').select('id, resource_type').eq('id', caseId).maybeSingle();
+    if (sourceError) return jsonResponse({ error: 'Falha ao consultar o caso.' }, 500);
+    if (!sourceCase) return jsonResponse({ error: 'Caso não encontrado.' }, 404);
+    if (sourceCase.resource_type !== body.resourceType) return jsonResponse({ error: 'A modalidade não corresponde ao caso.' }, 409);
 
     const { data: existing } = await db
       .from('inpi_generation_jobs')
@@ -2419,14 +2494,19 @@ async function handleJobAction(req: Request, body: any): Promise<Response> {
       return jsonResponse({ job: existing, resumed: true });
     }
 
-    if (existing && (action === 'retry' || existing.status !== 'processing' || isRunStale(existing))) {
+    if (existing?.status === 'done' && action === 'retry') return jsonResponse({ job: existing, resumed: true });
+
+    if (existing && action === 'retry') {
+      if (existing.user_orientation !== (body.userOrientation || null) || existing.agent_name !== (body.agentName || null)) {
+        return jsonResponse({ error: 'Orientação ou agente mudou. Inicie uma nova geração para esta versão.' }, 409);
+      }
       // Retoma da etapa que falhou, sem refazer o que já ficou pronto.
       const preparedOk = Array.isArray((existing.prepared_files as any)?.docs)
         && (existing.prepared_files as any).docs.length > 0;
-      const resumeStep = !preparedOk
+      const resumeStep = !preparedOk || existing.stage === 'prepare'
         ? 'prepare'
         : (existing.pass1_content && existing.pass1_content.length > 1000 ? 'pass2' : 'pass1');
-      const { data: updated, error: upErr } = await db.from('inpi_generation_jobs').update({
+      let retryQuery = db.from('inpi_generation_jobs').update({
         status: 'processing',
         stage: resumeStep,
         attempt: (existing.attempt || 0) + 1,
@@ -2435,9 +2515,13 @@ async function handleJobAction(req: Request, body: any): Promise<Response> {
         result_content: null,
         run_token: null,
         heartbeat_at: new Date().toISOString(),
-      }).eq('id', existing.id).select().maybeSingle();
+      }).eq('id', existing.id).eq('attempt', existing.attempt).eq('status', existing.status);
+      retryQuery = existing.heartbeat_at ? retryQuery.eq('heartbeat_at', existing.heartbeat_at) : retryQuery.is('heartbeat_at', null);
+      retryQuery = existing.run_token ? retryQuery.eq('run_token', existing.run_token) : retryQuery.is('run_token', null);
+      const { data: updated, error: upErr } = await retryQuery.select().maybeSingle();
       if (upErr) return jsonResponse({ error: 'Não foi possível retomar a geração.' }, 500);
-      dispatchStep(existing.id, resumeStep);
+      if (!updated) return jsonResponse({ error: 'Outra execução já retomou este caso. Atualize o andamento.' }, 409);
+      dispatchStep(existing.id, resumeStep, updated.attempt);
       return jsonResponse({ job: updated, resumed: true });
     }
 
@@ -2453,7 +2537,7 @@ async function handleJobAction(req: Request, body: any): Promise<Response> {
       heartbeat_at: new Date().toISOString(),
     }).select().maybeSingle();
     if (insErr || !created) return jsonResponse({ error: 'Não foi possível iniciar a geração.' }, 500);
-    dispatchStep(created.id, 'prepare');
+    dispatchStep(created.id, 'prepare', created.attempt);
     return jsonResponse({ job: created });
   }
 

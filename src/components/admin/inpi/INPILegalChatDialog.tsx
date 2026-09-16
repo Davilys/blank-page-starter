@@ -240,9 +240,11 @@ Como posso ajudar você hoje?`,
   // Fetch knowledge base metadata on open
   const fetchKnowledgeMeta = useCallback(async () => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Sua sessão expirou. Entre novamente.');
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-inpi-legal`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ getMetadata: true }),
       });
       if (res.ok) {
@@ -425,9 +427,11 @@ Como posso ajudar você hoje?`,
             fileName: m.fileName,
           };
         });
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Sua sessão expirou. Entre novamente.');
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-inpi-legal`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ messages: apiMessages }),
       });
       if (!response.ok) throw new Error('Erro ao conectar com a IA');
