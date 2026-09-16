@@ -107,6 +107,8 @@ export default function CaseApprovalPanel({
   const [approving, setApproving] = useState<string | null>(null);
   const [review, setReview] = useState<ReviewRow | null>(null);
   const [reviewing, setReviewing] = useState(false);
+  /* Conferência humana assumida mesmo com apontamento grave da revisão. */
+  const [overrideAck, setOverrideAck] = useState(false);
 
   const reload = useCallback(async () => {
     const [{ data: d }, { data: a }, { data: o }, { data: r }] = await Promise.all([
@@ -193,11 +195,12 @@ export default function CaseApprovalPanel({
   const reviewBlocking = !!currentReview?.has_blocking;
 
   const draftStamp = useMemo(() => {
+    // Conferida a peça por pessoa responsável, o PDF sai limpo.
+    if (protocolApproval) return null;
     if (summary && !packageComplete) return 'PRÉVIA — PACOTE DOCUMENTAL INCOMPLETO';
     if (reviewBlocking) return 'PRÉVIA — REVISÃO JURÍDICA COM APONTAMENTO GRAVE';
     if (reviewPending) return 'MINUTA — REVISÃO JURÍDICA PENDENTE';
-    if (!protocolApproval) return 'MINUTA — PENDENTE DE CONFERÊNCIA';
-    return null;
+    return 'MINUTA — PENDENTE DE CONFERÊNCIA';
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [protocolApproval, packageComplete, summary, reviewBlocking, reviewPending]);
 
