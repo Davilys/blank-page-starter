@@ -6073,6 +6073,7 @@ export type Database = {
         Args: { _conversation_id: string; _user_id: string }
         Returns: boolean
       }
+      is_master_user: { Args: never; Returns: boolean }
       is_meeting_participant: {
         Args: { _meeting_id: string; _user_id: string }
         Returns: boolean
