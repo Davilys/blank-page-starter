@@ -18,23 +18,29 @@ A prévia e o PDF (`INPIResourcePDFPreview`) leem **somente a lista 2**. Consequ
 ## O que será feito
 
 ### 1. Inventário único de provas por caso e versão
+
 Uma única fonte: os documentos do caso. Cada documento recebe número de Doc. estável, finalidade, hash, páginas lidas e, quando for imagem ou página relevante, a imagem real derivada do arquivo original (sem redesenhar, sem gerar imagem por IA). Consultoria, geração, revisão, aprovação e exportação passam a receber esse mesmo inventário e a mesma versão. A galeria antiga continua legível para os recursos históricos, mas deixa de ser a única origem.
 
 ### 2. Resolver marcadores contra o inventário real
+
 `[DOC:NN]` e `[IMG:...]` passam a resolver para documentos/páginas do inventário, com legenda (documento, página) e link para abrir a página integral. Marcador sem correspondência deixa de virar `(Imagem)` silencioso: aparece como pendência visível na prévia e bloqueia o anúncio de pacote completo. Referência repetida no mesmo parágrafo ("(Doc. 02) (Doc. 02)") é normalizada.
 
 ### 3. Anexos centralizados na etapa Documentos
+
 O botão "Anexar evidências" da Revisão é substituído por "Gerenciar documentos", que volta à etapa inicial preservando texto, orientação e histórico. A lista de provas permanece visível na revisão, com as páginas. Adicionar, substituir, remover ou recategorizar prova cria nova versão do inventário e sinaliza que orientação, peça e conferência precisam ser refeitas — preservando as edições humanas e sem destruir a versão aprovada.
 
 ### 4. Leitura e preservação dos formatos
+
 PDF com texto, PDF digitalizado ou misto, JPG/JPEG/PNG/WEBP, Word, Excel e CSV. Detecção do formato real, integridade, tamanho e proteção; OCR/leitura visual por página com registro de quais páginas foram lidas, parcialmente lidas ou falharam. "Recebido" continua diferente de "Lido". Imagens mantêm proporção, orientação e resolução legível; planilhas mantêm a relação com aba e células em conversão paginada.
 
 ### 5. Um só montador de PDF em todos os caminhos
+
 Prévia, download na revisão, download após aprovação e download pelo histórico passam a usar o mesmo montador e a mesma versão do inventário: peça com as imagens dentro dos argumentos → índice de anexos com páginas → todos os documentos originais, uma vez cada, na ordem conferida. Recorte no corpo e original no anexo convivem (é intencional); a deduplicação por hash não elimina páginas diferentes de um mesmo PDF. Timbre atual preservado na peça e não sobreposto às provas. Os ativos são aguardados antes de exportar.
 
 Marcador não resolvido, arquivo inacessível, conversão falha ou anexo faltante impedem "pacote completo para protocolo" e liberam apenas prévia carimbada com o motivo real. O carimbo de minuta não é removido por o histórico dizer "Aprovado": aprovação interna e conferência para protocolo continuam separadas e presas à versão exata.
 
 ### 6. Conteúdo jurídico — validações das três modalidades
+
 - Apresentação da marca (nominativa/mista), titular, número e serviços vêm do documento oficial; contradição entre cabeçalho e corpo passa a ser apontada e bloqueante.
 - Autoridade de endereçamento correta, sem combinar cargos.
 - A especificação genérica da classe não pode ser apresentada como a especificação concreta do pedido.
@@ -50,4 +56,12 @@ Marcador não resolvido, arquivo inacessível, conversão falha ou anexo faltant
 Cópia isolada do caso BANDA UAU, identificada como teste, sem alterar o aprovado: anexar/recuperar → ler → orientar → gerar → revisar → conferir → exportar → reabrir pelo histórico. O PDF gerado será aberto e conferido visualmente (Instagram e cartaz no contexto do argumento com legenda e página; originais de 2 páginas e comprovante de 1 página nos anexos; índice correto; marcadores resolvidos; timbre preservado; sem conteúdo de outro caso). Também: PDF sem texto, JPG/PNG, arquivo ilegível, imagem inacessível, recarregar a página, alterar prova depois da aprovação, dois casos simultâneos e exportação pelo histórico. As outras duas modalidades são verificadas com documentos fictícios em testes direcionados do mesmo fluxo, sem repetir nove gerações caras. A autenticação não será desativada; o que exigir login de administrador será entregue como pendência nomeada.
 
 ## Entrega
-Uma resposta final com: causas encontradas, arquivos alterados, testes executados e resultado, PDF de teste para conferência e pendências reais. A correção só é declarada validada depois de abrir e conferir o PDF. Nenhuma promessa de validade jurídica ou de deferimento — a conferência do responsável pela peça continua necessária.
+
+Uma resposta final com: causas encontradas, arquivos alterados, testes executados e resultado, PDF de teste para conferência e pendências reais. A correção só é declarada validada depois de abrir e conferir o PDF. Nenhuma promessa de validade jurídica ou de deferimento — a conferência do responsável pela peça continua necessária. Execute o plano com estes requisitos:
+
+1. Persista no banco o inventário e sua versão. O PDF reaberto pelo histórico deve usar exatamente os documentos e o texto da versão conferida, sem depender da sessão atual.
+2. Vincule imagens por **ID do documento e número da página**, sem correspondência aproximada pelo nome. Referência ambígua deve virar pendência, nunca escolher uma prova automaticamente.
+3. Preserve os recursos históricos e as aprovações existentes. Qualquer correção gera uma nova versão; BANDA UAU permanece intacto.
+4. Entregue o PDF de teste com as imagens no corpo, índice e anexos completos, incluindo a verificação após recarregar e reabrir pelo histórico.
+
+**Conclua a implementação e os testes acessíveis nesta entrega.** Se algum teste depender de acesso indisponível, informe exatamente qual ficou pendente e não declare essa parte validada. Não amplie o escopo nem inicie novas rodadas de melhorias.
