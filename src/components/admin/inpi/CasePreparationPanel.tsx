@@ -77,6 +77,20 @@ export default function CasePreparationPanel({
   const inputs = useRef<Record<string, HTMLInputElement | null>>({});
   const caseInitStarted = useRef(false);
 
+  const reloadDocs = useCallback(async (id: string) => {
+    const { data, error } = await supabase
+      .from('inpi_case_documents')
+      .select('id, category, file_name, byte_size, sha256, extraction_status, extraction_notes, review_status, page_count, interpreted_pages, unreadable_pages, vision_read_pages')
+      .eq('case_id', id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true });
+    if (error) {
+      toast.error('Não foi possível atualizar a lista de documentos: ' + error.message);
+      throw error;
+    }
+    setDocs((data || []) as CaseDoc[]);
+  }, []);
+
   /* ── Caso: criado uma única vez por sessão de preparação. ───────────── */
   useEffect(() => {
     if (caseInitStarted.current) return;
@@ -134,20 +148,6 @@ export default function CasePreparationPanel({
     })();
   }, [resourceType, agentId, agentName, reloadDocs]);
 
-  const reloadDocs = useCallback(async (id: string) => {
-    const { data, error } = await supabase
-      .from('inpi_case_documents')
-      .select('id, category, file_name, byte_size, sha256, extraction_status, extraction_notes, review_status, page_count, interpreted_pages, unreadable_pages, vision_read_pages')
-      .eq('case_id', id)
-      .eq('is_active', true)
-      .order('created_at', { ascending: true });
-    if (error) {
-      toast.error('Não foi possível atualizar a lista de documentos: ' + error.message);
-      throw error;
-    }
-    setDocs((data || []) as CaseDoc[]);
-  }, []);
-
   const setAttempt = (id: string, patch: Partial<UploadAttempt>) => {
     setUploadAttempts((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
   };
@@ -161,7 +161,6 @@ export default function CasePreparationPanel({
     const { category, file } = attempt;
     setAttempt(attempt.id, { status: 'enviando', error: null });
     setBusyCategory(category);
-    let uploadedPath: string | null = null;
     try {
       if (file.size > MAX_FILE_BYTES) throw new Error('Arquivo acima de 25 MB.');
 
@@ -182,7 +181,6 @@ export default function CasePreparationPanel({
         upsert: false,
       });
       if (upErr) throw new Error(`Falha no armazenamento: ${upErr.message}`);
-      uploadedPath = path;
 
       const { data: row, error: insErr } = await supabase
         .from('inpi_case_documents')
@@ -203,7 +201,6 @@ export default function CasePreparationPanel({
         .single();
       if (insErr) {
         const { error: cleanupError } = await supabase.storage.from(BUCKET).remove([path]);
-        uploadedPath = null;
         const cleanupNote = cleanupError ? `; limpeza pendente: ${cleanupError.message}` : '';
         throw new Error(`Falha ao vincular ao caso: ${insErr.message}${cleanupNote}`);
       }
@@ -357,11 +354,30 @@ export default function CasePreparationPanel({
       .update({ confirmed_at: new Date().toISOString(), editable_text: orientationText })
       .eq('id', orientation.id);
     if (error) { toast.error(error.message); return; }
-    const files = docs.map((d) => localFiles.current.get(d.id)).filter(Boolean) as File[];
-    if (!files.length) {
-      toast.error('Reanexe os arquivos nesta sessão para gerar a peça.');
-      return;
+    const files: File[] = [];
+    for (const doc of usable) {
+      const localFile = localFiles.current.get(doc.id);
+      if (localFile) {
+        files.push(localFile);
+        continue;
+      }
+
+      const { data: storedFile, error: downloadError } = await supabase.storage
+        .from(BUCKET)
+        .download(doc.storage_path);
+      if (downloadError || !storedFile) {
+        toast.error(
+          `${doc.file_name}: não foi possível recuperar o arquivo (${downloadError?.message || 'arquivo indisponível'}).`,
+        );
+        return;
+      }
+      const restoredFile = new File([storedFile], doc.file_name, {
+        type: storedFile.type || 'application/octet-stream',
+      });
+      localFiles.current.set(doc.id, restoredFile);
+      files.push(restoredFile);
     }
+    if (!files.length) { toast.error('Anexe ao menos um arquivo utilizável.'); return; }
     onProceed({ caseId, files, orientation: orientationText });
   };
 
