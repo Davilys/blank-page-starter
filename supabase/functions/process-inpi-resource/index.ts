@@ -550,6 +550,26 @@ function cleanAIContent(raw: string): string {
 // ═══════════════════════════════════════════════════════════
 // HELPER: Build mandatory opening block deterministically
 // ═══════════════════════════════════════════════════════════
+/*
+ * Endereçamento por modalidade. Não existe autoridade combinada:
+ * o recurso contra indeferimento é dirigido ao Presidente do INPI (art. 212 da LPI);
+ * exigência de mérito e manifestação à oposição são dirigidas à Diretoria de Marcas.
+ */
+const ADDRESSEE_BY_TYPE: Record<string, string> = {
+  indeferimento:
+    'AO SENHOR PRESIDENTE DO INSTITUTO NACIONAL DA PROPRIEDADE INDUSTRIAL – INPI',
+  exigencia_merito:
+    'À DIRETORIA DE MARCAS DO INSTITUTO NACIONAL DA PROPRIEDADE INDUSTRIAL – INPI',
+  oposicao:
+    'À DIRETORIA DE MARCAS DO INSTITUTO NACIONAL DA PROPRIEDADE INDUSTRIAL – INPI',
+};
+
+function addresseeFor(resourceType: string, resourceTypeLabel: string): string {
+  if (ADDRESSEE_BY_TYPE[resourceType]) return ADDRESSEE_BY_TYPE[resourceType];
+  if (/OPOSIÇÃO|EXIGÊNCIA/i.test(resourceTypeLabel)) return ADDRESSEE_BY_TYPE.oposicao;
+  return ADDRESSEE_BY_TYPE.indeferimento;
+}
+
 function buildMandatoryOpeningBlock(
   resourceTypeLabel: string,
   data: {
@@ -558,20 +578,27 @@ function buildMandatoryOpeningBlock(
     ncl_class?: string;
     holder?: string;
     examiner_or_opponent?: string;
-  }
+    presentation?: string;
+  },
+  resourceType = ''
 ): string {
   const brandUpper = (data.brand_name || 'N/I').toUpperCase();
   const processNum = (data.process_number || 'N/I').replace(/[^\d./-]/g, '').trim() || 'N/I';
+  // Apresentação (nominativa/mista/figurativa) só entra se vier do documento oficial.
+  const presentation =
+    (data.presentation || '').trim() ||
+    (/(nominativ\w*|mist\w*|figurativ\w*|tridimensional)/i.exec(data.ncl_class || '')?.[0] ?? '');
   const brandLine = data.brand_name
-    ? `${data.brand_name}${/nominativ|mist|figurativ/i.test(data.ncl_class || '') ? '' : ' (nominativa)'}`
+    ? `${data.brand_name}${presentation ? ` (${presentation.toLowerCase()})` : ''}`
     : 'N/I';
   const nclClass = data.ncl_class || 'N/I';
   const holder = data.holder || 'N/I';
   const examinerOrOpponent = data.examiner_or_opponent || 'N/I';
-  const isOposicao = /OPOSIÇÃO/i.test(resourceTypeLabel);
-  const isExigenciaMerito = /EXIGÊNCIA DE MÉRITO/i.test(resourceTypeLabel);
+  const isOposicao = /OPOSIÇÃO/i.test(resourceTypeLabel) || resourceType === 'oposicao';
+  const isExigenciaMerito =
+    /EXIGÊNCIA DE MÉRITO/i.test(resourceTypeLabel) || resourceType === 'exigencia_merito';
   const personLabel = isOposicao ? 'Oponente' : 'Examinador(a)';
-  const headerTitle = isExigenciaMerito
+  const headerTitle = isExigenciaMerito || isOposicao
     ? resourceTypeLabel
     : `RECURSO ADMINISTRATIVO – ${resourceTypeLabel}`;
 
@@ -579,13 +606,12 @@ function buildMandatoryOpeningBlock(
 
 MARCA: ${brandUpper}
 
-EXCELENTÍSSIMO SENHOR PRESIDENTE DA DIRETORIA DE MARCAS,
-PATENTES E DESENHOS INDUSTRIAIS DO INSTITUTO NACIONAL
-DA PROPRIEDADE INDUSTRIAL – INPI
+${addresseeFor(resourceType, resourceTypeLabel)}
 
 Processo INPI nº: ${processNum}
 Marca: ${brandLine}
-Classe NCL (12ª Ed.): ${nclClass}
+Apresentação: ${presentation || 'a conferir no espelho oficial'}
+Classe NCL: ${nclClass}
 Titular/Requerente: ${holder}
 ${personLabel}: ${examinerOrOpponent}
 Procurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79`;
