@@ -513,10 +513,26 @@ export default function CaseApprovalPanel({
               {protocolApproval ? 'Conferido para protocolo' : 'Conferir para protocolo'}
             </Button>
           </div>
-          {!packageComplete && summary && (
+          {!summary && (
+            <div className="rounded-md bg-muted p-2 text-xs text-muted-foreground">
+              Motivo do bloqueio: pacote documental ainda não preparado.
+            </div>
+          )}
+          {summary && !packageComplete && (
             <div className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
-              Há anexo não incluído. A conferência para protocolo está bloqueada — só é possível baixar uma
-              prévia carimbada.
+              Motivo do bloqueio — <strong>pacote documental incompleto</strong>: {summary.failed.length} anexo(s)
+              não incluído(s). Só é possível baixar uma prévia carimbada.
+            </div>
+          )}
+          {summary && packageComplete && reviewPending && (
+            <div className="rounded-md bg-amber-500/10 p-2 text-xs text-amber-700">
+              Motivo do bloqueio — <strong>revisão jurídica pendente</strong>. O pacote documental está completo.
+            </div>
+          )}
+          {summary && packageComplete && reviewBlocking && (
+            <div className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
+              Motivo do bloqueio — <strong>revisão jurídica com apontamento grave</strong>. O pacote documental
+              está completo; o impedimento é de conteúdo, não de anexos.
             </div>
           )}
           {approvals.some((a) => a.invalidated_at) && (
