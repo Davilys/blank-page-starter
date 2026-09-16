@@ -1016,7 +1016,7 @@ Procurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79
 ═══════════════════════════════════════════════════════════
 
 I – SÍNTESE DOS FATOS E DO HISTÓRICO PROCESSUAL
-(MÍNIMO 800 palavras — NÃO ENCURTE)
+(desenvolva o necessário; sem mínimo artificial de palavras)
 - Narrar CRONOLOGICAMENTE todo o histórico do processo em detalhes minuciosos
 - Transcrever trechos relevantes do despacho/decisão do INPI
 - Explicar detalhadamente o fundamento usado pelo INPI (artigo, inciso, alínea)
@@ -1027,7 +1027,7 @@ I – SÍNTESE DOS FATOS E DO HISTÓRICO PROCESSUAL
 - Detalhar a especificação de produtos/serviços
 
 II – DA TEMPESTIVIDADE E LEGITIMIDADE
-(MÍNIMO 300 palavras)
+(objetivo, sem mínimo artificial de palavras)
 - Demonstrar tempestividade (prazo art. 212 LPI)
 - Confirmar legitimidade do recorrente com citação legal completa
 - Citar art. 212 e parágrafos da Lei 9.279/96 com transcrição do dispositivo
@@ -1036,7 +1036,7 @@ II – DA TEMPESTIVIDADE E LEGITIMIDADE
 - Citar a IN INPI aplicável sobre representação
 
 III – FUNDAMENTAÇÃO JURÍDICA APROFUNDADA
-(MÍNIMO 1.500 palavras — SEÇÃO MAIS IMPORTANTE — DESENVOLVA EXTENSIVAMENTE)
+(seção mais importante — desenvolva o necessário, sem repetição nem mínimo artificial)
 - Analisar DETALHADAMENTE CADA fundamento utilizado pelo INPI na decisão
 - Demonstrar com precisão POR QUE a decisão está equivocada
 - Transcrever TEXTUALMENTE cada artigo da LPI aplicável com análise de cada inciso
@@ -1051,7 +1051,7 @@ III – FUNDAMENTAÇÃO JURÍDICA APROFUNDADA
 - Demonstrar que a interpretação do INPI é restritiva ou contra a própria normativa
 
 IV – ANÁLISE TÉCNICA DO CONJUNTO MARCÁRIO
-(MÍNIMO 1.200 palavras — DESENVOLVA EXTENSIVAMENTE)
+(desenvolva o necessário, sem repetição nem mínimo artificial)
 - IMPRESSÃO DE CONJUNTO: fundamentar com Manual de Marcas INPI (Cap. 5, Seção 5.10.1)
 - ANÁLISE FONÉTICA DETALHADA: pronúncia sílaba a sílaba, número de sílabas, tonicidade, sonoridade, cadência rítmica, comparação fonema por fonema
 - ANÁLISE VISUAL DETALHADA: grafismo, tipografia, elementos figurativos, cores, disposição espacial, peso visual, estilização
