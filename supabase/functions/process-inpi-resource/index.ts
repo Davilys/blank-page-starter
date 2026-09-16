@@ -91,7 +91,7 @@ async function callOpenAI(
   userParts: any[],
   maxTokens: number = 16000,
   _temperature?: number,
-  timeoutMs: number = 120000,
+  timeoutMs: number = 300000,
   ctx?: CallContext,
 ): Promise<{ content: string; error?: string; status?: number; errorKind?: string }> {
   const inputMessages = [
