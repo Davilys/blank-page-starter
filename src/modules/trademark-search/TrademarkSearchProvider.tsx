@@ -284,7 +284,13 @@ export function TrademarkSearchProvider({ children }: { children: ReactNode }) {
     } else if (s.phase === 'completed' && s.jobId) {
       // Link do PDF é assinado e expira: renova consultando o status de novo.
       trademarkSearchService.status(s.jobId).then((res) => {
-        if (token !== runToken.current || res.ok === false) return;
+        if (token !== runToken.current) return;
+        if (res.ok === false) {
+          // Consulta antiga já expirou na base: mantém o resultado exibido, apenas
+          // descarta o vínculo para não tentar renovar o PDF indefinidamente.
+          if (res.error.code === 'not_found') setState((prev) => ({ ...prev, jobId: null }));
+          return;
+        }
         if (res.job.status === 'completed' && res.job.result) applyJob(res.job, token, { silentRefresh: true });
       });
     }
