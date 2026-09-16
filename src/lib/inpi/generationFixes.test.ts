@@ -54,3 +54,30 @@ describe('preparação dos anexos da geração', () => {
     expect(attachments.map((part) => part.file?.filename)).toEqual(['decisão.pdf', 'prova.pdf']);
   });
 });
+
+import { isRunStale, documentsSignature, STALE_RUN_MS } from '../../../supabase/functions/process-inpi-resource/runControl.ts';
+
+describe('controle de execução da geração', () => {
+  const now = Date.now();
+  const iso = (ms: number) => new Date(now - ms).toISOString();
+  it('não declara falha enquanto houver sinal de vida recente', () => {
+    expect(isRunStale({ status: 'processing', heartbeat_at: iso(20000) }, now)).toBe(false);
+  });
+  it('libera retomada quando o sinal de vida para', () => {
+    expect(isRunStale({ status: 'processing', heartbeat_at: iso(STALE_RUN_MS + 1000) }, now)).toBe(true);
+  });
+  it('usa updated_at para trabalhos antigos sem sinal de vida', () => {
+    expect(isRunStale({ status: 'processing', updated_at: iso(STALE_RUN_MS + 1000) }, now)).toBe(true);
+    expect(isRunStale({ status: 'processing', updated_at: iso(5000) }, now)).toBe(false);
+  });
+  it('não mexe em trabalho concluído ou com erro', () => {
+    expect(isRunStale({ status: 'done', heartbeat_at: iso(999999) }, now)).toBe(false);
+    expect(isRunStale({ status: 'error' }, now)).toBe(false);
+  });
+  it('assinatura muda quando o acervo muda', () => {
+    const a = [{ id: 'a', doc_number: 1, storage_path: 'p/a.pdf' }];
+    const b = [{ id: 'a', doc_number: 1, storage_path: 'p/a.pdf' }, { id: 'b', doc_number: 2, storage_path: 'p/b.pdf' }];
+    expect(documentsSignature(a)).toBe(documentsSignature([...a]));
+    expect(documentsSignature(a)).not.toBe(documentsSignature(b));
+  });
+});

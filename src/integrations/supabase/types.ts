@@ -2872,11 +2872,14 @@ export type Database = {
           error_code: string | null
           error_message: string | null
           extracted_data: Json | null
+          heartbeat_at: string | null
           id: string
           owner_id: string | null
           pass1_content: string | null
+          prepared_files: Json | null
           resource_type: string
           result_content: string | null
+          run_token: string | null
           stage: string
           status: string
           updated_at: string
@@ -2891,11 +2894,14 @@ export type Database = {
           error_code?: string | null
           error_message?: string | null
           extracted_data?: Json | null
+          heartbeat_at?: string | null
           id?: string
           owner_id?: string | null
           pass1_content?: string | null
+          prepared_files?: Json | null
           resource_type: string
           result_content?: string | null
+          run_token?: string | null
           stage?: string
           status?: string
           updated_at?: string
@@ -2910,11 +2916,14 @@ export type Database = {
           error_code?: string | null
           error_message?: string | null
           extracted_data?: Json | null
+          heartbeat_at?: string | null
           id?: string
           owner_id?: string | null
           pass1_content?: string | null
+          prepared_files?: Json | null
           resource_type?: string
           result_content?: string | null
+          run_token?: string | null
           stage?: string
           status?: string
           updated_at?: string
