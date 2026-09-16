@@ -23,6 +23,7 @@ interface CaseDoc {
   file_name: string;
   byte_size: number | null;
   sha256: string | null;
+  storage_path: string;
   extraction_status: ExtractionStatus;
   extraction_notes: string | null;
   review_status: string;
@@ -80,7 +81,7 @@ export default function CasePreparationPanel({
   const reloadDocs = useCallback(async (id: string) => {
     const { data, error } = await supabase
       .from('inpi_case_documents')
-      .select('id, category, file_name, byte_size, sha256, extraction_status, extraction_notes, review_status, page_count, interpreted_pages, unreadable_pages, vision_read_pages')
+      .select('id, category, file_name, byte_size, sha256, storage_path, extraction_status, extraction_notes, review_status, page_count, interpreted_pages, unreadable_pages, vision_read_pages')
       .eq('case_id', id)
       .eq('is_active', true)
       .order('created_at', { ascending: true });
@@ -197,7 +198,7 @@ export default function CasePreparationPanel({
           uploaded_by: user.id,
           display_order: docs.length,
         })
-        .select('id, category, file_name, byte_size, sha256, extraction_status, extraction_notes, review_status, page_count, interpreted_pages, unreadable_pages, vision_read_pages')
+        .select('id, category, file_name, byte_size, sha256, storage_path, extraction_status, extraction_notes, review_status, page_count, interpreted_pages, unreadable_pages, vision_read_pages')
         .single();
       if (insErr) {
         const { error: cleanupError } = await supabase.storage.from(BUCKET).remove([path]);
