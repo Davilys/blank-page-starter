@@ -262,7 +262,27 @@ Deno.serve(async (req) => {
       })
       .select()
       .single();
-    if (saveError) throw saveError;
+    // Concorrência real (duas abas / dois envios simultâneos): o índice único no
+    // servidor recusa a segunda gravação e devolvemos a revisão já registrada.
+    if (saveError) {
+      if ((saveError as { code?: string }).code === '23505') {
+        const { data: concurrent } = await admin
+          .from('inpi_draft_reviews')
+          .select('*')
+          .eq('case_id', caseId)
+          .eq('content_hash', contentHash)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (concurrent) {
+          await admin.from('inpi_ai_call_logs').insert({
+            ...logBase, status: 'sucesso', http_status: 200, error_kind: 'duplicado_concorrente',
+          });
+          return json({ success: true, review: concurrent, reused: true });
+        }
+      }
+      throw saveError;
+    }
 
     await admin.from('inpi_ai_call_logs').insert({
       ...logBase,
