@@ -1331,7 +1331,22 @@ const handleRequest = async (req: Request): Promise<Response> => {
       );
     }
 
-    const body = await req.json();
+    // O envio pode ser interrompido no meio (conexão móvel instável). Sem este
+    // tratamento a função estourava com "end of file before message length reached"
+    // e a tela ficava em branco.
+    let body: any;
+    try {
+      body = await req.json();
+    } catch (bodyError) {
+      console.error('Falha ao ler o corpo da requisição:', bodyError);
+      return new Response(
+        JSON.stringify({
+          error: 'O envio dos arquivos foi interrompido antes de chegar por completo. Verifique a conexão e tente novamente.',
+          error_kind: 'body_incomplete',
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     const { resourceType, agentStrategy, agentName } = body;
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
