@@ -135,7 +135,17 @@ async function callOpenAI(
     return result;
   };
 
-  try {
+  type Attempt = {
+    content: string;
+    refusal: string;
+    finalStatus: string;
+    incompleteReason: string;
+    usage: { input_tokens?: number; output_tokens?: number };
+    hardError?: { error: string; status: number; errorKind: string };
+  };
+
+  const attempt = async (input: any[]): Promise<Attempt> => {
+    const out: Attempt = { content: '', refusal: '', finalStatus: '', incompleteReason: '', usage: {} };
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       signal: controller.signal,
@@ -145,7 +155,7 @@ async function callOpenAI(
       },
       body: JSON.stringify({
         model: modelConfig.model,
-        input: inputMessages,
+        input,
         max_output_tokens: maxTokens,
         reasoning: { effort: modelConfig.reasoningEffort },
         text: { verbosity: 'high' },
@@ -156,17 +166,16 @@ async function callOpenAI(
     if (!response.ok) {
       const errorText = await response.text();
       console.error('OpenAI API error:', response.status, errorText.substring(0, 500));
-      const errorKind = isModelAccessError(response.status, errorText) ? 'model_access' : 'http';
-      return await finish({ content: '', error: errorText, status: response.status, errorKind });
+      out.hardError = {
+        error: errorText,
+        status: response.status,
+        errorKind: isModelAccessError(response.status, errorText) ? 'model_access' : 'http',
+      };
+      return out;
     }
 
     // Leitura em streaming: cada evento renova a atividade, então o corte só
     // acontece se a IA realmente parar de responder.
-    let content = '';
-    let refusal = '';
-    let finalStatus = '';
-    let incompleteReason = '';
-    let usage: { input_tokens?: number; output_tokens?: number } = {};
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
@@ -184,45 +193,99 @@ async function callOpenAI(
         let evt: any;
         try { evt = JSON.parse(payload); } catch { continue; }
         if (evt.type === 'response.output_text.delta' && typeof evt.delta === 'string') {
-          content += evt.delta;
+          out.content += evt.delta;
         } else if (evt.type === 'response.refusal.delta' && typeof evt.delta === 'string') {
-          refusal += evt.delta;
+          out.refusal += evt.delta;
         } else if (evt.type === 'response.completed' || evt.type === 'response.incomplete' || evt.type === 'response.failed') {
-          finalStatus = evt.response?.status || '';
-          incompleteReason = evt.response?.incomplete_details?.reason || '';
-          usage = {
+          out.finalStatus = evt.response?.status || '';
+          out.incompleteReason = evt.response?.incomplete_details?.reason || '';
+          out.usage = {
             input_tokens: evt.response?.usage?.input_tokens,
             output_tokens: evt.response?.usage?.output_tokens,
           };
-          if (!content && Array.isArray(evt.response?.output)) {
+          if (!out.content && Array.isArray(evt.response?.output)) {
             for (const item of evt.response.output) {
               if (item.type === 'message' && Array.isArray(item.content)) {
                 for (const part of item.content) {
-                  if (part.type === 'output_text') content += part.text || '';
-                  if (part.type === 'refusal') refusal += part.refusal || '';
+                  if (part.type === 'output_text') out.content += part.text || '';
+                  if (part.type === 'refusal') out.refusal += part.refusal || '';
                 }
               }
             }
           }
         } else if (evt.type === 'error') {
-          return await finish({
-            content: '',
+          out.hardError = {
             error: evt.error?.message || 'Erro no fluxo da IA',
             status: 502,
             errorKind: 'http',
-          }, usage);
+          };
+          return out;
         }
       }
     }
+    return out;
+  };
 
-    if (refusal && !content) {
-      return await finish({ content: '', error: `Recusa do modelo: ${refusal.slice(0, 300)}`, status: 422, errorKind: 'refusal' }, usage);
+  // Junta a continuação removendo eventual sobreposição literal entre o fim do
+  // texto parcial e o início da continuação (evita parágrafos duplicados).
+  const joinWithoutOverlap = (head: string, tail: string): string => {
+    const a = head.trimEnd();
+    const b = tail.trimStart();
+    const max = Math.min(600, a.length, b.length);
+    for (let len = max; len >= 40; len--) {
+      if (a.slice(-len) === b.slice(0, len)) return a + b.slice(len);
+    }
+    return a + (a.endsWith('\n') ? '' : '\n') + b;
+  };
+
+  try {
+    let first = await attempt(inputMessages);
+    if (first.hardError) {
+      return await finish({ content: '', ...first.hardError }, first.usage);
+    }
+
+    let content = first.content;
+    let usage = first.usage;
+    let finalStatus = first.finalStatus;
+    let incompleteReason = first.incompleteReason;
+    let continued = false;
+
+    // UMA única continuação quando o texto foi cortado por orçamento de tokens.
+    // O texto parcial é preservado; nada é descartado.
+    if (finalStatus === 'incomplete' && incompleteReason === 'max_output_tokens' && content.trim().length > 500) {
+      console.warn('Resposta truncada — solicitando continuação única.');
+      const continuation = await attempt([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userParts },
+        { role: 'assistant', content: [{ type: 'output_text', text: content.slice(-12000) }] },
+        {
+          role: 'user',
+          content: [{
+            type: 'input_text',
+            text: 'O texto acima foi interrompido por limite de tamanho. CONTINUE EXATAMENTE do ponto em que parou, sem reescrever, sem repetir trechos já produzidos e sem reabrir seções já encerradas. Complete as seções que faltam e o encerramento obrigatório. Responda apenas com a continuação.',
+          }],
+        },
+      ]);
+      continued = true;
+      if (!continuation.hardError && continuation.content.trim().length > 0) {
+        content = joinWithoutOverlap(content, continuation.content);
+        finalStatus = continuation.finalStatus;
+        incompleteReason = continuation.incompleteReason;
+        usage = {
+          input_tokens: (usage.input_tokens ?? 0) + (continuation.usage.input_tokens ?? 0),
+          output_tokens: (usage.output_tokens ?? 0) + (continuation.usage.output_tokens ?? 0),
+        };
+      }
+    }
+
+    if (first.refusal && !content) {
+      return await finish({ content: '', error: `Recusa do modelo: ${first.refusal.slice(0, 300)}`, status: 422, errorKind: 'refusal' }, usage);
     }
 
     if (finalStatus === 'incomplete') {
       return await finish({
         content,
-        error: `Resposta incompleta da IA (motivo: ${incompleteReason || 'desconhecido'}). O conteúdo não foi considerado final.`,
+        error: `Resposta incompleta da IA (motivo: ${incompleteReason || 'desconhecido'})${continued ? ' mesmo após uma continuação' : ''}. O conteúdo parcial foi preservado como rascunho.`,
         status: 502,
         errorKind: 'truncated',
       }, usage);
@@ -998,7 +1061,7 @@ IV – ANÁLISE TÉCNICA DO CONJUNTO MARCÁRIO
 
 ⚠️ RESPONDA APENAS com o texto jurídico completo das Seções I a IV. SEM JSON. SEM explicações. Apenas o documento jurídico, COM formatação markdown leve conforme #formatacao_visual_obrigatoria (negrito, itálico, tabelas e marcadores [IMG:] / [DOC:NN]).
 ⚠️ NÃO termine com "continuação na próxima parte" ou similar — termine a Seção IV normalmente.
-⚠️ O texto desta parte deve ter NO MÍNIMO 3.800 palavras.`;
+⚠️ Priorize fundamentação completa, pertinente e sem repetição — não persiga contagem de palavras nem alongue o texto artificialmente.`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1201,7 +1264,7 @@ Procurador(a) Constituído(a)
 CPF: 393.239.118-79
 
 ⚠️ RESPONDA APENAS com o texto jurídico das Seções V a VIII + encerramento. SEM JSON. SEM explicações. Apenas o documento jurídico, COM formatação markdown leve conforme #formatacao_visual_obrigatoria (negrito, itálico, tabelas e marcadores [IMG:] / [DOC:NN]).
-⚠️ O texto desta parte deve ter NO MÍNIMO 3.400 palavras.`;
+⚠️ Priorize fundamentação completa, pertinente e sem repetição — não persiga contagem de palavras nem alongue o texto artificialmente.`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1268,7 +1331,22 @@ const handleRequest = async (req: Request): Promise<Response> => {
       );
     }
 
-    const body = await req.json();
+    // O envio pode ser interrompido no meio (conexão móvel instável). Sem este
+    // tratamento a função estourava com "end of file before message length reached"
+    // e a tela ficava em branco.
+    let body: any;
+    try {
+      body = await req.json();
+    } catch (bodyError) {
+      console.error('Falha ao ler o corpo da requisição:', bodyError);
+      return new Response(
+        JSON.stringify({
+          error: 'O envio dos arquivos foi interrompido antes de chegar por completo. Verifique a conexão e tente novamente.',
+          error_kind: 'body_incomplete',
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     const { resourceType, agentStrategy, agentName } = body;
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
@@ -1605,6 +1683,61 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
       }
     } else if (fileBase64 && fileType) {
       appendUploadOnlyFilePart(fileParts, sourceFilesForUpload, { base64: fileBase64, type: fileType, name: fileType === 'application/pdf' ? 'documento_inpi.pdf' : 'image' }, fileType === 'application/pdf' ? 'documento_inpi.pdf' : 'image');
+    } else if (caseId && requestedPass !== 'pass2') {
+      // Documentos já enviados pela tela de preparação: o servidor busca os
+      // arquivos no armazenamento privado a partir do caso. O navegador não
+      // envia mais o conteúdo do PDF (era o que quebrava no celular) e nunca
+      // informa caminhos de arquivo — só o id do caso, já validado acima
+      // (sessão + papel de administrador).
+      const { data: caseRow, error: caseErr } = await supabase
+        .from('inpi_resource_cases')
+        .select('id, resource_type')
+        .eq('id', caseId)
+        .maybeSingle();
+      if (caseErr || !caseRow) {
+        return new Response(JSON.stringify({ error: 'Caso não encontrado ou sem permissão de acesso.' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      if (caseRow.resource_type !== resourceType) {
+        return new Response(JSON.stringify({ error: 'A modalidade informada não corresponde ao caso.' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const { data: caseDocs, error: docsErr } = await supabase
+        .from('inpi_case_documents')
+        .select('id, file_name, mime_type, storage_path, category, created_at')
+        .eq('case_id', caseId)
+        .order('created_at', { ascending: true });
+      if (docsErr) {
+        return new Response(JSON.stringify({ error: 'Não foi possível ler os documentos do caso.' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const usable = (caseDocs || []).filter((d: any) =>
+        d.storage_path && (d.mime_type === 'application/pdf' || String(d.mime_type || '').startsWith('image/')));
+      if (usable.length === 0) {
+        return new Response(JSON.stringify({ error: 'Nenhum documento utilizável (PDF ou imagem) foi encontrado neste caso.' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const failedDownloads: string[] = [];
+      for (const doc of usable) {
+        const { data: blob, error: dlErr } = await supabaseAdmin.storage
+          .from('inpi-recursos-docs')
+          .download(doc.storage_path);
+        if (dlErr || !blob) { failedDownloads.push(doc.file_name); continue; }
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        let binary = '';
+        for (let i = 0; i < bytes.length; i += 0x8000) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        }
+        appendUploadOnlyFilePart(
+          fileParts,
+          sourceFilesForUpload,
+          { base64: btoa(binary), type: doc.mime_type, name: doc.file_name },
+          doc.mime_type === 'application/pdf' ? 'documento_inpi.pdf' : 'image',
+        );
+      }
+      if (fileParts.length === 0) {
+        return new Response(JSON.stringify({ error: `Não foi possível recuperar os arquivos do caso: ${failedDownloads.join(', ')}` }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      console.log('Documentos carregados do caso:', fileParts.length, '| falhas:', failedDownloads.length);
     } else if (requestedPass !== 'pass2') {
       return new Response(JSON.stringify({ error: 'Nenhum arquivo fornecido' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -1683,11 +1816,11 @@ SEÇÕES I A IV JÁ GERADAS:
 ${basePass1Content.substring(0, 6000)}
 ---
 
-Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo e nível de profundidade. ${resourceType === 'exigencia_merito' ? 'O texto total desta parte deve ter entre 800 e 1.400 palavras — SEJA OBJETIVO.' : 'O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.'}${userOrientationBlock}${evidenceBlock}` },
+Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo e nível de profundidade. ${resourceType === 'exigencia_merito' ? 'O texto total desta parte deve ter entre 800 e 1.400 palavras — SEJA OBJETIVO.' : 'Priorize fundamentação completa e sem repetição; não alongue o texto artificialmente.'}${userOrientationBlock}${evidenceBlock}` },
       ];
 
       console.log('PASS 2 only: Generating Sections V-VIII...');
-      const pass2Result = await callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 20000, 0.25, 300000, makeCtx('pass2'));
+      const pass2Result = await callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 32000, 0.25, 300000, makeCtx('pass2'));
       if (pass2Result.error) {
         const cfg = modelFailureResponse(pass2Result);
         if (cfg) return cfg;
@@ -1730,7 +1863,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     const pass1User = [
       { type: 'input_text', text: resourceType === 'exigencia_merito'
         ? `Analise o(s) documento(s) do INPI anexado(s) e elabore APENAS o miolo (Parte 1) do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. PASSO 1 (obrigatório, mental): classifique a exigência como TIPO A (especificação/classificação), TIPO B (prova de atividade/titularidade) ou TIPO C (oposição). Se TIPO A: gere no MÁXIMO 450-700 palavras (Síntese curta + Cumprimento com nova especificação); NÃO crie seções de boa-fé, conclusão extensa, não cite jurisprudência, doutrina nem examinador, não amplie escopo. Se TIPO B/C: siga estrutura I–IV mais densa, mas sem doutrina/jurisprudência. 🛑 PROIBIDO nesta Parte 1: escrever "Termos em que", "Pede deferimento", "São Paulo, ${currentDate}", linha de assinatura, "Davilys Danques", "CPF:" ou lista "(Doc. 01) – …". Isso será emitido APENAS na Parte 2. Termine após a última seção, sem fechamento. 🔒 Nunca invente produtos, serviços, documentos ou atividades que não estejam expressamente no processo/anexos.${userOrientationBlock}${evidenceBlock}`
-        : `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do recurso administrativo. CADA seção deve ter a extensão MÍNIMA especificada. O texto total desta parte deve ter NO MÍNIMO 3.800 palavras. Desenvolva CADA argumento com máxima profundidade, como um escritório de PI de elite faria.${userOrientationBlock}${evidenceBlock}` },
+        : `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do recurso administrativo. Desenvolva CADA argumento com profundidade real, sem repetição e sem alongar o texto artificialmente, como um escritório de PI de elite faria.${userOrientationBlock}${evidenceBlock}` },
       ...fileResponseParts,
     ];
 
@@ -1738,7 +1871,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     const pass2User = [
       { type: 'input_text', text: resourceType === 'exigencia_merito'
         ? `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS o fechamento (Parte 2) do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Reclassifique a exigência: TIPO A (especificação), TIPO B (prova de atividade) ou TIPO C (oposição). Se TIPO A: produza SOMENTE uma seção curta "DOS PEDIDOS" (60-120 palavras) + encerramento único ("Termos em que / Pede deferimento / São Paulo, ${currentDate} / assinatura / CPF"); total 150-300 palavras; NÃO escreva Seções V/VI/VII; NÃO cite jurisprudência, doutrina ou examinador; NÃO amplie escopo. Se TIPO B/C: siga V–VIII + encerramento, sem doutrina/jurisprudência. 🔒 Nunca invente produtos, serviços, documentos ou atividades que não estejam no processo/anexos. O encerramento aparece UMA ÚNICA VEZ, ao final.${userOrientationBlock}${evidenceBlock}`
-        : `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do recurso administrativo. Mantenha tom técnico, fundamentação robusta e conclusões objetivas. O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.${userOrientationBlock}${evidenceBlock}` },
+        : `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do recurso administrativo. Mantenha tom técnico, fundamentação robusta e conclusões objetivas, sem repetição e sem alongar o texto artificialmente.${userOrientationBlock}${evidenceBlock}` },
       ...fileResponseParts,
     ];
 
@@ -1751,9 +1884,9 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     console.time('ai_generation');
     const [extractionResult, pass1Result, pass2Result] = await Promise.all([
       callOpenAI(OPENAI_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, 800, 0.1, 60000, makeCtx('extracao')),
-      callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 20000, 0.25, 300000, makeCtx('pass1')),
+      callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 32000, 0.25, 300000, makeCtx('pass1')),
       shouldRunPass2Now
-        ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 20000, 0.25, 300000, makeCtx('pass2'))
+        ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 32000, 0.25, 300000, makeCtx('pass2'))
         : Promise.resolve({ content: '', error: undefined as string | undefined, status: undefined as number | undefined, errorKind: undefined as string | undefined }),
     ]);
     console.timeEnd('ai_generation');
