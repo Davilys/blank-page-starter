@@ -60,14 +60,16 @@ interface Props {
   agentStrategy: string;
   onBack: () => void;
   onProceed: (payload: { caseId: string; files: File[]; orientation: string }) => void;
+  onResumeJob: (caseId: string, jobId: string, orientation: string) => void;
 }
 
 const BUCKET = 'inpi-recursos-docs';
 
 export default function CasePreparationPanel({
-  resourceType, agentId, agentName, agentStrategy, onBack, onProceed,
+  resourceType, agentId, agentName, agentStrategy, onBack, onProceed, onResumeJob,
 }: Props) {
   const [caseId, setCaseId] = useState<string | null>(null);
+  const [savedJobId, setSavedJobId] = useState<string | null>(null);
   const [docs, setDocs] = useState<CaseDoc[]>([]);
   const [busyCategory, setBusyCategory] = useState<CaseCategory | null>(null);
   const [uploadAttempts, setUploadAttempts] = useState<UploadAttempt[]>([]);
@@ -76,6 +78,8 @@ export default function CasePreparationPanel({
   const [orientationText, setOrientationText] = useState('');
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const actionLocks = useRef(new Set<string>());
   const localFiles = useRef<Map<string, File>>(new Map());
   const inputs = useRef<Record<string, HTMLInputElement | null>>({});
   const initializedCaseKey = useRef<string | null>(null);
@@ -100,7 +104,10 @@ export default function CasePreparationPanel({
     if (initializedCaseKey.current === caseKey) return;
     initializedCaseKey.current = caseKey;
     setCaseId(null);
+    setSavedJobId(null);
     setDocs([]);
+    setOrientation(null);
+    setOrientationText('');
     setUploadAttempts([]);
     localFiles.current.clear();
     (async () => {
@@ -128,8 +135,17 @@ export default function CasePreparationPanel({
         }
         if (existingCase) {
           setCaseId(existingCase.id);
+          setSavedJobId(sessionStorage.getItem('inpi-job-' + existingCase.id));
           try {
             await reloadDocs(existingCase.id);
+            const { data: saved, error: orientationError } = await supabase
+              .from('inpi_case_orientations').select('*').eq('case_id', existingCase.id)
+              .order('version', { ascending: false }).limit(1).maybeSingle();
+            if (orientationError) throw orientationError;
+            if (saved) {
+              setOrientation(saved as OrientationRow);
+              setOrientationText(saved.editable_text || '');
+            }
           } catch {
             // reloadDocs já mostra o erro real ao usuário.
           }
@@ -239,7 +255,7 @@ export default function CasePreparationPanel({
       if (result.status === 'recebido' || result.status === 'parcial') {
         await runVisionRead(persisted.id, file);
       }
-      if (orientation) markStale();
+      if (orientation) await markStale();
     } catch (error) {
       const reason = error instanceof Error ? error.message : 'Falha desconhecida no envio.';
       setAttempt(attempt.id, { status: 'falha', error: reason });
@@ -279,7 +295,8 @@ export default function CasePreparationPanel({
   /** Envia as páginas digitalizadas para leitura visual da IA. */
   const runVisionRead = async (docId: string, file: File) => {
     if (!caseId) return;
-    if (visionBusy.has(docId)) return; // protege contra clique repetido
+    if (actionLocks.current.has(docId)) return;
+    actionLocks.current.add(docId);
     setVisionBusy((s) => new Set(s).add(docId));
     try {
       const ext = fileExtension(file.name);
@@ -305,25 +322,31 @@ export default function CasePreparationPanel({
           'As páginas seguem como não conferidas.',
       );
     } finally {
+      actionLocks.current.delete(docId);
       setVisionBusy((s) => { const n = new Set(s); n.delete(docId); return n; });
-      await reloadDocs(caseId);
+      try { await reloadDocs(caseId); } catch { /* reloadDocs displays the failure. */ }
     }
   };
 
   const removeDoc = async (docId: string) => {
-    if (!caseId) return;
-    await supabase.from('inpi_case_documents').update({ is_active: false }).eq('id', docId);
-    localFiles.current.delete(docId);
-    await reloadDocs(caseId);
-    if (orientation) markStale();
+    if (!caseId || actionLocks.current.has(docId)) return;
+    try {
+      const { error } = await supabase.from('inpi_case_documents')
+        .update({ is_active: false }).eq('id', docId).eq('case_id', caseId);
+      if (error) throw error;
+      localFiles.current.delete(docId);
+      await reloadDocs(caseId);
+      if (orientation) await markStale();
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'Não foi possível remover o documento.'); }
   };
 
   const currentFingerprint = useMemo(() => documentsFingerprint(docs), [docs]);
   const isStale = !!orientation && orientation.documents_fingerprint !== currentFingerprint;
 
-  const markStale = () => {
+  const markStale = async () => {
     if (!orientation) return;
-    supabase.from('inpi_case_orientations').update({ is_stale: true }).eq('id', orientation.id);
+    const { error } = await supabase.from('inpi_case_orientations').update({ is_stale: true }).eq('id', orientation.id);
+    if (error) throw error;
   };
 
   const usable = docs.filter((d) => d.extraction_status !== 'falha');
@@ -334,8 +357,9 @@ export default function CasePreparationPanel({
 
   /* ── Orientação com IA ───────────────────────────────────────────────── */
   const generateOrientation = async () => {
-    if (!caseId) return;
+    if (!caseId || generating || visionBusy.size || busyCategory || actionLocks.current.has('orientation')) return;
     if (!usable.length) { toast.error('Anexe ao menos um arquivo utilizável.'); return; }
+    actionLocks.current.add('orientation');
     setGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke('generate-inpi-orientation', {
@@ -353,56 +377,42 @@ export default function CasePreparationPanel({
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Falha ao gerar orientação');
     } finally {
+      actionLocks.current.delete('orientation');
       setGenerating(false);
     }
   };
 
   const saveOrientation = async () => {
-    if (!orientation) return;
+    if (!orientation || actionLocks.current.has('save')) return;
+    actionLocks.current.add('save');
     setSaving(true);
-    const { error } = await supabase
-      .from('inpi_case_orientations')
-      .update({ editable_text: orientationText, human_edited: true })
-      .eq('id', orientation.id);
-    setSaving(false);
-    if (error) { toast.error(error.message); return; }
-    setOrientation({ ...orientation, editable_text: orientationText, human_edited: true });
-    toast.success('Orientação salva.');
+    try {
+      const { error } = await supabase.from('inpi_case_orientations')
+        .update({ editable_text: orientationText, human_edited: true, confirmed_at: null })
+        .eq('id', orientation.id);
+      if (error) throw error;
+      setOrientation({ ...orientation, editable_text: orientationText, human_edited: true, confirmed_at: null });
+      toast.success('Orientação salva.');
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'Não foi possível salvar a orientação.'); }
+    finally { actionLocks.current.delete('save'); setSaving(false); }
   };
 
   const confirmAndProceed = async () => {
-    if (!caseId || !orientation) return;
+    if (!caseId || !orientation || visionBusy.size || busyCategory || generating || actionLocks.current.has('confirm')) return;
     if (isStale) { toast.error('Os documentos mudaram. Atualize a análise antes de gerar a peça.'); return; }
-    const { error } = await supabase
-      .from('inpi_case_orientations')
-      .update({ confirmed_at: new Date().toISOString(), editable_text: orientationText })
-      .eq('id', orientation.id);
-    if (error) { toast.error(error.message); return; }
-    const files: File[] = [];
-    for (const doc of usable) {
-      const localFile = localFiles.current.get(doc.id);
-      if (localFile) {
-        files.push(localFile);
-        continue;
-      }
-
-      const { data: storedFile, error: downloadError } = await supabase.storage
-        .from(BUCKET)
-        .download(doc.storage_path);
-      if (downloadError || !storedFile) {
-        toast.error(
-          `${doc.file_name}: não foi possível recuperar o arquivo (${downloadError?.message || 'arquivo indisponível'}).`,
-        );
-        return;
-      }
-      const restoredFile = new File([storedFile], doc.file_name, {
-        type: storedFile.type || 'application/octet-stream',
-      });
-      localFiles.current.set(doc.id, restoredFile);
-      files.push(restoredFile);
-    }
-    if (!files.length) { toast.error('Anexe ao menos um arquivo utilizável.'); return; }
-    onProceed({ caseId, files, orientation: orientationText });
+    if (!usable.length || !orientationText.trim()) { toast.error('Confira os documentos e a orientação.'); return; }
+    actionLocks.current.add('confirm');
+    setConfirming(true);
+    try {
+      const { error } = await supabase.from('inpi_case_orientations')
+        .update({ confirmed_at: new Date().toISOString(), editable_text: orientationText })
+        .eq('id', orientation.id).eq('case_id', caseId);
+      if (error) throw error;
+      // These modalities already load persisted files on the server by caseId.
+      // Do not download the entire dossier again on a mobile device.
+      onProceed({ caseId, files: [], orientation: orientationText });
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'Não foi possível confirmar a orientação.'); }
+    finally { actionLocks.current.delete('confirm'); setConfirming(false); }
   };
 
   const requestList = useMemo(() => {
@@ -572,7 +582,7 @@ export default function CasePreparationPanel({
             </div>
             <Button
               onClick={generateOrientation}
-              disabled={generating || !usable.length}
+              disabled={generating || !usable.length || !!busyCategory || visionBusy.size > 0}
               className="rounded-xl gap-2 shrink-0"
             >
               {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
@@ -650,9 +660,14 @@ export default function CasePreparationPanel({
 
       <div className="flex gap-3">
         <Button variant="outline" onClick={onBack} className="rounded-xl">Voltar</Button>
+        {caseId && savedJobId && (
+          <Button variant="outline" onClick={() => onResumeJob(caseId, savedJobId, orientationText)}>
+            Retomar geração existente
+          </Button>
+        )}
         <Button
           onClick={confirmAndProceed}
-          disabled={!orientation || isStale || !usable.length}
+          disabled={!orientation || isStale || !usable.length || confirming || generating || !!busyCategory || visionBusy.size > 0}
           className="flex-1 rounded-xl h-12 gap-2"
         >
           <Zap className="h-5 w-5" />

@@ -24,7 +24,9 @@ export function isRunStale(
 
 /** Assinatura da versão exata dos documentos ativos do caso. */
 export function documentsSignature(
-  docs: Array<{ id: string; doc_number: number; storage_path?: string | null; file_name?: string | null }>,
+  docs: Array<{ id: string; doc_number: number; storage_path?: string | null; file_name?: string | null;
+    sha256?: string | null; version?: number; category?: string; extracted_text?: string | null; extraction_status?: string }>,
 ): string {
-  return docs.map((d) => `${d.id}:${d.doc_number}:${d.storage_path || d.file_name || ''}`).join('|');
+  return JSON.stringify(docs.map(d => [d.id, d.doc_number, d.storage_path || d.file_name || '',
+    d.sha256, d.version, d.category, d.extracted_text, d.extraction_status]));
 }

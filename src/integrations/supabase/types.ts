@@ -2523,6 +2523,8 @@ export type Database = {
           version: number
           vision_model: string | null
           vision_notes: string | null
+          vision_read_token: string | null
+          vision_read_started_at: string | null
           vision_read_at: string | null
           vision_read_pages: number
         }
@@ -2559,6 +2561,8 @@ export type Database = {
           version?: number
           vision_model?: string | null
           vision_notes?: string | null
+          vision_read_token?: string | null
+          vision_read_started_at?: string | null
           vision_read_at?: string | null
           vision_read_pages?: number
         }
@@ -2595,6 +2599,8 @@ export type Database = {
           version?: number
           vision_model?: string | null
           vision_notes?: string | null
+          vision_read_token?: string | null
+          vision_read_started_at?: string | null
           vision_read_at?: string | null
           vision_read_pages?: number
         }
@@ -3119,6 +3125,7 @@ export type Database = {
       }
       inpi_resources: {
         Row: {
+          generation_job_id: string | null
           adjustments_history: Json | null
           approved_at: string | null
           brand_name: string | null
@@ -3139,6 +3146,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          generation_job_id?: string | null
           adjustments_history?: Json | null
           approved_at?: string | null
           brand_name?: string | null
@@ -3159,6 +3167,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          generation_job_id?: string | null
           adjustments_history?: Json | null
           approved_at?: string | null
           brand_name?: string | null

@@ -3,6 +3,7 @@
 // páginas são enviadas como imagem e o que foi efetivamente interpretado fica
 // registrado no documento.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { parseProviderResponse } from '../process-inpi-resource/durableResponse.ts';
 import {
   resolveModelConfig,
   isRecursosInpiModality,
@@ -33,6 +34,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const started = Date.now();
+  let releaseLease: (() => Promise<void>) | undefined;
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) return json({ error: 'Não autorizado' }, 401);
@@ -53,10 +55,12 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const caseId: string | null = typeof body?.caseId === 'string' ? body.caseId : null;
     const documentId: string | null = typeof body?.documentId === 'string' ? body.documentId : null;
-    const pages: PageInput[] = Array.isArray(body?.pages) ? body.pages.slice(0, MAX_PAGES) : [];
+    const pages: PageInput[] = Array.isArray(body?.pages) ? body.pages : [];
     if (!caseId || !documentId || !pages.length) {
       return json({ error: 'Informe o caso, o documento e ao menos uma página.' }, 400);
     }
+    if (pages.length > MAX_PAGES || new Set(pages.map(p => p.page)).size !== pages.length ||
+        pages.some(p => !Number.isInteger(p.page) || p.page < 1)) return json({ error: 'Páginas inválidas ou repetidas.' }, 400);
     if (pages.some((p) => typeof p.dataUrl !== 'string' || !p.dataUrl.startsWith('data:image/'))) {
       return json({ error: 'Páginas devem ser imagens.' }, 400);
     }
@@ -79,31 +83,35 @@ Deno.serve(async (req) => {
     // Isolamento entre casos: o documento precisa pertencer ao caso informado.
     const { data: docRow } = await admin
       .from('inpi_case_documents')
-      .select('id, case_id, file_name, extracted_text, page_count, interpreted_pages, extraction_status, vision_read_at, vision_read_pages')
+      .select('id, case_id, file_name, extracted_text, page_count, interpreted_pages, extraction_status, vision_read_at, vision_read_pages, vision_read_started_at, vision_read_token')
       .eq('id', documentId)
       .maybeSingle();
     if (!docRow || docRow.case_id !== caseId) {
       return json({ error: 'Documento não pertence a este caso' }, 404);
     }
 
-    // Proteção de duplicação no servidor: leitura visual já concluída (ou em curso
-    // há menos de 5 minutos) não é refeita por duas abas ou envios simultâneos.
-    if (docRow.vision_read_at && body?.force !== true) {
-      return json({
-        success: true,
-        reused: true,
-        pages_read: docRow.vision_read_pages || 0,
-        message: 'Leitura visual já registrada para este documento.',
-      });
-    }
-    // Marca o início — a segunda requisição concorrente cai no bloco acima.
-    await admin.from('inpi_case_documents')
-      .update({ vision_read_at: new Date().toISOString() })
-      .eq('id', documentId)
-      .is('vision_read_at', null);
-
+    if (pages.some(p => docRow.page_count && p.page > docRow.page_count)) return json({ error: 'Página fora do documento.' }, 400);
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     if (!OPENAI_API_KEY) return json({ error: 'OPENAI_API_KEY não configurada' }, 503);
+    if (docRow.vision_read_at && docRow.vision_read_pages > 0 && body?.force !== true) {
+      return json({ success: true, reused: true, pages_interpreted: docRow.vision_read_pages });
+    }
+    if (docRow.vision_read_started_at && Date.now() - Date.parse(docRow.vision_read_started_at) < 120000) {
+      return json({ error: 'A leitura deste documento já está em andamento.', error_kind: 'reading' }, 409);
+    }
+    const leaseToken = crypto.randomUUID();
+    let claim = admin.from('inpi_case_documents').update({
+      vision_read_token: leaseToken, vision_read_started_at: new Date().toISOString(),
+    }).eq('id', documentId);
+    claim = docRow.vision_read_token ? claim.eq('vision_read_token', docRow.vision_read_token) : claim.is('vision_read_token', null);
+    const { data: claimed, error: claimError } = await claim.select('id').maybeSingle();
+    if (claimError) throw new Error('Não foi possível reservar a leitura do documento.');
+    if (!claimed) return json({ error: 'Outra leitura foi iniciada. Aguarde.', error_kind: 'reading' }, 409);
+    releaseLease = async () => {
+      const { error } = await admin.from('inpi_case_documents').update({ vision_read_token: null, vision_read_started_at: null })
+        .eq('id', documentId).eq('vision_read_token', leaseToken);
+      if (error) console.error('Falha ao liberar reserva de leitura; expira em 120 segundos.');
+    };
 
     const modelConfig = resolveModelConfig(caseRow.resource_type, 'gpt-5-mini', 'minimal');
     const correlationId = crypto.randomUUID();
@@ -120,6 +128,7 @@ Deno.serve(async (req) => {
 
     const resp = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
+      signal: AbortSignal.timeout(110000),
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
@@ -177,6 +186,8 @@ Deno.serve(async (req) => {
     }
 
     const parsed = JSON.parse(raw);
+    const terminal = parseProviderResponse(parsed);
+    if (terminal.error) return json({ error: terminal.error, error_kind: terminal.errorKind }, 502);
     const text: string =
       parsed.output_text ||
       (parsed.output || [])
@@ -196,6 +207,12 @@ Deno.serve(async (req) => {
       return json({ error: 'A leitura visual respondeu em formato inesperado.' }, 502);
     }
 
+    if (!Array.isArray(result.paginas) || !result.paginas.length ||
+      new Set(result.paginas.map(p => p.pagina)).size !== result.paginas.length ||
+      result.paginas.some(p => !pages.some(sent => sent.page === p.pagina) ||
+        !['texto', 'imagem', 'ilegivel'].includes(p.tipo || '') || typeof p.transcricao !== 'string')) {
+      return json({ error: 'A IA devolveu páginas inválidas. Nenhuma leitura foi confirmada.' }, 502);
+    }
     const readPages = (result.paginas || []).filter(
       (p) => (p.transcricao || '').trim().length > 0 || (p.observacao || '').trim().length > 0,
     );
@@ -212,11 +229,11 @@ Deno.serve(async (req) => {
 
     const combined = [docRow.extracted_text || '', visionText].filter(Boolean).join('\n\n').slice(0, 200000);
     const totalPages = docRow.page_count ?? pages.length;
-    const interpretedTotal = Math.min(totalPages, (docRow.interpreted_pages || 0) + interpretedByVision);
+    const interpretedTotal = Math.min(totalPages, Math.max(docRow.interpreted_pages || 0, interpretedByVision));
     const unreadable = Math.max(0, totalPages - interpretedTotal);
     const status = interpretedTotal === 0 ? 'recebido' : unreadable > 0 ? 'parcial' : 'lido';
 
-    await admin.from('inpi_case_documents').update({
+    const { data: persisted, error: persistError } = await admin.from('inpi_case_documents').update({
       extracted_text: combined,
       extraction_status: status,
       interpreted_pages: interpretedTotal,
@@ -230,8 +247,9 @@ Deno.serve(async (req) => {
         .map((p) => `Pág. ${p.pagina ?? '?'}: ${p.tipo || 'texto'}${p.observacao ? ` — ${p.observacao}` : ''}`)
         .join(' | ')
         .slice(0, 2000),
-      vision_read_at: new Date().toISOString(),
-    }).eq('id', documentId);
+      vision_read_at: interpretedByVision > 0 ? new Date().toISOString() : null,
+    }).eq('id', documentId).eq('vision_read_token', leaseToken).select('id').maybeSingle();
+    if (persistError || !persisted) throw new Error('A leitura não foi salva; nenhuma conclusão foi confirmada.');
 
     await admin.from('inpi_ai_call_logs').insert({
       ...logBase,
@@ -253,5 +271,7 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : 'Erro inesperado' }, 500);
+  } finally {
+    if (releaseLease) await releaseLease();
   }
 });

@@ -3,6 +3,8 @@
 // se os fundamentos foram respondidos, se há citação não conferida, campo não
 // preenchido ou informação inventada. Não altera a peça: apenas aponta.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { validateReview } from '../_shared/inpiReviewValidation.ts';
+import { parseProviderResponse } from '../process-inpi-resource/durableResponse.ts';
 import {
   resolveModelConfig,
   isRecursosInpiModality,
@@ -81,7 +83,7 @@ Deno.serve(async (req) => {
 
     const { data: caseRow } = await admin
       .from('inpi_resource_cases')
-      .select('id, resource_type, brand_name, process_number')
+      .select('id, resource_type, brand_name, process_number, resource_id')
       .eq('id', caseId)
       .maybeSingle();
     if (!caseRow) return json({ error: 'Caso não encontrado' }, 404);
@@ -89,6 +91,23 @@ Deno.serve(async (req) => {
       return json({ error: 'Modalidade fora do escopo desta revisão' }, 400);
     }
 
+    if (!resourceId || caseRow.resource_id !== resourceId) return json({ error: 'A peça não pertence a este caso.' }, 409);
+
+    const { data: docs, error: docsError } = await admin
+      .from('inpi_case_documents')
+      .select('id, doc_number, category, sha256, file_name, extraction_status, extraction_notes, extracted_text, interpreted_pages, unreadable_pages')
+      .eq('case_id', caseId)
+      .eq('is_active', true)
+      .order('display_order', { ascending: true });
+
+    if (docsError) throw new Error('Falha ao carregar os documentos para revisão.');
+    const documents = docs || [];
+    const hashText = async (value: string) => Array.from(new Uint8Array(
+      await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))), b => b.toString(16).padStart(2, '0')).join('');
+    const fingerprint = (rows: any[]) => rows.map(d => JSON.stringify([d.id, d.doc_number, d.category, d.sha256])).sort().join('|');
+    if (await hashText(content) !== contentHash || await hashText(fingerprint(documents)) !== documentsHash) {
+      return json({ error: 'O texto ou os documentos mudaram. Atualize a revisão.', error_kind: 'version_changed' }, 409);
+    }
     // Idempotência: mesma versão de texto e de anexos não gera revisão duplicada.
     const { data: existing } = await admin
       .from('inpi_draft_reviews')
@@ -102,14 +121,7 @@ Deno.serve(async (req) => {
       return json({ success: true, review: existing, reused: true });
     }
 
-    const { data: docs } = await admin
-      .from('inpi_case_documents')
-      .select('id, doc_number, category, file_name, extraction_status, extraction_notes, extracted_text, interpreted_pages, unreadable_pages')
-      .eq('case_id', caseId)
-      .eq('is_active', true)
-      .order('display_order', { ascending: true });
 
-    const documents = docs || [];
     const dossier = documents.length
       ? documents
           .map((d, i) => {
@@ -120,7 +132,7 @@ Deno.serve(async (req) => {
             return (
               header +
               (d.extracted_text
-                ? `\nConteúdo conferido:\n${String(d.extracted_text).slice(0, 25000)}`
+                ? `\nConteúdo conferido:\n${String(d.extracted_text)}`
                 : '\nSem conteúdo interpretado: nada pode ser afirmado a partir deste documento.')
             );
           })
@@ -176,13 +188,14 @@ Deno.serve(async (req) => {
       (orientation?.editable_text as string) || '(sem orientação registrada)',
       '',
       'PEÇA A REVISAR:',
-      content.slice(0, 60000),
+      content,
     ]
       .filter(Boolean)
       .join('\n');
 
     const resp = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
+      signal: AbortSignal.timeout(110000),
       headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: modelConfig.model,
@@ -224,6 +237,8 @@ Deno.serve(async (req) => {
     }
 
     const parsed = JSON.parse(raw);
+    const terminal = parseProviderResponse(parsed);
+    if (terminal.error) return json({ error: terminal.error, error_kind: terminal.errorKind }, 502);
     const text: string =
       parsed.output_text ||
       (parsed.output || [])
@@ -235,7 +250,7 @@ Deno.serve(async (req) => {
     let review: { resumo?: string; apontamentos?: { bloqueante?: boolean }[] };
     try {
       const cleaned = text.replace(/```json|```/g, '').trim();
-      review = JSON.parse(cleaned.slice(cleaned.indexOf('{'), cleaned.lastIndexOf('}') + 1));
+      review = validateReview(JSON.parse(cleaned.slice(cleaned.indexOf('{'), cleaned.lastIndexOf('}') + 1)));
     } catch {
       await admin.from('inpi_ai_call_logs').insert({
         ...logBase, status: 'erro', http_status: 200, error_kind: 'parse',
@@ -243,6 +258,13 @@ Deno.serve(async (req) => {
       return json({ error: 'A revisão respondeu em formato inesperado.' }, 502);
     }
 
+    const { data: currentDocs, error: currentError } = await admin.from('inpi_case_documents')
+      .select('id, doc_number, category, sha256, extracted_text').eq('case_id', caseId).eq('is_active', true);
+    if (currentError) throw new Error('Não foi possível confirmar a versão revisada.');
+    const textSnapshot = (rows: any[]) => rows.map(d => JSON.stringify([d.id, d.extracted_text])).sort().join('|');
+    if (fingerprint(currentDocs || []) !== fingerprint(documents) || textSnapshot(currentDocs || []) !== textSnapshot(documents)) {
+      return json({ error: 'Os documentos mudaram durante a revisão. Revise a versão atual.', error_kind: 'version_changed' }, 409);
+    }
     const findings = review.apontamentos || [];
     const hasBlocking = findings.some((f) => f?.bloqueante === true);
 
@@ -271,6 +293,7 @@ Deno.serve(async (req) => {
           .select('*')
           .eq('case_id', caseId)
           .eq('content_hash', contentHash)
+          .eq('documents_hash', documentsHash)
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();

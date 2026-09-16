@@ -248,7 +248,8 @@ export interface PackageSummary {
 }
 
 export function summarizePackage(annexes: AnnexDoc[]): PackageSummary {
-  const failed = annexes.filter((a) => a.status === 'falha' || a.status === 'parcial');
+  const failed = annexes.filter((a) => a.status !== 'convertido' ||
+    a.pageEstimate < 1 || (a.images.length === 0 && a.textBlocks.length === 0));
   return {
     annexes,
     failed,
