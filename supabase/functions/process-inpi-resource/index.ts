@@ -1019,7 +1019,7 @@ ou, quando estritamente necessário, uma MANIFESTAÇÃO TÉCNICA LIMITADA aos po
 
 #tipo_recurso: ${resourceTypeLabel}
 
-${LEGAL_KNOWLEDGE}
+${LEGAL_SOURCES_STRICT}
 
 ${FORMATTING_INSTRUCTIONS}
 
@@ -1101,7 +1101,7 @@ de ALTÍSSIMO NÍVEL JURÍDICO, no padrão dos melhores escritórios de PI do Br
 
 #tipo_recurso: ${resourceTypeLabel}
 
-${LEGAL_KNOWLEDGE}
+${LEGAL_SOURCES_STRICT}
 
 ${FORMATTING_INSTRUCTIONS}
 
@@ -1228,7 +1228,7 @@ mantendo foco estrito na exigência formulada pelo(a) examinador(a) do INPI.
 
 #tipo_recurso: ${resourceTypeLabel}
 
-${LEGAL_KNOWLEDGE}
+${LEGAL_SOURCES_STRICT}
 
 ${FORMATTING_INSTRUCTIONS}
 
@@ -1303,7 +1303,7 @@ O usuário já gerou as Seções I a IV. Agora você deve continuar com as Seç�
 
 #tipo_recurso: ${resourceTypeLabel}
 
-${LEGAL_KNOWLEDGE}
+${LEGAL_SOURCES_STRICT}
 
 ${FORMATTING_INSTRUCTIONS}
 
