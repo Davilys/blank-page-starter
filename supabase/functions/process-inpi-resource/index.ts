@@ -2342,7 +2342,7 @@ async function runStep(jobId: string, step: string) {
   }
 }
 
-async function requireAdmin(req: Request): Promise<{ userId: string } | Response> {
+async function requireInpiAccess(req: Request, needEdit = true): Promise<{ userId: string } | Response> {
   const authHeader = req.headers.get('Authorization') || '';
   if (!authHeader.startsWith('Bearer ')) {
     return new Response(JSON.stringify({ error: 'Não autorizado' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -2353,9 +2353,9 @@ async function requireAdmin(req: Request): Promise<{ userId: string } | Response
   if (error || !userData?.user) {
     return new Response(JSON.stringify({ error: 'Não autorizado' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
-  const { data: isAdmin } = await sb.rpc('has_role', { _user_id: userData.user.id, _role: 'admin' });
-  if (!isAdmin) {
-    return new Response(JSON.stringify({ error: 'Acesso de administrador necessário' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  const { data: canUse } = await sb.rpc('has_inpi_resources_access', { _user_id: userData.user.id, _need_edit: needEdit });
+  if (!canUse) {
+    return new Response(JSON.stringify({ error: 'Sem permissão para Recursos INPI' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
   return { userId: userData.user.id };
 }
