@@ -326,8 +326,8 @@ export default function CaseApprovalPanel({
         toast.error('Execute a revisão jurídica desta versão antes da conferência para protocolo.');
         return;
       }
-      if (currentReview.has_blocking) {
-        toast.error('A revisão apontou problemas bloqueantes. Corrija antes de conferir para protocolo.');
+      if (currentReview.has_blocking && !overrideAck) {
+        toast.error('A revisão apontou problemas bloqueantes. Corrija ou assuma a conferência marcando a confirmação.');
         return;
       }
     }
@@ -533,7 +533,7 @@ export default function CaseApprovalPanel({
               variant={protocolApproval ? 'outline' : 'default'}
               disabled={
                 !!protocolApproval || approving !== null || !packageComplete ||
-                !currentReview || currentReview.has_blocking
+                !currentReview || (currentReview.has_blocking && !overrideAck)
               }
               onClick={() => approve('conferencia_protocolo')}
             >
@@ -557,10 +557,21 @@ export default function CaseApprovalPanel({
               Motivo do bloqueio — <strong>revisão jurídica pendente</strong>. O pacote documental está completo.
             </div>
           )}
-          {summary && packageComplete && reviewBlocking && (
-            <div className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
-              Motivo do bloqueio — <strong>revisão jurídica com apontamento grave</strong>. O pacote documental
-              está completo; o impedimento é de conteúdo, não de anexos.
+          {summary && packageComplete && reviewBlocking && !protocolApproval && (
+            <div className="space-y-2 rounded-md bg-destructive/10 p-2 text-xs text-destructive">
+              <p>
+                Motivo do bloqueio — <strong>revisão jurídica com apontamento grave</strong>. O pacote documental
+                está completo; o impedimento é de conteúdo, não de anexos.
+              </p>
+              <label className="flex items-start gap-2 font-medium">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={overrideAck}
+                  onChange={(e) => setOverrideAck(e.target.checked)}
+                />
+                Li os apontamentos acima e assumo a conferência desta versão, liberando o PDF sem carimbo.
+              </label>
             </div>
           )}
           {approvals.some((a) => a.invalidated_at) && (
