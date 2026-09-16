@@ -5,7 +5,7 @@
  * precisa virar página imprimível. Quando qualquer documento falha, o pacote
  * NÃO pode ser anunciado como completo.
  */
-import { fileExtension, isImageExt, loadPdfJs, type CaseCategory, type ConversionStatus } from './caseDocuments';
+import { fileExtension, isImageExt, loadPdfJs, readableFailure, type CaseCategory, type ConversionStatus } from './caseDocuments';
 
 export interface AnnexPageImage {
   dataUrl: string;
