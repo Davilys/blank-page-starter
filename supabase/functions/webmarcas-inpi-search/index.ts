@@ -268,7 +268,10 @@ function mapUpstreamFailure(u: Exclude<Upstream, { kind: 'ok' }>, cors: Record<s
     case 'timeout':
       return fail('upstream_timeout', 'A base do INPI demorou para responder.', 504, cors);
     case 'not_found':
-      return fail('not_found', 'Consulta não encontrada.', 404, cors);
+      // Consulta expirada/inexistente é um estado esperado do fluxo (sessão antiga
+      // retomada), não uma falha do serviço: responde 200 com o código no corpo
+      // para o cliente tratar sem gerar erro de aplicação.
+      return fail('not_found', 'Consulta não encontrada.', 200, cors);
     case 'unavailable':
       return fail('upstream_unavailable', 'Serviço de consulta temporariamente indisponível.', 503, cors);
     default:
