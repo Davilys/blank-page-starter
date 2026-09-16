@@ -2859,6 +2859,74 @@ export type Database = {
           },
         ]
       }
+      inpi_generation_jobs: {
+        Row: {
+          agent_name: string | null
+          agent_strategy: string | null
+          attempt: number
+          case_id: string | null
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          extracted_data: Json | null
+          id: string
+          owner_id: string | null
+          pass1_content: string | null
+          resource_type: string
+          result_content: string | null
+          stage: string
+          status: string
+          updated_at: string
+          user_orientation: string | null
+        }
+        Insert: {
+          agent_name?: string | null
+          agent_strategy?: string | null
+          attempt?: number
+          case_id?: string | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          extracted_data?: Json | null
+          id?: string
+          owner_id?: string | null
+          pass1_content?: string | null
+          resource_type: string
+          result_content?: string | null
+          stage?: string
+          status?: string
+          updated_at?: string
+          user_orientation?: string | null
+        }
+        Update: {
+          agent_name?: string | null
+          agent_strategy?: string | null
+          attempt?: number
+          case_id?: string | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          extracted_data?: Json | null
+          id?: string
+          owner_id?: string | null
+          pass1_content?: string | null
+          resource_type?: string
+          result_content?: string | null
+          stage?: string
+          status?: string
+          updated_at?: string
+          user_orientation?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inpi_generation_jobs_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "inpi_resource_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inpi_knowledge_base: {
         Row: {
           category: string
