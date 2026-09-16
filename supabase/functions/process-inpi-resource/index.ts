@@ -1282,34 +1282,27 @@ ${getAgentIdentity(agentName, agentStrategy)}
 CONTINUE DIRETAMENTE com a Seção V (sem repetir cabeçalho):
 
 V – DA CONFORMIDADE DA ESPECIFICAÇÃO COM O MANUAL DE MARCAS E A CLASSIFICAÇÃO DE NICE
-(250 a 400 palavras)
-- Demonstrar por que a redação apresentada atende aos critérios do INPI
-- Explicar a compatibilidade da especificação final com a classe NCL indicada
-- Evidenciar clareza, precisão, objetividade e aderência à atividade econômica do requerente
-- Indicar, quando cabível, que a genericidade anteriormente apontada foi superada
+- Demonstrar por que a redação apresentada atende aos critérios do INPI vigentes
+- Explicar a compatibilidade da especificação final com a classe indicada, sem ampliar o escopo do pedido
+- Indicar, quando cabível, que a genericidade apontada foi superada
 
-VI – DA BOA-FÉ PROCESSUAL, DA COOPERAÇÃO ADMINISTRATIVA E DA SUFICIÊNCIA DO CUMPRIMENTO
-(200 a 350 palavras)
-- Demonstrar a postura colaborativa do requerente perante o exame de mérito
-- Reforçar que o atendimento da exigência foi completo, específico e tecnicamente fundamentado
-- Mostrar que a manifestação fornece elementos suficientes para o regular prosseguimento do exame
-- Sustentar eventual esclarecimento adicional apenas se vinculado ao conteúdo da exigência
+VI – DA SUFICIÊNCIA DO CUMPRIMENTO
+- Demonstrar objetivamente que cada item da exigência foi atendido, remetendo ao documento correspondente
+- Registrar expressamente qualquer item que dependa de documento ainda não juntado
+- Não declarar cumprido o que não foi demonstrado
 
 VII – DA CONCLUSÃO
-(150 a 250 palavras)
-- Sintetizar os pontos centrais da exigência e como cada um foi atendido
-- Reforçar a adequação da especificação e da classificação adotada
-- Concluir de forma objetiva que o cumprimento apresentado é apto a sanar integralmente a exigência
+- Sintetizar, sem repetir a argumentação, como cada item foi atendido
 
 VIII – DOS PEDIDOS
-(150 a 250 palavras)
+(curto e objetivo; não repetir a argumentação)
 
 Ante o exposto, requer:
 
-a) o recebimento da presente manifestação/cumprimento de exigência, por tempestiva e regular;
-b) o acolhimento da especificação e/ou dos esclarecimentos ora apresentados, nos exatos termos desta petição;
-c) o reconhecimento de que a exigência de mérito foi devidamente cumprida;
-d) o regular prosseguimento do exame do pedido de registro, com apreciação do mérito à luz das informações retificadas/complementadas;
+a) o recebimento da presente manifestação de cumprimento de exigência;
+b) o acolhimento da especificação e/ou dos esclarecimentos ora apresentados;
+c) o reconhecimento de que a exigência de mérito foi cumprida;
+d) o regular prosseguimento do exame do pedido de registro;
 e) a juntada desta manifestação aos autos do processo administrativo correspondente.
 
 #encerramento_obrigatorio
@@ -1325,8 +1318,8 @@ Procurador(a) Constituído(a)
 CPF: 393.239.118-79
 
 ⚠️ RESPONDA APENAS com o texto jurídico das Seções V a VIII + encerramento. SEM JSON. SEM explicações. Apenas o documento jurídico, COM formatação markdown leve conforme #formatacao_visual_obrigatoria (negrito, itálico, tabelas e marcadores [IMG:] / [DOC:NN]).
-⚠️ Para EXIGÊNCIA DE MÉRITO, mantenha foco exclusivo no CUMPRIMENTO/ESCLARECIMENTO da exigência real do despacho.
-⚠️ O texto desta parte deve ter entre 800 e 1.400 palavras. SEJA OBJETIVO — cumprimento de exigência não exige tese; foque em resolver o ponto pedido pelo examinador. NÃO chame a peça de "Recurso Administrativo".`;
+⚠️ Mantenha foco exclusivo no cumprimento da exigência real do despacho.
+⚠️ Sem mínimo de palavras e sem repetir o que já foi dito na Parte 1. NÃO chame a peça de "Recurso Administrativo".`;
   }
 
   return `#instruction
