@@ -106,3 +106,35 @@ describe('integridade dos imports do servidor de geração', () => {
     }
   });
 });
+
+// ── Leitura barata do fluxo da IA (evita "CPU Time exceeded" no servidor) ──
+import { fastTextDelta } from '../../../supabase/functions/process-inpi-resource/sseParse.ts';
+
+describe('fastTextDelta', () => {
+  const ev = (delta: string) =>
+    JSON.stringify({ type: 'response.output_text.delta', sequence_number: 1, item_id: 'x', delta, obfuscation: 'abc' });
+
+  it('lê texto simples sem parse do objeto', () => {
+    expect(fastTextDelta(ev('Excelentíssimo'))).toBe('Excelentíssimo');
+  });
+
+  it('lê texto com aspas, barras e quebras escapadas', () => {
+    const tricky = 'diz "BANDA UAU"\n— art. 124\\XIX — c:\\temp';
+    expect(fastTextDelta(ev(tricky))).toBe(tricky);
+  });
+
+  it('devolve null para eventos que não são delta de texto', () => {
+    expect(fastTextDelta(JSON.stringify({ type: 'response.completed', response: { status: 'completed' } }))).toBeNull();
+    expect(fastTextDelta(JSON.stringify({ type: 'response.refusal.delta', delta: 'não' }))).toBeNull();
+    expect(fastTextDelta('[DONE]')).toBeNull();
+  });
+
+  it('devolve null em evento truncado, deixando o parse normal decidir', () => {
+    expect(fastTextDelta('{"type":"response.output_text.delta","delta":"sem fim')).toBeNull();
+  });
+
+  it('reconstrói o texto completo na mesma ordem', () => {
+    const partes = ['I', ' – ', 'DOS ', 'FATOS'];
+    expect(partes.map((p) => fastTextDelta(ev(p))).join('')).toBe('I – DOS FATOS');
+  });
+});
