@@ -149,6 +149,7 @@ async function callOpenAI(
         max_output_tokens: maxTokens,
         reasoning: { effort: modelConfig.reasoningEffort },
         text: { verbosity: 'high' },
+        stream: true,
       }),
     });
 
@@ -159,35 +160,76 @@ async function callOpenAI(
       return await finish({ content: '', error: errorText, status: response.status, errorKind });
     }
 
-    const data = await response.json();
+    // Leitura em streaming: cada evento renova a atividade, então o corte só
+    // acontece se a IA realmente parar de responder.
     let content = '';
     let refusal = '';
-    if (data.output && Array.isArray(data.output)) {
-      for (const item of data.output) {
-        if (item.type === 'message' && item.content) {
-          for (const part of item.content) {
-            if (part.type === 'output_text') content += part.text;
-            if (part.type === 'refusal') refusal += part.refusal || '';
+    let finalStatus = '';
+    let incompleteReason = '';
+    let usage: { input_tokens?: number; output_tokens?: number } = {};
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      lastActivity = Date.now();
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (!payload || payload === '[DONE]') continue;
+        let evt: any;
+        try { evt = JSON.parse(payload); } catch { continue; }
+        if (evt.type === 'response.output_text.delta' && typeof evt.delta === 'string') {
+          content += evt.delta;
+        } else if (evt.type === 'response.refusal.delta' && typeof evt.delta === 'string') {
+          refusal += evt.delta;
+        } else if (evt.type === 'response.completed' || evt.type === 'response.incomplete' || evt.type === 'response.failed') {
+          finalStatus = evt.response?.status || '';
+          incompleteReason = evt.response?.incomplete_details?.reason || '';
+          usage = {
+            input_tokens: evt.response?.usage?.input_tokens,
+            output_tokens: evt.response?.usage?.output_tokens,
+          };
+          if (!content && Array.isArray(evt.response?.output)) {
+            for (const item of evt.response.output) {
+              if (item.type === 'message' && Array.isArray(item.content)) {
+                for (const part of item.content) {
+                  if (part.type === 'output_text') content += part.text || '';
+                  if (part.type === 'refusal') refusal += part.refusal || '';
+                }
+              }
+            }
           }
+        } else if (evt.type === 'error') {
+          return await finish({
+            content: '',
+            error: evt.error?.message || 'Erro no fluxo da IA',
+            status: 502,
+            errorKind: 'http',
+          }, usage);
         }
       }
     }
-
-    const usage = { input_tokens: data?.usage?.input_tokens, output_tokens: data?.usage?.output_tokens };
 
     if (refusal && !content) {
       return await finish({ content: '', error: `Recusa do modelo: ${refusal.slice(0, 300)}`, status: 422, errorKind: 'refusal' }, usage);
     }
 
-    // Truncamento: a Responses API devolve status "incomplete" com o motivo.
-    if (data?.status === 'incomplete') {
-      const reason = data?.incomplete_details?.reason || 'desconhecido';
+    if (finalStatus === 'incomplete') {
       return await finish({
         content,
-        error: `Resposta incompleta da IA (motivo: ${reason}). O conteúdo não foi considerado final.`,
+        error: `Resposta incompleta da IA (motivo: ${incompleteReason || 'desconhecido'}). O conteúdo não foi considerado final.`,
         status: 502,
         errorKind: 'truncated',
       }, usage);
+    }
+
+    if (!content) {
+      return await finish({ content: '', error: 'A IA não devolveu texto.', status: 502, errorKind: 'empty' }, usage);
     }
 
     return await finish({ content }, usage);
@@ -202,7 +244,7 @@ async function callOpenAI(
       errorKind: isTimeout ? 'timeout' : 'exception',
     });
   } finally {
-    clearTimeout(timeout);
+    clearInterval(timeout);
   }
 }
 
