@@ -615,6 +615,7 @@ export default function RecursosINPI() {
 
   const JOB_STAGE_LABELS: Record<string, string> = {
     preparar: 'Preparando os documentos do caso',
+    prepare: 'Preparando os documentos do caso',
     pass1: 'Escrevendo a primeira parte da peça',
     pass2: 'Escrevendo a segunda parte da peça',
     concluido: 'Finalizando',
