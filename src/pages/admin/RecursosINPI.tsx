@@ -3068,10 +3068,14 @@ export default function RecursosINPI() {
                   activeCaseId && selectedResource.id === currentResourceId ? exportPackage?.annexes : undefined
                 }
                 draftStamp={
-                  activeCaseId &&
-                  selectedResource.id === currentResourceId &&
                   UPGRADED_MODALITIES.includes(selectedResource.resource_type)
-                    ? (exportPackage?.draftStamp ?? 'MINUTA — PENDENTE DE CONFERÊNCIA')
+                    ? activeCaseId && selectedResource.id === currentResourceId
+                      // Caso aberto: usa o carimbo real calculado pela conferência.
+                      ? (exportPackage?.draftStamp ?? 'MINUTA — PENDENTE DE CONFERÊNCIA')
+                      // Abertura pelo histórico: só sai sem carimbo se já estiver aprovado.
+                      : selectedResource.status === 'approved'
+                        ? null
+                        : 'MINUTA — PENDENTE DE CONFERÊNCIA'
                     : null
                 }
               />
