@@ -1048,41 +1048,35 @@ Procurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79
 ═══════════════════════════════════════════════════════════
 
 I – SÍNTESE DA EXIGÊNCIA FORMULADA E DO HISTÓRICO PROCESSUAL
-(300 a 500 palavras — seja objetivo)
-- Narrar cronologicamente o histórico do pedido
-- Transcrever e explicar, com fidelidade, a exigência formulada pelo INPI
-- Identificar o ponto técnico exato a ser cumprido (ex.: especificação genérica, necessidade de detalhamento, adequação da classe, correção formal)
-- Explicar o contexto do exame de mérito e o conteúdo do despacho sem polemizar desnecessariamente
-- Descrever a marca, o titular, a classe e o objeto do pedido com precisão
+- Narrar cronologicamente o histórico do pedido, distinguindo data do despacho, data da publicação na RPI e data deste ato
+- Transcrever a exigência formulada, item por item, na ordem em que foi apresentada
+- Identificar o ponto técnico exato a ser cumprido em cada item
+- Descrever marca, apresentação, titular, classe e especificação oficial com precisão, sem preencher dado ausente
 
-II – DA TEMPESTIVIDADE, CABIMENTO E REGULARIDADE DA PRESENTE MANIFESTAÇÃO
-(150 a 250 palavras)
-- Demonstrar a tempestividade do cumprimento/manifestação
-- Confirmar a legitimidade do requerente e do procurador constituído
-- Fundamentar o cabimento à luz da LPI, do Manual de Marcas e das regras procedimentais do INPI
-- Mencionar recolhimento de GRU apenas se compatível com o ato descrito no caso
+II – DA REGULARIDADE DA PRESENTE MANIFESTAÇÃO
+- Indicar o cabimento do cumprimento da exigência
+- Só afirmar tempestividade se a data da publicação e o prazo aplicável constarem do dossiê; caso contrário, registrar "tempestividade a conferir na publicação"
+- Confirmar a representação apenas com base em documento do dossiê; não atribuir OAB nem qualificação de advogado sem comprovação
+- Mencionar recolhimento apenas se houver guia no dossiê, distinguindo guia, comprovante de pagamento e vínculo com o processo
 
-III – DO EFETIVO CUMPRIMENTO DA EXIGÊNCIA DE MÉRITO
-(500 a 800 palavras — SEÇÃO MAIS IMPORTANTE, mas direta e técnica)
-- Responder PONTO A PONTO ao que o(a) examinador(a) solicitou
-- Se a exigência envolver especificação genérica, APRESENTAR a redação corrigida e detalhada da especificação
-- Se houver exemplos no despacho, utilizá-los como referência técnica, sem copiar cegamente quando o documento exigir adaptação ao caso concreto
-- Justificar por que a nova redação atende à Classificação de Nice e ao Manual de Marcas
-- Se necessário, esclarecer a atividade real do requerente e sua aderência à classe indicada
-- Se houver defesa técnica, ela deve ser limitada ao ponto da exigência, com tom respeitoso e objetivo
-- NÃO discutir oposição, colidência com terceiros ou risco de confusão, salvo se isso estiver literalmente no despacho
+III – DO CUMPRIMENTO DA EXIGÊNCIA, ITEM A ITEM
+- Responder cada item da exigência NA MESMA ORDEM, identificando o item respondido
+- Explicar objetivamente como cada item foi cumprido e indicar o documento correspondente com marcador [DOC:NN]
+- Havendo ajuste de especificação, apresentar a redação precisa proposta, respeitando os limites admitidos para o pedido (não ampliar o escopo)
+- Justificar a redação pela Classificação de Nice e pelo Manual de Marcas vigente
+- Não tratar a exigência como indeferimento nem pedir reforma de decisão inexistente
+- Eventual contestação de item deve ser expressa, identificada como tal e fundamentada
+- Não discutir oposição, colidência ou risco de confusão, salvo se o próprio despacho tratar disso
 
-IV – DA ADEQUAÇÃO TÉCNICA DA ESPECIFICAÇÃO, CLASSIFICAÇÃO E DELIMITAÇÃO DO ESCOPO
-(300 a 500 palavras)
-- Demonstrar tecnicamente a correção do enquadramento na classe NCL pertinente
-- Explicar como a especificação retificada elimina genericidade, ambiguidade ou excesso
-- Relacionar a redação proposta com a atividade do requerente e com os parâmetros do INPI
-- Quando aplicável, apresentar a especificação final de forma clara, pronta para acolhimento administrativo
-- Encerrar a seção com conclusão objetiva de que a exigência foi devidamente cumprida
+IV – DA ADEQUAÇÃO DA ESPECIFICAÇÃO E DA CLASSIFICAÇÃO
+- Demonstrar a correção do enquadramento na classe indicada
+- Explicar como a redação proposta supera a genericidade ou ambiguidade apontada
+- Apontar expressamente qualquer item que dependa de documento ainda não juntado
+- Encerrar com conclusão objetiva, sem declarar cumprido o que não foi demonstrado
 
 ⚠️ RESPONDA APENAS com o texto jurídico completo das Seções I a IV. SEM JSON. SEM explicações. Apenas o documento jurídico, COM formatação markdown leve conforme #formatacao_visual_obrigatoria (negrito, itálico, tabelas e marcadores [IMG:] / [DOC:NN]).
-⚠️ Para EXIGÊNCIA DE MÉRITO, mantenha foco exclusivo no CUMPRIMENTO/ESCLARECIMENTO da exigência real do despacho.
-⚠️ O texto desta parte deve ter entre 1.300 e 2.000 palavras. EVITE prolixidade: cumprimento de exigência é peça objetiva, não tese acadêmica. NÃO chame a peça de "Recurso Administrativo" no corpo do texto — use "Cumprimento de Exigência de Mérito" ou "Manifestação".`;
+⚠️ Use a extensão necessária para cumprir a exigência com clareza: sem mínimo e sem enchimento. Não repita conteúdo.
+⚠️ NÃO chame a peça de "Recurso Administrativo" — use "Cumprimento de Exigência de Mérito".`;
   }
 
   return `#instruction
