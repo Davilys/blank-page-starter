@@ -7,6 +7,8 @@ import { useState } from 'react';
 import jsPDF from 'jspdf';
 import { convertDocument, summarizePackage, type AnnexDoc } from '@/lib/inpi/packageBuilder';
 import { extractContent } from '@/lib/inpi/caseDocuments';
+import { normalizeMarkers } from '@/lib/inpi/caseInventory';
+
 import { generateNativePDF } from '@/components/admin/INPIResourcePDFPreview';
 
 const log = (msg: string) => {
