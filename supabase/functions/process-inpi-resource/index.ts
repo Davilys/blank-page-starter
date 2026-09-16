@@ -647,9 +647,11 @@ function enforceMandatoryOpening(
     ncl_class?: string;
     holder?: string;
     examiner_or_opponent?: string;
-  }
+    presentation?: string;
+  },
+  resourceType = ''
 ): string {
-  const header = buildMandatoryOpeningBlock(resourceTypeLabel, data);
+  const header = buildMandatoryOpeningBlock(resourceTypeLabel, data, resourceType);
   const body = extractBodyFromSectionI(content);
   return `${header}\n\n${body}`;
 }
