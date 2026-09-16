@@ -1827,7 +1827,9 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
     // the file_id across extraction + pass1 + pass2. Cuts total payload
     // by ~66% and slashes generation latency.
     console.time('file_upload_dedupe');
-    const failedUploads = await maybeReplaceFilePartsWithFileIds(OPENAI_API_KEY, fileParts, sourceFilesForUpload);
+    const failedUploads = usingPreparedFiles
+      ? []
+      : await maybeReplaceFilePartsWithFileIds(OPENAI_API_KEY, fileParts, sourceFilesForUpload);
     console.timeEnd('file_upload_dedupe');
     // Drop every base64 reference now that OpenAI has the files. Keeping these
     // strings alive during the 3 parallel model calls below is what triggers
