@@ -76,7 +76,7 @@ export default function CasePreparationPanel({
   const [saving, setSaving] = useState(false);
   const localFiles = useRef<Map<string, File>>(new Map());
   const inputs = useRef<Record<string, HTMLInputElement | null>>({});
-  const caseInitStarted = useRef(false);
+  const initializedCaseKey = useRef<string | null>(null);
 
   const reloadDocs = useCallback(async (id: string) => {
     const { data, error } = await supabase
@@ -94,8 +94,13 @@ export default function CasePreparationPanel({
 
   /* ── Caso: criado uma única vez por sessão de preparação. ───────────── */
   useEffect(() => {
-    if (caseInitStarted.current) return;
-    caseInitStarted.current = true;
+    const caseKey = `${resourceType}:${agentId}`;
+    if (initializedCaseKey.current === caseKey) return;
+    initializedCaseKey.current = caseKey;
+    setCaseId(null);
+    setDocs([]);
+    setUploadAttempts([]);
+    localFiles.current.clear();
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -103,7 +108,7 @@ export default function CasePreparationPanel({
         return;
       }
 
-      const storageKey = `inpi-resource-case:${user.id}:${resourceType}:${agentId}`;
+      const storageKey = `inpi-resource-case:${user.id}:${caseKey}`;
       const storedCaseId = sessionStorage.getItem(storageKey);
       if (storedCaseId) {
         const { data: existingCase, error: existingError } = await supabase
