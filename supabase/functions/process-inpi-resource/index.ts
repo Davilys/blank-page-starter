@@ -135,7 +135,17 @@ async function callOpenAI(
     return result;
   };
 
-  try {
+  type Attempt = {
+    content: string;
+    refusal: string;
+    finalStatus: string;
+    incompleteReason: string;
+    usage: { input_tokens?: number; output_tokens?: number };
+    hardError?: { error: string; status: number; errorKind: string };
+  };
+
+  const attempt = async (input: any[]): Promise<Attempt> => {
+    const out: Attempt = { content: '', refusal: '', finalStatus: '', incompleteReason: '', usage: {} };
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       signal: controller.signal,
@@ -145,7 +155,7 @@ async function callOpenAI(
       },
       body: JSON.stringify({
         model: modelConfig.model,
-        input: inputMessages,
+        input,
         max_output_tokens: maxTokens,
         reasoning: { effort: modelConfig.reasoningEffort },
         text: { verbosity: 'high' },
@@ -156,17 +166,16 @@ async function callOpenAI(
     if (!response.ok) {
       const errorText = await response.text();
       console.error('OpenAI API error:', response.status, errorText.substring(0, 500));
-      const errorKind = isModelAccessError(response.status, errorText) ? 'model_access' : 'http';
-      return await finish({ content: '', error: errorText, status: response.status, errorKind });
+      out.hardError = {
+        error: errorText,
+        status: response.status,
+        errorKind: isModelAccessError(response.status, errorText) ? 'model_access' : 'http',
+      };
+      return out;
     }
 
     // Leitura em streaming: cada evento renova a atividade, então o corte só
     // acontece se a IA realmente parar de responder.
-    let content = '';
-    let refusal = '';
-    let finalStatus = '';
-    let incompleteReason = '';
-    let usage: { input_tokens?: number; output_tokens?: number } = {};
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
@@ -184,45 +193,99 @@ async function callOpenAI(
         let evt: any;
         try { evt = JSON.parse(payload); } catch { continue; }
         if (evt.type === 'response.output_text.delta' && typeof evt.delta === 'string') {
-          content += evt.delta;
+          out.content += evt.delta;
         } else if (evt.type === 'response.refusal.delta' && typeof evt.delta === 'string') {
-          refusal += evt.delta;
+          out.refusal += evt.delta;
         } else if (evt.type === 'response.completed' || evt.type === 'response.incomplete' || evt.type === 'response.failed') {
-          finalStatus = evt.response?.status || '';
-          incompleteReason = evt.response?.incomplete_details?.reason || '';
-          usage = {
+          out.finalStatus = evt.response?.status || '';
+          out.incompleteReason = evt.response?.incomplete_details?.reason || '';
+          out.usage = {
             input_tokens: evt.response?.usage?.input_tokens,
             output_tokens: evt.response?.usage?.output_tokens,
           };
-          if (!content && Array.isArray(evt.response?.output)) {
+          if (!out.content && Array.isArray(evt.response?.output)) {
             for (const item of evt.response.output) {
               if (item.type === 'message' && Array.isArray(item.content)) {
                 for (const part of item.content) {
-                  if (part.type === 'output_text') content += part.text || '';
-                  if (part.type === 'refusal') refusal += part.refusal || '';
+                  if (part.type === 'output_text') out.content += part.text || '';
+                  if (part.type === 'refusal') out.refusal += part.refusal || '';
                 }
               }
             }
           }
         } else if (evt.type === 'error') {
-          return await finish({
-            content: '',
+          out.hardError = {
             error: evt.error?.message || 'Erro no fluxo da IA',
             status: 502,
             errorKind: 'http',
-          }, usage);
+          };
+          return out;
         }
       }
     }
+    return out;
+  };
 
-    if (refusal && !content) {
-      return await finish({ content: '', error: `Recusa do modelo: ${refusal.slice(0, 300)}`, status: 422, errorKind: 'refusal' }, usage);
+  // Junta a continuação removendo eventual sobreposição literal entre o fim do
+  // texto parcial e o início da continuação (evita parágrafos duplicados).
+  const joinWithoutOverlap = (head: string, tail: string): string => {
+    const a = head.trimEnd();
+    const b = tail.trimStart();
+    const max = Math.min(600, a.length, b.length);
+    for (let len = max; len >= 40; len--) {
+      if (a.slice(-len) === b.slice(0, len)) return a + b.slice(len);
+    }
+    return a + (a.endsWith('\n') ? '' : '\n') + b;
+  };
+
+  try {
+    let first = await attempt(inputMessages);
+    if (first.hardError) {
+      return await finish({ content: '', ...first.hardError }, first.usage);
+    }
+
+    let content = first.content;
+    let usage = first.usage;
+    let finalStatus = first.finalStatus;
+    let incompleteReason = first.incompleteReason;
+    let continued = false;
+
+    // UMA única continuação quando o texto foi cortado por orçamento de tokens.
+    // O texto parcial é preservado; nada é descartado.
+    if (finalStatus === 'incomplete' && incompleteReason === 'max_output_tokens' && content.trim().length > 500) {
+      console.warn('Resposta truncada — solicitando continuação única.');
+      const continuation = await attempt([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userParts },
+        { role: 'assistant', content: [{ type: 'output_text', text: content.slice(-12000) }] },
+        {
+          role: 'user',
+          content: [{
+            type: 'input_text',
+            text: 'O texto acima foi interrompido por limite de tamanho. CONTINUE EXATAMENTE do ponto em que parou, sem reescrever, sem repetir trechos já produzidos e sem reabrir seções já encerradas. Complete as seções que faltam e o encerramento obrigatório. Responda apenas com a continuação.',
+          }],
+        },
+      ]);
+      continued = true;
+      if (!continuation.hardError && continuation.content.trim().length > 0) {
+        content = joinWithoutOverlap(content, continuation.content);
+        finalStatus = continuation.finalStatus;
+        incompleteReason = continuation.incompleteReason;
+        usage = {
+          input_tokens: (usage.input_tokens ?? 0) + (continuation.usage.input_tokens ?? 0),
+          output_tokens: (usage.output_tokens ?? 0) + (continuation.usage.output_tokens ?? 0),
+        };
+      }
+    }
+
+    if (first.refusal && !content) {
+      return await finish({ content: '', error: `Recusa do modelo: ${first.refusal.slice(0, 300)}`, status: 422, errorKind: 'refusal' }, usage);
     }
 
     if (finalStatus === 'incomplete') {
       return await finish({
         content,
-        error: `Resposta incompleta da IA (motivo: ${incompleteReason || 'desconhecido'}). O conteúdo não foi considerado final.`,
+        error: `Resposta incompleta da IA (motivo: ${incompleteReason || 'desconhecido'})${continued ? ' mesmo após uma continuação' : ''}. O conteúdo parcial foi preservado como rascunho.`,
         status: 502,
         errorKind: 'truncated',
       }, usage);
