@@ -326,9 +326,9 @@ export const CONVERSION_LABEL: Record<ConversionStatus, string> = {
 };
 
 /** Impressão digital do conjunto ativo de documentos. */
-export function documentsFingerprint(docs: { sha256: string | null; id: string }[]): string {
+export function documentsFingerprint(docs: { sha256: string | null; id: string; doc_number?: number; category?: string }[]): string {
   return docs
-    .map((d) => d.sha256 || d.id)
+    .map((d) => JSON.stringify([d.id, d.doc_number, d.category, d.sha256]))
     .sort()
     .join('|');
 }

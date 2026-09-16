@@ -30,6 +30,7 @@ import type { NativeAnnexDoc } from '@/components/admin/INPIResourcePDFPreview';
 const BUCKET = 'inpi-recursos-docs';
 
 interface CaseDocRow {
+  doc_number: number;
   id: string;
   category: CaseCategory;
   file_name: string;
@@ -111,8 +112,9 @@ export default function CaseApprovalPanel({
     const [{ data: d }, { data: a }, { data: o }, { data: r }] = await Promise.all([
       supabase
         .from('inpi_case_documents')
-        .select('id, category, file_name, storage_path, sha256, extraction_status, extraction_notes, page_count, interpreted_pages, unreadable_pages, conversion_status, conversion_notes, display_order')
-        .eq('case_id', caseId).eq('is_active', true).order('display_order', { ascending: true }),
+        .select('id, doc_number, category, file_name, storage_path, sha256, extraction_status, extraction_notes, page_count, interpreted_pages, unreadable_pages, conversion_status, conversion_notes, display_order')
+        .eq('case_id', caseId).eq('is_active', true).order('display_order', { ascending: true })
+        .order('created_at', { ascending: true }).order('id', { ascending: true }),
       supabase
         .from('inpi_case_approvals')
         .select('id, approval_kind, content_hash, documents_hash, orientation_hash, approved_at, invalidated_at, invalidation_reason')
@@ -228,12 +230,13 @@ export default function CaseApprovalPanel({
     setConverting(true);
     try {
       const built: AnnexDoc[] = [];
-      let n = 1;
       for (const doc of docs) {
+        const docNumber = doc.doc_number;
+        if (!Number.isInteger(docNumber) || docNumber < 1) throw new Error('Numeração documental indisponível.');
         const { data: blob, error } = await supabase.storage.from(BUCKET).download(doc.storage_path);
         if (error || !blob) {
           built.push({
-            id: doc.id, docNumber: n++, title: `Doc. ${String(n).padStart(2, '0')} — ${doc.file_name}`,
+            id: doc.id, docNumber, title: `Doc. ${String(docNumber).padStart(2, '0')} — ${doc.file_name}`,
             category: doc.category, categoryLabel: CATEGORY_LABEL[doc.category] || doc.category,
             fileName: doc.file_name, images: [], textBlocks: [], pageEstimate: 0,
             status: 'falha', notes: error?.message || 'Arquivo não localizado no armazenamento.',
@@ -242,7 +245,7 @@ export default function CaseApprovalPanel({
         }
         const annex = await convertDocument(
           { id: doc.id, file_name: doc.file_name, category: doc.category, categoryLabel: CATEGORY_LABEL[doc.category] || doc.category },
-          blob, n++,
+          blob, docNumber,
         );
         built.push(annex);
         await supabase.from('inpi_case_documents').update({

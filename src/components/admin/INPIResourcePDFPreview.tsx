@@ -907,7 +907,10 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [inventory, setInventory] = useState<CaseInventory | null>(null);
   const [isLoadingInventory, setIsLoadingInventory] = useState(false);
+  const [inventoryError, setInventoryError] = useState<string | null>(null);
   const [inventoryAnnexes, setInventoryAnnexes] = useState<NativeAnnexDoc[] | null>(null);
+  const exportVersionRef = useRef('');
+  exportVersionRef.current = `${resource.id}\u0000${liveContent}`;
   const [isBuildingAnnexes, setIsBuildingAnnexes] = useState(false);
 
 
@@ -1023,20 +1026,26 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
     (async () => {
       if (debugEvidenceOverride) return;
       setIsLoadingInventory(true);
+      setInventory(null);
+      setInventoryError(null);
+      setInventoryAnnexes(null);
       try {
         const inv = await loadCaseInventory(resource.id);
         if (!inv || cancelled) { if (!cancelled) setInventory(null); return; }
-        const hydrated = await hydrateInventoryPreviews(inv.items);
+        const hydrated = await hydrateInventoryPreviews(inv.items, liveContent);
         if (!cancelled) setInventory({ ...inv, items: hydrated });
       } catch (err) {
         console.error('Falha ao carregar o inventário do caso:', err);
-        if (!cancelled) setInventory(null);
+        if (!cancelled) {
+          setInventory(null);
+          setInventoryError(err instanceof Error ? err.message : 'Falha ao carregar o acervo.');
+        }
       } finally {
         if (!cancelled) setIsLoadingInventory(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [resource.id, debugEvidenceOverride]);
+  }, [resource.id, debugEvidenceOverride, liveContent]);
 
   const inventoryItems = inventory?.items ?? [];
   const hasInventory = inventoryItems.length > 0;
@@ -1096,7 +1105,12 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
     if (!hasInventory) return undefined;
     const res = resolveMarker(`[IMG:${slug}]`, null, slug, inventoryItems);
     if (res.kind !== 'doc') return undefined;
-    return activeEvidences.find((e) => e.id === res.item.id);
+    const evidence = activeEvidences.find((e) => e.id === res.item.id);
+    const page = res.item.previewPages?.[res.page];
+    if (!evidence || !page) return undefined;
+    return { ...evidence, dataUrl: page.dataUrl, width: page.width, height: page.height,
+      page_number: res.page,
+      caption: `${res.item.categoryLabel} — ${res.item.fileName} (página ${res.page})` };
   };
 
   const markerPendencies: string[] = (() => {
@@ -1110,6 +1124,12 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
       if (!hasInventory) continue;
       const res = resolveMarker(m[0], m[2] ? parseInt(m[2], 10) : null, m[3] ? m[3].toLowerCase() : null, inventoryItems);
       if (res.kind === 'unresolved') out.push(`${m[0]} — ${res.reason}`);
+      else if (m[3] && !res.item.previewPages?.[res.page]) {
+        out.push(`${m[0]} — Imagem da página ${res.page} indisponível.`);
+      }
+      else if (m[2] && !res.item.previewDataUrl && /\.(pdf|jpe?g|png|webp)$/i.test(res.item.fileName)) {
+        out.push(`${m[0]} — Imagem do documento indisponível.`);
+      }
     }
     return out;
   })();
@@ -1245,7 +1265,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
    * o próprio montador converte os documentos persistidos do caso.
    */
   const ensureAnnexes = async (): Promise<NativeAnnexDoc[] | undefined> => {
-    if (annexes && annexes.length) return annexes;
+    const version = exportVersionRef.current;
     if (!hasInventory) return annexes;
     if (inventoryAnnexes) return inventoryAnnexes;
     setIsBuildingAnnexes(true);
@@ -1256,6 +1276,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
         fileName: a.fileName, images: a.images, textBlocks: a.textBlocks,
         status: a.status, notes: a.notes,
       }));
+      if (exportVersionRef.current !== version) throw new Error('O recurso mudou durante a conversão. Gere novamente.');
       setInventoryAnnexes(mapped);
       return mapped;
     } finally {
@@ -1264,6 +1285,12 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
   };
 
   const handleDownloadPDF = async () => {
+    if (isGeneratingPDF || isBuildingAnnexes) return;
+    const version = exportVersionRef.current;
+    if (inventoryError) {
+      toast({ title: 'Exportação bloqueada', description: inventoryError, variant: 'destructive' });
+      return;
+    }
     if (isLoadingEvidence || isLoadingInventory) {
       toast({ title: 'Aguarde', description: 'As provas ainda estão sendo preparadas para entrar no PDF.' });
       return;
@@ -1271,6 +1298,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
     setIsGeneratingPDF(true);
     try {
       const finalAnnexes = await ensureAnnexes();
+      if (version !== exportVersionRef.current) throw new Error('O recurso mudou durante a exportação. Gere novamente.');
       const conversionFailed = (finalAnnexes || []).some((a) => a.status === 'falha' || a.status === 'parcial');
       // Pendência de marcador, conversão falha ou anexo faltante ⇒ só prévia.
       const effectiveStamp = draftStamp
@@ -1278,7 +1306,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
           ? 'PRÉVIA — REFERÊNCIA DE PROVA NÃO VINCULADA'
           : conversionFailed
             ? 'PRÉVIA — PACOTE DOCUMENTAL INCOMPLETO'
-            : null);
+            : draftStamp === undefined && hasInventory ? 'MINUTA — CONFERÊNCIA DESTA VERSÃO NECESSÁRIA' : null);
       await generateNativePDF({
         pdfFileName,
         bodyContent,
@@ -1410,6 +1438,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
 
   return (
     <div className="space-y-4">
+      {inventoryError && <p role="alert" className="text-destructive">{inventoryError} Exportação bloqueada; nenhum pacote foi validado.</p>}
       {hasInventory && (
         <div className="print:hidden rounded-xl border bg-muted/40 p-3 text-xs space-y-1">
           <p className="font-semibold">

@@ -2500,6 +2500,7 @@ export type Database = {
           created_at: string
           declared_mime_type: string | null
           display_order: number
+          doc_number: number
           extracted_text: string | null
           extraction_notes: string | null
           extraction_status: string
@@ -2535,6 +2536,7 @@ export type Database = {
           created_at?: string
           declared_mime_type?: string | null
           display_order?: number
+          doc_number?: number
           extracted_text?: string | null
           extraction_notes?: string | null
           extraction_status?: string
@@ -2570,6 +2572,7 @@ export type Database = {
           created_at?: string
           declared_mime_type?: string | null
           display_order?: number
+          doc_number?: number
           extracted_text?: string | null
           extraction_notes?: string | null
           extraction_status?: string
@@ -2987,6 +2990,7 @@ export type Database = {
           id: string
           is_homologation: boolean
           last_error: string | null
+          next_document_number: number
           owner_id: string
           process_number: string | null
           resource_id: string | null
@@ -3005,6 +3009,7 @@ export type Database = {
           id?: string
           is_homologation?: boolean
           last_error?: string | null
+          next_document_number?: number
           owner_id: string
           process_number?: string | null
           resource_id?: string | null
@@ -3023,6 +3028,7 @@ export type Database = {
           id?: string
           is_homologation?: boolean
           last_error?: string | null
+          next_document_number?: number
           owner_id?: string
           process_number?: string | null
           resource_id?: string | null
