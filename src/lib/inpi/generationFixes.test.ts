@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { orientationItemText } from './orientationDisplay';
 import { isTrustedInpiStep } from '../../../supabase/functions/_shared/inpiInternalAuth';
