@@ -1061,7 +1061,7 @@ IV – ANÁLISE TÉCNICA DO CONJUNTO MARCÁRIO
 
 ⚠️ RESPONDA APENAS com o texto jurídico completo das Seções I a IV. SEM JSON. SEM explicações. Apenas o documento jurídico, COM formatação markdown leve conforme #formatacao_visual_obrigatoria (negrito, itálico, tabelas e marcadores [IMG:] / [DOC:NN]).
 ⚠️ NÃO termine com "continuação na próxima parte" ou similar — termine a Seção IV normalmente.
-⚠️ O texto desta parte deve ter NO MÍNIMO 3.800 palavras.`;
+⚠️ Priorize fundamentação completa, pertinente e sem repetição — não persiga contagem de palavras nem alongue o texto artificialmente.`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1264,7 +1264,7 @@ Procurador(a) Constituído(a)
 CPF: 393.239.118-79
 
 ⚠️ RESPONDA APENAS com o texto jurídico das Seções V a VIII + encerramento. SEM JSON. SEM explicações. Apenas o documento jurídico, COM formatação markdown leve conforme #formatacao_visual_obrigatoria (negrito, itálico, tabelas e marcadores [IMG:] / [DOC:NN]).
-⚠️ O texto desta parte deve ter NO MÍNIMO 3.400 palavras.`;
+⚠️ Priorize fundamentação completa, pertinente e sem repetição — não persiga contagem de palavras nem alongue o texto artificialmente.`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1746,11 +1746,11 @@ SEÇÕES I A IV JÁ GERADAS:
 ${basePass1Content.substring(0, 6000)}
 ---
 
-Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo e nível de profundidade. ${resourceType === 'exigencia_merito' ? 'O texto total desta parte deve ter entre 800 e 1.400 palavras — SEJA OBJETIVO.' : 'O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.'}${userOrientationBlock}${evidenceBlock}` },
+Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo e nível de profundidade. ${resourceType === 'exigencia_merito' ? 'O texto total desta parte deve ter entre 800 e 1.400 palavras — SEJA OBJETIVO.' : 'Priorize fundamentação completa e sem repetição; não alongue o texto artificialmente.'}${userOrientationBlock}${evidenceBlock}` },
       ];
 
       console.log('PASS 2 only: Generating Sections V-VIII...');
-      const pass2Result = await callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 20000, 0.25, 300000, makeCtx('pass2'));
+      const pass2Result = await callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 32000, 0.25, 300000, makeCtx('pass2'));
       if (pass2Result.error) {
         const cfg = modelFailureResponse(pass2Result);
         if (cfg) return cfg;
@@ -1793,7 +1793,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     const pass1User = [
       { type: 'input_text', text: resourceType === 'exigencia_merito'
         ? `Analise o(s) documento(s) do INPI anexado(s) e elabore APENAS o miolo (Parte 1) do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. PASSO 1 (obrigatório, mental): classifique a exigência como TIPO A (especificação/classificação), TIPO B (prova de atividade/titularidade) ou TIPO C (oposição). Se TIPO A: gere no MÁXIMO 450-700 palavras (Síntese curta + Cumprimento com nova especificação); NÃO crie seções de boa-fé, conclusão extensa, não cite jurisprudência, doutrina nem examinador, não amplie escopo. Se TIPO B/C: siga estrutura I–IV mais densa, mas sem doutrina/jurisprudência. 🛑 PROIBIDO nesta Parte 1: escrever "Termos em que", "Pede deferimento", "São Paulo, ${currentDate}", linha de assinatura, "Davilys Danques", "CPF:" ou lista "(Doc. 01) – …". Isso será emitido APENAS na Parte 2. Termine após a última seção, sem fechamento. 🔒 Nunca invente produtos, serviços, documentos ou atividades que não estejam expressamente no processo/anexos.${userOrientationBlock}${evidenceBlock}`
-        : `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do recurso administrativo. CADA seção deve ter a extensão MÍNIMA especificada. O texto total desta parte deve ter NO MÍNIMO 3.800 palavras. Desenvolva CADA argumento com máxima profundidade, como um escritório de PI de elite faria.${userOrientationBlock}${evidenceBlock}` },
+        : `Analise o(s) documento(s) do INPI anexado(s) e elabore as SEÇÕES I a IV do recurso administrativo. Desenvolva CADA argumento com profundidade real, sem repetição e sem alongar o texto artificialmente, como um escritório de PI de elite faria.${userOrientationBlock}${evidenceBlock}` },
       ...fileResponseParts,
     ];
 
@@ -1801,7 +1801,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     const pass2User = [
       { type: 'input_text', text: resourceType === 'exigencia_merito'
         ? `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS o fechamento (Parte 2) do CUMPRIMENTO DE EXIGÊNCIA DE MÉRITO. Reclassifique a exigência: TIPO A (especificação), TIPO B (prova de atividade) ou TIPO C (oposição). Se TIPO A: produza SOMENTE uma seção curta "DOS PEDIDOS" (60-120 palavras) + encerramento único ("Termos em que / Pede deferimento / São Paulo, ${currentDate} / assinatura / CPF"); total 150-300 palavras; NÃO escreva Seções V/VI/VII; NÃO cite jurisprudência, doutrina ou examinador; NÃO amplie escopo. Se TIPO B/C: siga V–VIII + encerramento, sem doutrina/jurisprudência. 🔒 Nunca invente produtos, serviços, documentos ou atividades que não estejam no processo/anexos. O encerramento aparece UMA ÚNICA VEZ, ao final.${userOrientationBlock}${evidenceBlock}`
-        : `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do recurso administrativo. Mantenha tom técnico, fundamentação robusta e conclusões objetivas. O texto total desta parte deve ter NO MÍNIMO 3.400 palavras.${userOrientationBlock}${evidenceBlock}` },
+        : `Analise diretamente o(s) documento(s) do INPI anexado(s) e elabore APENAS as SEÇÕES V a VIII + encerramento do recurso administrativo. Mantenha tom técnico, fundamentação robusta e conclusões objetivas, sem repetição e sem alongar o texto artificialmente.${userOrientationBlock}${evidenceBlock}` },
       ...fileResponseParts,
     ];
 
@@ -1814,9 +1814,9 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     console.time('ai_generation');
     const [extractionResult, pass1Result, pass2Result] = await Promise.all([
       callOpenAI(OPENAI_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, 800, 0.1, 60000, makeCtx('extracao')),
-      callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 20000, 0.25, 300000, makeCtx('pass1')),
+      callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 32000, 0.25, 300000, makeCtx('pass1')),
       shouldRunPass2Now
-        ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 20000, 0.25, 300000, makeCtx('pass2'))
+        ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 32000, 0.25, 300000, makeCtx('pass2'))
         : Promise.resolve({ content: '', error: undefined as string | undefined, status: undefined as number | undefined, errorKind: undefined as string | undefined }),
     ]);
     console.timeEnd('ai_generation');
