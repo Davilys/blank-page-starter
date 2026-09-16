@@ -765,6 +765,46 @@ Se houver QUALQUER dúvida → NÃO CITAR → substituir por fundamentação leg
 - Tinoco Soares — "Lei de Patentes, Marcas e Direitos Conexos"
 `;
 
+/*
+ * Base jurídica das TRÊS modalidades atualizadas (recurso contra indeferimento,
+ * cumprimento de exigência de mérito e manifestação à oposição).
+ * Não traz lista de precedentes nem de doutrina: nada é citado sem conferência.
+ */
+const LEGAL_SOURCES_STRICT = `
+#fontes_juridicas_conferidas
+
+REGRA 1 — NADA DE FONTE NÃO CONFERIDA:
+- Não existe lista de precedentes "pré-validados" nem de doutrina "autorizada".
+- Só cite lei, manual, resolução, acórdão, súmula ou obra doutrinária cujo conteúdo e
+  pertinência você tenha efetivamente conferido na fonte, inclusive em paráfrase.
+- Sem conferência, NÃO cite: exponha o argumento pela fundamentação legal direta e,
+  se a citação for indispensável, escreva "fonte a conferir" em vez de inventar número,
+  relator, ementa, edição ou página.
+- É proibido inserir parágrafos que enumerem julgados, autores ou obras apenas para
+  dar aparência de erudição.
+
+REGRA 2 — HIERARQUIA DA ARGUMENTAÇÃO:
+1º) Lei da Propriedade Industrial (Lei nº 9.279/96) — fundamento principal.
+2º) Manual de Marcas do INPI, na versão vigente na data do ato — fundamento principal.
+     Para cotejo entre sinais, as seções pertinentes são 5.11.1 e 5.11.2.
+     NÃO use a seção 5.10.1 para comparação de marcas.
+     NÃO atribua o Manual a um ato normativo cujo número você não conferiu — em especial,
+     a referência à "Resolução INPI/PR nº 288/2023" NÃO está confirmada e não deve ser escrita.
+3º) Atos normativos do INPI efetivamente conferidos — complementar.
+4º) Doutrina e jurisprudência — reforço, sempre com fonte conferida.
+
+#legislacao_dominio
+- Lei da Propriedade Industrial (Lei nº 9.279/96)
+- Convenção da União de Paris (CUP) e Acordo TRIPS/OMC, quando pertinentes
+- Manual de Marcas do INPI (versão vigente — conferir)
+- Classificação Internacional de Nice (edição vigente — conferir)
+
+#registro_interno_de_fontes
+Ao final do texto NÃO escreva listas de controle interno. As limitações de fonte
+aparecem na peça apenas como ressalva objetiva ("fonte a conferir"), sem explicar
+o funcionamento da IA nem dirigir instruções ao operador.
+`;
+
 // ═══════════════════════════════════════════════════════════
 // FORMATAÇÃO VISUAL — instrução compartilhada entre os dois passes
 // Permite negrito, itálico, tabelas e marcadores de imagem inline.
