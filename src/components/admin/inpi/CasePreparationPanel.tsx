@@ -32,6 +32,14 @@ interface CaseDoc {
   vision_read_pages: number | null;
 }
 
+interface UploadAttempt {
+  id: string;
+  category: CaseCategory;
+  file: File;
+  status: 'enviando' | 'falha';
+  error: string | null;
+}
+
 interface OrientationRow {
   id: string;
   version: number;
@@ -59,6 +67,7 @@ export default function CasePreparationPanel({
   const [caseId, setCaseId] = useState<string | null>(null);
   const [docs, setDocs] = useState<CaseDoc[]>([]);
   const [busyCategory, setBusyCategory] = useState<CaseCategory | null>(null);
+  const [uploadAttempts, setUploadAttempts] = useState<UploadAttempt[]>([]);
   const [visionBusy, setVisionBusy] = useState<Set<string>>(new Set());
   const [orientation, setOrientation] = useState<OrientationRow | null>(null);
   const [orientationText, setOrientationText] = useState('');
@@ -66,13 +75,47 @@ export default function CasePreparationPanel({
   const [saving, setSaving] = useState(false);
   const localFiles = useRef<Map<string, File>>(new Map());
   const inputs = useRef<Record<string, HTMLInputElement | null>>({});
+  const caseInitStarted = useRef(false);
 
   /* ── Caso: criado uma única vez por sessão de preparação. ───────────── */
   useEffect(() => {
-    let cancelled = false;
+    if (caseInitStarted.current) return;
+    caseInitStarted.current = true;
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        toast.error('Sua sessão expirou. Entre novamente para anexar documentos.');
+        return;
+      }
+
+      const storageKey = `inpi-resource-case:${user.id}:${resourceType}:${agentId}`;
+      const storedCaseId = sessionStorage.getItem(storageKey);
+      if (storedCaseId) {
+        const { data: existingCase, error: existingError } = await supabase
+          .from('inpi_resource_cases')
+          .select('id')
+          .eq('id', storedCaseId)
+          .eq('owner_id', user.id)
+          .eq('resource_type', resourceType)
+          .eq('agent_id', agentId)
+          .maybeSingle();
+
+        if (existingError) {
+          toast.error('Não foi possível recuperar o caso: ' + existingError.message);
+          return;
+        }
+        if (existingCase) {
+          setCaseId(existingCase.id);
+          try {
+            await reloadDocs(existingCase.id);
+          } catch {
+            // reloadDocs já mostra o erro real ao usuário.
+          }
+          return;
+        }
+        sessionStorage.removeItem(storageKey);
+      }
+
       const { data, error } = await supabase
         .from('inpi_resource_cases')
         .insert({
@@ -85,88 +128,131 @@ export default function CasePreparationPanel({
         .select('id')
         .single();
       if (error) { toast.error('Não foi possível abrir o caso: ' + error.message); return; }
-      if (!cancelled) setCaseId(data.id);
+      sessionStorage.setItem(storageKey, data.id);
+      setCaseId(data.id);
+      setDocs([]);
     })();
-    return () => { cancelled = true; };
-  }, [resourceType, agentId, agentName]);
+  }, [resourceType, agentId, agentName, reloadDocs]);
 
   const reloadDocs = useCallback(async (id: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('inpi_case_documents')
       .select('id, category, file_name, byte_size, sha256, extraction_status, extraction_notes, review_status, page_count, interpreted_pages, unreadable_pages, vision_read_pages')
       .eq('case_id', id)
       .eq('is_active', true)
       .order('created_at', { ascending: true });
+    if (error) {
+      toast.error('Não foi possível atualizar a lista de documentos: ' + error.message);
+      throw error;
+    }
     setDocs((data || []) as CaseDoc[]);
   }, []);
 
-  const handleFiles = async (category: CaseCategory, fileList: FileList | null) => {
-    if (!fileList?.length || !caseId) return;
+  const setAttempt = (id: string, patch: Partial<UploadAttempt>) => {
+    setUploadAttempts((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
+  };
+
+  const removeAttempt = (id: string) => {
+    setUploadAttempts((current) => current.filter((item) => item.id !== id));
+  };
+
+  const uploadFile = async (attempt: UploadAttempt) => {
+    if (!caseId) return;
+    const { category, file } = attempt;
+    setAttempt(attempt.id, { status: 'enviando', error: null });
     setBusyCategory(category);
-    const { data: { user } } = await supabase.auth.getUser();
+    let uploadedPath: string | null = null;
     try {
-      for (const file of Array.from(fileList)) {
-        if (file.size > MAX_FILE_BYTES) {
-          toast.error(`${file.name}: acima de 25 MB.`);
-          continue;
-        }
-        const hash = await sha256Hex(file);
-        if (docs.some((d) => d.sha256 === hash)) {
-          toast.info(`${file.name} já estava anexado.`);
-          continue;
-        }
-        const path = `${caseId}/${category}/${crypto.randomUUID()}-${file.name}`;
-        const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, {
-          contentType: file.type || 'application/octet-stream',
-        });
-        if (upErr) { toast.error(`${file.name}: falha no envio (${upErr.message})`); continue; }
+      if (file.size > MAX_FILE_BYTES) throw new Error('Arquivo acima de 25 MB.');
 
-        const { data: row, error: insErr } = await supabase
-          .from('inpi_case_documents')
-          .insert({
-            case_id: caseId,
-            category,
-            file_name: file.name,
-            mime_type: file.type || null,
-            declared_mime_type: file.type || null,
-            byte_size: file.size,
-            storage_path: path,
-            sha256: hash,
-            extraction_status: 'lendo',
-            uploaded_by: user?.id ?? null,
-            display_order: docs.length,
-          })
-          .select('id')
-          .single();
-        if (insErr) { toast.error(`${file.name}: ${insErr.message}`); continue; }
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error(authError?.message || 'Sessão expirada. Entre novamente.');
 
-        localFiles.current.set(row.id, file);
-        const result = await extractContent(file);
-        await supabase
-          .from('inpi_case_documents')
-          .update({
-            extraction_status: result.status,
-            extraction_notes: result.notes,
-            extracted_text: result.text,
-            page_count: result.pageCount,
-            interpreted_pages: result.interpretedPages,
-            unreadable_pages: result.unreadablePages,
-            sheet_names: result.sheetNames,
-          })
-          .eq('id', row.id);
-
-        // PDF sem texto ou imagem não é documento ilegível: as páginas vão
-        // para a leitura visual da IA e só o que for realmente interpretado
-        // é registrado.
-        if (result.status === 'recebido' || result.status === 'parcial') {
-          await runVisionRead(row.id, file);
-        }
+      const hash = await sha256Hex(file);
+      if (docs.some((d) => d.sha256 === hash)) {
+        removeAttempt(attempt.id);
+        toast.info(`${file.name} já estava anexado.`);
+        return;
       }
+
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${caseId}/${category}/${crypto.randomUUID()}-${safeName}`;
+      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, {
+        contentType: file.type || 'application/pdf',
+        upsert: false,
+      });
+      if (upErr) throw new Error(`Falha no armazenamento: ${upErr.message}`);
+      uploadedPath = path;
+
+      const { data: row, error: insErr } = await supabase
+        .from('inpi_case_documents')
+        .insert({
+          case_id: caseId,
+          category,
+          file_name: file.name,
+          mime_type: file.type || null,
+          declared_mime_type: file.type || null,
+          byte_size: file.size,
+          storage_path: path,
+          sha256: hash,
+          extraction_status: 'recebido',
+          uploaded_by: user.id,
+          display_order: docs.length,
+        })
+        .select('id, category, file_name, byte_size, sha256, extraction_status, extraction_notes, review_status, page_count, interpreted_pages, unreadable_pages, vision_read_pages')
+        .single();
+      if (insErr) {
+        const { error: cleanupError } = await supabase.storage.from(BUCKET).remove([path]);
+        uploadedPath = null;
+        const cleanupNote = cleanupError ? `; limpeza pendente: ${cleanupError.message}` : '';
+        throw new Error(`Falha ao vincular ao caso: ${insErr.message}${cleanupNote}`);
+      }
+
+      const persisted = row as CaseDoc;
+      localFiles.current.set(persisted.id, file);
+      setDocs((current) => [...current.filter((doc) => doc.id !== persisted.id), persisted]);
+      removeAttempt(attempt.id);
+
+      const result = await extractContent(file);
+      const { error: extractionUpdateError } = await supabase
+        .from('inpi_case_documents')
+        .update({
+          extraction_status: result.status,
+          extraction_notes: result.notes,
+          extracted_text: result.text,
+          page_count: result.pageCount,
+          interpreted_pages: result.interpretedPages,
+          unreadable_pages: result.unreadablePages,
+          sheet_names: result.sheetNames,
+        })
+        .eq('id', persisted.id);
+      if (extractionUpdateError) {
+        toast.warning(`${file.name}: recebido, mas a leitura não foi salva (${extractionUpdateError.message}).`);
+      }
+
       await reloadDocs(caseId);
+      if (result.status === 'recebido' || result.status === 'parcial') {
+        await runVisionRead(persisted.id, file);
+      }
       if (orientation) markStale();
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Falha desconhecida no envio.';
+      setAttempt(attempt.id, { status: 'falha', error: reason });
+      toast.error(`${file.name}: ${reason}`);
     } finally {
       setBusyCategory(null);
     }
+  };
+
+  const handleFiles = (category: CaseCategory, files: File[]) => {
+    if (!files.length || !caseId) return;
+    const attempts = files.map((file) => ({
+      id: crypto.randomUUID(), category, file, status: 'enviando' as const, error: null,
+    }));
+    setUploadAttempts((current) => [...current, ...attempts]);
+    void (async () => {
+      for (const attempt of attempts) await uploadFile(attempt);
+    })();
   };
 
   /** Envia as páginas digitalizadas para leitura visual da IA. */
@@ -323,6 +409,7 @@ export default function CasePreparationPanel({
 
           {CASE_CATEGORIES.map((cat) => {
             const catDocs = docs.filter((d) => d.category === cat.key);
+            const catAttempts = uploadAttempts.filter((item) => item.category === cat.key);
             const hint = (cat.hint as Record<string, string>)[resourceType] || cat.hint.default;
             return (
               <div key={cat.key} className="rounded-xl border p-4 space-y-3">
@@ -347,9 +434,38 @@ export default function CasePreparationPanel({
                   <input
                     ref={(el) => { inputs.current[cat.key] = el; }}
                     type="file" multiple hidden accept={ACCEPTED_EXTENSIONS}
-                    onChange={(e) => { handleFiles(cat.key, e.target.files); e.target.value = ''; }}
+                     onChange={(e) => {
+                       // Safari mantém FileList ligada ao input. Copiar antes de limpar evita
+                       // que a seleção fique vazia depois do primeiro await do upload.
+                       const selectedFiles = Array.from(e.currentTarget.files ?? []);
+                       e.currentTarget.value = '';
+                       handleFiles(cat.key, selectedFiles);
+                     }}
                   />
                 </div>
+
+                 {catAttempts.map((attempt) => (
+                   <div key={attempt.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/40">
+                     {attempt.status === 'enviando'
+                       ? <Loader2 className="h-4 w-4 text-primary shrink-0 animate-spin" />
+                       : <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />}
+                     <div className="flex-1 min-w-0">
+                       <p className="text-sm truncate">{attempt.file.name}</p>
+                       <p className={`text-[11px] ${attempt.status === 'falha' ? 'text-destructive' : 'text-muted-foreground'}`}>
+                         {attempt.status === 'enviando' ? 'Enviando' : attempt.error}
+                       </p>
+                     </div>
+                     {attempt.status === 'falha' && (
+                       <Button
+                         variant="outline" size="sm" className="h-8 shrink-0"
+                         onClick={() => void uploadFile(attempt)}
+                       >
+                         <RefreshCw className="h-3.5 w-3.5" />
+                         <span className="ml-1">Tentar novamente</span>
+                       </Button>
+                     )}
+                   </div>
+                 ))}
 
                 {catDocs.map((d) => (
                   <div key={d.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/40">
