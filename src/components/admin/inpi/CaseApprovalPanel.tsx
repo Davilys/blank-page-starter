@@ -368,8 +368,30 @@ export default function CaseApprovalPanel({
         return;
       }
       if (apErr) throw apErr;
+      // Conferida a peça, o PDF sai limpo: marca a peça como aprovada e
+      // reemite o pacote sem carimbo, sem reconverter os anexos.
+      if (kind === 'conferencia_protocolo') {
+        if (resourceId) {
+          await supabase
+            .from('inpi_resources')
+            .update({ status: 'approved', approved_at: new Date().toISOString(), final_content: content })
+            .eq('id', resourceId);
+        }
+        if (annexes) {
+          onPackageReady({
+            annexes: annexes.map((a) => ({
+              id: a.id, docNumber: a.docNumber, title: a.title, categoryLabel: a.categoryLabel,
+              fileName: a.fileName, images: a.images, textBlocks: a.textBlocks,
+              status: a.status, notes: a.notes,
+            })),
+            isComplete: true,
+            previewOnly: false,
+            draftStamp: null,
+          });
+        }
+      }
       await reload();
-      toast.success(kind === 'texto_interno' ? 'Texto aprovado internamente.' : 'Conferência para protocolo registrada.');
+      toast.success(kind === 'texto_interno' ? 'Texto aprovado internamente.' : 'Conferência registrada — o PDF sai sem carimbo.');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Falha ao registrar a aprovação.');
     } finally {

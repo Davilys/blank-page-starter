@@ -522,6 +522,24 @@ export default function RecursosINPI() {
 
   const handleEditResource = (resource: INPIResource) => {
     setEditingResource(resource);
+    // Reabrir a peça precisa trazer o caso junto: é o caso que habilita
+    // pacote de anexos, revisão jurídica e conferência final.
+    setActiveCaseId(null);
+    setExportPackage(null);
+    if (UPGRADED_MODALITIES.includes(resource.resource_type)) {
+      void supabase
+        .from('inpi_resource_cases')
+        .select('id, agent_id')
+        .eq('resource_id', resource.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .then(({ data }) => {
+          const found = data?.[0];
+          if (!found) return;
+          setActiveCaseId(found.id as string);
+          if (found.agent_id) setSelectedAgent(found.agent_id as AgentId);
+        });
+    }
     let content = resource.final_content || resource.draft_content || '';
     const data = {
       process_number: resource.process_number || '',
