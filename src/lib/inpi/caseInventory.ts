@@ -218,9 +218,17 @@ export function resolveMarker(
   };
 }
 
-/** Remove repetições coladas do mesmo marcador: "[DOC:02] [DOC:02]" → "[DOC:02]". */
+/**
+ * Normaliza referências repetidas:
+ *  "[DOC:02] [DOC:02]" → "[DOC:02]"
+ *  "(**Doc. 02**) [DOC:02]" → "[DOC:02]" (o marcador já é renderizado como "(Doc. 02)")
+ */
 export function normalizeMarkers(text: string): string {
   return text
+    .replace(
+      /\(\*{0,2}Doc\.\s*0*(\d{1,3})\*{0,2}\)\s*\[DOC:0*(\d{1,3})\]/gi,
+      (m, a: string, b: string) => (a === b ? `[DOC:${String(parseInt(a, 10)).padStart(2, '0')}]` : m),
+    )
     .replace(/(\[(?:DOC:\d{1,3}|IMG:[a-z0-9_-]+)\])(\s*\1)+/gi, '$1')
     .replace(/(\(Doc\.\s*\d{1,3}\))(\s*\1)+/gi, '$1');
 }
