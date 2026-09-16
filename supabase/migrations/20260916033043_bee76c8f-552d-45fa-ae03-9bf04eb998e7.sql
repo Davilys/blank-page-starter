@@ -1,0 +1,1 @@
+ALTER TABLE public.inpi_case_documents ALTER COLUMN doc_number SET DEFAULT 0;
