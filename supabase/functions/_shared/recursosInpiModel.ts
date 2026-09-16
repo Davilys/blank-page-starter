@@ -44,7 +44,9 @@ export function resolveModelConfig(
   legacyEffort: ModelConfig['reasoningEffort'] = 'minimal',
 ): ModelConfig {
   if (isRecursosInpiModality(resourceType)) {
-    return { model: getRecursosInpiModel(), reasoningEffort: 'high', dedicated: true };
+    // Raciocínio 'medium': 'high' consumia o mesmo orçamento do texto final e
+    // truncava a peça (incomplete_details.reason = max_output_tokens).
+    return { model: getRecursosInpiModel(), reasoningEffort: 'medium', dedicated: true };
   }
   return { model: legacyModel, reasoningEffort: legacyEffort, dedicated: false };
 }
