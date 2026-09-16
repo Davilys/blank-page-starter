@@ -2415,13 +2415,18 @@ async function handleJobAction(req: Request, body: any): Promise<Response> {
       .limit(1)
       .maybeSingle();
 
-    if (existing && existing.status === 'processing' && action === 'start') {
+    // Execução viva não é substituída, nem por clique repetido nem por retry.
+    if (existing && existing.status === 'processing' && !isRunStale(existing)) {
       return jsonResponse({ job: existing, resumed: true });
     }
 
-    if (existing && (action === 'retry' || existing.status !== 'processing')) {
+    if (existing && (action === 'retry' || existing.status !== 'processing' || isRunStale(existing))) {
       // Retoma da etapa que falhou, sem refazer o que já ficou pronto.
-      const resumeStep = existing.pass1_content && existing.pass1_content.length > 1000 ? 'pass2' : 'pass1';
+      const preparedOk = Array.isArray((existing.prepared_files as any)?.docs)
+        && (existing.prepared_files as any).docs.length > 0;
+      const resumeStep = !preparedOk
+        ? 'prepare'
+        : (existing.pass1_content && existing.pass1_content.length > 1000 ? 'pass2' : 'pass1');
       const { data: updated, error: upErr } = await db.from('inpi_generation_jobs').update({
         status: 'processing',
         stage: resumeStep,
@@ -2429,6 +2434,8 @@ async function handleJobAction(req: Request, body: any): Promise<Response> {
         error_message: null,
         error_code: null,
         result_content: null,
+        run_token: null,
+        heartbeat_at: new Date().toISOString(),
       }).eq('id', existing.id).select().maybeSingle();
       if (upErr) return jsonResponse({ error: 'Não foi possível retomar a geração.' }, 500);
       dispatchStep(existing.id, resumeStep);
@@ -2442,11 +2449,12 @@ async function handleJobAction(req: Request, body: any): Promise<Response> {
       agent_name: body.agentName || null,
       agent_strategy: body.agentStrategy || null,
       user_orientation: body.userOrientation || null,
-      stage: 'pass1',
+      stage: 'prepare',
       status: 'processing',
+      heartbeat_at: new Date().toISOString(),
     }).select().maybeSingle();
     if (insErr || !created) return jsonResponse({ error: 'Não foi possível iniciar a geração.' }, 500);
-    dispatchStep(created.id, 'pass1');
+    dispatchStep(created.id, 'prepare');
     return jsonResponse({ job: created });
   }
 
