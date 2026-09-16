@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { isTrustedInpiStep } from '../_shared/inpiInternalAuth.ts';
 import { isRunStale, documentsSignature, INTERRUPTED_MESSAGE, STALE_RUN_MS } from './runControl.ts';
+import { fastTextDelta } from './sseParse.ts';
 import {
   type AiCallLogEntry,
   isModelAccessError,
@@ -177,10 +178,14 @@ async function callOpenAI(
     }
 
     // Leitura em streaming: cada evento renova a atividade, então o corte só
-    // acontece se a IA realmente parar de responder.
+    // acontece se a IA realmente parar de responder. Os eventos de texto são
+    // lidos sem JSON.parse do objeto inteiro — com dezenas de milhares de
+    // eventos, o parse completo estoura o orçamento de CPU do runtime e o
+    // servidor morre no meio da geração.
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    const chunks: string[] = [];
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -192,10 +197,12 @@ async function callOpenAI(
         if (!line.startsWith('data:')) continue;
         const payload = line.slice(5).trim();
         if (!payload || payload === '[DONE]') continue;
+        const fast = fastTextDelta(payload);
+        if (fast !== null) { chunks.push(fast); continue; }
         let evt: any;
         try { evt = JSON.parse(payload); } catch { continue; }
         if (evt.type === 'response.output_text.delta' && typeof evt.delta === 'string') {
-          out.content += evt.delta;
+          chunks.push(evt.delta);
         } else if (evt.type === 'response.refusal.delta' && typeof evt.delta === 'string') {
           out.refusal += evt.delta;
         } else if (evt.type === 'response.completed' || evt.type === 'response.incomplete' || evt.type === 'response.failed') {
@@ -205,17 +212,18 @@ async function callOpenAI(
             input_tokens: evt.response?.usage?.input_tokens,
             output_tokens: evt.response?.usage?.output_tokens,
           };
-          if (!out.content && Array.isArray(evt.response?.output)) {
+          if (chunks.length === 0 && Array.isArray(evt.response?.output)) {
             for (const item of evt.response.output) {
               if (item.type === 'message' && Array.isArray(item.content)) {
                 for (const part of item.content) {
-                  if (part.type === 'output_text') out.content += part.text || '';
+                  if (part.type === 'output_text') chunks.push(part.text || '');
                   if (part.type === 'refusal') out.refusal += part.refusal || '';
                 }
               }
             }
           }
         } else if (evt.type === 'error') {
+          out.content = chunks.join('');
           out.hardError = {
             error: evt.error?.message || 'Erro no fluxo da IA',
             status: 502,
@@ -225,6 +233,7 @@ async function callOpenAI(
         }
       }
     }
+    out.content = chunks.join('');
     return out;
   };
 
@@ -2108,6 +2117,8 @@ function dispatchStep(jobId: string, step: string) {
 
 const HEARTBEAT_MS = 10000;
 const PREPARE_BATCH = 2;
+/** Retomadas automáticas antes de apresentar a geração como interrompida. */
+const AUTO_RESUME_LIMIT = 3;
 
 async function openAiFileExists(apiKey: string, fileId: string): Promise<boolean> {
   try {
@@ -2390,8 +2401,24 @@ async function handleJobAction(req: Request, body: any): Promise<Response> {
     if (error) return jsonResponse({ error: 'Não foi possível consultar o andamento.' }, 500);
     if (!data) return jsonResponse({ job: null });
     // Quem decide se a execução expirou é o servidor: sem sinal de vida por
-    // vários minutos, o trabalho é liberado para nova tentativa.
+    // vários minutos, o trabalho é liberado. Como o runtime pode encerrar um
+    // processo por orçamento próprio, a etapa que parou é retomada sozinha
+    // (até AUTO_RESUME_LIMIT vezes) sem refazer o que já ficou pronto. Só
+    // depois disso o caso é apresentado como interrompido, com "Tentar de novo".
     if (isRunStale(data)) {
+      const attempt = Number(data.attempt || 0);
+      if (attempt < AUTO_RESUME_LIMIT) {
+        const { data: resumed } = await db.from('inpi_generation_jobs').update({
+          attempt: attempt + 1,
+          run_token: null,
+          heartbeat_at: new Date().toISOString(),
+        }).eq('id', data.id).eq('status', 'processing').select().maybeSingle();
+        if (resumed) {
+          console.log('inpi_job_auto_resume', { jobId: data.id, stage: data.stage, attempt: attempt + 1 });
+          dispatchStep(data.id, String(data.stage || 'prepare'));
+          return jsonResponse({ job: resumed });
+        }
+      }
       const { data: closed } = await db.from('inpi_generation_jobs').update({
         status: 'error', error_code: 'interrompido', error_message: INTERRUPTED_MESSAGE, run_token: null,
       }).eq('id', data.id).eq('status', 'processing').select().maybeSingle();
@@ -2404,7 +2431,8 @@ async function handleJobAction(req: Request, body: any): Promise<Response> {
   if (action === 'start' || action === 'retry') {
     const caseId = typeof body.caseId === 'string' ? body.caseId : null;
     if (!caseId) return jsonResponse({ error: 'Caso não informado.' }, 400);
-    if (!body.resourceType) return jsonResponse({ error: 'Modalidade não informada.' }, 400);
+    // Retomar não exige modalidade: o trabalho existente já a conhece. Só a
+    // criação de um trabalho novo precisa dela.
 
     const { data: existing } = await db
       .from('inpi_generation_jobs')
@@ -2440,6 +2468,8 @@ async function handleJobAction(req: Request, body: any): Promise<Response> {
       dispatchStep(existing.id, resumeStep);
       return jsonResponse({ job: updated, resumed: true });
     }
+
+    if (!body.resourceType) return jsonResponse({ error: 'Modalidade não informada.' }, 400);
 
     const { data: created, error: insErr } = await db.from('inpi_generation_jobs').insert({
       case_id: caseId,

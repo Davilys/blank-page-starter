@@ -82,6 +82,8 @@ type Step = 'list' | 'select-type' | 'select-agent' | 'notificacao-data' | 'proc
 
 // Modalidades com o fluxo de preparação documental + consultoria preparatória.
 const UPGRADED_MODALITIES = ['indeferimento', 'exigencia_merito', 'oposicao'];
+/** Geração em andamento, para reabrir a tela após recarregar a página. */
+const ACTIVE_JOB_KEY = 'inpi-active-job';
 
 const RESOURCE_TYPE_LABELS: Record<string, string> = {
   indeferimento: 'Recurso contra Indeferimento',
@@ -621,7 +623,10 @@ export default function RecursosINPI() {
     concluido: 'Finalizando',
   };
 
-  const finalizeJobResult = async (job: any, caseId: string) => {
+  // O tipo pode vir de fora quando a tela é reaberta: o estado ainda não foi
+  // aplicado quando a retomada precisa gravar a minuta.
+  const finalizeJobResult = async (job: any, caseId: string, typeOverride?: string) => {
+    const type = typeOverride || resourceType;
     const safeExtracted = sanitizeExtractedData(job.extracted_data);
     const safeContent = toSafeString(job.result_content);
     setExtractedData(safeExtracted);
@@ -632,7 +637,7 @@ export default function RecursosINPI() {
       .from('inpi_resources')
       .insert({
         user_id: user?.id,
-        resource_type: resourceType,
+        resource_type: type,
         process_number: safeExtracted.process_number || null,
         brand_name: safeExtracted.brand_name || null,
         ncl_class: safeExtracted.ncl_class || null,
@@ -657,12 +662,13 @@ export default function RecursosINPI() {
       })
       .eq('id', caseId);
 
+    localStorage.removeItem(ACTIVE_JOB_KEY);
     setProcessingProgress(100);
     setTimeout(() => setStep('review'), 400);
     toast.success('Minuta gerada. Confira a revisão antes de aprovar.');
   };
 
-  const pollGenerationJob = async (jobId: string, caseId: string) => {
+  const pollGenerationJob = async (jobId: string, caseId: string, typeOverride?: string) => {
     let delay = 3000;
     const deadline = Date.now() + 30 * 60 * 1000;
     let unconfirmed = 0;
@@ -683,12 +689,13 @@ export default function RecursosINPI() {
       setProcessingStage(JOB_STAGE_LABELS[job.stage] || 'Processando');
       setProcessingProgress((prev) => Math.max(prev, job.stage === 'pass2' ? 62 : job.stage === 'pass1' ? 28 : 12));
       if (job.status === 'error') {
+        localStorage.removeItem(ACTIVE_JOB_KEY);
         setProcessingError(job.error_message || 'Geração interrompida. Você pode tentar de novo a partir da etapa que parou.');
         setIsProcessing(false);
         return;
       }
       if (job.status === 'done') {
-        await finalizeJobResult(job, caseId);
+        await finalizeJobResult(job, caseId, typeOverride);
         setIsProcessing(false);
         return;
       }
@@ -717,7 +724,11 @@ export default function RecursosINPI() {
       if (error) throw error;
       if (!data?.job) throw new Error(data?.error || 'Não foi possível iniciar a geração.');
       setActiveJobId(data.job.id);
-      sessionStorage.setItem('inpi-job-' + caseId, data.job.id);
+      // Guarda o suficiente para reabrir a tela de processamento se a página
+      // for recarregada ou fechada durante a geração.
+      localStorage.setItem(ACTIVE_JOB_KEY, JSON.stringify({
+        caseId, jobId: data.job.id, resourceType, agent: selectedAgent, orientation,
+      }));
       await pollGenerationJob(data.job.id, caseId);
     } catch (e) {
       console.error('Falha ao iniciar a geração:', e);
@@ -725,6 +736,51 @@ export default function RecursosINPI() {
       setIsProcessing(false);
     }
   };
+
+  // Recarregar a página não pode perder uma geração em andamento: o trabalho
+  // continua no servidor e a tela volta para ele, na etapa em que está.
+  useEffect(() => {
+    let cancelled = false;
+    const raw = localStorage.getItem(ACTIVE_JOB_KEY);
+    if (!raw) return;
+    let saved: { caseId?: string; jobId?: string; resourceType?: string; agent?: AgentId; orientation?: string } | null = null;
+    try { saved = JSON.parse(raw); } catch { localStorage.removeItem(ACTIVE_JOB_KEY); return; }
+    if (!saved?.caseId || !saved?.jobId || !saved?.resourceType) { localStorage.removeItem(ACTIVE_JOB_KEY); return; }
+    (async () => {
+      const { data, error } = await supabase.functions.invoke('process-inpi-resource', {
+        body: { action: 'status', job_id: saved!.jobId },
+      });
+      if (cancelled) return;
+      const job = data?.job;
+      if (error || !job || (job.status !== 'processing' && job.status !== 'done')) {
+        localStorage.removeItem(ACTIVE_JOB_KEY);
+        return;
+      }
+      setResourceType(saved!.resourceType);
+      if (saved!.agent) setSelectedAgent(saved!.agent);
+      setActiveCaseId(saved!.caseId!);
+      setActiveJobId(saved!.jobId!);
+      setLastJobRequest({ caseId: saved!.caseId!, orientation: saved!.orientation || '' });
+      setUserOrientation(saved!.orientation || '');
+      setProcessingError(null);
+      setIsProcessing(true);
+      setStep('processing');
+      if (job.status === 'done') {
+        await finalizeJobResult(job, saved!.caseId!, saved!.resourceType);
+        setIsProcessing(false);
+        return;
+      }
+      setProcessingStage(JOB_STAGE_LABELS[job.stage] || 'Processando');
+      await pollGenerationJob(saved!.jobId!, saved!.caseId!, saved!.resourceType);
+    })().catch((e) => {
+      console.error('Falha ao retomar a geração:', e);
+      setProcessingError(e instanceof Error ? e.message : 'Não foi possível retomar a geração.');
+      setIsProcessing(false);
+    });
+    return () => { cancelled = true; };
+    // Executa uma vez, ao abrir a aba.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const processDocument = async (override?: { files?: File[]; orientation?: string; caseId?: string }) => {
     if (resourceType === 'notificacao_extrajudicial') {
