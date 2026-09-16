@@ -2442,7 +2442,17 @@ export default function RecursosINPI() {
           {/* PREPARAÇÃO DOCUMENTAL + CONSULTORIA (três modalidades) */}
           {step === 'upload' && UPGRADED_MODALITIES.includes(resourceType) && (
             <motion.div key="upload-case" {...fadeIn}>
-              <CasePreparationPanel
+              {draftContent && (
+                <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border bg-muted/40 p-3">
+                  <p className="text-sm text-muted-foreground">
+                    O texto da peça, a orientação e o histórico estão preservados. Gerar novamente só acontece se você mandar.
+                  </p>
+                  <Button variant="outline" className="rounded-xl shrink-0" onClick={() => setStep('review')}>
+                    Voltar à revisão
+                  </Button>
+                </div>
+              )}
+
                 resourceType={resourceType}
                 agentId={selectedAgent}
                 agentName={agent.name}
