@@ -1364,7 +1364,7 @@ serve(async (req) => {
         ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
       ];
       if (body) body.files = undefined;
-      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25, 120000, makeCtx('notificacao'));
+      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25, 300000, makeCtx('notificacao'));
       if (result.error) {
         return new Response(JSON.stringify({ error: `Erro IA: ${result.status}` }), { status: result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
@@ -1479,7 +1479,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
         ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
       ];
       if (body) body.files = undefined;
-      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, undefined, 120000, makeCtx('resposta_notificacao'));
+      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, undefined, 300000, makeCtx('resposta_notificacao'));
       
       if (result.error) {
         console.error('OpenAI error for resposta_notificacao:', result.status, result.error.substring(0, 300));
@@ -1523,7 +1523,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
         ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
       ];
       if (body) body.files = undefined;
-      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25, 120000, makeCtx('procurador'));
+      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25, 300000, makeCtx('procurador'));
       if (result.error) {
         return new Response(JSON.stringify({ error: `Erro IA: ${result.status}` }), { status: result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
@@ -1687,7 +1687,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
       ];
 
       console.log('PASS 2 only: Generating Sections V-VIII...');
-      const pass2Result = await callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25, 120000, makeCtx('pass2'));
+      const pass2Result = await callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25, 300000, makeCtx('pass2'));
       if (pass2Result.error) {
         const cfg = modelFailureResponse(pass2Result);
         if (cfg) return cfg;
@@ -1751,9 +1751,9 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     console.time('ai_generation');
     const [extractionResult, pass1Result, pass2Result] = await Promise.all([
       callOpenAI(OPENAI_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, 800, 0.1, 60000, makeCtx('extracao')),
-      callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 9000, 0.25, 120000, makeCtx('pass1')),
+      callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 9000, 0.25, 300000, makeCtx('pass1')),
       shouldRunPass2Now
-        ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25, 120000, makeCtx('pass2'))
+        ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25, 300000, makeCtx('pass2'))
         : Promise.resolve({ content: '', error: undefined as string | undefined, status: undefined as number | undefined, errorKind: undefined as string | undefined }),
     ]);
     console.timeEnd('ai_generation');
