@@ -235,7 +235,7 @@ export async function convertDocument(
     return {
       ...base,
       status: 'falha',
-      notes: err instanceof Error ? err.message : 'Falha na conversão para o PDF.',
+      notes: readableFailure(err),
     };
   }
 }
