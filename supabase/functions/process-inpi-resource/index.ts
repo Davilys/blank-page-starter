@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { isTrustedInpiStep } from '../_shared/inpiInternalAuth.ts';
 import {
   type AiCallLogEntry,
   isModelAccessError,
@@ -1333,8 +1334,7 @@ const handleRequest = async (req: Request): Promise<Response> => {
     // Chamada interna do próprio servidor (execução por etapas). O segredo é a
     // chave de serviço, que nunca sai do servidor; o acesso do administrador já
     // foi validado quando o pedido foi criado.
-    const isInternalStep = req.headers.get('x-internal-job') === '1'
-      && token === (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '__none__');
+    const isInternalStep = isTrustedInpiStep(req.headers, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
 
     if (!isInternalStep) {
       const { data: userData, error: userError } = await supabase.auth.getUser(token);
@@ -1717,19 +1717,26 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
       // envia mais o conteúdo do PDF (era o que quebrava no celular) e nunca
       // informa caminhos de arquivo — só o id do caso, já validado acima
       // (sessão + papel de administrador).
-      const { data: caseRow, error: caseErr } = await supabase
+      // Server jobs authenticate with the service client, never the anon client.
+      // Browser calls retain their JWT/RLS context after the admin check above.
+      const caseClient = isInternalStep ? supabaseAdmin : supabase;
+      const { data: caseRow, error: caseErr } = await caseClient
         .from('inpi_resource_cases')
         .select('id, resource_type')
         .eq('id', caseId)
         .maybeSingle();
-      if (caseErr || !caseRow) {
-        return new Response(JSON.stringify({ error: 'Caso não encontrado ou sem permissão de acesso.' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      if (caseErr) {
+        console.error('inpi_case_read_failed', { caseId, code: caseErr.code, internal: isInternalStep });
+        return new Response(JSON.stringify({ error: 'Não foi possível consultar o caso. Os documentos foram preservados.', error_kind: 'case_read_failed' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      if (!caseRow) {
+        return new Response(JSON.stringify({ error: 'Caso não encontrado ou não disponível para esta sessão.', error_kind: 'case_not_found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       if (caseRow.resource_type !== resourceType) {
         return new Response(JSON.stringify({ error: 'A modalidade informada não corresponde ao caso.' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      const { data: caseDocs, error: docsErr } = await supabase
+      const { data: caseDocs, error: docsErr } = await caseClient
         .from('inpi_case_documents')
         .select('id, doc_number, file_name, mime_type, storage_path, category, created_at, extracted_text, extraction_status')
         .eq('case_id', caseId)
@@ -2166,8 +2173,7 @@ async function handleJobAction(req: Request, body: any): Promise<Response> {
   const action = body?.action;
 
   if (action === 'step') {
-    const internal = req.headers.get('x-internal-job') === '1'
-      && (req.headers.get('Authorization') || '') === `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '__none__'}`;
+    const internal = isTrustedInpiStep(req.headers, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
     if (!internal) return jsonResponse({ error: 'Não autorizado' }, 401);
     const jobId = String(body.job_id || '');
     const step = String(body.step || '');
