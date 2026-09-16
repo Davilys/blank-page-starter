@@ -2390,8 +2390,17 @@ async function handleJobAction(req: Request, body: any): Promise<Response> {
     const { data, error } = await query.maybeSingle();
     if (error) return jsonResponse({ error: 'Não foi possível consultar o andamento.' }, 500);
     if (!data) return jsonResponse({ job: null });
+    // Quem decide se a execução expirou é o servidor: sem sinal de vida por
+    // vários minutos, o trabalho é liberado para nova tentativa.
+    if (isRunStale(data)) {
+      const { data: closed } = await db.from('inpi_generation_jobs').update({
+        status: 'error', error_code: 'interrompido', error_message: INTERRUPTED_MESSAGE, run_token: null,
+      }).eq('id', data.id).eq('status', 'processing').select().maybeSingle();
+      return jsonResponse({ job: closed || data });
+    }
     return jsonResponse({ job: data });
   }
+
 
   if (action === 'start' || action === 'retry') {
     const caseId = typeof body.caseId === 'string' ? body.caseId : null;
