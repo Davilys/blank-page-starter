@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { isTrustedInpiStep } from '../_shared/inpiInternalAuth.ts';
-import { isRunStale, documentsSignature, INTERRUPTED_MESSAGE } from './runControl.ts';
+import { isRunStale, documentsSignature, INTERRUPTED_MESSAGE, STALE_RUN_MS } from './runControl.ts';
 import {
   type AiCallLogEntry,
   isModelAccessError,
@@ -1364,14 +1364,14 @@ const handleRequest = async (req: Request): Promise<Response> => {
         );
       }
 
-      const { data: isAdmin, error: roleError } = await supabase.rpc('has_role', {
+      const { data: canUse, error: roleError } = await supabase.rpc('has_inpi_resources_access', {
         _user_id: userData.user.id,
-        _role: 'admin'
+        _need_edit: true
       });
 
-      if (roleError || !isAdmin) {
+      if (roleError || !canUse) {
         return new Response(
-          JSON.stringify({ error: 'Acesso de administrador necessário' }),
+          JSON.stringify({ error: 'Sem permissão para Recursos INPI' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -2342,7 +2342,7 @@ async function runStep(jobId: string, step: string) {
   }
 }
 
-async function requireAdmin(req: Request): Promise<{ userId: string } | Response> {
+async function requireInpiAccess(req: Request, needEdit = true): Promise<{ userId: string } | Response> {
   const authHeader = req.headers.get('Authorization') || '';
   if (!authHeader.startsWith('Bearer ')) {
     return new Response(JSON.stringify({ error: 'Não autorizado' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -2353,9 +2353,9 @@ async function requireAdmin(req: Request): Promise<{ userId: string } | Response
   if (error || !userData?.user) {
     return new Response(JSON.stringify({ error: 'Não autorizado' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
-  const { data: isAdmin } = await sb.rpc('has_role', { _user_id: userData.user.id, _role: 'admin' });
-  if (!isAdmin) {
-    return new Response(JSON.stringify({ error: 'Acesso de administrador necessário' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  const { data: canUse } = await sb.rpc('has_inpi_resources_access', { _user_id: userData.user.id, _need_edit: needEdit });
+  if (!canUse) {
+    return new Response(JSON.stringify({ error: 'Sem permissão para Recursos INPI' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
   return { userId: userData.user.id };
 }
@@ -2378,7 +2378,7 @@ async function handleJobAction(req: Request, body: any): Promise<Response> {
     return jsonResponse({ accepted: true });
   }
 
-  const auth = await requireAdmin(req);
+  const auth = await requireInpiAccess(req, action !== 'status');
   if (auth instanceof Response) return auth;
 
   if (action === 'status') {

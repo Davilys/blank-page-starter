@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { orientationItemText } from './orientationDisplay';
 import { isTrustedInpiStep } from '../../../supabase/functions/_shared/inpiInternalAuth';
@@ -79,5 +80,29 @@ describe('controle de execução da geração', () => {
     const b = [{ id: 'a', doc_number: 1, storage_path: 'p/a.pdf' }, { id: 'b', doc_number: 2, storage_path: 'p/b.pdf' }];
     expect(documentsSignature(a)).toBe(documentsSignature([...a]));
     expect(documentsSignature(a)).not.toBe(documentsSignature(b));
+  });
+});
+
+describe('integridade dos imports do servidor de geração', () => {
+  const indexPath = 'supabase/functions/process-inpi-resource/index.ts';
+  const source = readFileSync(indexPath, 'utf8');
+  const control = readFileSync('supabase/functions/process-inpi-resource/runControl.ts', 'utf8');
+
+  const exported = Array.from(control.matchAll(/export (?:const|function) (\w+)/g)).map((m) => m[1]);
+  const importLine = source.match(/import \{([^}]+)\} from '\.\/runControl\.ts';/);
+
+  it('exporta os símbolos esperados do controle de execução', () => {
+    expect(exported).toContain('STALE_RUN_MS');
+    expect(exported).toContain('isRunStale');
+  });
+
+  it('importa todo símbolo do controle de execução que o servidor usa', () => {
+    expect(importLine).toBeTruthy();
+    const imported = importLine![1].split(',').map((s) => s.trim()).filter(Boolean);
+    const body = source.replace(importLine![0], '');
+    for (const name of exported) {
+      const used = new RegExp(`\\b${name}\\b`).test(body);
+      if (used) expect(imported).toContain(name);
+    }
   });
 });

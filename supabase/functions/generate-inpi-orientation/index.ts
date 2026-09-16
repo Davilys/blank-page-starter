@@ -119,12 +119,12 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const { data: isAdmin } = await supabase.rpc('has_role', {
+    const { data: canUse } = await supabase.rpc('has_inpi_resources_access', {
       _user_id: userData.user.id,
-      _role: 'admin',
+      _need_edit: true,
     });
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: 'Acesso de administrador necessário' }), {
+    if (!canUse) {
+      return new Response(JSON.stringify({ error: 'Sem permissão para Recursos INPI' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
