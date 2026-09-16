@@ -263,10 +263,14 @@ export default function CaseApprovalPanel({
         isComplete: sum.isComplete,
         previewOnly: !protocolApproval || !sum.isComplete,
         draftStamp: !sum.isComplete
-          ? 'PRÉVIA — PACOTE INCOMPLETO, NÃO PROTOCOLAR'
-          : !protocolApproval
-            ? 'MINUTA — PENDENTE DE CONFERÊNCIA'
-            : null,
+          ? 'PRÉVIA — PACOTE DOCUMENTAL INCOMPLETO'
+          : reviewBlocking
+            ? 'PRÉVIA — REVISÃO JURÍDICA COM APONTAMENTO GRAVE'
+            : reviewPending
+              ? 'MINUTA — REVISÃO JURÍDICA PENDENTE'
+              : !protocolApproval
+                ? 'MINUTA — PENDENTE DE CONFERÊNCIA'
+                : null,
       });
       await supabase.from('inpi_export_packages').insert({
         case_id: caseId,
