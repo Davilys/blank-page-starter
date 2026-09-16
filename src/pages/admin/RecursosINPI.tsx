@@ -2730,16 +2730,15 @@ export default function RecursosINPI() {
                     {(resourceType === 'indeferimento' || resourceType === 'exigencia_merito' || resourceType === 'oposicao') && currentResourceId && (
                       <Button
                         variant="outline"
-                        onClick={() => setShowEvidenceGallery(true)}
+                        onClick={() => setStep('upload')}
                         className="gap-2 rounded-xl"
+                        title="Volta à etapa Documentos preservando o texto, a orientação e o histórico."
                       >
                         <ImageIcon className="h-4 w-4" />
-                        Anexar evidências (prints/imagens)
-                        {evidenceCount > 0 && (
-                          <Badge variant="secondary" className="ml-1">{evidenceCount}</Badge>
-                        )}
+                        Gerenciar documentos
                       </Button>
                     )}
+
                     <Button onClick={handleApproveResource} className="flex-1 gap-2 rounded-xl h-11 shadow-lg shadow-primary/15">
                       <CheckCircle2 className="h-4 w-4" />
                       {resourceType === 'notificacao_extrajudicial'
