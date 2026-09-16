@@ -1227,7 +1227,7 @@ REGRAS OBRIGATÓRIAS:
 // ═══════════════════════════════════════════════════════════
 // MAIN HANDLER
 // ═══════════════════════════════════════════════════════════
-serve(async (req) => {
+const handleRequest = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
