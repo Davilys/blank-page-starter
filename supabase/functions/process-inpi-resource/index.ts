@@ -1683,6 +1683,61 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
       }
     } else if (fileBase64 && fileType) {
       appendUploadOnlyFilePart(fileParts, sourceFilesForUpload, { base64: fileBase64, type: fileType, name: fileType === 'application/pdf' ? 'documento_inpi.pdf' : 'image' }, fileType === 'application/pdf' ? 'documento_inpi.pdf' : 'image');
+    } else if (caseId && requestedPass !== 'pass2') {
+      // Documentos já enviados pela tela de preparação: o servidor busca os
+      // arquivos no armazenamento privado a partir do caso. O navegador não
+      // envia mais o conteúdo do PDF (era o que quebrava no celular) e nunca
+      // informa caminhos de arquivo — só o id do caso, já validado acima
+      // (sessão + papel de administrador).
+      const { data: caseRow, error: caseErr } = await supabase
+        .from('inpi_resource_cases')
+        .select('id, resource_type')
+        .eq('id', caseId)
+        .maybeSingle();
+      if (caseErr || !caseRow) {
+        return new Response(JSON.stringify({ error: 'Caso não encontrado ou sem permissão de acesso.' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      if (caseRow.resource_type !== resourceType) {
+        return new Response(JSON.stringify({ error: 'A modalidade informada não corresponde ao caso.' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const { data: caseDocs, error: docsErr } = await supabase
+        .from('inpi_case_documents')
+        .select('id, file_name, mime_type, storage_path, category, created_at')
+        .eq('case_id', caseId)
+        .order('created_at', { ascending: true });
+      if (docsErr) {
+        return new Response(JSON.stringify({ error: 'Não foi possível ler os documentos do caso.' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const usable = (caseDocs || []).filter((d: any) =>
+        d.storage_path && (d.mime_type === 'application/pdf' || String(d.mime_type || '').startsWith('image/')));
+      if (usable.length === 0) {
+        return new Response(JSON.stringify({ error: 'Nenhum documento utilizável (PDF ou imagem) foi encontrado neste caso.' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const failedDownloads: string[] = [];
+      for (const doc of usable) {
+        const { data: blob, error: dlErr } = await supabaseAdmin.storage
+          .from('inpi-recursos-docs')
+          .download(doc.storage_path);
+        if (dlErr || !blob) { failedDownloads.push(doc.file_name); continue; }
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        let binary = '';
+        for (let i = 0; i < bytes.length; i += 0x8000) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        }
+        appendUploadOnlyFilePart(
+          fileParts,
+          sourceFilesForUpload,
+          { base64: btoa(binary), type: doc.mime_type, name: doc.file_name },
+          doc.mime_type === 'application/pdf' ? 'documento_inpi.pdf' : 'image',
+        );
+      }
+      if (fileParts.length === 0) {
+        return new Response(JSON.stringify({ error: `Não foi possível recuperar os arquivos do caso: ${failedDownloads.join(', ')}` }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      console.log('Documentos carregados do caso:', fileParts.length, '| falhas:', failedDownloads.length);
     } else if (requestedPass !== 'pass2') {
       return new Response(JSON.stringify({ error: 'Nenhum arquivo fornecido' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
