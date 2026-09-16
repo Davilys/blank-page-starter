@@ -347,6 +347,12 @@ export default function CaseApprovalPanel({
         orientation_hash: orientationHash,
         approved_by: user?.id ?? null,
       });
+      // Duas abas ou dois envios simultâneos: o servidor recusa a segunda gravação.
+      if (apErr && (apErr as { code?: string }).code === '23505') {
+        await reload();
+        toast.info('Esta aprovação já estava registrada para esta mesma versão.');
+        return;
+      }
       if (apErr) throw apErr;
       await reload();
       toast.success(kind === 'texto_interno' ? 'Texto aprovado internamente.' : 'Conferência para protocolo registrada.');
