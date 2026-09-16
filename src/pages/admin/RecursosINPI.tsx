@@ -477,7 +477,7 @@ export default function RecursosINPI() {
   useEffect(() => { fetchResources(); }, []);
 
   useEffect(() => {
-    if (step === 'processing') {
+    if (step === 'processing' && !processingError && !UPGRADED_MODALITIES.includes(resourceType)) {
       setProcessingProgress(0);
       const interval = setInterval(() => {
         setProcessingProgress(prev => {
@@ -487,7 +487,7 @@ export default function RecursosINPI() {
       }, 900);
       return () => clearInterval(interval);
     }
-  }, [step]);
+  }, [step, processingError, resourceType]);
 
   const fetchResources = async () => {
     try {
@@ -2715,14 +2715,14 @@ export default function RecursosINPI() {
           {step === 'processing' && (
             <motion.div key="processing" {...fadeIn}>
               <Card className="border-primary/20 overflow-hidden">
-                <div className="h-1 bg-muted">
+                {!processingError && !UPGRADED_MODALITIES.includes(resourceType) && <div className="h-1 bg-muted">
                   <motion.div 
                     className={`h-full bg-gradient-to-r ${agent.color}`}
                     initial={{ width: '0%' }}
                     animate={{ width: `${processingProgress}%` }}
                     transition={{ duration: 0.5 }}
                   />
-                </div>
+                </div>}
                 <CardContent className="py-16">
                   <div className="flex flex-col items-center justify-center text-center space-y-6 max-w-md mx-auto">
                     <div className="relative">
@@ -2732,7 +2732,7 @@ export default function RecursosINPI() {
                       </div>
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold mb-2">{agent.name} Processando</h3>
+                      <h3 className="text-xl font-bold mb-2">{processingError ? 'Geração interrompida' : `${agent.name} Processando`}</h3>
                       {processingStage && !processingError && (
                         <p className="text-sm font-medium text-primary mb-2">{processingStage}…</p>
                       )}
@@ -2754,16 +2754,16 @@ export default function RecursosINPI() {
                           </div>
                         </div>
                       )}
-                      <p className="text-muted-foreground">
+                      {!processingError && <p className="text-muted-foreground">
                         {resourceType === 'notificacao_extrajudicial' 
                           ? `Elaborando Notificação Extrajudicial com estratégia "${agent.style}" e fundamentação legal completa...`
                           : resourceType === 'resposta_notificacao_extrajudicial'
                           ? `Analisando notificação recebida e elaborando defesa com estratégia "${agent.style}" e jurisprudência real...`
                           : `Aplicando estratégia "${agent.style}" com jurisprudência real e fundamentação completa...`
                         }
-                      </p>
+                      </p>}
                     </div>
-                    <div className="w-full space-y-2">
+                    {!processingError && !UPGRADED_MODALITIES.includes(resourceType) && <div className="w-full space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Progresso</span>
                         <span className="font-medium text-primary">{Math.round(processingProgress)}%</span>
@@ -2774,8 +2774,8 @@ export default function RecursosINPI() {
                           style={{ width: `${processingProgress}%` }}
                         />
                       </div>
-                    </div>
-                    <div className="flex flex-wrap justify-center gap-2 pt-2">
+                    </div>}
+                    {!processingError && !UPGRADED_MODALITIES.includes(resourceType) && <div className="flex flex-wrap justify-center gap-2 pt-2">
                       {(resourceType === 'notificacao_extrajudicial' 
                         ? ['Analisando dados', 'Processando provas', 'Fundamentação legal', 'Elaborando notificação', 'Revisão final']
                         : resourceType === 'resposta_notificacao_extrajudicial'
@@ -2787,7 +2787,7 @@ export default function RecursosINPI() {
                           {label}
                         </Badge>
                       ))}
-                    </div>
+                    </div>}
                   </div>
                 </CardContent>
               </Card>

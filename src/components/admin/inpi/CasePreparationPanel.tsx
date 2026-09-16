@@ -16,6 +16,7 @@ import {
   type CaseCategory, type ExtractionStatus,
 } from '@/lib/inpi/caseDocuments';
 import { rasterizePdfPages, imageToDataUrl } from '@/lib/inpi/packageBuilder';
+import { orientationItemText } from '@/lib/inpi/orientationDisplay';
 
 interface CaseDoc {
   doc_number: number;
@@ -418,7 +419,7 @@ export default function CasePreparationPanel({
   const sections = orientation?.sections as Record<string, unknown> | undefined;
   const listOf = (key: string): string[] => {
     const v = sections?.[key];
-    return Array.isArray(v) ? v.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))) : [];
+    return Array.isArray(v) ? v.map(orientationItemText).filter(Boolean) : [];
   };
 
   const statusBadge = (s: ExtractionStatus) => {
@@ -575,7 +576,7 @@ export default function CasePreparationPanel({
               className="rounded-xl gap-2 shrink-0"
             >
               {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
-              {orientation ? 'Atualizar análise' : 'Gerar orientação com IA'}
+              {generating ? 'Analisando documentos…' : orientation ? 'Atualizar análise' : 'Gerar orientação com IA'}
             </Button>
           </div>
 
