@@ -1239,17 +1239,50 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
     setTimeout(() => document.body.classList.remove('printing-inpi-doc'), 1000);
   };
 
+  /**
+   * Anexos do pacote: quem chama pode fornecê-los (fluxo de aprovação); se não
+   * fornecer e houver inventário do caso (inclusive ao reabrir pelo histórico),
+   * o próprio montador converte os documentos persistidos do caso.
+   */
+  const ensureAnnexes = async (): Promise<NativeAnnexDoc[] | undefined> => {
+    if (annexes && annexes.length) return annexes;
+    if (!hasInventory) return annexes;
+    if (inventoryAnnexes) return inventoryAnnexes;
+    setIsBuildingAnnexes(true);
+    try {
+      const built = await buildInventoryAnnexes(inventoryItems);
+      const mapped: NativeAnnexDoc[] = built.map((a) => ({
+        id: a.id, docNumber: a.docNumber, title: a.title, categoryLabel: a.categoryLabel,
+        fileName: a.fileName, images: a.images, textBlocks: a.textBlocks,
+        status: a.status, notes: a.notes,
+      }));
+      setInventoryAnnexes(mapped);
+      return mapped;
+    } finally {
+      setIsBuildingAnnexes(false);
+    }
+  };
+
   const handleDownloadPDF = async () => {
-    if (isLoadingEvidence) {
-      toast({ title: 'Aguarde', description: 'As evidências ainda estão sendo preparadas para entrar no PDF.' });
+    if (isLoadingEvidence || isLoadingInventory) {
+      toast({ title: 'Aguarde', description: 'As provas ainda estão sendo preparadas para entrar no PDF.' });
       return;
     }
     setIsGeneratingPDF(true);
     try {
+      const finalAnnexes = await ensureAnnexes();
+      const conversionFailed = (finalAnnexes || []).some((a) => a.status === 'falha' || a.status === 'parcial');
+      // Pendência de marcador, conversão falha ou anexo faltante ⇒ só prévia.
+      const effectiveStamp = draftStamp
+        ?? (markerPendencies.length
+          ? 'PRÉVIA — REFERÊNCIA DE PROVA NÃO VINCULADA'
+          : conversionFailed
+            ? 'PRÉVIA — PACOTE DOCUMENTAL INCOMPLETO'
+            : null);
       await generateNativePDF({
         pdfFileName,
         bodyContent,
-        evidences,
+        evidences: activeEvidences,
         evidenceByNum,
         findEvidenceBySlug,
         uncitedEvidences,
@@ -1258,8 +1291,8 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
         approvalDate,
         isExtrajudicialDoc,
         isProcuradorPetition,
-        annexes,
-        draftStamp,
+        annexes: finalAnnexes,
+        draftStamp: effectiveStamp,
       });
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -1272,6 +1305,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
       setIsGeneratingPDF(false);
     }
   };
+
 
   const renderContent = () => {
     return bodyContent.split('\n\n').filter(p => p.trim()).map((paragraph, idx) => {
