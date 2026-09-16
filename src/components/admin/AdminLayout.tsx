@@ -459,11 +459,21 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
       }
 
       if (!isAdminRole) {
-        sessionStorage.removeItem('admin_verified');
-        sessionStorage.removeItem('admin_user_id');
-        toast.error('Acesso negado. Você não tem permissão de administrador.');
-        navigate('/cliente/dashboard');
-        return;
+        // Usuário sem papel de administrador ainda pode entrar se estiver
+        // liberado em alguma seção — hoje, Recursos INPI. O guarda de rotas
+        // abaixo continua limitando o que ele enxerga.
+        const { data: canInpi } = await withTimeout(
+          supabase.rpc('has_inpi_resources_access', { _user_id: user.id, _need_edit: false }),
+          12000,
+        ).catch(() => ({ data: false } as { data: boolean }));
+
+        if (!canInpi) {
+          sessionStorage.removeItem('admin_verified');
+          sessionStorage.removeItem('admin_user_id');
+          toast.error('Acesso negado. Você não tem permissão de administrador.');
+          navigate('/cliente/dashboard');
+          return;
+        }
       }
 
       sessionStorage.setItem('admin_verified', 'true');
