@@ -752,7 +752,21 @@ const FORMATTING_INSTRUCTIONS = `
 6. PARÁGRAFOS — denso, justificado, juridicamente sólido. Não use bullets em excesso; prefira parágrafos coesos. Listas só nos PEDIDOS finais (a, b, c, d…).
 
 ⚠️ O texto continua sendo uma peça jurídica formal — formatação markdown deve ser PARCIMONIOSA e ESTRATÉGICA, nunca decorativa. Use negrito ~3-5x por seção. Use itálico apenas onde tecnicamente correto. Tabela ao menos uma em IV e uma em V.
+
+#regras_de_conteudo_obrigatorias (valem para recurso contra indeferimento, cumprimento de exigência de mérito e manifestação à oposição)
+- APRESENTAÇÃO DA MARCA: nominativa, mista ou figurativa é UM só campo, retirado do documento oficial do acervo. É proibido o cabeçalho dizer uma coisa e o corpo outra. Sem documento que comprove, escreva "apresentação a conferir no espelho oficial".
+- TITULAR, NÚMERO DO PROCESSO, CLASSE E ESPECIFICAÇÃO saem do documento oficial. A descrição genérica da classe NUNCA pode ser apresentada como a especificação concreta do pedido.
+- ENDEREÇAMENTO: use a autoridade competente exata. Não combine cargos nem invente órgão.
+- CITAÇÕES JURÍDICAS: só cite acórdão, súmula ou doutrina cuja íntegra esteja no dossiê recebido. Do contrário, escreva "precedente a conferir na fonte oficial" e NÃO use a tese como se estivesse comprovada. Não existe lista "pré-validada". Doutrina exige obra, edição e localização.
+- PAGAMENTO E PREPARO: informe o código de serviço e o valor apenas como dado a conferir na tabela vigente na data do ato, salvo se a guia do acervo comprovar. Não afirme que um valor está correto sem comprovante no caso. Não mencione pagamento sem comprovante juntado.
+- PRAZO E PUBLICAÇÃO: data da decisão não é data da publicação na RPI. Peça ainda não protocolada não menciona recibo de protocolo.
+- ART. 220 não sana qualquer vício: confronte arts. 218, 219 e 221 e use também o art. 214 quando pertinente.
+- PROVAS: uso em shows, eventos ou redes sociais, isoladamente, não prova prioridade, notoriedade nem ausência de confusão. Não atribua ano a documento que não traz ano. Não declare um termo juridicamente fraco só por ser interjeição, nem que um acréscimo baste para distinguir. Enfrente o contexto desfavorável que a própria prova revelar.
+- Risco de confusão não exige episódio consumado; ausência de má-fé ou de alto renome não afasta automaticamente o art. 124, XIX.
+- SEPARE claramente fato provado por documento do acervo, inferência e tese defensiva. Não declare registrabilidade demonstrada quando faltar dado essencial ao cotejo — aponte a lacuna.
+- Evite repetição e pedidos genéricos. O tamanho é consequência do conteúdo necessário.
 `;
+
 
 // ═══════════════════════════════════════════════════════════
 // NOTIFICAÇÃO EXTRAJUDICIAL PROMPT (unchanged from original logic)
