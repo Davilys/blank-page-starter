@@ -400,6 +400,10 @@ export default function RecursosINPI() {
   const clientSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clientDropdownRef = useRef<HTMLDivElement>(null);
   const [processingProgress, setProcessingProgress] = useState(0);
+  const [processingStage, setProcessingStage] = useState<string>('');
+  const [processingError, setProcessingError] = useState<string | null>(null);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [lastJobRequest, setLastJobRequest] = useState<{ caseId: string; orientation: string } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [editingResource, setEditingResource] = useState<INPIResource | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -609,6 +613,112 @@ export default function RecursosINPI() {
     });
   };
 
+  const JOB_STAGE_LABELS: Record<string, string> = {
+    preparar: 'Preparando os documentos do caso',
+    pass1: 'Escrevendo a primeira parte da peça',
+    pass2: 'Escrevendo a segunda parte da peça',
+    concluido: 'Finalizando',
+  };
+
+  const finalizeJobResult = async (job: any, caseId: string) => {
+    const safeExtracted = sanitizeExtractedData(job.extracted_data);
+    const safeContent = toSafeString(job.result_content);
+    setExtractedData(safeExtracted);
+    setDraftContent(safeContent);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: insertedResource, error: insertError } = await supabase
+      .from('inpi_resources')
+      .insert({
+        user_id: user?.id,
+        resource_type: resourceType,
+        process_number: safeExtracted.process_number || null,
+        brand_name: safeExtracted.brand_name || null,
+        ncl_class: safeExtracted.ncl_class || null,
+        holder: safeExtracted.holder || null,
+        examiner_or_opponent: safeExtracted.examiner_or_opponent || null,
+        legal_basis: safeExtracted.legal_basis || null,
+        draft_content: safeContent,
+        status: 'pending_review',
+      })
+      .select()
+      .single();
+    if (insertError) throw insertError;
+    setCurrentResourceId(insertedResource.id);
+
+    await supabase
+      .from('inpi_resource_cases')
+      .update({
+        resource_id: insertedResource.id,
+        status: 'minuta',
+        process_number: safeExtracted.process_number || null,
+        brand_name: safeExtracted.brand_name || null,
+      })
+      .eq('id', caseId);
+
+    setProcessingProgress(100);
+    setTimeout(() => setStep('review'), 400);
+    toast.success('Minuta gerada. Confira a revisão antes de aprovar.');
+  };
+
+  const pollGenerationJob = async (jobId: string, caseId: string) => {
+    let delay = 3000;
+    const deadline = Date.now() + 20 * 60 * 1000;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, delay));
+      delay = Math.min(delay * 1.3, 12000);
+      const { data, error } = await supabase.functions.invoke('process-inpi-resource', {
+        body: { action: 'status', job_id: jobId },
+      });
+      if (error) continue;
+      const job = data?.job;
+      if (!job) continue;
+      setProcessingStage(JOB_STAGE_LABELS[job.stage] || 'Processando');
+      setProcessingProgress((prev) => Math.max(prev, job.stage === 'pass2' ? 62 : 28));
+      if (job.status === 'error') {
+        setProcessingError(job.error_message || 'A geração falhou. Você pode tentar de novo a partir da etapa que parou.');
+        setIsProcessing(false);
+        return;
+      }
+      if (job.status === 'done') {
+        await finalizeJobResult(job, caseId);
+        setIsProcessing(false);
+        return;
+      }
+    }
+    setProcessingError('A geração está demorando mais que o normal. Toque em "Tentar de novo" para retomar da etapa em que parou.');
+    setIsProcessing(false);
+  };
+
+  const startGenerationJob = async (caseId: string, orientation: string, action: 'start' | 'retry') => {
+    const agent = AI_AGENTS[selectedAgent];
+    setProcessingError(null);
+    setProcessingStage('Preparando os documentos do caso');
+    setIsProcessing(true);
+    setStep('processing');
+    try {
+      const { data, error } = await supabase.functions.invoke('process-inpi-resource', {
+        body: {
+          action,
+          caseId,
+          resourceType,
+          agentName: agent.name,
+          agentStrategy: agent.promptExtra,
+          userOrientation: orientation || undefined,
+        },
+      });
+      if (error) throw error;
+      if (!data?.job) throw new Error(data?.error || 'Não foi possível iniciar a geração.');
+      setActiveJobId(data.job.id);
+      sessionStorage.setItem('inpi-job-' + caseId, data.job.id);
+      await pollGenerationJob(data.job.id, caseId);
+    } catch (e) {
+      console.error('Falha ao iniciar a geração:', e);
+      setProcessingError(e instanceof Error ? e.message : 'Não foi possível iniciar a geração.');
+      setIsProcessing(false);
+    }
+  };
+
   const processDocument = async (override?: { files?: File[]; orientation?: string; caseId?: string }) => {
     if (resourceType === 'notificacao_extrajudicial') {
       return processNotificacao();
@@ -621,6 +731,13 @@ export default function RecursosINPI() {
     }
     const filesToSend = override?.files?.length ? override.files : multipleFiles;
     const orientationToSend = (override?.orientation ?? userOrientation).trim();
+    // Com um caso preparado, a geração roda por etapas no servidor: cada etapa
+    // tem orçamento próprio de processamento, o andamento fica salvo e a tela
+    // pode ser fechada e reaberta sem perder o trabalho.
+    if (override?.caseId && UPGRADED_MODALITIES.includes(resourceType)) {
+      setLastJobRequest({ caseId: override.caseId, orientation: orientationToSend });
+      return startGenerationJob(override.caseId, orientationToSend, 'start');
+    }
     // Com um caso preparado, os arquivos já estão no armazenamento privado:
     // o servidor os busca de lá em vez de recebê-los convertidos no envio.
     const useCaseDocuments = Boolean(override?.caseId);
@@ -2616,6 +2733,27 @@ export default function RecursosINPI() {
                     </div>
                     <div>
                       <h3 className="text-xl font-bold mb-2">{agent.name} Processando</h3>
+                      {processingStage && !processingError && (
+                        <p className="text-sm font-medium text-primary mb-2">{processingStage}…</p>
+                      )}
+                      {processingError && (
+                        <div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-left">
+                          <p className="text-sm text-destructive font-medium mb-3">{processingError}</p>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => lastJobRequest && startGenerationJob(lastJobRequest.caseId, lastJobRequest.orientation, 'retry')}
+                              disabled={!lastJobRequest}
+                              className="rounded-xl"
+                            >
+                              Tentar de novo
+                            </Button>
+                            <Button size="sm" variant="outline" className="rounded-xl" onClick={() => { setProcessingError(null); setStep('upload'); }}>
+                              Voltar aos documentos
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                       <p className="text-muted-foreground">
                         {resourceType === 'notificacao_extrajudicial' 
                           ? `Elaborando Notificação Extrajudicial com estratégia "${agent.style}" e fundamentação legal completa...`

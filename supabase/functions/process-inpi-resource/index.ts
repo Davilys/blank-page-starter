@@ -352,6 +352,8 @@ function convertToResponsesFormat(userContent: any[]): any[] {
 // pass2) we send the raw bytes once and reference the file_id in
 // every subsequent call.
 // ═══════════════════════════════════════════════════════════
+interface SourceFileRef { base64: string; bytes?: Uint8Array; type: string; name?: string }
+
 function base64ToUint8Array(b64: string): Uint8Array {
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
@@ -398,7 +400,7 @@ async function uploadFileToOpenAI(
 async function maybeReplaceFilePartsWithFileIds(
   apiKey: string,
   fileParts: any[],
-  sourceFiles: Array<{ base64: string; type: string; name?: string }>,
+  sourceFiles: SourceFileRef[],
 ): Promise<string[]> {
   const failedFiles: string[] = [];
   if (fileParts.length === 0 || sourceFiles.length !== fileParts.length) return failedFiles;
@@ -407,17 +409,18 @@ async function maybeReplaceFilePartsWithFileIds(
     const part = fileParts[i];
     const src = sourceFiles[i];
     const filename = src?.name || (part.type === 'file' ? part.file?.filename : 'image');
-    if (!src?.base64 || !src?.type) {
+    if ((!src?.base64 && !src?.bytes) || !src?.type) {
       failedFiles.push(filename || `arquivo-${i + 1}`);
       continue;
     }
 
     try {
-      const bytes = base64ToUint8Array(src.base64);
+      const bytes = src.bytes ?? base64ToUint8Array(src.base64);
       // Drop the request's base64 string before the network request starts;
       // the Uint8Array is the only large buffer alive for this file now.
       src.base64 = '';
 
+      src.bytes = undefined;
       const fileId = await uploadFileToOpenAI(apiKey, bytes, filename || `arquivo-${i + 1}`, src.type);
       if (!fileId) {
         failedFiles.push(filename || `arquivo-${i + 1}`);
@@ -440,25 +443,25 @@ async function maybeReplaceFilePartsWithFileIds(
 
 function appendUploadOnlyFilePart(
   fileParts: any[],
-  sourceFiles: Array<{ base64: string; type: string; name?: string }>,
-  file: { base64?: string; type?: string; name?: string },
+  sourceFiles: SourceFileRef[],
+  file: { base64?: string; type?: string; name?: string; bytes?: Uint8Array },
   fallbackName: string,
 ) {
-  if (!file?.base64 || !file?.type) return;
+  if ((!file?.base64 && !file?.bytes) || !file?.type) return;
   const filename = file.name || fallbackName;
   if (file.type === 'application/pdf') {
     fileParts.push({ type: 'file', file: { filename } });
-    sourceFiles.push({ base64: file.base64, type: 'application/pdf', name: filename });
+    sourceFiles.push({ base64: file.base64 || '', bytes: file.bytes, type: 'application/pdf', name: filename });
   } else if (file.type.startsWith('image/')) {
     fileParts.push({ type: 'image_url', image_url: { filename } });
-    sourceFiles.push({ base64: file.base64, type: file.type, name: filename });
+    sourceFiles.push({ base64: file.base64 || '', bytes: file.bytes, type: file.type, name: filename });
   }
 }
 
 async function uploadAndPrepareFileParts(
   apiKey: string,
   fileParts: any[],
-  sourceFiles: Array<{ base64: string; type: string; name?: string }>,
+  sourceFiles: SourceFileRef[],
   originalFiles?: any[],
 ): Promise<any[]> {
   const failedFiles = await maybeReplaceFilePartsWithFileIds(apiKey, fileParts, sourceFiles);
@@ -1327,25 +1330,34 @@ const handleRequest = async (req: Request): Promise<Response> => {
     );
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !userData?.user) {
-      return new Response(
-        JSON.stringify({ error: 'Não autorizado' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Chamada interna do próprio servidor (execução por etapas). O segredo é a
+    // chave de serviço, que nunca sai do servidor; o acesso do administrador já
+    // foi validado quando o pedido foi criado.
+    const isInternalStep = req.headers.get('x-internal-job') === '1'
+      && token === (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '__none__');
+
+    if (!isInternalStep) {
+      const { data: userData, error: userError } = await supabase.auth.getUser(token);
+      if (userError || !userData?.user) {
+        return new Response(
+          JSON.stringify({ error: 'Não autorizado' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { data: isAdmin, error: roleError } = await supabase.rpc('has_role', {
+        _user_id: userData.user.id,
+        _role: 'admin'
+      });
+
+      if (roleError || !isAdmin) {
+        return new Response(
+          JSON.stringify({ error: 'Acesso de administrador necessário' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
-    const { data: isAdmin, error: roleError } = await supabase.rpc('has_role', {
-      _user_id: userData.user.id,
-      _role: 'admin'
-    });
-
-    if (roleError || !isAdmin) {
-      return new Response(
-        JSON.stringify({ error: 'Acesso de administrador necessário' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
 
     // O envio pode ser interrompido no meio (conexão móvel instável). Sem este
     // tratamento a função estourava com "end of file before message length reached"
@@ -1448,7 +1460,7 @@ const handleRequest = async (req: Request): Promise<Response> => {
       const systemPrompt = buildNotificacaoPrompt(currentDate, notificanteData || {}, notificadoData || {}, userInstructions || '', agentStrategy, agentName);
       
       const fileParts: any[] = [];
-      const sourceFilesForUpload: Array<{ base64: string; type: string; name?: string }> = [];
+      const sourceFilesForUpload: SourceFileRef[] = [];
       if (files && Array.isArray(files)) {
         for (const file of files) appendUploadOnlyFilePart(fileParts, sourceFilesForUpload, file, file?.type === 'application/pdf' ? 'doc.pdf' : 'image');
       }
@@ -1562,7 +1574,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
 
       // Build user content parts for OpenAI Responses API
       const fileParts: any[] = [];
-      const sourceFilesForUpload: Array<{ base64: string; type: string; name?: string }> = [];
+      const sourceFilesForUpload: SourceFileRef[] = [];
 
       if (files && Array.isArray(files)) {
         for (const file of files) appendUploadOnlyFilePart(fileParts, sourceFilesForUpload, file, file?.type === 'application/pdf' ? 'notificacao.pdf' : 'image');
@@ -1607,7 +1619,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
       const systemPrompt = buildProcuradorPrompt(currentDate, pData, resourceType, agentStrategy, agentName);
       
       const fileParts: any[] = [];
-      const sourceFilesForUpload: Array<{ base64: string; type: string; name?: string }> = [];
+      const sourceFilesForUpload: SourceFileRef[] = [];
       if (files && Array.isArray(files)) {
         for (const file of files) appendUploadOnlyFilePart(fileParts, sourceFilesForUpload, file, file?.type === 'application/pdf' ? 'doc.pdf' : 'image');
       }
@@ -1692,7 +1704,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
 
     // Build file parts for all calls
     const fileParts: any[] = [];
-    const sourceFilesForUpload: Array<{ base64: string; type: string; name?: string }> = [];
+    const sourceFilesForUpload: SourceFileRef[] = [];
     if (multiFiles && multiFiles.length > 0) {
       for (const file of multiFiles) {
         appendUploadOnlyFilePart(fileParts, sourceFilesForUpload, file, file?.type === 'application/pdf' ? 'doc.pdf' : 'image');
@@ -1739,14 +1751,10 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
           .download(doc.storage_path);
         if (dlErr || !blob) { failedDownloads.push(doc.file_name); continue; }
         const bytes = new Uint8Array(await blob.arrayBuffer());
-        let binary = '';
-        for (let i = 0; i < bytes.length; i += 0x8000) {
-          binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-        }
         appendUploadOnlyFilePart(
           fileParts,
           sourceFilesForUpload,
-          { base64: btoa(binary), type: doc.mime_type, name: doc.file_name },
+          { bytes, type: doc.mime_type, name: doc.file_name },
           doc.mime_type === 'application/pdf' ? 'documento_inpi.pdf' : 'image',
         );
       }
@@ -2009,6 +2017,216 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
   }
 };
 
+// ═══════════════════════════════════════════════════════════
+// EXECUÇÃO POR ETAPAS (evita estouro de CPU numa única chamada)
+// Cada etapa roda numa invocação própria da função, com orçamento
+// de CPU novo, e grava o andamento em inpi_generation_jobs.
+// ═══════════════════════════════════════════════════════════
+const adminClient = () => createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY')!,
+);
+
+const SELF_URL = `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-inpi-resource`;
+
+function dispatchStep(jobId: string, step: string) {
+  const body = JSON.stringify({ action: 'step', job_id: jobId, step });
+  const call = fetch(SELF_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''}`,
+      'x-internal-job': '1',
+      'x-job-dispatch': '1',
+    },
+    body,
+  }).catch((e) => console.error('dispatchStep falhou:', (e as Error).message));
+  // @ts-ignore EdgeRuntime existe no runtime do Supabase
+  if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) EdgeRuntime.waitUntil(call);
+  return call;
+}
+
+async function runStep(jobId: string, step: string) {
+  const db = adminClient();
+  const { data: job } = await db.from('inpi_generation_jobs').select('*').eq('id', jobId).maybeSingle();
+  if (!job) return;
+  if (job.status !== 'processing') return;
+
+  const internalHeaders = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''}`,
+    'x-internal-job': '1',
+  };
+
+  const fail = async (message: string, code?: string) => {
+    await db.from('inpi_generation_jobs').update({
+      status: 'error', error_message: message.substring(0, 900), error_code: code || 'erro',
+    }).eq('id', jobId);
+  };
+
+  const legacy = async (payload: Record<string, unknown>) => {
+    const res = await handleRequest(new Request(SELF_URL, {
+      method: 'POST', headers: internalHeaders, body: JSON.stringify(payload),
+    }));
+    const text = await res.text();
+    let parsed: any = null;
+    try { parsed = JSON.parse(text); } catch { /* resposta ilegível */ }
+    return { ok: res.ok && parsed?.success === true, status: res.status, data: parsed, raw: text };
+  };
+
+  const base = {
+    resourceType: job.resource_type,
+    agentName: job.agent_name || undefined,
+    agentStrategy: job.agent_strategy || undefined,
+    userOrientation: job.user_orientation || undefined,
+    caseId: job.case_id || undefined,
+  };
+
+  try {
+    if (step === 'pass1') {
+      await db.from('inpi_generation_jobs').update({ stage: 'pass1' }).eq('id', jobId);
+      const r = await legacy({ ...base, generationPass: 'pass1' });
+      if (!r.ok) {
+        await fail(r.data?.error || 'Falha ao escrever a primeira parte da peça.', r.data?.error_kind);
+        return;
+      }
+      await db.from('inpi_generation_jobs').update({
+        stage: 'pass2',
+        pass1_content: r.data.pass1_content || r.data.resource_content || '',
+        extracted_data: r.data.extracted_data || null,
+      }).eq('id', jobId);
+      dispatchStep(jobId, 'pass2');
+      return;
+    }
+
+    if (step === 'pass2') {
+      const r = await legacy({
+        ...base,
+        generationPass: 'pass2',
+        pass1Content: job.pass1_content || '',
+        extractedData: job.extracted_data || {},
+      });
+      if (!r.ok) {
+        await fail(r.data?.error || 'Falha ao escrever a segunda parte da peça.', r.data?.error_kind);
+        return;
+      }
+      await db.from('inpi_generation_jobs').update({
+        stage: 'concluido',
+        status: 'done',
+        result_content: r.data.resource_content || '',
+        extracted_data: r.data.extracted_data || job.extracted_data,
+      }).eq('id', jobId);
+      return;
+    }
+
+    await fail(`Etapa desconhecida: ${step}`, 'etapa_invalida');
+  } catch (e) {
+    await fail((e as Error).message || 'Erro inesperado durante a geração.', 'excecao');
+  }
+}
+
+async function requireAdmin(req: Request): Promise<{ userId: string } | Response> {
+  const authHeader = req.headers.get('Authorization') || '';
+  if (!authHeader.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'Não autorizado' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+  const token = authHeader.replace('Bearer ', '');
+  const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authHeader } } });
+  const { data: userData, error } = await sb.auth.getUser(token);
+  if (error || !userData?.user) {
+    return new Response(JSON.stringify({ error: 'Não autorizado' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+  const { data: isAdmin } = await sb.rpc('has_role', { _user_id: userData.user.id, _role: 'admin' });
+  if (!isAdmin) {
+    return new Response(JSON.stringify({ error: 'Acesso de administrador necessário' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+  return { userId: userData.user.id };
+}
+
+const jsonResponse = (payload: unknown, status = 200) =>
+  new Response(JSON.stringify(payload), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+async function handleJobAction(req: Request, body: any): Promise<Response> {
+  const db = adminClient();
+  const action = body?.action;
+
+  if (action === 'step') {
+    const internal = req.headers.get('x-internal-job') === '1'
+      && (req.headers.get('Authorization') || '') === `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '__none__'}`;
+    if (!internal) return jsonResponse({ error: 'Não autorizado' }, 401);
+    const jobId = String(body.job_id || '');
+    const step = String(body.step || '');
+    const work = runStep(jobId, step);
+    // @ts-ignore EdgeRuntime existe no runtime do Supabase
+    if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) EdgeRuntime.waitUntil(work); else await work;
+    return jsonResponse({ accepted: true });
+  }
+
+  const auth = await requireAdmin(req);
+  if (auth instanceof Response) return auth;
+
+  if (action === 'status') {
+    const jobId = typeof body.job_id === 'string' ? body.job_id : null;
+    const caseId = typeof body.caseId === 'string' ? body.caseId : null;
+    let query = db.from('inpi_generation_jobs').select('*').order('created_at', { ascending: false }).limit(1);
+    query = jobId ? query.eq('id', jobId) : query.eq('case_id', caseId ?? '');
+    const { data, error } = await query.maybeSingle();
+    if (error) return jsonResponse({ error: 'Não foi possível consultar o andamento.' }, 500);
+    if (!data) return jsonResponse({ job: null });
+    return jsonResponse({ job: data });
+  }
+
+  if (action === 'start' || action === 'retry') {
+    const caseId = typeof body.caseId === 'string' ? body.caseId : null;
+    if (!caseId) return jsonResponse({ error: 'Caso não informado.' }, 400);
+    if (!body.resourceType) return jsonResponse({ error: 'Modalidade não informada.' }, 400);
+
+    const { data: existing } = await db
+      .from('inpi_generation_jobs')
+      .select('*')
+      .eq('case_id', caseId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existing && existing.status === 'processing' && action === 'start') {
+      return jsonResponse({ job: existing, resumed: true });
+    }
+
+    if (existing && (action === 'retry' || existing.status !== 'processing')) {
+      // Retoma da etapa que falhou, sem refazer o que já ficou pronto.
+      const resumeStep = existing.pass1_content && existing.pass1_content.length > 1000 ? 'pass2' : 'pass1';
+      const { data: updated, error: upErr } = await db.from('inpi_generation_jobs').update({
+        status: 'processing',
+        stage: resumeStep,
+        attempt: (existing.attempt || 0) + 1,
+        error_message: null,
+        error_code: null,
+        result_content: null,
+      }).eq('id', existing.id).select().maybeSingle();
+      if (upErr) return jsonResponse({ error: 'Não foi possível retomar a geração.' }, 500);
+      dispatchStep(existing.id, resumeStep);
+      return jsonResponse({ job: updated, resumed: true });
+    }
+
+    const { data: created, error: insErr } = await db.from('inpi_generation_jobs').insert({
+      case_id: caseId,
+      owner_id: auth.userId,
+      resource_type: body.resourceType,
+      agent_name: body.agentName || null,
+      agent_strategy: body.agentStrategy || null,
+      user_orientation: body.userOrientation || null,
+      stage: 'pass1',
+      status: 'processing',
+    }).select().maybeSingle();
+    if (insErr || !created) return jsonResponse({ error: 'Não foi possível iniciar a geração.' }, 500);
+    dispatchStep(created.id, 'pass1');
+    return jsonResponse({ job: created });
+  }
+
+  return jsonResponse({ error: 'Ação desconhecida.' }, 400);
+}
+
 // A geração pode levar vários minutos. O runtime encerra a requisição se ficar
 // 150s sem enviar bytes, então respondemos em streaming: espaços em branco
 // (ignorados pelo JSON.parse do cliente) mantêm a conexão viva até o resultado.
@@ -2017,7 +2235,25 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const work = handleRequest(req);
+  // Fluxo por etapas: respostas curtas e imediatas.
+  let jobBody: any = null;
+  let rawBody = '';
+  try {
+    rawBody = await req.text();
+    jobBody = rawBody ? JSON.parse(rawBody) : null;
+  } catch { jobBody = null; }
+
+  if (jobBody && ['start', 'status', 'step', 'retry'].includes(jobBody.action)) {
+    try {
+      return await handleJobAction(req, jobBody);
+    } catch (e) {
+      return jsonResponse({ error: (e as Error).message || 'Erro inesperado.' }, 500);
+    }
+  }
+
+  // Fluxo direto (demais modalidades e chamadas internas por etapa).
+  const replayed = new Request(req.url, { method: req.method, headers: req.headers, body: rawBody });
+  const work = handleRequest(replayed);
   const encoder = new TextEncoder();
   let settled: { status: number; body: string } | null = null;
 
@@ -2051,4 +2287,3 @@ serve(async (req) => {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 });
-
