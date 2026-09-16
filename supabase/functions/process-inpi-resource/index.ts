@@ -2378,7 +2378,7 @@ async function handleJobAction(req: Request, body: any): Promise<Response> {
     return jsonResponse({ accepted: true });
   }
 
-  const auth = await requireAdmin(req);
+  const auth = await requireInpiAccess(req, action !== 'status');
   if (auth instanceof Response) return auth;
 
   if (action === 'status') {
