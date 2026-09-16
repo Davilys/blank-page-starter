@@ -79,12 +79,28 @@ Deno.serve(async (req) => {
     // Isolamento entre casos: o documento precisa pertencer ao caso informado.
     const { data: docRow } = await admin
       .from('inpi_case_documents')
-      .select('id, case_id, file_name, extracted_text, page_count, interpreted_pages, extraction_status')
+      .select('id, case_id, file_name, extracted_text, page_count, interpreted_pages, extraction_status, vision_read_at, vision_read_pages')
       .eq('id', documentId)
       .maybeSingle();
     if (!docRow || docRow.case_id !== caseId) {
       return json({ error: 'Documento não pertence a este caso' }, 404);
     }
+
+    // Proteção de duplicação no servidor: leitura visual já concluída (ou em curso
+    // há menos de 5 minutos) não é refeita por duas abas ou envios simultâneos.
+    if (docRow.vision_read_at && body?.force !== true) {
+      return json({
+        success: true,
+        reused: true,
+        pages_read: docRow.vision_read_pages || 0,
+        message: 'Leitura visual já registrada para este documento.',
+      });
+    }
+    // Marca o início — a segunda requisição concorrente cai no bloco acima.
+    await admin.from('inpi_case_documents')
+      .update({ vision_read_at: new Date().toISOString() })
+      .eq('id', documentId)
+      .is('vision_read_at', null);
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     if (!OPENAI_API_KEY) return json({ error: 'OPENAI_API_KEY não configurada' }, 503);

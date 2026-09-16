@@ -146,16 +146,22 @@ Deno.serve(async (req) => {
       '',
       'Confira, item a item:',
       '1. FATO SEM LASTRO — afirmação de fato que nenhum documento do dossiê sustenta (inclusive datas, valores, nomes e números).',
-      '2. CITACAO — norma, artigo, súmula, acórdão ou decisão citada. Marque como não conferida quando não constar do dossiê.',
+      '2. CITACAO — norma, artigo, súmula, acórdão, decisão ou doutrina citada. Você NÃO tem acesso a fontes externas:',
+      '   toda referência jurídica que não esteja transcrita no dossiê é NÃO CONFERIDA e exige conferência humana na fonte oficial.',
       '3. FUNDAMENTO NAO RESPONDIDO — fundamento do INPI ou do opositor que a peça não enfrenta.',
       '4. PLACEHOLDER — campo não preenchido, colchete, "XXX", nome ou número faltando.',
       '5. CONTRADICAO — afirmações incompatíveis entre si ou com o dossiê.',
       '6. DOCUMENTO NAO CONFERIDO — conclusão apoiada em documento cujas páginas não foram interpretadas.',
       '',
-      'Regras: nunca invente. Cite sempre o trecho exato da peça. Um problema dos tipos 1, 2, 4 e 6 é BLOQUEANTE.',
+      'REGRA DE PROVA (obrigatória): citar "DOC:01" NÃO comprova nada. Para cada afirmação de fato que você',
+      'considerar sustentada, copie em "trecho_fonte" a passagem LITERAL do conteúdo conferido daquele documento',
+      'que a sustenta. Se não houver passagem literal para copiar, o apontamento é fato_sem_lastro (bloqueante),',
+      'ainda que a peça cite o documento. Nunca parafraseie no campo "trecho_fonte"; nunca invente conteúdo de documento.',
+      '',
+      'Bloqueantes: tipos 1, 2, 4 e 6.',
       '',
       'Responda SOMENTE com JSON válido:',
-      '{"resumo":"","apontamentos":[{"tipo":"fato_sem_lastro|citacao_nao_conferida|fundamento_nao_respondido|placeholder|contradicao|documento_nao_conferido","trecho":"","problema":"","sugestao":"","bloqueante":true,"fontes":["DOC:01"]}]}',
+      '{"resumo":"","apontamentos":[{"tipo":"fato_sem_lastro|citacao_nao_conferida|fundamento_nao_respondido|placeholder|contradicao|documento_nao_conferido","trecho":"","trecho_fonte":"","problema":"","sugestao":"","bloqueante":true,"fontes":["DOC:01"],"conferencia_externa_necessaria":false}]}',
     ].join('\n');
 
     const userContent = [
@@ -256,7 +262,27 @@ Deno.serve(async (req) => {
       })
       .select()
       .single();
-    if (saveError) throw saveError;
+    // Concorrência real (duas abas / dois envios simultâneos): o índice único no
+    // servidor recusa a segunda gravação e devolvemos a revisão já registrada.
+    if (saveError) {
+      if ((saveError as { code?: string }).code === '23505') {
+        const { data: concurrent } = await admin
+          .from('inpi_draft_reviews')
+          .select('*')
+          .eq('case_id', caseId)
+          .eq('content_hash', contentHash)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (concurrent) {
+          await admin.from('inpi_ai_call_logs').insert({
+            ...logBase, status: 'sucesso', http_status: 200, error_kind: 'duplicado_concorrente',
+          });
+          return json({ success: true, review: concurrent, reused: true });
+        }
+      }
+      throw saveError;
+    }
 
     await admin.from('inpi_ai_call_logs').insert({
       ...logBase,

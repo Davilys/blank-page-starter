@@ -186,11 +186,18 @@ export default function CaseApprovalPanel({
       ? review
       : null;
 
+  /* Dois motivos distintos de bloqueio — nunca confundidos entre si. */
+  const reviewPending = !currentReview;
+  const reviewBlocking = !!currentReview?.has_blocking;
+
   const draftStamp = useMemo(() => {
-    if (!packageComplete) return 'PRÉVIA — PACOTE INCOMPLETO, NÃO PROTOCOLAR';
+    if (summary && !packageComplete) return 'PRÉVIA — PACOTE DOCUMENTAL INCOMPLETO';
+    if (reviewBlocking) return 'PRÉVIA — REVISÃO JURÍDICA COM APONTAMENTO GRAVE';
+    if (reviewPending) return 'MINUTA — REVISÃO JURÍDICA PENDENTE';
     if (!protocolApproval) return 'MINUTA — PENDENTE DE CONFERÊNCIA';
     return null;
-  }, [protocolApproval, packageComplete]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [protocolApproval, packageComplete, summary, reviewBlocking, reviewPending]);
 
   /* ── Revisão jurídica automática ─────────────────────────────────────── */
   const runReview = async () => {
@@ -256,10 +263,14 @@ export default function CaseApprovalPanel({
         isComplete: sum.isComplete,
         previewOnly: !protocolApproval || !sum.isComplete,
         draftStamp: !sum.isComplete
-          ? 'PRÉVIA — PACOTE INCOMPLETO, NÃO PROTOCOLAR'
-          : !protocolApproval
-            ? 'MINUTA — PENDENTE DE CONFERÊNCIA'
-            : null,
+          ? 'PRÉVIA — PACOTE DOCUMENTAL INCOMPLETO'
+          : reviewBlocking
+            ? 'PRÉVIA — REVISÃO JURÍDICA COM APONTAMENTO GRAVE'
+            : reviewPending
+              ? 'MINUTA — REVISÃO JURÍDICA PENDENTE'
+              : !protocolApproval
+                ? 'MINUTA — PENDENTE DE CONFERÊNCIA'
+                : null,
       });
       await supabase.from('inpi_export_packages').insert({
         case_id: caseId,
@@ -347,6 +358,12 @@ export default function CaseApprovalPanel({
         orientation_hash: orientationHash,
         approved_by: user?.id ?? null,
       });
+      // Duas abas ou dois envios simultâneos: o servidor recusa a segunda gravação.
+      if (apErr && (apErr as { code?: string }).code === '23505') {
+        await reload();
+        toast.info('Esta aprovação já estava registrada para esta mesma versão.');
+        return;
+      }
       if (apErr) throw apErr;
       await reload();
       toast.success(kind === 'texto_interno' ? 'Texto aprovado internamente.' : 'Conferência para protocolo registrada.');
@@ -496,10 +513,26 @@ export default function CaseApprovalPanel({
               {protocolApproval ? 'Conferido para protocolo' : 'Conferir para protocolo'}
             </Button>
           </div>
-          {!packageComplete && summary && (
+          {!summary && (
+            <div className="rounded-md bg-muted p-2 text-xs text-muted-foreground">
+              Motivo do bloqueio: pacote documental ainda não preparado.
+            </div>
+          )}
+          {summary && !packageComplete && (
             <div className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
-              Há anexo não incluído. A conferência para protocolo está bloqueada — só é possível baixar uma
-              prévia carimbada.
+              Motivo do bloqueio — <strong>pacote documental incompleto</strong>: {summary.failed.length} anexo(s)
+              não incluído(s). Só é possível baixar uma prévia carimbada.
+            </div>
+          )}
+          {summary && packageComplete && reviewPending && (
+            <div className="rounded-md bg-amber-500/10 p-2 text-xs text-amber-700">
+              Motivo do bloqueio — <strong>revisão jurídica pendente</strong>. O pacote documental está completo.
+            </div>
+          )}
+          {summary && packageComplete && reviewBlocking && (
+            <div className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
+              Motivo do bloqueio — <strong>revisão jurídica com apontamento grave</strong>. O pacote documental
+              está completo; o impedimento é de conteúdo, não de anexos.
             </div>
           )}
           {approvals.some((a) => a.invalidated_at) && (
