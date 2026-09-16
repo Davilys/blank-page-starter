@@ -1327,25 +1327,34 @@ const handleRequest = async (req: Request): Promise<Response> => {
     );
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !userData?.user) {
-      return new Response(
-        JSON.stringify({ error: 'Não autorizado' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Chamada interna do próprio servidor (execução por etapas). O segredo é a
+    // chave de serviço, que nunca sai do servidor; o acesso do administrador já
+    // foi validado quando o pedido foi criado.
+    const isInternalStep = req.headers.get('x-internal-job') === '1'
+      && token === (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '__none__');
+
+    if (!isInternalStep) {
+      const { data: userData, error: userError } = await supabase.auth.getUser(token);
+      if (userError || !userData?.user) {
+        return new Response(
+          JSON.stringify({ error: 'Não autorizado' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { data: isAdmin, error: roleError } = await supabase.rpc('has_role', {
+        _user_id: userData.user.id,
+        _role: 'admin'
+      });
+
+      if (roleError || !isAdmin) {
+        return new Response(
+          JSON.stringify({ error: 'Acesso de administrador necessário' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
-    const { data: isAdmin, error: roleError } = await supabase.rpc('has_role', {
-      _user_id: userData.user.id,
-      _role: 'admin'
-    });
-
-    if (roleError || !isAdmin) {
-      return new Response(
-        JSON.stringify({ error: 'Acesso de administrador necessário' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
 
     // O envio pode ser interrompido no meio (conexão móvel instável). Sem este
     // tratamento a função estourava com "end of file before message length reached"
