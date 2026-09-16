@@ -550,6 +550,26 @@ function cleanAIContent(raw: string): string {
 // ═══════════════════════════════════════════════════════════
 // HELPER: Build mandatory opening block deterministically
 // ═══════════════════════════════════════════════════════════
+/*
+ * Endereçamento por modalidade. Não existe autoridade combinada:
+ * o recurso contra indeferimento é dirigido ao Presidente do INPI (art. 212 da LPI);
+ * exigência de mérito e manifestação à oposição são dirigidas à Diretoria de Marcas.
+ */
+const ADDRESSEE_BY_TYPE: Record<string, string> = {
+  indeferimento:
+    'AO SENHOR PRESIDENTE DO INSTITUTO NACIONAL DA PROPRIEDADE INDUSTRIAL – INPI',
+  exigencia_merito:
+    'À DIRETORIA DE MARCAS DO INSTITUTO NACIONAL DA PROPRIEDADE INDUSTRIAL – INPI',
+  oposicao:
+    'À DIRETORIA DE MARCAS DO INSTITUTO NACIONAL DA PROPRIEDADE INDUSTRIAL – INPI',
+};
+
+function addresseeFor(resourceType: string, resourceTypeLabel: string): string {
+  if (ADDRESSEE_BY_TYPE[resourceType]) return ADDRESSEE_BY_TYPE[resourceType];
+  if (/OPOSIÇÃO|EXIGÊNCIA/i.test(resourceTypeLabel)) return ADDRESSEE_BY_TYPE.oposicao;
+  return ADDRESSEE_BY_TYPE.indeferimento;
+}
+
 function buildMandatoryOpeningBlock(
   resourceTypeLabel: string,
   data: {
@@ -558,20 +578,27 @@ function buildMandatoryOpeningBlock(
     ncl_class?: string;
     holder?: string;
     examiner_or_opponent?: string;
-  }
+    presentation?: string;
+  },
+  resourceType = ''
 ): string {
   const brandUpper = (data.brand_name || 'N/I').toUpperCase();
   const processNum = (data.process_number || 'N/I').replace(/[^\d./-]/g, '').trim() || 'N/I';
+  // Apresentação (nominativa/mista/figurativa) só entra se vier do documento oficial.
+  const presentation =
+    (data.presentation || '').trim() ||
+    (/(nominativ\w*|mist\w*|figurativ\w*|tridimensional)/i.exec(data.ncl_class || '')?.[0] ?? '');
   const brandLine = data.brand_name
-    ? `${data.brand_name}${/nominativ|mist|figurativ/i.test(data.ncl_class || '') ? '' : ' (nominativa)'}`
+    ? `${data.brand_name}${presentation ? ` (${presentation.toLowerCase()})` : ''}`
     : 'N/I';
   const nclClass = data.ncl_class || 'N/I';
   const holder = data.holder || 'N/I';
   const examinerOrOpponent = data.examiner_or_opponent || 'N/I';
-  const isOposicao = /OPOSIÇÃO/i.test(resourceTypeLabel);
-  const isExigenciaMerito = /EXIGÊNCIA DE MÉRITO/i.test(resourceTypeLabel);
+  const isOposicao = /OPOSIÇÃO/i.test(resourceTypeLabel) || resourceType === 'oposicao';
+  const isExigenciaMerito =
+    /EXIGÊNCIA DE MÉRITO/i.test(resourceTypeLabel) || resourceType === 'exigencia_merito';
   const personLabel = isOposicao ? 'Oponente' : 'Examinador(a)';
-  const headerTitle = isExigenciaMerito
+  const headerTitle = isExigenciaMerito || isOposicao
     ? resourceTypeLabel
     : `RECURSO ADMINISTRATIVO – ${resourceTypeLabel}`;
 
@@ -579,13 +606,12 @@ function buildMandatoryOpeningBlock(
 
 MARCA: ${brandUpper}
 
-EXCELENTÍSSIMO SENHOR PRESIDENTE DA DIRETORIA DE MARCAS,
-PATENTES E DESENHOS INDUSTRIAIS DO INSTITUTO NACIONAL
-DA PROPRIEDADE INDUSTRIAL – INPI
+${addresseeFor(resourceType, resourceTypeLabel)}
 
 Processo INPI nº: ${processNum}
 Marca: ${brandLine}
-Classe NCL (12ª Ed.): ${nclClass}
+Apresentação: ${presentation || 'a conferir no espelho oficial'}
+Classe NCL: ${nclClass}
 Titular/Requerente: ${holder}
 ${personLabel}: ${examinerOrOpponent}
 Procurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79`;
@@ -621,9 +647,11 @@ function enforceMandatoryOpening(
     ncl_class?: string;
     holder?: string;
     examiner_or_opponent?: string;
-  }
+    presentation?: string;
+  },
+  resourceType = ''
 ): string {
-  const header = buildMandatoryOpeningBlock(resourceTypeLabel, data);
+  const header = buildMandatoryOpeningBlock(resourceTypeLabel, data, resourceType);
   const body = extractBodyFromSectionI(content);
   return `${header}\n\n${body}`;
 }
@@ -735,6 +763,46 @@ Se houver QUALQUER dúvida → NÃO CITAR → substituir por fundamentação leg
 - Lélio Denicoli Schmidt — "Marcas em Semiótica"
 - Carlos Alberto Bittar — "Teoria e Prática da Propriedade Industrial"
 - Tinoco Soares — "Lei de Patentes, Marcas e Direitos Conexos"
+`;
+
+/*
+ * Base jurídica das TRÊS modalidades atualizadas (recurso contra indeferimento,
+ * cumprimento de exigência de mérito e manifestação à oposição).
+ * Não traz lista de precedentes nem de doutrina: nada é citado sem conferência.
+ */
+const LEGAL_SOURCES_STRICT = `
+#fontes_juridicas_conferidas
+
+REGRA 1 — NADA DE FONTE NÃO CONFERIDA:
+- Não existe lista de precedentes "pré-validados" nem de doutrina "autorizada".
+- Só cite lei, manual, resolução, acórdão, súmula ou obra doutrinária cujo conteúdo e
+  pertinência você tenha efetivamente conferido na fonte, inclusive em paráfrase.
+- Sem conferência, NÃO cite: exponha o argumento pela fundamentação legal direta e,
+  se a citação for indispensável, escreva "fonte a conferir" em vez de inventar número,
+  relator, ementa, edição ou página.
+- É proibido inserir parágrafos que enumerem julgados, autores ou obras apenas para
+  dar aparência de erudição.
+
+REGRA 2 — HIERARQUIA DA ARGUMENTAÇÃO:
+1º) Lei da Propriedade Industrial (Lei nº 9.279/96) — fundamento principal.
+2º) Manual de Marcas do INPI, na versão vigente na data do ato — fundamento principal.
+     Para cotejo entre sinais, as seções pertinentes são 5.11.1 e 5.11.2.
+     NÃO use a seção 5.10.1 para comparação de marcas.
+     NÃO atribua o Manual a um ato normativo cujo número você não conferiu — em especial,
+     a referência à "Resolução INPI/PR nº 288/2023" NÃO está confirmada e não deve ser escrita.
+3º) Atos normativos do INPI efetivamente conferidos — complementar.
+4º) Doutrina e jurisprudência — reforço, sempre com fonte conferida.
+
+#legislacao_dominio
+- Lei da Propriedade Industrial (Lei nº 9.279/96)
+- Convenção da União de Paris (CUP) e Acordo TRIPS/OMC, quando pertinentes
+- Manual de Marcas do INPI (versão vigente — conferir)
+- Classificação Internacional de Nice (edição vigente — conferir)
+
+#registro_interno_de_fontes
+Ao final do texto NÃO escreva listas de controle interno. As limitações de fonte
+aparecem na peça apenas como ressalva objetiva ("fonte a conferir"), sem explicar
+o funcionamento da IA nem dirigir instruções ao operador.
 `;
 
 // ═══════════════════════════════════════════════════════════
@@ -951,7 +1019,7 @@ ou, quando estritamente necessário, uma MANIFESTAÇÃO TÉCNICA LIMITADA aos po
 
 #tipo_recurso: ${resourceTypeLabel}
 
-${LEGAL_KNOWLEDGE}
+${LEGAL_SOURCES_STRICT}
 
 ${FORMATTING_INSTRUCTIONS}
 
@@ -966,13 +1034,13 @@ ${resourceTypeLabel}
 MARCA: [NOME DA MARCA EXTRAÍDO DO PDF]
 ═══════════════════════════════════════════════════════════
 
-EXCELENTÍSSIMO SENHOR PRESIDENTE DA DIRETORIA DE MARCAS,
-PATENTES E DESENHOS INDUSTRIAIS DO INSTITUTO NACIONAL
-DA PROPRIEDADE INDUSTRIAL – INPI
+${ADDRESSEE_BY_TYPE.exigencia_merito}
 
 Processo INPI nº: [extraído]
-Marca: [extraído + natureza]
-Classe NCL (12ª Ed.): [extraído + especificação completa]
+Marca: [extraído]
+Apresentação: [nominativa/mista/figurativa conforme o documento oficial; se não constar, "a conferir no espelho oficial"]
+Classe NCL: [classe extraída]
+Especificação do pedido: [transcrição da especificação oficial; nunca a descrição genérica da classe]
 Titular/Requerente: [extraído]
 Examinador(a): [quando identificável]
 Procurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79
@@ -980,60 +1048,125 @@ Procurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79
 ═══════════════════════════════════════════════════════════
 
 I – SÍNTESE DA EXIGÊNCIA FORMULADA E DO HISTÓRICO PROCESSUAL
-(300 a 500 palavras — seja objetivo)
-- Narrar cronologicamente o histórico do pedido
-- Transcrever e explicar, com fidelidade, a exigência formulada pelo INPI
-- Identificar o ponto técnico exato a ser cumprido (ex.: especificação genérica, necessidade de detalhamento, adequação da classe, correção formal)
-- Explicar o contexto do exame de mérito e o conteúdo do despacho sem polemizar desnecessariamente
-- Descrever a marca, o titular, a classe e o objeto do pedido com precisão
+- Narrar cronologicamente o histórico do pedido, distinguindo data do despacho, data da publicação na RPI e data deste ato
+- Transcrever a exigência formulada, item por item, na ordem em que foi apresentada
+- Identificar o ponto técnico exato a ser cumprido em cada item
+- Descrever marca, apresentação, titular, classe e especificação oficial com precisão, sem preencher dado ausente
 
-II – DA TEMPESTIVIDADE, CABIMENTO E REGULARIDADE DA PRESENTE MANIFESTAÇÃO
-(150 a 250 palavras)
-- Demonstrar a tempestividade do cumprimento/manifestação
-- Confirmar a legitimidade do requerente e do procurador constituído
-- Fundamentar o cabimento à luz da LPI, do Manual de Marcas e das regras procedimentais do INPI
-- Mencionar recolhimento de GRU apenas se compatível com o ato descrito no caso
+II – DA REGULARIDADE DA PRESENTE MANIFESTAÇÃO
+- Indicar o cabimento do cumprimento da exigência
+- Só afirmar tempestividade se a data da publicação e o prazo aplicável constarem do dossiê; caso contrário, registrar "tempestividade a conferir na publicação"
+- Confirmar a representação apenas com base em documento do dossiê; não atribuir OAB nem qualificação de advogado sem comprovação
+- Mencionar recolhimento apenas se houver guia no dossiê, distinguindo guia, comprovante de pagamento e vínculo com o processo
 
-III – DO EFETIVO CUMPRIMENTO DA EXIGÊNCIA DE MÉRITO
-(500 a 800 palavras — SEÇÃO MAIS IMPORTANTE, mas direta e técnica)
-- Responder PONTO A PONTO ao que o(a) examinador(a) solicitou
-- Se a exigência envolver especificação genérica, APRESENTAR a redação corrigida e detalhada da especificação
-- Se houver exemplos no despacho, utilizá-los como referência técnica, sem copiar cegamente quando o documento exigir adaptação ao caso concreto
-- Justificar por que a nova redação atende à Classificação de Nice e ao Manual de Marcas
-- Se necessário, esclarecer a atividade real do requerente e sua aderência à classe indicada
-- Se houver defesa técnica, ela deve ser limitada ao ponto da exigência, com tom respeitoso e objetivo
-- NÃO discutir oposição, colidência com terceiros ou risco de confusão, salvo se isso estiver literalmente no despacho
+III – DO CUMPRIMENTO DA EXIGÊNCIA, ITEM A ITEM
+- Responder cada item da exigência NA MESMA ORDEM, identificando o item respondido
+- Explicar objetivamente como cada item foi cumprido e indicar o documento correspondente com marcador [DOC:NN]
+- Havendo ajuste de especificação, apresentar a redação precisa proposta, respeitando os limites admitidos para o pedido (não ampliar o escopo)
+- Justificar a redação pela Classificação de Nice e pelo Manual de Marcas vigente
+- Não tratar a exigência como indeferimento nem pedir reforma de decisão inexistente
+- Eventual contestação de item deve ser expressa, identificada como tal e fundamentada
+- Não discutir oposição, colidência ou risco de confusão, salvo se o próprio despacho tratar disso
 
-IV – DA ADEQUAÇÃO TÉCNICA DA ESPECIFICAÇÃO, CLASSIFICAÇÃO E DELIMITAÇÃO DO ESCOPO
-(300 a 500 palavras)
-- Demonstrar tecnicamente a correção do enquadramento na classe NCL pertinente
-- Explicar como a especificação retificada elimina genericidade, ambiguidade ou excesso
-- Relacionar a redação proposta com a atividade do requerente e com os parâmetros do INPI
-- Quando aplicável, apresentar a especificação final de forma clara, pronta para acolhimento administrativo
-- Encerrar a seção com conclusão objetiva de que a exigência foi devidamente cumprida
+IV – DA ADEQUAÇÃO DA ESPECIFICAÇÃO E DA CLASSIFICAÇÃO
+- Demonstrar a correção do enquadramento na classe indicada
+- Explicar como a redação proposta supera a genericidade ou ambiguidade apontada
+- Apontar expressamente qualquer item que dependa de documento ainda não juntado
+- Encerrar com conclusão objetiva, sem declarar cumprido o que não foi demonstrado
 
 ⚠️ RESPONDA APENAS com o texto jurídico completo das Seções I a IV. SEM JSON. SEM explicações. Apenas o documento jurídico, COM formatação markdown leve conforme #formatacao_visual_obrigatoria (negrito, itálico, tabelas e marcadores [IMG:] / [DOC:NN]).
-⚠️ Para EXIGÊNCIA DE MÉRITO, mantenha foco exclusivo no CUMPRIMENTO/ESCLARECIMENTO da exigência real do despacho.
-⚠️ O texto desta parte deve ter entre 1.300 e 2.000 palavras. EVITE prolixidade: cumprimento de exigência é peça objetiva, não tese acadêmica. NÃO chame a peça de "Recurso Administrativo" no corpo do texto — use "Cumprimento de Exigência de Mérito" ou "Manifestação".`;
+⚠️ Use a extensão necessária para cumprir a exigência com clareza: sem mínimo e sem enchimento. Não repita conteúdo.
+⚠️ NÃO chame a peça de "Recurso Administrativo" — use "Cumprimento de Exigência de Mérito".`;
+  }
+
+  if (resourceType === 'oposicao') {
+    return `#instruction
+
+Você é um ADVOGADO ESPECIALISTA EM PROPRIEDADE INDUSTRIAL.
+Você está elaborando a PRIMEIRA PARTE (Seções I a IV) de uma MANIFESTAÇÃO À OPOSIÇÃO
+apresentada por terceiro contra pedido de registro do requerente.
+
+⚠️ REGRAS ABSOLUTAS:
+- Esta peça NÃO é oposição, NÃO é recurso contra indeferimento e NÃO é réplica em juízo.
+  Não existe decisão de indeferimento a reformar: há oposição a ser respondida.
+- NÃO importar endereçamento, pedidos ou fundamentos de outra modalidade.
+- JAMAIS inventar fatos, documentos, decisões ou citações.
+- Não afirmar sem prova: prioridade de uso, notoriedade, alto renome, convivência pacífica,
+  ausência de confusão, diluição/fraqueza do sinal, tempestividade.
+
+#tipo_recurso: ${resourceTypeLabel}
+
+${LEGAL_SOURCES_STRICT}
+
+${FORMATTING_INSTRUCTIONS}
+
+${getAgentIdentity(agentName, agentStrategy)}
+
+#estrutura_obrigatoria_parte_1
+
+COMECE O DOCUMENTO COM:
+
+═══════════════════════════════════════════════════════════
+${resourceTypeLabel}
+MARCA: [NOME DA MARCA EXTRAÍDO DO PDF]
+═══════════════════════════════════════════════════════════
+
+${ADDRESSEE_BY_TYPE.oposicao}
+
+Processo INPI nº: [extraído]
+Marca: [extraído]
+Apresentação: [conforme documento oficial; se não constar, "a conferir no espelho oficial"]
+Classe NCL: [extraída]
+Especificação do pedido: [transcrição oficial; nunca a descrição genérica da classe]
+Requerente: [extraído]
+Opoente: [nome do opoente e, se constar, seu processo/registro anterior]
+Procurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79
+
+═══════════════════════════════════════════════════════════
+
+I – SÍNTESE DO PEDIDO E DA OPOSIÇÃO APRESENTADA
+- Identificar o pedido do requerente e sua situação processual
+- Identificar a oposição: quem opôs, com que fundamento legal, com que marca/registro anterior e quais documentos juntou
+- Distinguir data da publicação da oposição e data desta manifestação
+- Listar, de forma numerada, TODAS as alegações do opoente que serão respondidas
+
+II – DA REGULARIDADE DA MANIFESTAÇÃO
+- Indicar o cabimento da manifestação à oposição
+- Só afirmar tempestividade com a data da publicação da oposição no dossiê; caso contrário, escrever "tempestividade a conferir na publicação"
+- Confirmar representação apenas com documento do dossiê; não atribuir OAB sem comprovação
+- Tratar guia, comprovante e vínculo com o processo como elementos distintos, quando houver
+
+III – RESPOSTA ÀS ALEGAÇÕES DO OPOENTE
+- Responder INDIVIDUALMENTE cada alegação listada na Seção I, mantendo a numeração
+- Indicar, para cada resposta, a prova do requerente que a sustenta, com marcador [DOC:NN] e a página exata
+- Enfrentar também os elementos desfavoráveis, sem omiti-los
+- Quando faltar prova, dizer expressamente que o ponto depende de documento ainda não juntado
+
+IV – COTEJO ENTRE OS SINAIS E ENTRE AS ESPECIFICAÇÕES
+- Comparar os sinais nos planos visual, fonético e conceitual, com base nas seções 5.11.1 e 5.11.2 do Manual de Marcas vigente
+- Comparar as especificações oficiais e a afinidade mercadológica efetiva, sem presumir públicos ou canais
+- Apresentar tabela comparativa apenas com dados conferidos
+- Não intitular a seção como demonstração definitiva de inexistência de confusão se a comparação estiver incompleta
+
+⚠️ RESPONDA APENAS com o texto jurídico das Seções I a IV. SEM JSON. SEM explicações, COM formatação markdown leve conforme #formatacao_visual_obrigatoria.
+⚠️ NÃO termine com "continuação na próxima parte".
+⚠️ Use a extensão necessária: sem mínimo de palavras, sem repetição, sem enchimento.`;
   }
 
   return `#instruction
 
-Você é um ADVOGADO ESPECIALISTA EM PROPRIEDADE INDUSTRIAL de ELITE.
-Você está elaborando a PRIMEIRA PARTE (Seções I a IV) de um RECURSO ADMINISTRATIVO
-de ALTÍSSIMO NÍVEL JURÍDICO, no padrão dos melhores escritórios de PI do Brasil.
+Você é um ADVOGADO ESPECIALISTA EM PROPRIEDADE INDUSTRIAL.
+Você está elaborando a PRIMEIRA PARTE (Seções I a IV) de um RECURSO CONTRA INDEFERIMENTO.
 
 ⚠️ REGRAS ABSOLUTAS:
-- JAMAIS inventar fatos, decisões ou jurisprudência
-- JAMAIS simplificar ou superficializar a argumentação
-- CADA seção DEVE ter a extensão MÍNIMA especificada
-- A argumentação deve ser DENSA, PROFUNDA e ESPECÍFICA ao caso concreto
-- DESENVOLVA cada argumento em MÚLTIPLOS PARÁGRAFOS com fundamentação robusta
-- O recurso TOTAL terá entre 10 e 20 páginas — esta é a PRIMEIRA METADE
+- JAMAIS inventar fatos, decisões, documentos ou citações
+- Enfrentar os FUNDAMENTOS EFETIVOS da decisão recorrida; não transformar o recurso em alegação genérica de falta de motivação
+- Não afirmar sem prova: prioridade de uso, notoriedade, alto renome, convivência pacífica, ausência de confusão, diluição, regularidade do recolhimento, tempestividade
+- Use a extensão necessária ao caso: sem mínimo de palavras, sem repetição
 
 #tipo_recurso: ${resourceTypeLabel}
 
-${LEGAL_KNOWLEDGE}
+${LEGAL_SOURCES_STRICT}
 
 ${FORMATTING_INSTRUCTIONS}
 
@@ -1048,68 +1181,46 @@ RECURSO ADMINISTRATIVO – ${resourceTypeLabel}
 MARCA: [NOME DA MARCA EXTRAÍDO DO PDF]
 ═══════════════════════════════════════════════════════════
 
-EXCELENTÍSSIMO SENHOR PRESIDENTE DA DIRETORIA DE MARCAS,
-PATENTES E DESENHOS INDUSTRIAIS DO INSTITUTO NACIONAL
-DA PROPRIEDADE INDUSTRIAL – INPI
+${ADDRESSEE_BY_TYPE.indeferimento}
 
 Processo INPI nº: [extraído]
-Marca: [extraído + natureza]
-Classe NCL (12ª Ed.): [extraído + especificação completa]
+Marca: [extraído]
+Apresentação: [nominativa/mista/figurativa conforme o documento oficial; se não constar, "a conferir no espelho oficial"]
+Classe NCL: [extraída]
+Especificação do pedido: [transcrição da especificação oficial; nunca a descrição genérica da classe]
 Titular/Requerente: [extraído]
-Oponente/Citante: [quando identificável]
+Marca(s) anterior(es) citada(s): [quando identificável]
 Procurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79
 
 ═══════════════════════════════════════════════════════════
 
 I – SÍNTESE DOS FATOS E DO HISTÓRICO PROCESSUAL
-(desenvolva o necessário; sem mínimo artificial de palavras)
-- Narrar CRONOLOGICAMENTE todo o histórico do processo em detalhes minuciosos
-- Transcrever trechos relevantes do despacho/decisão do INPI
-- Explicar detalhadamente o fundamento usado pelo INPI (artigo, inciso, alínea)
-- Contextualizar a decisão no panorama administrativo do INPI
-- Identificar TODOS os fatos relevantes do caso
-- Descrever a marca, seu significado, sua origem e sua importância para o titular
-- Narrar tentativas anteriores de registro se houver
-- Detalhar a especificação de produtos/serviços
+- Narrar cronologicamente o histórico do processo
+- Transcrever os trechos relevantes da decisão recorrida e identificar o dispositivo invocado (artigo, inciso, alínea)
+- Distinguir data da decisão, data da publicação na RPI e data deste recurso
+- Descrever marca, apresentação, titular e especificação oficial, sem preencher dado ausente
 
-II – DA TEMPESTIVIDADE E LEGITIMIDADE
-(objetivo, sem mínimo artificial de palavras)
-- Demonstrar tempestividade (prazo art. 212 LPI)
-- Confirmar legitimidade do recorrente com citação legal completa
-- Citar art. 212 e parágrafos da Lei 9.279/96 com transcrição do dispositivo
-- Mencionar recolhimento da GRU código 271
-- Demonstrar capacidade postulatória do procurador constituído
-- Citar a IN INPI aplicável sobre representação
+II – DA REGULARIDADE DO RECURSO
+- Indicar o cabimento do recurso com base no art. 212 da LPI
+- Só afirmar tempestividade se a data da publicação e o prazo constarem do dossiê; caso contrário, registrar "tempestividade a conferir na publicação"
+- Confirmar a representação apenas com documento do dossiê; não atribuir OAB nem qualificação de advogado sem comprovação
+- Sobre a retribuição: NÃO fixar código de serviço por presunção. Conferir serviço, tabela e regras vigentes na data do ato. Distinguir guia, comprovante bancário e vínculo com o processo. O valor pago isoladamente não comprova regularidade do recolhimento; se faltar elemento, registrar a pendência
 
-III – FUNDAMENTAÇÃO JURÍDICA APROFUNDADA
-(seção mais importante — desenvolva o necessário, sem repetição nem mínimo artificial)
-- Analisar DETALHADAMENTE CADA fundamento utilizado pelo INPI na decisão
-- Demonstrar com precisão POR QUE a decisão está equivocada
-- Transcrever TEXTUALMENTE cada artigo da LPI aplicável com análise de cada inciso
-- Aplicar doutrina de Denis Borges Barbosa com citação de obra e páginas
-- Aplicar doutrina de J. da Gama Cerqueira com citação específica
-- Aplicar Tinoco Soares quando pertinente
-- Demonstrar como o Manual de Marcas do INPI fundamenta a tese do recurso
-- Citar capítulos e seções específicos do Manual de Marcas (5.10, 5.11, etc.)
-- Analisar CADA inciso do art. 124 invocado pelo INPI e REFUTAR com argumentos sólidos
-- Desenvolver sub-argumentos em parágrafos densos
-- Fazer análise comparativa com casos análogos deferidos pelo INPI
-- Demonstrar que a interpretação do INPI é restritiva ou contra a própria normativa
+III – ENFRENTAMENTO DOS FUNDAMENTOS DA DECISÃO RECORRIDA
+- Analisar cada fundamento efetivamente usado pelo INPI e demonstrar por que está equivocado
+- Transcrever os dispositivos da LPI aplicáveis e analisá-los no caso concreto
+- Apoiar-se no Manual de Marcas vigente, indicando a seção pertinente conferida
+- Só usar doutrina ou jurisprudência com fonte conferida; na dúvida, argumentar pela lei
 
-IV – ANÁLISE TÉCNICA DO CONJUNTO MARCÁRIO
-(desenvolva o necessário, sem repetição nem mínimo artificial)
-- IMPRESSÃO DE CONJUNTO: fundamentar com Manual de Marcas INPI (Cap. 5, Seção 5.10.1)
-- ANÁLISE FONÉTICA DETALHADA: pronúncia sílaba a sílaba, número de sílabas, tonicidade, sonoridade, cadência rítmica, comparação fonema por fonema
-- ANÁLISE VISUAL DETALHADA: grafismo, tipografia, elementos figurativos, cores, disposição espacial, peso visual, estilização
-- ANÁLISE IDEOLÓGICA/CONCEITUAL: significado semântico, campo conceitual, associação mental, evocação, origem etimológica, referência cultural
-- ANÁLISE DE MERCADO: segmentos diferentes, canais de venda distintos, público-alvo diferenciado, faixa de preço, forma de comercialização
-- Teoria da Distância (Abstandslehre) aplicada ao caso
-- TABELA COMPARATIVA detalhada: coluna marca requerente vs. marca citada com análise ponto a ponto
-- Conclusão parcial demonstrando distinção suficiente
+IV – COTEJO ENTRE OS SINAIS E ENTRE AS ESPECIFICAÇÕES
+- Havendo conflito com anterioridade, comparar os sinais nos planos visual, fonético e conceitual, conforme as seções 5.11.1 e 5.11.2 do Manual de Marcas vigente
+- Comparar as especificações OFICIAIS de ambos os processos e a afinidade efetiva, sem presumir público, canal ou preço
+- Tabela comparativa apenas com dados conferidos
+- Se a comparação estiver incompleta, dizê-lo e não intitular a seção como demonstração definitiva de inexistência de confusão
 
-⚠️ RESPONDA APENAS com o texto jurídico completo das Seções I a IV. SEM JSON. SEM explicações. Apenas o documento jurídico, COM formatação markdown leve conforme #formatacao_visual_obrigatoria (negrito, itálico, tabelas e marcadores [IMG:] / [DOC:NN]).
-⚠️ NÃO termine com "continuação na próxima parte" ou similar — termine a Seção IV normalmente.
-⚠️ Priorize fundamentação completa, pertinente e sem repetição — não persiga contagem de palavras nem alongue o texto artificialmente.`;
+⚠️ RESPONDA APENAS com o texto jurídico das Seções I a IV. SEM JSON. SEM explicações, COM formatação markdown leve conforme #formatacao_visual_obrigatoria (negrito, itálico, tabelas e marcadores [IMG:] / [DOC:NN]).
+⚠️ NÃO termine com "continuação na próxima parte" — termine a Seção IV normalmente.
+⚠️ Priorize fundamentação pertinente e sem repetição — não persiga contagem de palavras.`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1160,7 +1271,7 @@ mantendo foco estrito na exigência formulada pelo(a) examinador(a) do INPI.
 
 #tipo_recurso: ${resourceTypeLabel}
 
-${LEGAL_KNOWLEDGE}
+${LEGAL_SOURCES_STRICT}
 
 ${FORMATTING_INSTRUCTIONS}
 
@@ -1171,34 +1282,27 @@ ${getAgentIdentity(agentName, agentStrategy)}
 CONTINUE DIRETAMENTE com a Seção V (sem repetir cabeçalho):
 
 V – DA CONFORMIDADE DA ESPECIFICAÇÃO COM O MANUAL DE MARCAS E A CLASSIFICAÇÃO DE NICE
-(250 a 400 palavras)
-- Demonstrar por que a redação apresentada atende aos critérios do INPI
-- Explicar a compatibilidade da especificação final com a classe NCL indicada
-- Evidenciar clareza, precisão, objetividade e aderência à atividade econômica do requerente
-- Indicar, quando cabível, que a genericidade anteriormente apontada foi superada
+- Demonstrar por que a redação apresentada atende aos critérios do INPI vigentes
+- Explicar a compatibilidade da especificação final com a classe indicada, sem ampliar o escopo do pedido
+- Indicar, quando cabível, que a genericidade apontada foi superada
 
-VI – DA BOA-FÉ PROCESSUAL, DA COOPERAÇÃO ADMINISTRATIVA E DA SUFICIÊNCIA DO CUMPRIMENTO
-(200 a 350 palavras)
-- Demonstrar a postura colaborativa do requerente perante o exame de mérito
-- Reforçar que o atendimento da exigência foi completo, específico e tecnicamente fundamentado
-- Mostrar que a manifestação fornece elementos suficientes para o regular prosseguimento do exame
-- Sustentar eventual esclarecimento adicional apenas se vinculado ao conteúdo da exigência
+VI – DA SUFICIÊNCIA DO CUMPRIMENTO
+- Demonstrar objetivamente que cada item da exigência foi atendido, remetendo ao documento correspondente
+- Registrar expressamente qualquer item que dependa de documento ainda não juntado
+- Não declarar cumprido o que não foi demonstrado
 
 VII – DA CONCLUSÃO
-(150 a 250 palavras)
-- Sintetizar os pontos centrais da exigência e como cada um foi atendido
-- Reforçar a adequação da especificação e da classificação adotada
-- Concluir de forma objetiva que o cumprimento apresentado é apto a sanar integralmente a exigência
+- Sintetizar, sem repetir a argumentação, como cada item foi atendido
 
 VIII – DOS PEDIDOS
-(150 a 250 palavras)
+(curto e objetivo; não repetir a argumentação)
 
 Ante o exposto, requer:
 
-a) o recebimento da presente manifestação/cumprimento de exigência, por tempestiva e regular;
-b) o acolhimento da especificação e/ou dos esclarecimentos ora apresentados, nos exatos termos desta petição;
-c) o reconhecimento de que a exigência de mérito foi devidamente cumprida;
-d) o regular prosseguimento do exame do pedido de registro, com apreciação do mérito à luz das informações retificadas/complementadas;
+a) o recebimento da presente manifestação de cumprimento de exigência;
+b) o acolhimento da especificação e/ou dos esclarecimentos ora apresentados;
+c) o reconhecimento de que a exigência de mérito foi cumprida;
+d) o regular prosseguimento do exame do pedido de registro;
 e) a juntada desta manifestação aos autos do processo administrativo correspondente.
 
 #encerramento_obrigatorio
@@ -1214,28 +1318,26 @@ Procurador(a) Constituído(a)
 CPF: 393.239.118-79
 
 ⚠️ RESPONDA APENAS com o texto jurídico das Seções V a VIII + encerramento. SEM JSON. SEM explicações. Apenas o documento jurídico, COM formatação markdown leve conforme #formatacao_visual_obrigatoria (negrito, itálico, tabelas e marcadores [IMG:] / [DOC:NN]).
-⚠️ Para EXIGÊNCIA DE MÉRITO, mantenha foco exclusivo no CUMPRIMENTO/ESCLARECIMENTO da exigência real do despacho.
-⚠️ O texto desta parte deve ter entre 800 e 1.400 palavras. SEJA OBJETIVO — cumprimento de exigência não exige tese; foque em resolver o ponto pedido pelo examinador. NÃO chame a peça de "Recurso Administrativo".`;
+⚠️ Mantenha foco exclusivo no cumprimento da exigência real do despacho.
+⚠️ Sem mínimo de palavras e sem repetir o que já foi dito na Parte 1. NÃO chame a peça de "Recurso Administrativo".`;
   }
 
-  return `#instruction
+  if (resourceType === 'oposicao') {
+    return `#instruction
 
-Você é um ADVOGADO ESPECIALISTA EM PROPRIEDADE INDUSTRIAL de ELITE.
-Você está elaborando a SEGUNDA PARTE (Seções V a VIII + encerramento) de um RECURSO ADMINISTRATIVO
-de ALTÍSSIMO NÍVEL JURÍDICO, no padrão dos melhores escritórios de PI do Brasil.
-
-O usuário já gerou as Seções I a IV. Agora você deve continuar com as Seções V a VIII + encerramento.
+Você é um ADVOGADO ESPECIALISTA EM PROPRIEDADE INDUSTRIAL.
+Você está elaborando a SEGUNDA PARTE (Seções V a VIII + encerramento) de uma MANIFESTAÇÃO À OPOSIÇÃO.
+As Seções I a IV já foram geradas — continue sem repetir cabeçalho nem conteúdo.
 
 ⚠️ REGRAS ABSOLUTAS:
-- JAMAIS inventar fatos, decisões ou jurisprudência
-- JAMAIS simplificar a argumentação — cada seção deve ser EXTENSA e DENSA
-- MANTENHA o mesmo tom, estilo e nível de profundidade da Parte 1
-- USE os dados do caso (marca, processo, classe, titular) conforme apresentados na Parte 1
-- CADA seção DEVE ter a extensão MÍNIMA especificada
+- Esta peça responde a uma oposição: não há decisão a reformar nem registro a anular
+- JAMAIS inventar fatos, documentos ou citações; só citar fonte conferida
+- Não afirmar sem prova: prioridade de uso, notoriedade, alto renome, convivência pacífica, ausência de confusão, diluição
+- Sem mínimo de palavras; sem repetir a argumentação nos pedidos
 
 #tipo_recurso: ${resourceTypeLabel}
 
-${LEGAL_KNOWLEDGE}
+${LEGAL_SOURCES_STRICT}
 
 ${FORMATTING_INSTRUCTIONS}
 
@@ -1245,64 +1347,105 @@ ${getAgentIdentity(agentName, agentStrategy)}
 
 CONTINUE DIRETAMENTE com a Seção V (sem repetir cabeçalho):
 
-V – DA INEXISTÊNCIA DE CONFUSÃO OU ASSOCIAÇÃO INDEVIDA
-(MÍNIMO 1.000 palavras — DESENVOLVA EXTENSIVAMENTE)
-- Demonstrar TECNICAMENTE que não há risco de confusão para o consumidor
-- Aplicar a Teoria da Distância com profundidade — demonstrar distância suficiente
-- Diferenciar o público consumidor (médio vs. especializado) com detalhamento
-- Citar exemplos concretos de convivência no mercado (se aplicável)
-- Aplicar o "teste do consumidor distraído" conforme jurisprudência do STJ
-- Analisar a força distintiva dos elementos em cotejo (fraco vs. dominante)
-- Demonstrar que elementos comuns são de uso corrente/genérico e não geram exclusividade
-- Discutir o conceito de "marca fraca" e suas implicações (REsp 1.032.014/RS)
-- Analisar se há possibilidade de diluição ou parasitismo — e refutar
-- Demonstrar a convivência pacífica em outros registros do INPI
-- Invocar o princípio da especialidade com análise detalhada das classes NCL
+V – DA IMPROCEDÊNCIA DAS ALEGAÇÕES DO OPOENTE
+- Reunir, sem repetir a Seção III, o resultado do enfrentamento de cada alegação
+- Apontar as alegações do opoente que não vieram acompanhadas de prova
+- Aplicar o princípio da especialidade com base nas especificações oficiais comparadas
 
-VI – DOS PRECEDENTES, DOUTRINA E JURISPRUDÊNCIA APLICÁVEL
-(MÍNIMO 1.200 palavras — DESENVOLVA COM MÁXIMA PROFUNDIDADE)
-⚠️ JURISPRUDÊNCIA É REFORÇO COMPLEMENTAR — fundamentação principal é LPI + Manual INPI
-- Citar APENAS precedentes da LISTA PRÉ-VALIDADA ou que tenha CERTEZA ABSOLUTA
-- Para CADA precedente citado: tribunal, número completo, relator, síntese FIEL da tese, e explicação de POR QUE se aplica ao caso
-- Organizar por TESE: especialidade, conjunto marcário, convivência, boa-fé, marca fraca
-- Desenvolver análise doutrinária APROFUNDADA:
-  * Denis Borges Barbosa: teoria da marca fraca, princípio da especialidade, limites da exclusividade
-  * Gama Cerqueira: registro e proteção, critérios de confusão
-  * Tinoco Soares: análise comparativa de marcas
-- Citar e transcrever trechos relevantes das obras doutrinárias
-- Análise de direito comparado: como EUIPO e USPTO tratam casos similares
-- Concluir demonstrando que a jurisprudência e doutrina CONVERGEM para o deferimento
+VI – DAS PROVAS DO REQUERENTE
+- Relacionar cada prova a um argumento, indicando documento e página exatos ([DOC:NN], página)
+- Não atribuir a uma prova conclusão que ela não sustenta
+- Apontar as provas ainda não juntadas e sua finalidade
 
-VII – DA CONCLUSÃO E DEMONSTRAÇÃO DE REGISTRABILIDADE
-(MÍNIMO 800 palavras)
-- Sintetizar TODOS os argumentos das 6 seções anteriores
-- Demonstrar OBJETIVAMENTE a registrabilidade da marca em lista numerada
-- Reforçar que o indeferimento/exigência é contrário à lei, doutrina e jurisprudência
-- Demonstrar o PREJUÍZO causado ao titular pelo indeferimento
-- Invocar princípios da RAZOABILIDADE e PROPORCIONALIDADE (art. 5º, LIV, CF)
-- Invocar LIVRE INICIATIVA (art. 170, CF/88)
-- Demonstrar que o INPI, em casos análogos, deferiu marcas com semelhança igual ou maior
-- Conclusão enfática pela reforma da decisão
+VII – DA CONCLUSÃO
+- Sintetizar objetivamente por que a oposição não deve prosperar, sem repetir seções anteriores
+- Manter visíveis as ressalvas e pendências relevantes
 
 VIII – DOS PEDIDOS
-(MÍNIMO 400 palavras — pedidos ESPECÍFICOS e detalhados)
+(curto e objetivo)
 
 Ante o exposto, requer:
 
-a) Seja CONHECIDO o presente recurso administrativo, por tempestivo e regular, conforme art. 212 e parágrafos da Lei nº 9.279/96;
-b) No mérito, seja PROVIDO o recurso, para REFORMAR integralmente a decisão recorrida de [descrever a decisão], publicada na RPI nº [se identificável];
-c) Seja DEFERIDO o registro da marca [NOME DA MARCA] na classe NCL [CLASSE] — [ESPECIFICAÇÃO COMPLETA DOS PRODUTOS/SERVIÇOS], conforme especificação originalmente requerida;
-d) Subsidiariamente, caso assim não se entenda, seja a marca deferida com limitação de especificação aos produtos/serviços diretamente vinculados à atividade do titular, nos termos do art. 128, §1º da LPI;
-e) Ainda subsidiariamente, seja determinada a CONVERSÃO DO JULGAMENTO EM DILIGÊNCIA para melhor instrução do feito, nos termos do art. 220 da LPI;
-f) Seja determinada a publicação do deferimento na Revista da Propriedade Industrial (RPI), para fins de oposição tempestiva;
-g) Sejam considerados todos os documentos e provas juntados a este recurso como parte integrante da fundamentação;
-
-Protesta provar o alegado por todos os meios de prova em direito admitidos, especialmente documental e pericial.
+a) o recebimento e a juntada da presente manifestação aos autos do pedido de registro;
+b) a rejeição da oposição apresentada, por não demonstrado o impedimento invocado;
+c) o prosseguimento do exame e o deferimento do pedido de registro, nos termos da especificação oficial;
+d) subsidiariamente, caso se entenda necessário, a apreciação dos documentos ora indicados antes da decisão.
 
 #encerramento_obrigatorio
 
 Nestes termos,
-Pede e espera deferimento.
+Pede deferimento.
+
+São Paulo, ${currentDate}.
+
+_______________________________________
+Davilys Danques de Oliveira Cunha
+Procurador(a) Constituído(a)
+CPF: 393.239.118-79
+
+⚠️ RESPONDA APENAS com o texto jurídico das Seções V a VIII + encerramento. SEM JSON. SEM explicações, COM formatação markdown leve conforme #formatacao_visual_obrigatoria.`;
+  }
+
+  return `#instruction
+
+Você é um ADVOGADO ESPECIALISTA EM PROPRIEDADE INDUSTRIAL.
+Você está elaborando a SEGUNDA PARTE (Seções V a VIII + encerramento) de um RECURSO CONTRA INDEFERIMENTO.
+
+O usuário já gerou as Seções I a IV. Continue com as Seções V a VIII + encerramento.
+
+⚠️ REGRAS ABSOLUTAS:
+- JAMAIS inventar fatos, decisões, documentos ou jurisprudência
+- MANTENHA o tom e os dados do caso apresentados na Parte 1
+- NÃO repetir o conteúdo da Parte 1; os pedidos não reproduzem a argumentação
+- Sem mínimo de palavras: use a extensão necessária
+- Não afirmar sem prova: prioridade de uso, notoriedade, alto renome, convivência pacífica, ausência de confusão, diluição, regularidade do recolhimento, tempestividade
+
+#tipo_recurso: ${resourceTypeLabel}
+
+${LEGAL_SOURCES_STRICT}
+
+${FORMATTING_INSTRUCTIONS}
+
+${getAgentIdentity(agentName, agentStrategy)}
+
+#estrutura_obrigatoria_parte_2
+
+CONTINUE DIRETAMENTE com a Seção V (sem repetir cabeçalho):
+
+V – DO RISCO DE CONFUSÃO OU ASSOCIAÇÃO
+- Avaliar tecnicamente o risco de confusão a partir do cotejo já feito na Seção IV, sem repeti-lo
+- Analisar a força distintiva dos elementos em cotejo e a eventual natureza de uso corrente de elementos comuns, com base em dados do dossiê
+- Aplicar o princípio da especialidade às especificações oficiais
+- Só alegar convivência de registros anteriores se houver indicação concreta dos processos no dossiê
+- Se a comparação for incompleta, dizê-lo expressamente e não intitular a seção como demonstração definitiva
+
+VI – DAS FONTES JURÍDICAS APLICÁVEIS
+- Fundamentar pela LPI e pelo Manual de Marcas vigente (seções 5.11.1 e 5.11.2 para cotejo de sinais)
+- Citar doutrina ou jurisprudência SOMENTE se conferida: tribunal, número, relator e tese fiel
+- Se não houver fonte conferida, NÃO citar: argumentar pela lei
+- É proibido enumerar julgados ou obras apenas para dar volume ao texto
+
+VII – DA CONCLUSÃO E DA REGISTRABILIDADE
+- Sintetizar objetivamente por que a decisão recorrida deve ser reformada
+- Demonstrar a registrabilidade em lista numerada, ancorada nos fundamentos já expostos
+- Manter visíveis as pendências documentais relevantes
+
+VIII – DOS PEDIDOS
+(pedido principal e pedidos subsidiários pertinentes e sustentados; sem repetir a argumentação)
+
+Ante o exposto, requer:
+
+a) o conhecimento do presente recurso, nos termos do art. 212 da Lei nº 9.279/96;
+b) o provimento do recurso, para reformar a decisão recorrida de [descrever a decisão], publicada na RPI nº [se identificável];
+c) o deferimento do registro da marca [NOME DA MARCA] na classe [CLASSE], conforme a especificação oficial do pedido;
+d) subsidiariamente, o deferimento com limitação da especificação aos produtos/serviços vinculados à atividade do requerente, quando isso for compatível com o pedido;
+e) subsidiariamente, a conversão do julgamento em diligência, se reputada necessária instrução complementar;
+f) a consideração dos documentos juntados como parte integrante da fundamentação.
+
+#encerramento_obrigatorio
+
+Nestes termos,
+Pede deferimento.
 
 São Paulo, ${currentDate}.
 
@@ -1312,7 +1455,7 @@ Procurador(a) Constituído(a)
 CPF: 393.239.118-79
 
 ⚠️ RESPONDA APENAS com o texto jurídico das Seções V a VIII + encerramento. SEM JSON. SEM explicações. Apenas o documento jurídico, COM formatação markdown leve conforme #formatacao_visual_obrigatoria (negrito, itálico, tabelas e marcadores [IMG:] / [DOC:NN]).
-⚠️ Priorize fundamentação completa, pertinente e sem repetição — não persiga contagem de palavras nem alongue o texto artificialmente.`;
+⚠️ Priorize fundamentação pertinente e sem repetição — não persiga contagem de palavras.`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1928,7 +2071,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
       const pass2Content = cleanAIContent(pass2Result.content);
       const rawFullContent = `${basePass1Content}\n\n${pass2Content}`;
       const enriched = enrichExtractedData(providedExtractedData || {}, rawFullContent);
-      const fullContent = enforceMandatoryOpening(rawFullContent, resourceTypeLabel, enriched);
+      const fullContent = enforceMandatoryOpening(rawFullContent, resourceTypeLabel, enriched, resourceType);
 
       return new Response(JSON.stringify({
         success: true,
@@ -2018,7 +2161,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
 
     if (requestedPass === 'pass1') {
       const enriched = enrichExtractedData(extractedData, pass1Content);
-      const partialContent = enforceMandatoryOpening(pass1Content, resourceTypeLabel, enriched);
+      const partialContent = enforceMandatoryOpening(pass1Content, resourceTypeLabel, enriched, resourceType);
       return new Response(JSON.stringify({
         success: true,
         generation_pass: 'pass1',
@@ -2038,7 +2181,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
       // Return pass 1 content with enforced header
 
       const enriched = enrichExtractedData(extractedData, pass1Content);
-      const normalizedPartial = enforceMandatoryOpening(pass1Content, resourceTypeLabel, enriched);
+      const normalizedPartial = enforceMandatoryOpening(pass1Content, resourceTypeLabel, enriched, resourceType);
       return new Response(JSON.stringify({
         success: true,
         extracted_data: sanitizeExtracted(enriched),
@@ -2061,7 +2204,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     // ─────────────────────────────────────────────────────
     const rawFullContent = pass1Content + '\n\n' + pass2Content;
     const enriched = enrichExtractedData(extractedData, rawFullContent);
-    const fullContent = enforceMandatoryOpening(rawFullContent, resourceTypeLabel, enriched);
+    const fullContent = enforceMandatoryOpening(rawFullContent, resourceTypeLabel, enriched, resourceType);
     
     console.log('=== TWO-PASS GENERATION COMPLETE ===');
     console.log('Total length:', fullContent.length, 'chars (~', Math.round(fullContent.split(/\s+/).length), 'words)');
