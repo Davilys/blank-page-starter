@@ -186,11 +186,18 @@ export default function CaseApprovalPanel({
       ? review
       : null;
 
+  /* Dois motivos distintos de bloqueio — nunca confundidos entre si. */
+  const reviewPending = !currentReview;
+  const reviewBlocking = !!currentReview?.has_blocking;
+
   const draftStamp = useMemo(() => {
-    if (!packageComplete) return 'PRÉVIA — PACOTE INCOMPLETO, NÃO PROTOCOLAR';
+    if (summary && !packageComplete) return 'PRÉVIA — PACOTE DOCUMENTAL INCOMPLETO';
+    if (reviewBlocking) return 'PRÉVIA — REVISÃO JURÍDICA COM APONTAMENTO GRAVE';
+    if (reviewPending) return 'MINUTA — REVISÃO JURÍDICA PENDENTE';
     if (!protocolApproval) return 'MINUTA — PENDENTE DE CONFERÊNCIA';
     return null;
-  }, [protocolApproval, packageComplete]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [protocolApproval, packageComplete, summary, reviewBlocking, reviewPending]);
 
   /* ── Revisão jurídica automática ─────────────────────────────────────── */
   const runReview = async () => {
