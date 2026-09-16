@@ -10,6 +10,11 @@ import signatureImage from '@/assets/davilys-signature.png';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  loadCaseInventory, hydrateInventoryPreviews, buildInventoryAnnexes, resolveMarker, normalizeMarkers,
+  type CaseInventory, type InventoryItem,
+} from '@/lib/inpi/caseInventory';
+
 
 interface ResourceEvidence {
   id: string;
@@ -567,8 +572,11 @@ export async function generateNativePDF(opts: NativePDFOptions): Promise<Blob | 
         label = `(Doc. ${String(n).padStart(2, '0')})`;
       } else if (slug) {
         ev = findEvidenceBySlug(slug);
-        label = '(Imagem)';
+        label = ev
+          ? `(Doc. ${String(ev.docNumber || 0).padStart(2, '0')})`
+          : `[prova não vinculada: ${slug}]`;
       }
+
       if (ev) {
         const key = ev.id;
         if (!seen.has(key)) { seen.add(key); figs.push(ev); }
@@ -897,6 +905,11 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
   const [isEditing, setIsEditing] = useState(false);
   const [editDraft, setEditDraft] = useState<string>(content);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [inventory, setInventory] = useState<CaseInventory | null>(null);
+  const [isLoadingInventory, setIsLoadingInventory] = useState(false);
+  const [inventoryAnnexes, setInventoryAnnexes] = useState<NativeAnnexDoc[] | null>(null);
+  const [isBuildingAnnexes, setIsBuildingAnnexes] = useState(false);
+
 
   useEffect(() => {
     setLiveContent(content);
@@ -1000,7 +1013,54 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
     return () => { cancelled = true; };
   }, [resource.id, debugEvidenceOverride]);
 
-  const evidenceByNum = (n: number) => evidences.find((e) => e.docNumber === n);
+  // ── Inventário único do caso (fonte de verdade das provas) ──────────────
+  // Quando o recurso tem caso vinculado, as provas vêm de inpi_case_documents,
+  // com número de Doc. estável e a imagem real do arquivo original. A galeria
+  // antiga (inpi_resource_evidences) segue valendo para recursos históricos
+  // que não têm caso.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (debugEvidenceOverride) return;
+      setIsLoadingInventory(true);
+      try {
+        const inv = await loadCaseInventory(resource.id);
+        if (!inv || cancelled) { if (!cancelled) setInventory(null); return; }
+        const hydrated = await hydrateInventoryPreviews(inv.items);
+        if (!cancelled) setInventory({ ...inv, items: hydrated });
+      } catch (err) {
+        console.error('Falha ao carregar o inventário do caso:', err);
+        if (!cancelled) setInventory(null);
+      } finally {
+        if (!cancelled) setIsLoadingInventory(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [resource.id, debugEvidenceOverride]);
+
+  const inventoryItems = inventory?.items ?? [];
+  const hasInventory = inventoryItems.length > 0;
+
+  const inventoryEvidences: ResourceEvidence[] = hasInventory
+    ? inventoryItems.map((item) => ({
+        id: item.id,
+        storage_path: item.storagePath,
+        caption: `${item.categoryLabel} — ${item.fileName}${item.previewPage ? ` (página ${item.previewPage})` : ''}`,
+        source_file_name: item.fileName,
+        page_number: item.previewPage ?? null,
+        placement: 'inline' as const,
+        display_order: item.docNumber,
+        included: true,
+        docNumber: item.docNumber,
+        dataUrl: item.previewDataUrl,
+        width: item.previewWidth,
+        height: item.previewHeight,
+      }))
+    : [];
+
+  const activeEvidences = hasInventory ? inventoryEvidences : evidences;
+
+  const evidenceByNum = (n: number) => activeEvidences.find((e) => e.docNumber === n);
   // Detect which [DOC:NN] markers actually appear in the AI-generated text.
   // Any evidence NOT cited will be appended inline at the end of the content
   // as a safety fallback — we never render a separate "ANEXOS" section.
@@ -1012,7 +1072,12 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
       citedDocNums.add(parseInt(m[1], 10));
     }
   }
-  const uncitedEvidences = evidences.filter((e) => e.docNumber != null && !citedDocNums.has(e.docNumber));
+  // Com inventário, o pacote de anexos já traz todos os documentos: não se
+  // repete a prova solta no fim do corpo da peça.
+  const uncitedEvidences = hasInventory
+    ? []
+    : evidences.filter((e) => e.docNumber != null && !citedDocNums.has(e.docNumber));
+
 
   const isNotif = isNotificacao(resourceType);
   const isRespostaNotif = isRespostaNotificacao(resourceType);
@@ -1020,17 +1085,35 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
   const isProcuradorPetition = resourceType === 'troca_procurador' || resourceType === 'nomeacao_procurador';
   const isOposicao = resourceType === 'oposicao';
   const isExigenciaMerito = resourceType === 'exigencia_merito';
-  const cleanedContent = stripOpeningMarkers(softCleanMarkdown(liveContent));
+  const cleanedContent = normalizeMarkers(stripOpeningMarkers(softCleanMarkdown(liveContent)));
   const bodyContent = stripClosingFromContent(cleanedContent, resourceType);
 
   const getEvidenceSrc = (ev?: ResourceEvidence) => ev?.dataUrl || ev?.signedUrl || '';
 
-  const findEvidenceBySlug = (slug: string) =>
-    evidences.find((e) => {
-      const cap = (e.caption || '').toLowerCase();
-      const src = (e.source_file_name || '').toLowerCase();
-      return cap.includes(slug.replace(/_/g, ' ')) || src.includes(slug);
-    });
+  // Vinculação estrita: [IMG:docNN] / [IMG:docNN_pM] resolvem pelo ID do
+  // documento e pela página. Nada é escolhido por semelhança de nome.
+  const findEvidenceBySlug = (slug: string): ResourceEvidence | undefined => {
+    if (!hasInventory) return undefined;
+    const res = resolveMarker(`[IMG:${slug}]`, null, slug, inventoryItems);
+    if (res.kind !== 'doc') return undefined;
+    return activeEvidences.find((e) => e.id === res.item.id);
+  };
+
+  const markerPendencies: string[] = (() => {
+    const out: string[] = [];
+    const re = /\[(DOC:(\d{1,3})|IMG:([a-z0-9_\-]+))\]/gi;
+    const seen = new Set<string>();
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(bodyContent)) !== null) {
+      if (seen.has(m[0].toLowerCase())) continue;
+      seen.add(m[0].toLowerCase());
+      if (!hasInventory) continue;
+      const res = resolveMarker(m[0], m[2] ? parseInt(m[2], 10) : null, m[3] ? m[3].toLowerCase() : null, inventoryItems);
+      if (res.kind === 'unresolved') out.push(`${m[0]} — ${res.reason}`);
+    }
+    return out;
+  })();
+
 
   type EvidenceMarker = { type: 'doc' | 'img'; n?: number; slug?: string };
 
@@ -1064,7 +1147,22 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
       if (p.type === 'doc') {
         return <span key={`${keyPrefix}-d-${i}`} className="font-semibold" style={{ color: '#1e3a5f' }}>(Doc. {String(p.n).padStart(2, '0')})</span>;
       }
-      return <span key={`${keyPrefix}-i-${i}`} className="font-semibold" style={{ color: '#1e3a5f' }}>(Imagem)</span>;
+      {
+        const ev = findEvidenceBySlug(p.slug || '');
+        if (ev) {
+          return (
+            <span key={`${keyPrefix}-i-${i}`} className="font-semibold" style={{ color: '#1e3a5f' }}>
+              (Doc. {String(ev.docNumber).padStart(2, '0')})
+            </span>
+          );
+        }
+        return (
+          <span key={`${keyPrefix}-i-${i}`} className="font-semibold" style={{ color: '#b91c1c' }}>
+            [prova não vinculada: {p.slug}]
+          </span>
+        );
+      }
+
     });
   };
 
@@ -1141,17 +1239,50 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
     setTimeout(() => document.body.classList.remove('printing-inpi-doc'), 1000);
   };
 
+  /**
+   * Anexos do pacote: quem chama pode fornecê-los (fluxo de aprovação); se não
+   * fornecer e houver inventário do caso (inclusive ao reabrir pelo histórico),
+   * o próprio montador converte os documentos persistidos do caso.
+   */
+  const ensureAnnexes = async (): Promise<NativeAnnexDoc[] | undefined> => {
+    if (annexes && annexes.length) return annexes;
+    if (!hasInventory) return annexes;
+    if (inventoryAnnexes) return inventoryAnnexes;
+    setIsBuildingAnnexes(true);
+    try {
+      const built = await buildInventoryAnnexes(inventoryItems);
+      const mapped: NativeAnnexDoc[] = built.map((a) => ({
+        id: a.id, docNumber: a.docNumber, title: a.title, categoryLabel: a.categoryLabel,
+        fileName: a.fileName, images: a.images, textBlocks: a.textBlocks,
+        status: a.status, notes: a.notes,
+      }));
+      setInventoryAnnexes(mapped);
+      return mapped;
+    } finally {
+      setIsBuildingAnnexes(false);
+    }
+  };
+
   const handleDownloadPDF = async () => {
-    if (isLoadingEvidence) {
-      toast({ title: 'Aguarde', description: 'As evidências ainda estão sendo preparadas para entrar no PDF.' });
+    if (isLoadingEvidence || isLoadingInventory) {
+      toast({ title: 'Aguarde', description: 'As provas ainda estão sendo preparadas para entrar no PDF.' });
       return;
     }
     setIsGeneratingPDF(true);
     try {
+      const finalAnnexes = await ensureAnnexes();
+      const conversionFailed = (finalAnnexes || []).some((a) => a.status === 'falha' || a.status === 'parcial');
+      // Pendência de marcador, conversão falha ou anexo faltante ⇒ só prévia.
+      const effectiveStamp = draftStamp
+        ?? (markerPendencies.length
+          ? 'PRÉVIA — REFERÊNCIA DE PROVA NÃO VINCULADA'
+          : conversionFailed
+            ? 'PRÉVIA — PACOTE DOCUMENTAL INCOMPLETO'
+            : null);
       await generateNativePDF({
         pdfFileName,
         bodyContent,
-        evidences,
+        evidences: activeEvidences,
         evidenceByNum,
         findEvidenceBySlug,
         uncitedEvidences,
@@ -1160,8 +1291,8 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
         approvalDate,
         isExtrajudicialDoc,
         isProcuradorPetition,
-        annexes,
-        draftStamp,
+        annexes: finalAnnexes,
+        draftStamp: effectiveStamp,
       });
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -1174,6 +1305,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
       setIsGeneratingPDF(false);
     }
   };
+
 
   const renderContent = () => {
     return bodyContent.split('\n\n').filter(p => p.trim()).map((paragraph, idx) => {
@@ -1278,7 +1410,31 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
 
   return (
     <div className="space-y-4">
+      {hasInventory && (
+        <div className="print:hidden rounded-xl border bg-muted/40 p-3 text-xs space-y-1">
+          <p className="font-semibold">
+            Acervo do caso: {inventoryItems.length} documento(s) vinculado(s) — os mesmos que entram no índice e nos anexos do PDF.
+          </p>
+          <ul className="space-y-0.5">
+            {inventoryItems.map((it) => (
+              <li key={it.id}>
+                Doc. {String(it.docNumber).padStart(2, '0')} — {it.fileName} ({it.categoryLabel})
+                {it.previewError ? ` · imagem indisponível: ${it.previewError}` : ''}
+              </li>
+            ))}
+          </ul>
+          {markerPendencies.length > 0 && (
+            <div className="mt-2 rounded-lg border border-destructive/40 bg-destructive/5 p-2 text-destructive">
+              <p className="font-semibold">Referências de prova não vinculadas — o pacote não pode ser dado como completo:</p>
+              <ul className="list-disc pl-4">
+                {markerPendencies.map((p) => <li key={p}>{p}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
       <div className="flex gap-3 justify-end print:hidden">
+
         {isEditing ? (
           <>
             <Button
@@ -1309,7 +1465,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
               <Pencil className="h-4 w-4" />
               Editar PDF
             </Button>
-            <Button onClick={handleDownloadPDF} disabled={isGeneratingPDF || isLoadingEvidence} className="gap-2 rounded-xl shadow-lg shadow-primary/15">
+            <Button onClick={handleDownloadPDF} disabled={isGeneratingPDF || isLoadingEvidence || isLoadingInventory || isBuildingAnnexes} className="gap-2 rounded-xl shadow-lg shadow-primary/15">
           {isLoadingEvidence ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />

@@ -120,7 +120,7 @@ PASSO 4 — Devolva o RECURSO COMPLETO já com TODOS os ajustes aplicados. NÃO 
 
 REGRAS DE PRESERVAÇÃO (não alterar a menos que o usuário peça expressamente):
 - Mantenha o cabeçalho determinístico (processo, marca, classe NCL, titular, examinador/oponente, procurador).
-- Preserve TODOS os marcadores literais [DOC:NN], [IMG:marca_cliente], [IMG:marca_opositora] exatamente como aparecem.
+- Preserve TODOS os marcadores literais [DOC:NN] e [IMG:docNN] / [IMG:docNN_pM] exatamente como aparecem. NÃO crie marcadores de nome livre (ex.: [IMG:marca_cliente]) — eles não resolvem e viram pendência no PDF.
 - Preserve tabelas markdown (| col | col |), **negrito** e *itálico*.
 - Mantenha o encerramento ("Termos em que, pede deferimento" + assinatura) UMA ÚNICA vez ao final.
 
@@ -149,7 +149,7 @@ REGRAS DE FORMATAÇÃO (preserve OU adicione conforme o ajuste pedir):
 - Mantenha **negrito** (**texto**) em conclusões parciais, nomes de marcas em cotejo e termos jurídicos-chave.
 - Mantenha *itálico* (*texto*) em transcrições literais de lei, expressões em latim e citações doutrinárias.
 - PRESERVE tabelas markdown (| col | col |) intactas. Se o ajuste pedir cotejo de marcas e não houver tabela, ADICIONE uma.
-- PRESERVE marcadores literais [IMG:marca_cliente], [IMG:marca_opositora] e [DOC:NN] exatamente como aparecem — esses marcadores serão substituídos por imagens reais no PDF.
+- PRESERVE marcadores literais [DOC:NN] e [IMG:docNN] / [IMG:docNN_pM] exatamente como aparecem — eles são substituídos pela imagem real do documento do acervo. Nunca invente outro formato de marcador.
 - Títulos de seção em CAIXA-ALTA, sem # de cabeçalho markdown.
 `;
 

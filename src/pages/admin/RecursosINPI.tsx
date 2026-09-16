@@ -2442,8 +2442,19 @@ export default function RecursosINPI() {
           {/* PREPARAÇÃO DOCUMENTAL + CONSULTORIA (três modalidades) */}
           {step === 'upload' && UPGRADED_MODALITIES.includes(resourceType) && (
             <motion.div key="upload-case" {...fadeIn}>
+              {draftContent && (
+                <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border bg-muted/40 p-3">
+                  <p className="text-sm text-muted-foreground">
+                    O texto da peça, a orientação e o histórico estão preservados. Gerar novamente só acontece se você mandar.
+                  </p>
+                  <Button variant="outline" className="rounded-xl shrink-0" onClick={() => setStep('review')}>
+                    Voltar à revisão
+                  </Button>
+                </div>
+              )}
               <CasePreparationPanel
                 resourceType={resourceType}
+
                 agentId={selectedAgent}
                 agentName={agent.name}
                 agentStrategy={agent.promptExtra}
@@ -2730,16 +2741,15 @@ export default function RecursosINPI() {
                     {(resourceType === 'indeferimento' || resourceType === 'exigencia_merito' || resourceType === 'oposicao') && currentResourceId && (
                       <Button
                         variant="outline"
-                        onClick={() => setShowEvidenceGallery(true)}
+                        onClick={() => setStep('upload')}
                         className="gap-2 rounded-xl"
+                        title="Volta à etapa Documentos preservando o texto, a orientação e o histórico."
                       >
                         <ImageIcon className="h-4 w-4" />
-                        Anexar evidências (prints/imagens)
-                        {evidenceCount > 0 && (
-                          <Badge variant="secondary" className="ml-1">{evidenceCount}</Badge>
-                        )}
+                        Gerenciar documentos
                       </Button>
                     )}
+
                     <Button onClick={handleApproveResource} className="flex-1 gap-2 rounded-xl h-11 shadow-lg shadow-primary/15">
                       <CheckCircle2 className="h-4 w-4" />
                       {resourceType === 'notificacao_extrajudicial'

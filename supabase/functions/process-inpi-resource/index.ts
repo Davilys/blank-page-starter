@@ -735,22 +735,38 @@ const FORMATTING_INSTRUCTIONS = `
 
    Use tabela obrigatoriamente na Seção IV (cotejo de marcas) e na Seção V (análise de mercado/segmento). Tabela limpa, no máximo 6 linhas por tabela.
 
-4. MARCADORES DE IMAGEM INLINE — quando o sistema tiver fornecido evidências/imagens (marca do cliente extraída do espelho INPI, prints da oposição, fotos de produto, página de decisão), INSIRA marcadores literais no parágrafo argumentativo correspondente:
-   - [IMG:marca_cliente] — vinheta da marca conforme depósito INPI (use na Seção I — Síntese dos Fatos)
-   - [IMG:marca_opositora] — vinheta/representação da marca da oposição ou da marca anterior citada no indeferimento (use na Seção IV — Cotejo)
-   - [DOC:01], [DOC:02], [DOC:03] — para prints de site/redes sociais, fotos de produto, documentos escaneados, decisão do INPI. Use exatamente como [DOC:NN] (dois dígitos, entre colchetes).
+4. MARCADORES DE IMAGEM INLINE — só existem os documentos do acervo do caso, numerados no dossiê como [DOC:01], [DOC:02], … Nunca crie nomes livres de imagem.
+   - [DOC:NN] — referência ao documento NN do acervo (dois dígitos, entre colchetes).
+   - [IMG:docNN] ou [IMG:docNN_pM] — mostra a imagem da página M (padrão: 1) do documento NN dentro do argumento.
 
    REGRAS dos marcadores:
-   - Os marcadores serão SUBSTITUÍDOS pela imagem real na geração do PDF — NÃO descreva a imagem, apenas insira o marcador no fim da frase pertinente.
-   - Cite o número do Doc no texto também: "… conforme se vê do print juntado ao corpo desta peça (**Doc. 03**) [DOC:03]."
-   - Não invente marcadores cujas evidências não tenham sido fornecidas.
+   - Marcadores fora dessas formas (por exemplo [IMG:marca_cliente]) NÃO são resolvidos e aparecem como pendência no PDF: é proibido usá-los.
+   - Só cite um documento que conste do dossiê recebido. Não invente documento, página ou imagem.
+   - O marcador é substituído pela imagem real do arquivo original — não descreva a imagem, apenas insira o marcador no fim da frase pertinente.
+   - Cite o número do Doc no texto também: "… conforme o print juntado (**Doc. 03**) [DOC:03]." Nunca repita o mesmo marcador colado ("[DOC:02] [DOC:02]").
+   - Imagem só quando a avaliação depender do visual; a legenda deve dizer documento e página.
+
 
 5. SEÇÕES — títulos em CAIXA-ALTA, sem markdown de cabeçalho (#), em linha própria. Ex.: "III – FUNDAMENTAÇÃO JURÍDICA APROFUNDADA".
 
 6. PARÁGRAFOS — denso, justificado, juridicamente sólido. Não use bullets em excesso; prefira parágrafos coesos. Listas só nos PEDIDOS finais (a, b, c, d…).
 
 ⚠️ O texto continua sendo uma peça jurídica formal — formatação markdown deve ser PARCIMONIOSA e ESTRATÉGICA, nunca decorativa. Use negrito ~3-5x por seção. Use itálico apenas onde tecnicamente correto. Tabela ao menos uma em IV e uma em V.
+
+#regras_de_conteudo_obrigatorias (valem para recurso contra indeferimento, cumprimento de exigência de mérito e manifestação à oposição)
+- APRESENTAÇÃO DA MARCA: nominativa, mista ou figurativa é UM só campo, retirado do documento oficial do acervo. É proibido o cabeçalho dizer uma coisa e o corpo outra. Sem documento que comprove, escreva "apresentação a conferir no espelho oficial".
+- TITULAR, NÚMERO DO PROCESSO, CLASSE E ESPECIFICAÇÃO saem do documento oficial. A descrição genérica da classe NUNCA pode ser apresentada como a especificação concreta do pedido.
+- ENDEREÇAMENTO: use a autoridade competente exata. Não combine cargos nem invente órgão.
+- CITAÇÕES JURÍDICAS: só cite acórdão, súmula ou doutrina cuja íntegra esteja no dossiê recebido. Do contrário, escreva "precedente a conferir na fonte oficial" e NÃO use a tese como se estivesse comprovada. Não existe lista "pré-validada". Doutrina exige obra, edição e localização.
+- PAGAMENTO E PREPARO: informe o código de serviço e o valor apenas como dado a conferir na tabela vigente na data do ato, salvo se a guia do acervo comprovar. Não afirme que um valor está correto sem comprovante no caso. Não mencione pagamento sem comprovante juntado.
+- PRAZO E PUBLICAÇÃO: data da decisão não é data da publicação na RPI. Peça ainda não protocolada não menciona recibo de protocolo.
+- ART. 220 não sana qualquer vício: confronte arts. 218, 219 e 221 e use também o art. 214 quando pertinente.
+- PROVAS: uso em shows, eventos ou redes sociais, isoladamente, não prova prioridade, notoriedade nem ausência de confusão. Não atribua ano a documento que não traz ano. Não declare um termo juridicamente fraco só por ser interjeição, nem que um acréscimo baste para distinguir. Enfrente o contexto desfavorável que a própria prova revelar.
+- Risco de confusão não exige episódio consumado; ausência de má-fé ou de alto renome não afasta automaticamente o art. 124, XIX.
+- SEPARE claramente fato provado por documento do acervo, inferência e tese defensiva. Não declare registrabilidade demonstrada quando faltar dado essencial ao cotejo — aponte a lacuna.
+- Evite repetição e pedidos genéricos. O tamanho é consequência do conteúdo necessário.
 `;
+
 
 // ═══════════════════════════════════════════════════════════
 // NOTIFICAÇÃO EXTRAJUDICIAL PROMPT (unchanged from original logic)
@@ -1014,7 +1030,7 @@ Procurador: Davilys Danques de Oliveira Cunha – CPF 393.239.118-79
 ═══════════════════════════════════════════════════════════
 
 I – SÍNTESE DOS FATOS E DO HISTÓRICO PROCESSUAL
-(MÍNIMO 800 palavras — NÃO ENCURTE)
+(desenvolva o necessário; sem mínimo artificial de palavras)
 - Narrar CRONOLOGICAMENTE todo o histórico do processo em detalhes minuciosos
 - Transcrever trechos relevantes do despacho/decisão do INPI
 - Explicar detalhadamente o fundamento usado pelo INPI (artigo, inciso, alínea)
@@ -1025,7 +1041,7 @@ I – SÍNTESE DOS FATOS E DO HISTÓRICO PROCESSUAL
 - Detalhar a especificação de produtos/serviços
 
 II – DA TEMPESTIVIDADE E LEGITIMIDADE
-(MÍNIMO 300 palavras)
+(objetivo, sem mínimo artificial de palavras)
 - Demonstrar tempestividade (prazo art. 212 LPI)
 - Confirmar legitimidade do recorrente com citação legal completa
 - Citar art. 212 e parágrafos da Lei 9.279/96 com transcrição do dispositivo
@@ -1034,7 +1050,7 @@ II – DA TEMPESTIVIDADE E LEGITIMIDADE
 - Citar a IN INPI aplicável sobre representação
 
 III – FUNDAMENTAÇÃO JURÍDICA APROFUNDADA
-(MÍNIMO 1.500 palavras — SEÇÃO MAIS IMPORTANTE — DESENVOLVA EXTENSIVAMENTE)
+(seção mais importante — desenvolva o necessário, sem repetição nem mínimo artificial)
 - Analisar DETALHADAMENTE CADA fundamento utilizado pelo INPI na decisão
 - Demonstrar com precisão POR QUE a decisão está equivocada
 - Transcrever TEXTUALMENTE cada artigo da LPI aplicável com análise de cada inciso
@@ -1049,7 +1065,7 @@ III – FUNDAMENTAÇÃO JURÍDICA APROFUNDADA
 - Demonstrar que a interpretação do INPI é restritiva ou contra a própria normativa
 
 IV – ANÁLISE TÉCNICA DO CONJUNTO MARCÁRIO
-(MÍNIMO 1.200 palavras — DESENVOLVA EXTENSIVAMENTE)
+(desenvolva o necessário, sem repetição nem mínimo artificial)
 - IMPRESSÃO DE CONJUNTO: fundamentar com Manual de Marcas INPI (Cap. 5, Seção 5.10.1)
 - ANÁLISE FONÉTICA DETALHADA: pronúncia sílaba a sílaba, número de sílabas, tonicidade, sonoridade, cadência rítmica, comparação fonema por fonema
 - ANÁLISE VISUAL DETALHADA: grafismo, tipografia, elementos figurativos, cores, disposição espacial, peso visual, estilização

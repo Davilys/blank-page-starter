@@ -7,6 +7,8 @@ import { useState } from 'react';
 import jsPDF from 'jspdf';
 import { convertDocument, summarizePackage, type AnnexDoc } from '@/lib/inpi/packageBuilder';
 import { extractContent } from '@/lib/inpi/caseDocuments';
+import { normalizeMarkers } from '@/lib/inpi/caseInventory';
+
 import { generateNativePDF } from '@/components/admin/INPIResourcePDFPreview';
 
 const log = (msg: string) => {
@@ -99,19 +101,41 @@ export default function INPIPackageTestHarness() {
       log(`PACOTE: completo=${sum.isComplete} anexos=${annexes.length} páginas-anexo=${sum.totalAnnexPages} falhas=${sum.failed.length}`);
 
       // 3) PDF final (com e sem o documento que falhou)
-      const body = [
+      // Provas do "inventário": imagem real da página 1 de cada anexo convertido.
+      const inventoryEvidences = annexes
+        .filter((a) => a.images.length > 0)
+        .map((a) => ({
+          id: a.id,
+          docNumber: a.docNumber,
+          caption: `${a.categoryLabel} — ${a.fileName} (página 1)`,
+          source_file_name: a.fileName,
+          dataUrl: a.images[0].dataUrl,
+          width: a.images[0].width,
+          height: a.images[0].height,
+        }));
+      const evByNum = (n: number) => inventoryEvidences.find((e) => e.docNumber === n);
+      const evBySlug = (slug: string) => {
+        const m = slug.toLowerCase().match(/^doc[_-]?(\d{1,3})(?:[_-]?p\d{1,3})?$/);
+        return m ? evByNum(parseInt(m[1], 10)) : undefined;
+      };
+
+      const body = normalizeMarkers([
         'AO INSTITUTO NACIONAL DA PROPRIEDADE INDUSTRIAL',
         '## I — DOS FATOS',
-        'Trata-se de peça de teste gerada com documentos fictícios para validar a montagem do pacote.',
-        '## II — DO DIREITO',
+        'Trata-se de peça de teste gerada com documentos fictícios para validar a montagem do pacote. Conforme o despacho oficial (**Doc. 01**) [DOC:01].',
+        '## II — DA PROVA DE USO',
+        'A prova de uso do cliente demonstra a divulgação da marca [IMG:doc02], juntada ao acervo do caso.',
+        'Referência repetida colada que deve ser normalizada: [DOC:02] [DOC:02].',
+        'Marcador de nome livre que NÃO pode resolver: [IMG:marca_cliente].',
+        '## III — DO DIREITO',
         'Texto de teste, sem qualquer conteúdo jurídico real.',
-      ].join('\n\n');
+      ].join('\n\n'));
 
       const common = {
         bodyContent: body,
-        evidences: [],
-        evidenceByNum: () => undefined,
-        findEvidenceBySlug: () => undefined,
+        evidences: inventoryEvidences,
+        evidenceByNum: evByNum,
+        findEvidenceBySlug: evBySlug,
         uncitedEvidences: [],
         documentTitleUpper: 'RECURSO CONTRA INDEFERIMENTO (TESTE)',
         resource: { id: 'test', brand_name: 'TESTE PACOTE', process_number: '900000001', ncl_class: '25', holder: 'Cliente Fictício', approved_at: null },
@@ -119,6 +143,7 @@ export default function INPIPackageTestHarness() {
         isExtrajudicialDoc: false,
         isProcuradorPetition: false,
       };
+
 
       const incomplete = await generateNativePDF({
         ...common,
