@@ -1144,7 +1144,22 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
       if (p.type === 'doc') {
         return <span key={`${keyPrefix}-d-${i}`} className="font-semibold" style={{ color: '#1e3a5f' }}>(Doc. {String(p.n).padStart(2, '0')})</span>;
       }
-      return <span key={`${keyPrefix}-i-${i}`} className="font-semibold" style={{ color: '#1e3a5f' }}>(Imagem)</span>;
+      {
+        const ev = findEvidenceBySlug(p.slug || '');
+        if (ev) {
+          return (
+            <span key={`${keyPrefix}-i-${i}`} className="font-semibold" style={{ color: '#1e3a5f' }}>
+              (Doc. {String(ev.docNumber).padStart(2, '0')})
+            </span>
+          );
+        }
+        return (
+          <span key={`${keyPrefix}-i-${i}`} className="font-semibold" style={{ color: '#b91c1c' }}>
+            [prova não vinculada: {p.slug}]
+          </span>
+        );
+      }
+
     });
   };
 
