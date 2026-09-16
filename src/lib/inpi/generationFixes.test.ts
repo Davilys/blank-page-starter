@@ -55,7 +55,7 @@ describe('preparação dos anexos da geração', () => {
   });
 });
 
-import { isRunStale, documentsSignature, STALE_RUN_MS } from '../../../supabase/functions/process-inpi-resource/runControl';
+import { isRunStale, documentsSignature, STALE_RUN_MS } from '../../../supabase/functions/process-inpi-resource/runControl.ts';
 
 describe('controle de execução da geração', () => {
   const now = Date.now();
