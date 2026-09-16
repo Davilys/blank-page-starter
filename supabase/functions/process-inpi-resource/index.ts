@@ -1956,7 +1956,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
       const pass2Content = cleanAIContent(pass2Result.content);
       const rawFullContent = `${basePass1Content}\n\n${pass2Content}`;
       const enriched = enrichExtractedData(providedExtractedData || {}, rawFullContent);
-      const fullContent = enforceMandatoryOpening(rawFullContent, resourceTypeLabel, enriched);
+      const fullContent = enforceMandatoryOpening(rawFullContent, resourceTypeLabel, enriched, resourceType);
 
       return new Response(JSON.stringify({
         success: true,
@@ -2046,7 +2046,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
 
     if (requestedPass === 'pass1') {
       const enriched = enrichExtractedData(extractedData, pass1Content);
-      const partialContent = enforceMandatoryOpening(pass1Content, resourceTypeLabel, enriched);
+      const partialContent = enforceMandatoryOpening(pass1Content, resourceTypeLabel, enriched, resourceType);
       return new Response(JSON.stringify({
         success: true,
         generation_pass: 'pass1',
@@ -2066,7 +2066,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
       // Return pass 1 content with enforced header
 
       const enriched = enrichExtractedData(extractedData, pass1Content);
-      const normalizedPartial = enforceMandatoryOpening(pass1Content, resourceTypeLabel, enriched);
+      const normalizedPartial = enforceMandatoryOpening(pass1Content, resourceTypeLabel, enriched, resourceType);
       return new Response(JSON.stringify({
         success: true,
         extracted_data: sanitizeExtracted(enriched),
@@ -2089,7 +2089,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     // ─────────────────────────────────────────────────────
     const rawFullContent = pass1Content + '\n\n' + pass2Content;
     const enriched = enrichExtractedData(extractedData, rawFullContent);
-    const fullContent = enforceMandatoryOpening(rawFullContent, resourceTypeLabel, enriched);
+    const fullContent = enforceMandatoryOpening(rawFullContent, resourceTypeLabel, enriched, resourceType);
     
     console.log('=== TWO-PASS GENERATION COMPLETE ===');
     console.log('Total length:', fullContent.length, 'chars (~', Math.round(fullContent.split(/\s+/).length), 'words)');
