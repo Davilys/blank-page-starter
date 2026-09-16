@@ -659,7 +659,7 @@ export default function RecursosINPI() {
       })
       .eq('id', caseId);
 
-    sessionStorage.removeItem(ACTIVE_JOB_KEY);
+    localStorage.removeItem(ACTIVE_JOB_KEY);
     setProcessingProgress(100);
     setTimeout(() => setStep('review'), 400);
     toast.success('Minuta gerada. Confira a revisão antes de aprovar.');
@@ -686,7 +686,7 @@ export default function RecursosINPI() {
       setProcessingStage(JOB_STAGE_LABELS[job.stage] || 'Processando');
       setProcessingProgress((prev) => Math.max(prev, job.stage === 'pass2' ? 62 : job.stage === 'pass1' ? 28 : 12));
       if (job.status === 'error') {
-        sessionStorage.removeItem(ACTIVE_JOB_KEY);
+        localStorage.removeItem(ACTIVE_JOB_KEY);
         setProcessingError(job.error_message || 'Geração interrompida. Você pode tentar de novo a partir da etapa que parou.');
         setIsProcessing(false);
         return;
@@ -723,7 +723,7 @@ export default function RecursosINPI() {
       setActiveJobId(data.job.id);
       // Guarda o suficiente para reabrir a tela de processamento se a página
       // for recarregada ou fechada durante a geração.
-      sessionStorage.setItem(ACTIVE_JOB_KEY, JSON.stringify({
+      localStorage.setItem(ACTIVE_JOB_KEY, JSON.stringify({
         caseId, jobId: data.job.id, resourceType, agent: selectedAgent, orientation,
       }));
       await pollGenerationJob(data.job.id, caseId);
@@ -738,11 +738,11 @@ export default function RecursosINPI() {
   // continua no servidor e a tela volta para ele, na etapa em que está.
   useEffect(() => {
     let cancelled = false;
-    const raw = sessionStorage.getItem(ACTIVE_JOB_KEY);
+    const raw = localStorage.getItem(ACTIVE_JOB_KEY);
     if (!raw) return;
     let saved: { caseId?: string; jobId?: string; resourceType?: string; agent?: AgentId; orientation?: string } | null = null;
-    try { saved = JSON.parse(raw); } catch { sessionStorage.removeItem(ACTIVE_JOB_KEY); return; }
-    if (!saved?.caseId || !saved?.jobId || !saved?.resourceType) { sessionStorage.removeItem(ACTIVE_JOB_KEY); return; }
+    try { saved = JSON.parse(raw); } catch { localStorage.removeItem(ACTIVE_JOB_KEY); return; }
+    if (!saved?.caseId || !saved?.jobId || !saved?.resourceType) { localStorage.removeItem(ACTIVE_JOB_KEY); return; }
     (async () => {
       const { data, error } = await supabase.functions.invoke('process-inpi-resource', {
         body: { action: 'status', job_id: saved!.jobId },
@@ -750,7 +750,7 @@ export default function RecursosINPI() {
       if (cancelled) return;
       const job = data?.job;
       if (error || !job || (job.status !== 'processing' && job.status !== 'done')) {
-        sessionStorage.removeItem(ACTIVE_JOB_KEY);
+        localStorage.removeItem(ACTIVE_JOB_KEY);
         return;
       }
       setResourceType(saved!.resourceType);
