@@ -1465,7 +1465,7 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
               <Pencil className="h-4 w-4" />
               Editar PDF
             </Button>
-            <Button onClick={handleDownloadPDF} disabled={isGeneratingPDF || isLoadingEvidence} className="gap-2 rounded-xl shadow-lg shadow-primary/15">
+            <Button onClick={handleDownloadPDF} disabled={isGeneratingPDF || isLoadingEvidence || isLoadingInventory || isBuildingAnnexes} className="gap-2 rounded-xl shadow-lg shadow-primary/15">
           {isLoadingEvidence ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
