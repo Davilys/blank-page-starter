@@ -91,7 +91,7 @@ async function callOpenAI(
   userParts: any[],
   maxTokens: number = 16000,
   _temperature?: number,
-  timeoutMs: number = 120000,
+  timeoutMs: number = 300000,
   ctx?: CallContext,
 ): Promise<{ content: string; error?: string; status?: number; errorKind?: string }> {
   const inputMessages = [
@@ -101,7 +101,14 @@ async function callOpenAI(
 
   const modelConfig: ModelConfig = ctx?.modelConfig ?? { model: 'gpt-5-mini', reasoningEffort: 'minimal', dedicated: false };
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  // Modelos de raciocínio levam minutos. O corte é por INATIVIDADE (nenhum byte
+  // recebido), não por duração total: a resposta é lida em streaming.
+  const IDLE_LIMIT_MS = 120000;
+  let lastActivity = Date.now();
+  const deadline = Date.now() + timeoutMs;
+  const timeout = setInterval(() => {
+    if (Date.now() - lastActivity > IDLE_LIMIT_MS || Date.now() > deadline) controller.abort();
+  }, 5000);
   const started = Date.now();
 
   const finish = async (
@@ -142,6 +149,7 @@ async function callOpenAI(
         max_output_tokens: maxTokens,
         reasoning: { effort: modelConfig.reasoningEffort },
         text: { verbosity: 'high' },
+        stream: true,
       }),
     });
 
@@ -152,35 +160,76 @@ async function callOpenAI(
       return await finish({ content: '', error: errorText, status: response.status, errorKind });
     }
 
-    const data = await response.json();
+    // Leitura em streaming: cada evento renova a atividade, então o corte só
+    // acontece se a IA realmente parar de responder.
     let content = '';
     let refusal = '';
-    if (data.output && Array.isArray(data.output)) {
-      for (const item of data.output) {
-        if (item.type === 'message' && item.content) {
-          for (const part of item.content) {
-            if (part.type === 'output_text') content += part.text;
-            if (part.type === 'refusal') refusal += part.refusal || '';
+    let finalStatus = '';
+    let incompleteReason = '';
+    let usage: { input_tokens?: number; output_tokens?: number } = {};
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      lastActivity = Date.now();
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (!payload || payload === '[DONE]') continue;
+        let evt: any;
+        try { evt = JSON.parse(payload); } catch { continue; }
+        if (evt.type === 'response.output_text.delta' && typeof evt.delta === 'string') {
+          content += evt.delta;
+        } else if (evt.type === 'response.refusal.delta' && typeof evt.delta === 'string') {
+          refusal += evt.delta;
+        } else if (evt.type === 'response.completed' || evt.type === 'response.incomplete' || evt.type === 'response.failed') {
+          finalStatus = evt.response?.status || '';
+          incompleteReason = evt.response?.incomplete_details?.reason || '';
+          usage = {
+            input_tokens: evt.response?.usage?.input_tokens,
+            output_tokens: evt.response?.usage?.output_tokens,
+          };
+          if (!content && Array.isArray(evt.response?.output)) {
+            for (const item of evt.response.output) {
+              if (item.type === 'message' && Array.isArray(item.content)) {
+                for (const part of item.content) {
+                  if (part.type === 'output_text') content += part.text || '';
+                  if (part.type === 'refusal') refusal += part.refusal || '';
+                }
+              }
+            }
           }
+        } else if (evt.type === 'error') {
+          return await finish({
+            content: '',
+            error: evt.error?.message || 'Erro no fluxo da IA',
+            status: 502,
+            errorKind: 'http',
+          }, usage);
         }
       }
     }
-
-    const usage = { input_tokens: data?.usage?.input_tokens, output_tokens: data?.usage?.output_tokens };
 
     if (refusal && !content) {
       return await finish({ content: '', error: `Recusa do modelo: ${refusal.slice(0, 300)}`, status: 422, errorKind: 'refusal' }, usage);
     }
 
-    // Truncamento: a Responses API devolve status "incomplete" com o motivo.
-    if (data?.status === 'incomplete') {
-      const reason = data?.incomplete_details?.reason || 'desconhecido';
+    if (finalStatus === 'incomplete') {
       return await finish({
         content,
-        error: `Resposta incompleta da IA (motivo: ${reason}). O conteúdo não foi considerado final.`,
+        error: `Resposta incompleta da IA (motivo: ${incompleteReason || 'desconhecido'}). O conteúdo não foi considerado final.`,
         status: 502,
         errorKind: 'truncated',
       }, usage);
+    }
+
+    if (!content) {
+      return await finish({ content: '', error: 'A IA não devolveu texto.', status: 502, errorKind: 'empty' }, usage);
     }
 
     return await finish({ content }, usage);
@@ -195,7 +244,7 @@ async function callOpenAI(
       errorKind: isTimeout ? 'timeout' : 'exception',
     });
   } finally {
-    clearTimeout(timeout);
+    clearInterval(timeout);
   }
 }
 
@@ -1315,7 +1364,7 @@ serve(async (req) => {
         ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
       ];
       if (body) body.files = undefined;
-      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25, 120000, makeCtx('notificacao'));
+      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25, 300000, makeCtx('notificacao'));
       if (result.error) {
         return new Response(JSON.stringify({ error: `Erro IA: ${result.status}` }), { status: result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
@@ -1430,7 +1479,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
         ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
       ];
       if (body) body.files = undefined;
-      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, undefined, 120000, makeCtx('resposta_notificacao'));
+      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, undefined, 300000, makeCtx('resposta_notificacao'));
       
       if (result.error) {
         console.error('OpenAI error for resposta_notificacao:', result.status, result.error.substring(0, 300));
@@ -1474,7 +1523,7 @@ Responda APENAS com o texto completo da RESPOSTA À NOTIFICAÇÃO (mínimo 4.000
         ...await uploadAndPrepareFileParts(OPENAI_API_KEY, fileParts, sourceFilesForUpload, files),
       ];
       if (body) body.files = undefined;
-      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25, 120000, makeCtx('procurador'));
+      const result = await callOpenAI(OPENAI_API_KEY, systemPrompt, parts, 16000, 0.25, 300000, makeCtx('procurador'));
       if (result.error) {
         return new Response(JSON.stringify({ error: `Erro IA: ${result.status}` }), { status: result.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
@@ -1638,7 +1687,7 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
       ];
 
       console.log('PASS 2 only: Generating Sections V-VIII...');
-      const pass2Result = await callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25, 120000, makeCtx('pass2'));
+      const pass2Result = await callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25, 300000, makeCtx('pass2'));
       if (pass2Result.error) {
         const cfg = modelFailureResponse(pass2Result);
         if (cfg) return cfg;
@@ -1702,9 +1751,9 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
     console.time('ai_generation');
     const [extractionResult, pass1Result, pass2Result] = await Promise.all([
       callOpenAI(OPENAI_API_KEY, 'Extraia dados do documento INPI. Responda APENAS com JSON válido.', extractionParts, 800, 0.1, 60000, makeCtx('extracao')),
-      callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 9000, 0.25, 120000, makeCtx('pass1')),
+      callOpenAI(OPENAI_API_KEY, pass1System, pass1User, 9000, 0.25, 300000, makeCtx('pass1')),
       shouldRunPass2Now
-        ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25, 120000, makeCtx('pass2'))
+        ? callOpenAI(OPENAI_API_KEY, pass2System, pass2User, 9000, 0.25, 300000, makeCtx('pass2'))
         : Promise.resolve({ content: '', error: undefined as string | undefined, status: undefined as number | undefined, errorKind: undefined as string | undefined }),
     ]);
     console.timeEnd('ai_generation');
