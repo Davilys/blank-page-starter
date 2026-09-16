@@ -233,8 +233,10 @@ Deno.serve(async (req) => {
           { role: 'user', content: [{ type: 'input_text', text: userContent }] },
         ],
         reasoning: { effort: modelConfig.reasoningEffort },
-        max_output_tokens: 6000,
+        text: { format: { type: 'json_object' } },
+        max_output_tokens: 16000,
       }),
+
     });
 
     const durationMs = Date.now() - started;
