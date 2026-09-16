@@ -420,6 +420,7 @@ async function maybeReplaceFilePartsWithFileIds(
       // the Uint8Array is the only large buffer alive for this file now.
       src.base64 = '';
 
+      src.bytes = undefined;
       const fileId = await uploadFileToOpenAI(apiKey, bytes, filename || `arquivo-${i + 1}`, src.type);
       if (!fileId) {
         failedFiles.push(filename || `arquivo-${i + 1}`);
@@ -2016,6 +2017,216 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
   }
 };
 
+// ═══════════════════════════════════════════════════════════
+// EXECUÇÃO POR ETAPAS (evita estouro de CPU numa única chamada)
+// Cada etapa roda numa invocação própria da função, com orçamento
+// de CPU novo, e grava o andamento em inpi_generation_jobs.
+// ═══════════════════════════════════════════════════════════
+const adminClient = () => createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY')!,
+);
+
+const SELF_URL = `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-inpi-resource`;
+
+function dispatchStep(jobId: string, step: string) {
+  const body = JSON.stringify({ action: 'step', job_id: jobId, step });
+  const call = fetch(SELF_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''}`,
+      'x-internal-job': '1',
+      'x-job-dispatch': '1',
+    },
+    body,
+  }).catch((e) => console.error('dispatchStep falhou:', (e as Error).message));
+  // @ts-ignore EdgeRuntime existe no runtime do Supabase
+  if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) EdgeRuntime.waitUntil(call);
+  return call;
+}
+
+async function runStep(jobId: string, step: string) {
+  const db = adminClient();
+  const { data: job } = await db.from('inpi_generation_jobs').select('*').eq('id', jobId).maybeSingle();
+  if (!job) return;
+  if (job.status !== 'processing') return;
+
+  const internalHeaders = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''}`,
+    'x-internal-job': '1',
+  };
+
+  const fail = async (message: string, code?: string) => {
+    await db.from('inpi_generation_jobs').update({
+      status: 'error', error_message: message.substring(0, 900), error_code: code || 'erro',
+    }).eq('id', jobId);
+  };
+
+  const legacy = async (payload: Record<string, unknown>) => {
+    const res = await handleRequest(new Request(SELF_URL, {
+      method: 'POST', headers: internalHeaders, body: JSON.stringify(payload),
+    }));
+    const text = await res.text();
+    let parsed: any = null;
+    try { parsed = JSON.parse(text); } catch { /* resposta ilegível */ }
+    return { ok: res.ok && parsed?.success === true, status: res.status, data: parsed, raw: text };
+  };
+
+  const base = {
+    resourceType: job.resource_type,
+    agentName: job.agent_name || undefined,
+    agentStrategy: job.agent_strategy || undefined,
+    userOrientation: job.user_orientation || undefined,
+    caseId: job.case_id || undefined,
+  };
+
+  try {
+    if (step === 'pass1') {
+      await db.from('inpi_generation_jobs').update({ stage: 'pass1' }).eq('id', jobId);
+      const r = await legacy({ ...base, generationPass: 'pass1' });
+      if (!r.ok) {
+        await fail(r.data?.error || 'Falha ao escrever a primeira parte da peça.', r.data?.error_kind);
+        return;
+      }
+      await db.from('inpi_generation_jobs').update({
+        stage: 'pass2',
+        pass1_content: r.data.pass1_content || r.data.resource_content || '',
+        extracted_data: r.data.extracted_data || null,
+      }).eq('id', jobId);
+      dispatchStep(jobId, 'pass2');
+      return;
+    }
+
+    if (step === 'pass2') {
+      const r = await legacy({
+        ...base,
+        generationPass: 'pass2',
+        pass1Content: job.pass1_content || '',
+        extractedData: job.extracted_data || {},
+      });
+      if (!r.ok) {
+        await fail(r.data?.error || 'Falha ao escrever a segunda parte da peça.', r.data?.error_kind);
+        return;
+      }
+      await db.from('inpi_generation_jobs').update({
+        stage: 'concluido',
+        status: 'done',
+        result_content: r.data.resource_content || '',
+        extracted_data: r.data.extracted_data || job.extracted_data,
+      }).eq('id', jobId);
+      return;
+    }
+
+    await fail(`Etapa desconhecida: ${step}`, 'etapa_invalida');
+  } catch (e) {
+    await fail((e as Error).message || 'Erro inesperado durante a geração.', 'excecao');
+  }
+}
+
+async function requireAdmin(req: Request): Promise<{ userId: string } | Response> {
+  const authHeader = req.headers.get('Authorization') || '';
+  if (!authHeader.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'Não autorizado' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+  const token = authHeader.replace('Bearer ', '');
+  const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authHeader } } });
+  const { data: userData, error } = await sb.auth.getUser(token);
+  if (error || !userData?.user) {
+    return new Response(JSON.stringify({ error: 'Não autorizado' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+  const { data: isAdmin } = await sb.rpc('has_role', { _user_id: userData.user.id, _role: 'admin' });
+  if (!isAdmin) {
+    return new Response(JSON.stringify({ error: 'Acesso de administrador necessário' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+  return { userId: userData.user.id };
+}
+
+const jsonResponse = (payload: unknown, status = 200) =>
+  new Response(JSON.stringify(payload), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+async function handleJobAction(req: Request, body: any): Promise<Response> {
+  const db = adminClient();
+  const action = body?.action;
+
+  if (action === 'step') {
+    const internal = req.headers.get('x-internal-job') === '1'
+      && (req.headers.get('Authorization') || '') === `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '__none__'}`;
+    if (!internal) return jsonResponse({ error: 'Não autorizado' }, 401);
+    const jobId = String(body.job_id || '');
+    const step = String(body.step || '');
+    const work = runStep(jobId, step);
+    // @ts-ignore EdgeRuntime existe no runtime do Supabase
+    if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) EdgeRuntime.waitUntil(work); else await work;
+    return jsonResponse({ accepted: true });
+  }
+
+  const auth = await requireAdmin(req);
+  if (auth instanceof Response) return auth;
+
+  if (action === 'status') {
+    const jobId = typeof body.job_id === 'string' ? body.job_id : null;
+    const caseId = typeof body.caseId === 'string' ? body.caseId : null;
+    let query = db.from('inpi_generation_jobs').select('*').order('created_at', { ascending: false }).limit(1);
+    query = jobId ? query.eq('id', jobId) : query.eq('case_id', caseId ?? '');
+    const { data, error } = await query.maybeSingle();
+    if (error) return jsonResponse({ error: 'Não foi possível consultar o andamento.' }, 500);
+    if (!data) return jsonResponse({ job: null });
+    return jsonResponse({ job: data });
+  }
+
+  if (action === 'start' || action === 'retry') {
+    const caseId = typeof body.caseId === 'string' ? body.caseId : null;
+    if (!caseId) return jsonResponse({ error: 'Caso não informado.' }, 400);
+    if (!body.resourceType) return jsonResponse({ error: 'Modalidade não informada.' }, 400);
+
+    const { data: existing } = await db
+      .from('inpi_generation_jobs')
+      .select('*')
+      .eq('case_id', caseId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existing && existing.status === 'processing' && action === 'start') {
+      return jsonResponse({ job: existing, resumed: true });
+    }
+
+    if (existing && (action === 'retry' || existing.status !== 'processing')) {
+      // Retoma da etapa que falhou, sem refazer o que já ficou pronto.
+      const resumeStep = existing.pass1_content && existing.pass1_content.length > 1000 ? 'pass2' : 'pass1';
+      const { data: updated, error: upErr } = await db.from('inpi_generation_jobs').update({
+        status: 'processing',
+        stage: resumeStep,
+        attempt: (existing.attempt || 0) + 1,
+        error_message: null,
+        error_code: null,
+        result_content: null,
+      }).eq('id', existing.id).select().maybeSingle();
+      if (upErr) return jsonResponse({ error: 'Não foi possível retomar a geração.' }, 500);
+      dispatchStep(existing.id, resumeStep);
+      return jsonResponse({ job: updated, resumed: true });
+    }
+
+    const { data: created, error: insErr } = await db.from('inpi_generation_jobs').insert({
+      case_id: caseId,
+      owner_id: auth.userId,
+      resource_type: body.resourceType,
+      agent_name: body.agentName || null,
+      agent_strategy: body.agentStrategy || null,
+      user_orientation: body.userOrientation || null,
+      stage: 'pass1',
+      status: 'processing',
+    }).select().maybeSingle();
+    if (insErr || !created) return jsonResponse({ error: 'Não foi possível iniciar a geração.' }, 500);
+    dispatchStep(created.id, 'pass1');
+    return jsonResponse({ job: created });
+  }
+
+  return jsonResponse({ error: 'Ação desconhecida.' }, 400);
+}
+
 // A geração pode levar vários minutos. O runtime encerra a requisição se ficar
 // 150s sem enviar bytes, então respondemos em streaming: espaços em branco
 // (ignorados pelo JSON.parse do cliente) mantêm a conexão viva até o resultado.
@@ -2024,7 +2235,25 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const work = handleRequest(req);
+  // Fluxo por etapas: respostas curtas e imediatas.
+  let jobBody: any = null;
+  let rawBody = '';
+  try {
+    rawBody = await req.text();
+    jobBody = rawBody ? JSON.parse(rawBody) : null;
+  } catch { jobBody = null; }
+
+  if (jobBody && ['start', 'status', 'step', 'retry'].includes(jobBody.action)) {
+    try {
+      return await handleJobAction(req, jobBody);
+    } catch (e) {
+      return jsonResponse({ error: (e as Error).message || 'Erro inesperado.' }, 500);
+    }
+  }
+
+  // Fluxo direto (demais modalidades e chamadas internas por etapa).
+  const replayed = new Request(req.url, { method: req.method, headers: req.headers, body: rawBody });
+  const work = handleRequest(replayed);
   const encoder = new TextEncoder();
   let settled: { status: number; body: string } | null = null;
 
@@ -2058,4 +2287,3 @@ serve(async (req) => {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 });
-
