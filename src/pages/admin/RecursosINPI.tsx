@@ -2452,8 +2452,9 @@ export default function RecursosINPI() {
                   </Button>
                 </div>
               )}
-
+              <CasePreparationPanel
                 resourceType={resourceType}
+
                 agentId={selectedAgent}
                 agentName={agent.name}
                 agentStrategy={agent.promptExtra}
