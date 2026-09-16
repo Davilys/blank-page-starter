@@ -10,6 +10,11 @@ import signatureImage from '@/assets/davilys-signature.png';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  loadCaseInventory, hydrateInventoryPreviews, buildInventoryAnnexes, resolveMarker, normalizeMarkers,
+  type CaseInventory, type InventoryItem,
+} from '@/lib/inpi/caseInventory';
+
 
 interface ResourceEvidence {
   id: string;
