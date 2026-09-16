@@ -735,15 +735,17 @@ const FORMATTING_INSTRUCTIONS = `
 
    Use tabela obrigatoriamente na Seção IV (cotejo de marcas) e na Seção V (análise de mercado/segmento). Tabela limpa, no máximo 6 linhas por tabela.
 
-4. MARCADORES DE IMAGEM INLINE — quando o sistema tiver fornecido evidências/imagens (marca do cliente extraída do espelho INPI, prints da oposição, fotos de produto, página de decisão), INSIRA marcadores literais no parágrafo argumentativo correspondente:
-   - [IMG:marca_cliente] — vinheta da marca conforme depósito INPI (use na Seção I — Síntese dos Fatos)
-   - [IMG:marca_opositora] — vinheta/representação da marca da oposição ou da marca anterior citada no indeferimento (use na Seção IV — Cotejo)
-   - [DOC:01], [DOC:02], [DOC:03] — para prints de site/redes sociais, fotos de produto, documentos escaneados, decisão do INPI. Use exatamente como [DOC:NN] (dois dígitos, entre colchetes).
+4. MARCADORES DE IMAGEM INLINE — só existem os documentos do acervo do caso, numerados no dossiê como [DOC:01], [DOC:02], … Nunca crie nomes livres de imagem.
+   - [DOC:NN] — referência ao documento NN do acervo (dois dígitos, entre colchetes).
+   - [IMG:docNN] ou [IMG:docNN_pM] — mostra a imagem da página M (padrão: 1) do documento NN dentro do argumento.
 
    REGRAS dos marcadores:
-   - Os marcadores serão SUBSTITUÍDOS pela imagem real na geração do PDF — NÃO descreva a imagem, apenas insira o marcador no fim da frase pertinente.
-   - Cite o número do Doc no texto também: "… conforme se vê do print juntado ao corpo desta peça (**Doc. 03**) [DOC:03]."
-   - Não invente marcadores cujas evidências não tenham sido fornecidas.
+   - Marcadores fora dessas formas (por exemplo [IMG:marca_cliente]) NÃO são resolvidos e aparecem como pendência no PDF: é proibido usá-los.
+   - Só cite um documento que conste do dossiê recebido. Não invente documento, página ou imagem.
+   - O marcador é substituído pela imagem real do arquivo original — não descreva a imagem, apenas insira o marcador no fim da frase pertinente.
+   - Cite o número do Doc no texto também: "… conforme o print juntado (**Doc. 03**) [DOC:03]." Nunca repita o mesmo marcador colado ("[DOC:02] [DOC:02]").
+   - Imagem só quando a avaliação depender do visual; a legenda deve dizer documento e página.
+
 
 5. SEÇÕES — títulos em CAIXA-ALTA, sem markdown de cabeçalho (#), em linha própria. Ex.: "III – FUNDAMENTAÇÃO JURÍDICA APROFUNDADA".
 
