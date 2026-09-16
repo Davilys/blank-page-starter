@@ -57,11 +57,11 @@ Deno.serve(async (req) => {
     );
     const { data: userData } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
     if (!userData?.user) return json({ error: 'Não autorizado' }, 401);
-    const { data: isAdmin } = await supabase.rpc('has_role', {
+    const { data: canUse } = await supabase.rpc('has_inpi_resources_access', {
       _user_id: userData.user.id,
-      _role: 'admin',
+      _need_edit: true,
     });
-    if (!isAdmin) return json({ error: 'Acesso de administrador necessário' }, 403);
+    if (!canUse) return json({ error: 'Sem permissão para Recursos INPI' }, 403);
 
     const body = await req.json().catch(() => ({}));
     const caseId: string | null = typeof body?.caseId === 'string' ? body.caseId : null;
