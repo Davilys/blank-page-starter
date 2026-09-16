@@ -623,7 +623,10 @@ export default function RecursosINPI() {
     concluido: 'Finalizando',
   };
 
-  const finalizeJobResult = async (job: any, caseId: string) => {
+  // O tipo pode vir de fora quando a tela é reaberta: o estado ainda não foi
+  // aplicado quando a retomada precisa gravar a minuta.
+  const finalizeJobResult = async (job: any, caseId: string, typeOverride?: string) => {
+    const type = typeOverride || resourceType;
     const safeExtracted = sanitizeExtractedData(job.extracted_data);
     const safeContent = toSafeString(job.result_content);
     setExtractedData(safeExtracted);
@@ -634,7 +637,7 @@ export default function RecursosINPI() {
       .from('inpi_resources')
       .insert({
         user_id: user?.id,
-        resource_type: resourceType,
+        resource_type: type,
         process_number: safeExtracted.process_number || null,
         brand_name: safeExtracted.brand_name || null,
         ncl_class: safeExtracted.ncl_class || null,
@@ -665,7 +668,7 @@ export default function RecursosINPI() {
     toast.success('Minuta gerada. Confira a revisão antes de aprovar.');
   };
 
-  const pollGenerationJob = async (jobId: string, caseId: string) => {
+  const pollGenerationJob = async (jobId: string, caseId: string, typeOverride?: string) => {
     let delay = 3000;
     const deadline = Date.now() + 30 * 60 * 1000;
     let unconfirmed = 0;
@@ -692,7 +695,7 @@ export default function RecursosINPI() {
         return;
       }
       if (job.status === 'done') {
-        await finalizeJobResult(job, caseId);
+        await finalizeJobResult(job, caseId, typeOverride);
         setIsProcessing(false);
         return;
       }
@@ -763,13 +766,17 @@ export default function RecursosINPI() {
       setIsProcessing(true);
       setStep('processing');
       if (job.status === 'done') {
-        await finalizeJobResult(job, saved!.caseId!);
+        await finalizeJobResult(job, saved!.caseId!, saved!.resourceType);
         setIsProcessing(false);
         return;
       }
       setProcessingStage(JOB_STAGE_LABELS[job.stage] || 'Processando');
-      await pollGenerationJob(saved!.jobId!, saved!.caseId!);
-    })();
+      await pollGenerationJob(saved!.jobId!, saved!.caseId!, saved!.resourceType);
+    })().catch((e) => {
+      console.error('Falha ao retomar a geração:', e);
+      setProcessingError(e instanceof Error ? e.message : 'Não foi possível retomar a geração.');
+      setIsProcessing(false);
+    });
     return () => { cancelled = true; };
     // Executa uma vez, ao abrir a aba.
     // eslint-disable-next-line react-hooks/exhaustive-deps
