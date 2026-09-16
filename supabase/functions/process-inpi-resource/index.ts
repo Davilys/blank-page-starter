@@ -101,7 +101,14 @@ async function callOpenAI(
 
   const modelConfig: ModelConfig = ctx?.modelConfig ?? { model: 'gpt-5-mini', reasoningEffort: 'minimal', dedicated: false };
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  // Modelos de raciocínio levam minutos. O corte é por INATIVIDADE (nenhum byte
+  // recebido), não por duração total: a resposta é lida em streaming.
+  const IDLE_LIMIT_MS = 120000;
+  let lastActivity = Date.now();
+  const deadline = Date.now() + timeoutMs;
+  const timeout = setInterval(() => {
+    if (Date.now() - lastActivity > IDLE_LIMIT_MS || Date.now() > deadline) controller.abort();
+  }, 5000);
   const started = Date.now();
 
   const finish = async (
