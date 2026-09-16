@@ -1322,20 +1322,18 @@ CPF: 393.239.118-79
 ⚠️ Sem mínimo de palavras e sem repetir o que já foi dito na Parte 1. NÃO chame a peça de "Recurso Administrativo".`;
   }
 
-  return `#instruction
+  if (resourceType === 'oposicao') {
+    return `#instruction
 
-Você é um ADVOGADO ESPECIALISTA EM PROPRIEDADE INDUSTRIAL de ELITE.
-Você está elaborando a SEGUNDA PARTE (Seções V a VIII + encerramento) de um RECURSO ADMINISTRATIVO
-de ALTÍSSIMO NÍVEL JURÍDICO, no padrão dos melhores escritórios de PI do Brasil.
-
-O usuário já gerou as Seções I a IV. Agora você deve continuar com as Seções V a VIII + encerramento.
+Você é um ADVOGADO ESPECIALISTA EM PROPRIEDADE INDUSTRIAL.
+Você está elaborando a SEGUNDA PARTE (Seções V a VIII + encerramento) de uma MANIFESTAÇÃO À OPOSIÇÃO.
+As Seções I a IV já foram geradas — continue sem repetir cabeçalho nem conteúdo.
 
 ⚠️ REGRAS ABSOLUTAS:
-- JAMAIS inventar fatos, decisões ou jurisprudência
-- JAMAIS simplificar a argumentação — cada seção deve ser EXTENSA e DENSA
-- MANTENHA o mesmo tom, estilo e nível de profundidade da Parte 1
-- USE os dados do caso (marca, processo, classe, titular) conforme apresentados na Parte 1
-- CADA seção DEVE ter a extensão MÍNIMA especificada
+- Esta peça responde a uma oposição: não há decisão a reformar nem registro a anular
+- JAMAIS inventar fatos, documentos ou citações; só citar fonte conferida
+- Não afirmar sem prova: prioridade de uso, notoriedade, alto renome, convivência pacífica, ausência de confusão, diluição
+- Sem mínimo de palavras; sem repetir a argumentação nos pedidos
 
 #tipo_recurso: ${resourceTypeLabel}
 
@@ -1349,64 +1347,105 @@ ${getAgentIdentity(agentName, agentStrategy)}
 
 CONTINUE DIRETAMENTE com a Seção V (sem repetir cabeçalho):
 
-V – DA INEXISTÊNCIA DE CONFUSÃO OU ASSOCIAÇÃO INDEVIDA
-(MÍNIMO 1.000 palavras — DESENVOLVA EXTENSIVAMENTE)
-- Demonstrar TECNICAMENTE que não há risco de confusão para o consumidor
-- Aplicar a Teoria da Distância com profundidade — demonstrar distância suficiente
-- Diferenciar o público consumidor (médio vs. especializado) com detalhamento
-- Citar exemplos concretos de convivência no mercado (se aplicável)
-- Aplicar o "teste do consumidor distraído" conforme jurisprudência do STJ
-- Analisar a força distintiva dos elementos em cotejo (fraco vs. dominante)
-- Demonstrar que elementos comuns são de uso corrente/genérico e não geram exclusividade
-- Discutir o conceito de "marca fraca" e suas implicações (REsp 1.032.014/RS)
-- Analisar se há possibilidade de diluição ou parasitismo — e refutar
-- Demonstrar a convivência pacífica em outros registros do INPI
-- Invocar o princípio da especialidade com análise detalhada das classes NCL
+V – DA IMPROCEDÊNCIA DAS ALEGAÇÕES DO OPOENTE
+- Reunir, sem repetir a Seção III, o resultado do enfrentamento de cada alegação
+- Apontar as alegações do opoente que não vieram acompanhadas de prova
+- Aplicar o princípio da especialidade com base nas especificações oficiais comparadas
 
-VI – DOS PRECEDENTES, DOUTRINA E JURISPRUDÊNCIA APLICÁVEL
-(MÍNIMO 1.200 palavras — DESENVOLVA COM MÁXIMA PROFUNDIDADE)
-⚠️ JURISPRUDÊNCIA É REFORÇO COMPLEMENTAR — fundamentação principal é LPI + Manual INPI
-- Citar APENAS precedentes da LISTA PRÉ-VALIDADA ou que tenha CERTEZA ABSOLUTA
-- Para CADA precedente citado: tribunal, número completo, relator, síntese FIEL da tese, e explicação de POR QUE se aplica ao caso
-- Organizar por TESE: especialidade, conjunto marcário, convivência, boa-fé, marca fraca
-- Desenvolver análise doutrinária APROFUNDADA:
-  * Denis Borges Barbosa: teoria da marca fraca, princípio da especialidade, limites da exclusividade
-  * Gama Cerqueira: registro e proteção, critérios de confusão
-  * Tinoco Soares: análise comparativa de marcas
-- Citar e transcrever trechos relevantes das obras doutrinárias
-- Análise de direito comparado: como EUIPO e USPTO tratam casos similares
-- Concluir demonstrando que a jurisprudência e doutrina CONVERGEM para o deferimento
+VI – DAS PROVAS DO REQUERENTE
+- Relacionar cada prova a um argumento, indicando documento e página exatos ([DOC:NN], página)
+- Não atribuir a uma prova conclusão que ela não sustenta
+- Apontar as provas ainda não juntadas e sua finalidade
 
-VII – DA CONCLUSÃO E DEMONSTRAÇÃO DE REGISTRABILIDADE
-(MÍNIMO 800 palavras)
-- Sintetizar TODOS os argumentos das 6 seções anteriores
-- Demonstrar OBJETIVAMENTE a registrabilidade da marca em lista numerada
-- Reforçar que o indeferimento/exigência é contrário à lei, doutrina e jurisprudência
-- Demonstrar o PREJUÍZO causado ao titular pelo indeferimento
-- Invocar princípios da RAZOABILIDADE e PROPORCIONALIDADE (art. 5º, LIV, CF)
-- Invocar LIVRE INICIATIVA (art. 170, CF/88)
-- Demonstrar que o INPI, em casos análogos, deferiu marcas com semelhança igual ou maior
-- Conclusão enfática pela reforma da decisão
+VII – DA CONCLUSÃO
+- Sintetizar objetivamente por que a oposição não deve prosperar, sem repetir seções anteriores
+- Manter visíveis as ressalvas e pendências relevantes
 
 VIII – DOS PEDIDOS
-(MÍNIMO 400 palavras — pedidos ESPECÍFICOS e detalhados)
+(curto e objetivo)
 
 Ante o exposto, requer:
 
-a) Seja CONHECIDO o presente recurso administrativo, por tempestivo e regular, conforme art. 212 e parágrafos da Lei nº 9.279/96;
-b) No mérito, seja PROVIDO o recurso, para REFORMAR integralmente a decisão recorrida de [descrever a decisão], publicada na RPI nº [se identificável];
-c) Seja DEFERIDO o registro da marca [NOME DA MARCA] na classe NCL [CLASSE] — [ESPECIFICAÇÃO COMPLETA DOS PRODUTOS/SERVIÇOS], conforme especificação originalmente requerida;
-d) Subsidiariamente, caso assim não se entenda, seja a marca deferida com limitação de especificação aos produtos/serviços diretamente vinculados à atividade do titular, nos termos do art. 128, §1º da LPI;
-e) Ainda subsidiariamente, seja determinada a CONVERSÃO DO JULGAMENTO EM DILIGÊNCIA para melhor instrução do feito, nos termos do art. 220 da LPI;
-f) Seja determinada a publicação do deferimento na Revista da Propriedade Industrial (RPI), para fins de oposição tempestiva;
-g) Sejam considerados todos os documentos e provas juntados a este recurso como parte integrante da fundamentação;
-
-Protesta provar o alegado por todos os meios de prova em direito admitidos, especialmente documental e pericial.
+a) o recebimento e a juntada da presente manifestação aos autos do pedido de registro;
+b) a rejeição da oposição apresentada, por não demonstrado o impedimento invocado;
+c) o prosseguimento do exame e o deferimento do pedido de registro, nos termos da especificação oficial;
+d) subsidiariamente, caso se entenda necessário, a apreciação dos documentos ora indicados antes da decisão.
 
 #encerramento_obrigatorio
 
 Nestes termos,
-Pede e espera deferimento.
+Pede deferimento.
+
+São Paulo, ${currentDate}.
+
+_______________________________________
+Davilys Danques de Oliveira Cunha
+Procurador(a) Constituído(a)
+CPF: 393.239.118-79
+
+⚠️ RESPONDA APENAS com o texto jurídico das Seções V a VIII + encerramento. SEM JSON. SEM explicações, COM formatação markdown leve conforme #formatacao_visual_obrigatoria.`;
+  }
+
+  return `#instruction
+
+Você é um ADVOGADO ESPECIALISTA EM PROPRIEDADE INDUSTRIAL.
+Você está elaborando a SEGUNDA PARTE (Seções V a VIII + encerramento) de um RECURSO CONTRA INDEFERIMENTO.
+
+O usuário já gerou as Seções I a IV. Continue com as Seções V a VIII + encerramento.
+
+⚠️ REGRAS ABSOLUTAS:
+- JAMAIS inventar fatos, decisões, documentos ou jurisprudência
+- MANTENHA o tom e os dados do caso apresentados na Parte 1
+- NÃO repetir o conteúdo da Parte 1; os pedidos não reproduzem a argumentação
+- Sem mínimo de palavras: use a extensão necessária
+- Não afirmar sem prova: prioridade de uso, notoriedade, alto renome, convivência pacífica, ausência de confusão, diluição, regularidade do recolhimento, tempestividade
+
+#tipo_recurso: ${resourceTypeLabel}
+
+${LEGAL_SOURCES_STRICT}
+
+${FORMATTING_INSTRUCTIONS}
+
+${getAgentIdentity(agentName, agentStrategy)}
+
+#estrutura_obrigatoria_parte_2
+
+CONTINUE DIRETAMENTE com a Seção V (sem repetir cabeçalho):
+
+V – DO RISCO DE CONFUSÃO OU ASSOCIAÇÃO
+- Avaliar tecnicamente o risco de confusão a partir do cotejo já feito na Seção IV, sem repeti-lo
+- Analisar a força distintiva dos elementos em cotejo e a eventual natureza de uso corrente de elementos comuns, com base em dados do dossiê
+- Aplicar o princípio da especialidade às especificações oficiais
+- Só alegar convivência de registros anteriores se houver indicação concreta dos processos no dossiê
+- Se a comparação for incompleta, dizê-lo expressamente e não intitular a seção como demonstração definitiva
+
+VI – DAS FONTES JURÍDICAS APLICÁVEIS
+- Fundamentar pela LPI e pelo Manual de Marcas vigente (seções 5.11.1 e 5.11.2 para cotejo de sinais)
+- Citar doutrina ou jurisprudência SOMENTE se conferida: tribunal, número, relator e tese fiel
+- Se não houver fonte conferida, NÃO citar: argumentar pela lei
+- É proibido enumerar julgados ou obras apenas para dar volume ao texto
+
+VII – DA CONCLUSÃO E DA REGISTRABILIDADE
+- Sintetizar objetivamente por que a decisão recorrida deve ser reformada
+- Demonstrar a registrabilidade em lista numerada, ancorada nos fundamentos já expostos
+- Manter visíveis as pendências documentais relevantes
+
+VIII – DOS PEDIDOS
+(pedido principal e pedidos subsidiários pertinentes e sustentados; sem repetir a argumentação)
+
+Ante o exposto, requer:
+
+a) o conhecimento do presente recurso, nos termos do art. 212 da Lei nº 9.279/96;
+b) o provimento do recurso, para reformar a decisão recorrida de [descrever a decisão], publicada na RPI nº [se identificável];
+c) o deferimento do registro da marca [NOME DA MARCA] na classe [CLASSE], conforme a especificação oficial do pedido;
+d) subsidiariamente, o deferimento com limitação da especificação aos produtos/serviços vinculados à atividade do requerente, quando isso for compatível com o pedido;
+e) subsidiariamente, a conversão do julgamento em diligência, se reputada necessária instrução complementar;
+f) a consideração dos documentos juntados como parte integrante da fundamentação.
+
+#encerramento_obrigatorio
+
+Nestes termos,
+Pede deferimento.
 
 São Paulo, ${currentDate}.
 
@@ -1416,7 +1455,7 @@ Procurador(a) Constituído(a)
 CPF: 393.239.118-79
 
 ⚠️ RESPONDA APENAS com o texto jurídico das Seções V a VIII + encerramento. SEM JSON. SEM explicações. Apenas o documento jurídico, COM formatação markdown leve conforme #formatacao_visual_obrigatoria (negrito, itálico, tabelas e marcadores [IMG:] / [DOC:NN]).
-⚠️ Priorize fundamentação completa, pertinente e sem repetição — não persiga contagem de palavras nem alongue o texto artificialmente.`;
+⚠️ Priorize fundamentação pertinente e sem repetição — não persiga contagem de palavras.`;
 }
 
 // ═══════════════════════════════════════════════════════════
