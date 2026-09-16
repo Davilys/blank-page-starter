@@ -502,11 +502,11 @@ export default function CasePreparationPanel({
                           : ''}
                       </p>
                     </div>
-                    {(d.unreadable_pages || 0) > 0 && localFiles.current.has(d.id) && (
+                    {(d.unreadable_pages || 0) > 0 && (
                       <Button
                         variant="outline" size="sm" className="h-7 text-[11px] shrink-0"
                         disabled={visionBusy.has(d.id)}
-                        onClick={() => runVisionRead(d.id, localFiles.current.get(d.id) as File)}
+                        onClick={() => void runVisionReadById(d)}
                       >
                         {visionBusy.has(d.id)
                           ? <Loader2 className="h-3 w-3 animate-spin" />
