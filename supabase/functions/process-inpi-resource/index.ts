@@ -1858,4 +1858,48 @@ Agora elabore as SEÇÕES V a VIII + encerramento. Mantenha o MESMO tom, estilo 
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
+};
+
+// A geração pode levar vários minutos. O runtime encerra a requisição se ficar
+// 150s sem enviar bytes, então respondemos em streaming: espaços em branco
+// (ignorados pelo JSON.parse do cliente) mantêm a conexão viva até o resultado.
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  const work = handleRequest(req);
+  const encoder = new TextEncoder();
+  let settled: { status: number; body: string } | null = null;
+
+  const ready = work.then(
+    async (res) => {
+      settled = { status: res.status, body: await res.text() };
+    },
+    (err) => {
+      settled = {
+        status: 500,
+        body: JSON.stringify({ error: err instanceof Error ? err.message : 'Erro desconhecido' }),
+      };
+    },
+  );
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      let done = false;
+      ready.then(() => { done = true; });
+      while (!done) {
+        await Promise.race([ready, new Promise((r) => setTimeout(r, 15000))]);
+        if (!done) controller.enqueue(encoder.encode(' '));
+      }
+      controller.enqueue(encoder.encode(settled?.body ?? '{"error":"Erro desconhecido"}'));
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 });
+
