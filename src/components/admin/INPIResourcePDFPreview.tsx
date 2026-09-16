@@ -572,8 +572,11 @@ export async function generateNativePDF(opts: NativePDFOptions): Promise<Blob | 
         label = `(Doc. ${String(n).padStart(2, '0')})`;
       } else if (slug) {
         ev = findEvidenceBySlug(slug);
-        label = '(Imagem)';
+        label = ev
+          ? `(Doc. ${String(ev.docNumber || 0).padStart(2, '0')})`
+          : `[prova não vinculada: ${slug}]`;
       }
+
       if (ev) {
         const key = ev.id;
         if (!seen.has(key)) { seen.add(key); figs.push(ev); }
