@@ -278,10 +278,13 @@ Deno.serve(async (req) => {
     const text: string =
       json.output_text ||
       (json.output || [])
-        .flatMap((o: { content?: { text?: string }[] }) => o.content || [])
+        .flatMap((o: { content?: { type?: string; text?: string }[] }) => o.content || [])
+        .filter((c: { type?: string }) => !c.type || c.type === 'output_text')
         .map((c: { text?: string }) => c.text || '')
         .join('') ||
       '';
+
+    const incomplete = json?.status === 'incomplete';
 
     let sections: Record<string, unknown>;
     try {
@@ -292,13 +295,20 @@ Deno.serve(async (req) => {
         ...logBase,
         status: 'erro',
         http_status: 200,
-        error_kind: 'parse',
+        error_kind: incomplete ? 'truncated' : 'parse',
       });
       return new Response(
-        JSON.stringify({ error: 'A IA respondeu em formato inesperado. Tente novamente.' }),
+        JSON.stringify({
+          error: incomplete
+            ? 'A análise ficou longa demais e foi interrompida antes de terminar. Reduza os documentos anexados ou tente novamente.'
+            : 'A IA respondeu em formato inesperado. Tente novamente.',
+          error_kind: incomplete ? 'truncated' : 'parse',
+        }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
+
+
 
     const { data: last } = await admin
       .from('inpi_case_orientations')
