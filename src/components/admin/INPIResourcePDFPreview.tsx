@@ -1000,7 +1000,54 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
     return () => { cancelled = true; };
   }, [resource.id, debugEvidenceOverride]);
 
-  const evidenceByNum = (n: number) => evidences.find((e) => e.docNumber === n);
+  // ── Inventário único do caso (fonte de verdade das provas) ──────────────
+  // Quando o recurso tem caso vinculado, as provas vêm de inpi_case_documents,
+  // com número de Doc. estável e a imagem real do arquivo original. A galeria
+  // antiga (inpi_resource_evidences) segue valendo para recursos históricos
+  // que não têm caso.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (debugEvidenceOverride) return;
+      setIsLoadingInventory(true);
+      try {
+        const inv = await loadCaseInventory(resource.id);
+        if (!inv || cancelled) { if (!cancelled) setInventory(null); return; }
+        const hydrated = await hydrateInventoryPreviews(inv.items);
+        if (!cancelled) setInventory({ ...inv, items: hydrated });
+      } catch (err) {
+        console.error('Falha ao carregar o inventário do caso:', err);
+        if (!cancelled) setInventory(null);
+      } finally {
+        if (!cancelled) setIsLoadingInventory(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [resource.id, debugEvidenceOverride]);
+
+  const inventoryItems = inventory?.items ?? [];
+  const hasInventory = inventoryItems.length > 0;
+
+  const inventoryEvidences: ResourceEvidence[] = hasInventory
+    ? inventoryItems.map((item) => ({
+        id: item.id,
+        storage_path: item.storagePath,
+        caption: `${item.categoryLabel} — ${item.fileName}${item.previewPage ? ` (página ${item.previewPage})` : ''}`,
+        source_file_name: item.fileName,
+        page_number: item.previewPage ?? null,
+        placement: 'inline' as const,
+        display_order: item.docNumber,
+        included: true,
+        docNumber: item.docNumber,
+        dataUrl: item.previewDataUrl,
+        width: item.previewWidth,
+        height: item.previewHeight,
+      }))
+    : [];
+
+  const activeEvidences = hasInventory ? inventoryEvidences : evidences;
+
+  const evidenceByNum = (n: number) => activeEvidences.find((e) => e.docNumber === n);
   // Detect which [DOC:NN] markers actually appear in the AI-generated text.
   // Any evidence NOT cited will be appended inline at the end of the content
   // as a safety fallback — we never render a separate "ANEXOS" section.
@@ -1012,7 +1059,12 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
       citedDocNums.add(parseInt(m[1], 10));
     }
   }
-  const uncitedEvidences = evidences.filter((e) => e.docNumber != null && !citedDocNums.has(e.docNumber));
+  // Com inventário, o pacote de anexos já traz todos os documentos: não se
+  // repete a prova solta no fim do corpo da peça.
+  const uncitedEvidences = hasInventory
+    ? []
+    : evidences.filter((e) => e.docNumber != null && !citedDocNums.has(e.docNumber));
+
 
   const isNotif = isNotificacao(resourceType);
   const isRespostaNotif = isRespostaNotificacao(resourceType);
