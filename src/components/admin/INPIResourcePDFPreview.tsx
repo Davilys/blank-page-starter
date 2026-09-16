@@ -902,6 +902,11 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
   const [isEditing, setIsEditing] = useState(false);
   const [editDraft, setEditDraft] = useState<string>(content);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [inventory, setInventory] = useState<CaseInventory | null>(null);
+  const [isLoadingInventory, setIsLoadingInventory] = useState(false);
+  const [inventoryAnnexes, setInventoryAnnexes] = useState<NativeAnnexDoc[] | null>(null);
+  const [isBuildingAnnexes, setIsBuildingAnnexes] = useState(false);
+
 
   useEffect(() => {
     setLiveContent(content);
