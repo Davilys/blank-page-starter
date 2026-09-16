@@ -1410,7 +1410,31 @@ export function INPIResourcePDFPreview({ resource, content, resourceType, debugE
 
   return (
     <div className="space-y-4">
+      {hasInventory && (
+        <div className="print:hidden rounded-xl border bg-muted/40 p-3 text-xs space-y-1">
+          <p className="font-semibold">
+            Acervo do caso: {inventoryItems.length} documento(s) vinculado(s) — os mesmos que entram no índice e nos anexos do PDF.
+          </p>
+          <ul className="space-y-0.5">
+            {inventoryItems.map((it) => (
+              <li key={it.id}>
+                Doc. {String(it.docNumber).padStart(2, '0')} — {it.fileName} ({it.categoryLabel})
+                {it.previewError ? ` · imagem indisponível: ${it.previewError}` : ''}
+              </li>
+            ))}
+          </ul>
+          {markerPendencies.length > 0 && (
+            <div className="mt-2 rounded-lg border border-destructive/40 bg-destructive/5 p-2 text-destructive">
+              <p className="font-semibold">Referências de prova não vinculadas — o pacote não pode ser dado como completo:</p>
+              <ul className="list-disc pl-4">
+                {markerPendencies.map((p) => <li key={p}>{p}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
       <div className="flex gap-3 justify-end print:hidden">
+
         {isEditing ? (
           <>
             <Button
