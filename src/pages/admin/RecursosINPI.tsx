@@ -663,20 +663,26 @@ export default function RecursosINPI() {
 
   const pollGenerationJob = async (jobId: string, caseId: string) => {
     let delay = 3000;
-    const deadline = Date.now() + 20 * 60 * 1000;
+    const deadline = Date.now() + 30 * 60 * 1000;
+    let unconfirmed = 0;
     while (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, delay));
       delay = Math.min(delay * 1.3, 12000);
       const { data, error } = await supabase.functions.invoke('process-inpi-resource', {
         body: { action: 'status', job_id: jobId },
       });
-      if (error) continue;
-      const job = data?.job;
-      if (!job) continue;
+      if (error || !data?.job) {
+        // Consulta sem resposta não significa que o servidor parou.
+        unconfirmed++;
+        if (unconfirmed >= 3) setProcessingStage('Não foi possível confirmar o andamento');
+        continue;
+      }
+      unconfirmed = 0;
+      const job = data.job;
       setProcessingStage(JOB_STAGE_LABELS[job.stage] || 'Processando');
-      setProcessingProgress((prev) => Math.max(prev, job.stage === 'pass2' ? 62 : 28));
+      setProcessingProgress((prev) => Math.max(prev, job.stage === 'pass2' ? 62 : job.stage === 'pass1' ? 28 : 12));
       if (job.status === 'error') {
-        setProcessingError(job.error_message || 'A geração falhou. Você pode tentar de novo a partir da etapa que parou.');
+        setProcessingError(job.error_message || 'Geração interrompida. Você pode tentar de novo a partir da etapa que parou.');
         setIsProcessing(false);
         return;
       }
