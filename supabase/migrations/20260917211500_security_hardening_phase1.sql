@@ -10,7 +10,8 @@ security definer
 set search_path = public
 as $function$
 begin
-  if coalesce(auth.role(), '') <> 'service_role'\n     and (auth.uid() is null or not public.has_role(auth.uid(), 'admin')) then
+  if coalesce(auth.role(), '') <> 'service_role'
+     and (auth.uid() is null or not public.has_role(auth.uid(), 'admin')) then
     raise exception 'Apenas administradores podem conceder perfil administrativo';
   end if;
 
@@ -32,7 +33,8 @@ as $function$
 declare
   found_user_id uuid;
 begin
-  if coalesce(auth.role(), '') <> 'service_role'\n     and (auth.uid() is null or not public.has_role(auth.uid(), 'admin')) then
+  if coalesce(auth.role(), '') <> 'service_role'
+     and (auth.uid() is null or not public.has_role(auth.uid(), 'admin')) then
     raise exception 'Apenas administradores podem consultar usuários';
   end if;
 
@@ -56,7 +58,8 @@ security definer
 set search_path = public
 as $function$
 begin
-  if coalesce(auth.role(), '') <> 'service_role'\n     and (auth.uid() is null or not public.has_role(auth.uid(), 'admin')) then
+  if coalesce(auth.role(), '') <> 'service_role'
+     and (auth.uid() is null or not public.has_role(auth.uid(), 'admin')) then
     raise exception 'Apenas administradores podem unificar clientes';
   end if;
 
