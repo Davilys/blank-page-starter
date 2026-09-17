@@ -1015,7 +1015,7 @@ ou, quando estritamente necessário, uma MANIFESTAÇÃO TÉCNICA LIMITADA aos po
 - Mantenha a estrutura I–IV abaixo, mas SEM doutrina/jurisprudência.
 
 ➡️ SE TIPO C:
-- Elaborar defesa completa, com quadros comparativos e referências a imagens [IMG:NN] dos documentos.
+- Elaborar defesa completa, com quadros comparativos e imagens no formato [IMG:docNN_pM], sempre na página correta da prova.
 - Mantenha a estrutura I–IV abaixo.
 
 🔒 REGRA ABSOLUTA: Nunca inventar produtos, serviços, documentos ou atividades que não estejam EXPRESSAMENTE presentes no processo ou nos documentos anexados.
