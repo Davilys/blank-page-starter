@@ -801,13 +801,18 @@ export async function generateNativePDF(opts: NativePDFOptions): Promise<Blob | 
     pdf.line(MARGIN_L, y, A4_W_MM - MARGIN_R, y);
     y += 6;
 
+    // Posição das células "Localização", preenchidas depois de montar os anexos,
+    // para que o índice informe a página real em que cada anexo começa.
+    const locationCells: { row: number; page: number; x: number; y: number }[] = [];
+
     autoTable(pdf, {
-      head: [['Doc.', 'Documento', 'Finalidade', 'Páginas', 'Situação']],
+      head: [['Doc.', 'Documento', 'Finalidade', 'Páginas', 'Localização', 'Situação']],
       body: annexes.map((a) => [
         String(a.docNumber).padStart(2, '0'),
         a.fileName,
         a.categoryLabel,
         a.status === 'falha' ? '—' : String(a.images.length || Math.max(1, Math.ceil(a.textBlocks.length / 45))),
+        '',
         a.status === 'convertido' ? 'Incluído' : a.status === 'parcial' ? 'Incluído em parte' : 'NÃO INCLUÍDO',
       ]),
       startY: y,
@@ -816,6 +821,16 @@ export async function generateNativePDF(opts: NativePDFOptions): Promise<Blob | 
       headStyles: { fillColor: [30, 58, 95], textColor: [255, 255, 255], fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [247, 249, 252] },
       didDrawPage: () => { drawHeaderBars(); },
+      didDrawCell: (data) => {
+        if (data.section === 'body' && data.column.index === 4) {
+          locationCells.push({
+            row: data.row.index,
+            page: pdf.getNumberOfPages(),
+            x: data.cell.x + 1.8,
+            y: data.cell.y + data.cell.height - 2,
+          });
+        }
+      },
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const idxY = (pdf as any).lastAutoTable?.finalY;
@@ -829,9 +844,15 @@ export async function generateNativePDF(opts: NativePDFOptions): Promise<Blob | 
       );
     }
 
+    const annexLocation = new Map<number, string>();
+
     for (const annex of annexes) {
-      if (annex.status === 'falha') continue;
+      if (annex.status === 'falha') {
+        annexLocation.set(annexes.indexOf(annex), 'não incluído');
+        continue;
+      }
       addPage();
+      const annexStartPage = pdf.getNumberOfPages();
       y = MARGIN_TOP + 2;
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(10.5);
@@ -870,7 +891,25 @@ export async function generateNativePDF(opts: NativePDFOptions): Promise<Blob | 
           });
         }
       }
+      const annexEndPage = pdf.getNumberOfPages();
+      annexLocation.set(
+        annexes.indexOf(annex),
+        annexStartPage === annexEndPage
+          ? `pág. ${annexStartPage}`
+          : `págs. ${annexStartPage}–${annexEndPage}`,
+      );
     }
+
+    // Preenche a coluna "Localização" do índice com a página real de cada anexo.
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8.5);
+    pdf.setTextColor(26, 26, 26);
+    for (const cell of locationCells) {
+      const label = annexLocation.get(cell.row) ?? '—';
+      pdf.setPage(cell.page);
+      pdf.text(label, cell.x, cell.y);
+    }
+    pdf.setPage(pdf.getNumberOfPages());
   }
 
   // ============ FOOTERS + CARIMBO ============

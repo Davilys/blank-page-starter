@@ -845,6 +845,9 @@ const FORMATTING_INSTRUCTIONS = `
    - O marcador é substituído pela imagem real do arquivo original — não descreva a imagem, apenas insira o marcador no fim da frase pertinente.
    - Cite o número do Doc no texto também: "… conforme o print juntado (**Doc. 03**) [DOC:03]." Nunca repita o mesmo marcador colado ("[DOC:02] [DOC:02]").
    - Imagem só quando a avaliação depender do visual; a legenda deve dizer documento e página.
+   - A PÁGINA PRECISA SER A CORRETA: use a página em que a prova realmente está (ex.: se o cartaz está na página 2 do Doc. 02, escreva [IMG:doc02_p2], nunca [IMG:doc02]). Nunca use a primeira página como substituta.
+   - Não repita a mesma figura quando a referência textual [DOC:NN] já bastar.
+   - Se você não souber em que página está a prova, NÃO insira imagem: cite apenas [DOC:NN] e registre a pendência no texto.
 
 
 5. SEÇÕES — títulos em CAIXA-ALTA, sem markdown de cabeçalho (#), em linha própria. Ex.: "III – FUNDAMENTAÇÃO JURÍDICA APROFUNDADA".
@@ -1012,7 +1015,7 @@ ou, quando estritamente necessário, uma MANIFESTAÇÃO TÉCNICA LIMITADA aos po
 - Mantenha a estrutura I–IV abaixo, mas SEM doutrina/jurisprudência.
 
 ➡️ SE TIPO C:
-- Elaborar defesa completa, com quadros comparativos e referências a imagens [IMG:NN] dos documentos.
+- Elaborar defesa completa, com quadros comparativos e imagens no formato [IMG:docNN_pM], sempre na página correta da prova.
 - Mantenha a estrutura I–IV abaixo.
 
 🔒 REGRA ABSOLUTA: Nunca inventar produtos, serviços, documentos ou atividades que não estejam EXPRESSAMENTE presentes no processo ou nos documentos anexados.

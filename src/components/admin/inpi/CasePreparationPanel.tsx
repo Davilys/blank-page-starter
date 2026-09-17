@@ -419,7 +419,13 @@ export default function CasePreparationPanel({
   const sections = orientation?.sections as Record<string, unknown> | undefined;
   const listOf = (key: string): string[] => {
     const v = sections?.[key];
-    return Array.isArray(v) ? v.map(orientationItemText).filter(Boolean) : [];
+    if (Array.isArray(v)) return v.map(orientationItemText).filter(Boolean);
+    if (typeof v === 'string') return v.trim() ? [v.trim()] : [];
+    if (v && typeof v === 'object') {
+      const t = orientationItemText(v);
+      return t ? [t] : [];
+    }
+    return [];
   };
 
   const statusBadge = (s: ExtractionStatus) => {
@@ -591,12 +597,20 @@ export default function CasePreparationPanel({
             <div className="space-y-4">
               <Separator />
               {[
+                { key: 'questao_central', title: 'Questão a enfrentar' },
+                { key: 'dados_oficiais', title: 'Dados oficiais do caso' },
+                { key: 'divergencias', title: 'Divergências para conferência' },
+                { key: 'fatos_documentados', title: 'Fatos documentados e fontes' },
+                { key: 'inferencias', title: 'Inferências (não são fatos)' },
                 { key: 'fundamentos', title: 'Fundamentos a responder' },
                 { key: 'provas', title: 'Provas disponíveis e o que demonstram' },
+                { key: 'imagens_sugeridas', title: 'Imagens: documento, página e finalidade' },
                 { key: 'pontos_favoraveis', title: 'Pontos favoráveis' },
                 { key: 'pontos_desfavoraveis', title: 'Pontos desfavoráveis' },
-                { key: 'lacunas', title: 'Lacunas' },
+                { key: 'lacunas', title: 'Lacunas do acervo enviado' },
                 { key: 'documentos_recomendados', title: 'Documentos adicionais recomendados' },
+                { key: 'estrutura_sugerida', title: 'Estrutura sugerida da peça' },
+                { key: 'pedidos_compativeis', title: 'Pedidos compatíveis' },
               ].map(({ key, title }) => {
                 const items = listOf(key);
                 if (!items.length) return null;
