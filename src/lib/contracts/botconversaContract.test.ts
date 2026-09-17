@@ -18,6 +18,12 @@ describe('BotConversa contract payload', () => {
     expect(parsed.errors).toEqual([]);
     expect(parsed.data?.state).toBe('SP');
   });
+  it('uses the WhatsApp contact number when the agent does not collect a phone field', () => {
+    const { phone, ...withoutPhone } = valid;
+    const parsed = validateBotConversaContractInput({ ...withoutPhone, contact_phone: phone });
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.data?.phone).toBe(phone);
+  });
   it('rejects invalid CPF and a missing idempotency event', () => {
     expect(isValidCpf('111.111.111-11')).toBe(false);
     const parsed = validateBotConversaContractInput({ ...valid, cpf: '111.111.111-11', event_id: 'short' });
