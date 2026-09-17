@@ -147,6 +147,9 @@ verify_jwt = false
 [functions.inpi-process-lookup]
 verify_jwt = true
 
+[functions.create-contract-from-botconversa]
+verify_jwt = false
+
 [functions.read-inpi-scanned-pages]
 verify_jwt = false
 
