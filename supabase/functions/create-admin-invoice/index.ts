@@ -47,15 +47,11 @@ serve(async (req) => {
       throw new Error("Não autorizado");
     }
 
-    const { data: callerRole, error: roleLookupError } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", caller.id)
-      .eq("role", "admin")
-      .maybeSingle();
+    const { data: hasFinancialPermission, error: permissionError } = await supabaseAdmin
+      .rpc("has_financial_permission", { _user_id: caller.id });
 
-    if (roleLookupError || !callerRole) {
-      throw new Error("Apenas administradores podem executar esta ação");
+    if (permissionError || hasFinancialPermission !== true) {
+      throw new Error("Sem permissão financeira para executar esta ação");
     }
 
     if (!ASAAS_API_KEY) {
