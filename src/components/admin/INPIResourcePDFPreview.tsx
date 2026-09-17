@@ -891,7 +891,25 @@ export async function generateNativePDF(opts: NativePDFOptions): Promise<Blob | 
           });
         }
       }
+      const annexEndPage = pdf.getNumberOfPages();
+      annexLocation.set(
+        annexes.indexOf(annex),
+        annexStartPage === annexEndPage
+          ? `pág. ${annexStartPage}`
+          : `págs. ${annexStartPage}–${annexEndPage}`,
+      );
     }
+
+    // Preenche a coluna "Localização" do índice com a página real de cada anexo.
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8.5);
+    pdf.setTextColor(26, 26, 26);
+    for (const cell of locationCells) {
+      const label = annexLocation.get(cell.row) ?? '—';
+      pdf.setPage(cell.page);
+      pdf.text(label, cell.x, cell.y);
+    }
+    pdf.setPage(pdf.getNumberOfPages());
   }
 
   // ============ FOOTERS + CARIMBO ============
