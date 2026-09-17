@@ -75,8 +75,8 @@ serve(async (req) => {
     }
 
     const token = authHeader.slice("Bearer ".length);
-    const { data: { user: caller }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !caller) {
+    const { data: { user: caller }, error: callerAuthError } = await supabase.auth.getUser(token);
+    if (callerAuthError || !caller) {
       throw new Error("Não autorizado");
     }
 
