@@ -19,6 +19,15 @@ interface ConclusionView {
 }
 
 function conclusionView(job: TrademarkSearchJob, brand: string): ConclusionView {
+  const analysis = job.result?.activity_analysis;
+  if (job.status === 'completed' && analysis) {
+    return {
+      tone: analysis.counts.related ? 'warning' : 'neutral',
+      title: analysis.counts.related ? 'Ocorrências potencialmente relacionadas à sua atividade' : analysis.counts.pending ? 'Há ocorrências que precisam de conferência' : 'Nenhuma ocorrência relevante identificada nesta triagem',
+      description: analysis.message + ' Antes do protocolo, a WebMarcas realizará a conferência técnica. A consulta não garante registro.',
+      icon: analysis.counts.related ? AlertTriangle : HelpCircle,
+    };
+  }
   const conclusion = job.result?.conclusion;
   if (job.status === 'completed' && conclusion === 'no_matches_in_searched_terms') {
     return {
@@ -94,10 +103,11 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
   const Icon = view.icon;
   const result = job.result;
   const searches = result?.searches ?? [];
+  const analysis = result?.activity_analysis;
   const totalRecords = result?.records?.length ?? searches.reduce((acc, s) => acc + s.records.length, 0);
   const queriedAt = formatDate(result?.queried_at ?? null);
 
-  const hasOccurrences = job.status === 'completed' && result?.conclusion === 'requires_legal_review';
+  const hasOccurrences = job.status === 'completed' && (analysis ? analysis.counts.related + analysis.counts.pending > 0 : result?.conclusion === 'requires_legal_review');
   // Regra aprovada: ocorrências encontradas => CTA principal "Solicitar análise" (WhatsApp), não "registre agora".
   const whatsappMessage = hasOccurrences
     ? `Olá! Fiz a consulta da marca ${brandName} e foram encontradas ocorrências. Gostaria de solicitar uma análise técnica.`
@@ -126,8 +136,8 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
           <p className="text-sm font-bold truncate">{brandName}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-3">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Registros</p>
-          <p className="text-sm font-bold">{totalRecords}</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{analysis ? 'Relacionadas à atividade' : 'Correspondências textuais'}</p>
+          <p className="text-sm font-bold">{analysis ? analysis.counts.related : totalRecords}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-3">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Buscas</p>
@@ -139,7 +149,32 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
         </div>
       </div>
 
+      {analysis && (
+        <section aria-label="Triagem por atividade" className="space-y-3">
+          <p className="text-xs text-muted-foreground">{analysis.limitation}</p>
+          {(['related', 'pending', 'other'] as const).map(group => {
+            const label = {related: 'Potencialmente relacionadas', pending: 'Necessitam conferência — não descartadas', other: 'Outros segmentos — consultar resultados'}[group];
+            const selected = analysis.items.filter(i => i.group === group);
+            return <details key={group} open={group === 'related' || (group === 'pending' && !analysis.counts.related)} className="rounded-xl border border-border bg-card">
+              <summary className="cursor-pointer p-3 text-sm font-semibold">{label}: {selected.length}</summary>
+              {group === 'other' && <p className="px-3 text-xs text-muted-foreground">Não são impedimentos automáticos. Esta separação preliminar não exclui juridicamente conflito ou proteção especial.</p>}
+              {!selected.length ? <p className="px-3 pb-3 text-xs text-muted-foreground">{group === 'related' && analysis.counts.pending ? 'Sem ocorrência confirmada neste grupo; há pendências de conferência.' : 'Nenhuma ocorrência neste grupo.'}</p> :
+                <ul className="max-h-96 overflow-y-auto">{selected.map(item => {
+                  const record = result!.records.find(r => r.process === item.process)!;
+                  return <li key={item.process} className="border-t border-border">
+                    <ul><RecordRow r={record} /></ul>
+                    {item.specification && <p className="px-3 pb-2 text-xs break-words"><strong>Especificação oficial:</strong> {item.specification}</p>}
+                    <p className="px-3 pb-3 text-xs text-muted-foreground">{item.reason}</p>
+                  </li>;
+                })}</ul>}
+            </details>;
+          })}
+          <p className="text-xs text-muted-foreground">Total textual preservado: {totalRecords}. Classes de foco preliminar: {analysis.focus_classes.join(', ') || 'ramo a esclarecer'}.</p>
+        </section>
+      )}
       {searches.length > 0 && (
+        <details className="rounded-xl border border-border p-3" open={!analysis}>
+        <summary className="cursor-pointer text-sm font-medium">Rastreabilidade: todas as buscas e correspondências textuais</summary>
         <div className="space-y-2">
           {searches.map((s) => {
             const key = `${s.mode}:${s.term}`;
@@ -171,6 +206,7 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
             );
           })}
         </div>
+        </details>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

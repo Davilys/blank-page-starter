@@ -1,3 +1,4 @@
+import { normalizeActivityAnalysis } from '../_shared/activityAnalysis.ts';
 /**
  * webmarcas-inpi-search
  *
@@ -194,6 +195,7 @@ function normResult(v: unknown) {
     records: normRecords(r.records),
     conclusion: s(r.conclusion) ?? 'inconclusive',
     scope: s(r.scope),
+    activity_analysis: normalizeActivityAnalysis(r.activity_analysis, normRecords(r.records).map(r => r!.process)),
   };
 }
 

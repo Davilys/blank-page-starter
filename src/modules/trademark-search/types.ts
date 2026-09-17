@@ -1,3 +1,4 @@
+import type { ActivityAnalysis } from '../../../supabase/functions/_shared/activityAnalysis';
 /**
  * Tipos do buscador único de marcas (API WebMarcas/INPI).
  * Nenhum campo aqui contém segredo — tudo pode ser persistido em sessionStorage.
@@ -31,6 +32,7 @@ export interface TrademarkSearchMode {
 }
 
 export interface TrademarkSearchResultData {
+  activity_analysis?: ActivityAnalysis | null;
   brand: string;
   activity: string;
   queried_at: string | null;

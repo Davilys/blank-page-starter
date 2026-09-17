@@ -1,3 +1,4 @@
+import { normalizeActivityAnalysis } from '../../../supabase/functions/_shared/activityAnalysis';
 import type {
   SearchApiError,
   SearchApiResponse,
@@ -119,6 +120,7 @@ export function normalizeResult(raw: unknown): TrademarkSearchResultData | null 
     records: records.length > 0 ? records : dedupeRecords(searches.flatMap((s) => s.records)),
     conclusion: str(r.conclusion) ?? 'inconclusive',
     scope: str(r.scope),
+    activity_analysis: normalizeActivityAnalysis(r.activity_analysis, (records.length ? records : dedupeRecords(searches.flatMap(s => s.records))).map(r => r.process)),
   };
 }
 
