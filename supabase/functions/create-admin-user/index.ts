@@ -23,6 +23,29 @@ serve(async (req) => {
       }
     );
 
+    // Security: administrative actions require a valid admin session.
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      throw new Error("Não autorizado");
+    }
+
+    const token = authHeader.slice("Bearer ".length);
+    const { data: { user: caller }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !caller) {
+      throw new Error("Não autorizado");
+    }
+
+    const { data: callerRole, error: roleLookupError } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", caller.id)
+      .eq("role", "admin")
+      .maybeSingle();
+
+    if (roleLookupError || !callerRole) {
+      throw new Error("Apenas administradores podem executar esta ação");
+    }
+
     const { email, password, fullName, fullAccess, permissions, viewOwnClientsOnly } = await req.json();
 
     let userId: string;
