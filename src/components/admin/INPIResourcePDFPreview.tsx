@@ -844,9 +844,15 @@ export async function generateNativePDF(opts: NativePDFOptions): Promise<Blob | 
       );
     }
 
+    const annexLocation = new Map<number, string>();
+
     for (const annex of annexes) {
-      if (annex.status === 'falha') continue;
+      if (annex.status === 'falha') {
+        annexLocation.set(annexes.indexOf(annex), 'não incluído');
+        continue;
+      }
       addPage();
+      const annexStartPage = pdf.getNumberOfPages();
       y = MARGIN_TOP + 2;
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(10.5);
