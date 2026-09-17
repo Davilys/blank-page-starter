@@ -51,13 +51,15 @@ export function isValidCnpj(value: string): boolean {
 export function validateBotConversaContractInput(value: unknown): { data?: BotConversaContractInput; errors: string[] } {
   const raw = value && typeof value === 'object' ? value as Record<string, unknown> : {};
   const payment = normaliseText(raw.payment_method);
+  const phoneFromContact = raw.phone ?? raw.contact_phone ?? raw.whatsapp ?? (raw.contact && typeof raw.contact === 'object' ? (raw.contact as Record<string, unknown>).phone : undefined);
   const data: BotConversaContractInput = {
     event_id: normaliseText(raw.event_id),
     flow_name: normaliseText(raw.flow_name) || undefined,
     agent_name: normaliseText(raw.agent_name) || undefined,
     full_name: normaliseText(raw.full_name),
     email: normaliseText(raw.email).toLowerCase(),
-    phone: normaliseText(raw.phone),
+    // Phone is always supplied by the BotConversa contact context, never requested by Fernanda.
+    phone: normaliseText(phoneFromContact),
     cpf: normaliseText(raw.cpf),
     address: normaliseText(raw.address),
     neighborhood: normaliseText(raw.neighborhood),
