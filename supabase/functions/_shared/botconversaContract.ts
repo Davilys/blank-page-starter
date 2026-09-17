@@ -77,7 +77,9 @@ export function validateBotConversaContractInput(value: unknown): { data?: BotCo
       : undefined,
   };
   const errors: string[] = [];
-  if (!/^[A-Za-z0-9:_-]{8,200}$/.test(data.event_id)) errors.push('event_id inválido');
+  // BotConversa composes this stable key from contact fields. Formatting
+  // characters are accepted because phone/CPF may arrive masked.
+  if (!/^[^\u0000-\u001F\u007F]{8,500}$/u.test(data.event_id)) errors.push('event_id inválido');
   if (data.full_name.length < 3 || data.full_name.length > 160) errors.push('full_name inválido');
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email) || data.email.length > 254) errors.push('email inválido');
   if (!/^\d{10,11}$/.test(digits(data.phone))) errors.push('phone inválido');

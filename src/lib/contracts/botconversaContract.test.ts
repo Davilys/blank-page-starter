@@ -24,6 +24,13 @@ describe('BotConversa contract payload', () => {
     expect(parsed.errors).toEqual([]);
     expect(parsed.data?.phone).toBe(phone);
   });
+  it('accepts the idempotency key exactly as BotConversa composes it', () => {
+    const parsed = validateBotConversaContractInput({
+      ...valid,
+      event_id: 'contrato-+55 (11) 99999-9999-529.982.247-25-Marca & Café',
+    });
+    expect(parsed.errors).toEqual([]);
+  });
   it('rejects invalid CPF and a missing idempotency event', () => {
     expect(isValidCpf('111.111.111-11')).toBe(false);
     const parsed = validateBotConversaContractInput({ ...valid, cpf: '111.111.111-11', event_id: 'short' });

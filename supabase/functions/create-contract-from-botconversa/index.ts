@@ -42,8 +42,15 @@ function responseForExisting(request: any) {
       },
     }, 409);
   }
-  if (request.status === 'processing') return json({ error: 'Solicitação já está em processamento. Aguarde e não envie novamente.' }, 409);
   return null;
+}
+
+const PROCESSING_LEASE_MS = 60_000;
+
+function isStaleProcessingRequest(updatedAt: string | null | undefined) {
+  if (!updatedAt) return false;
+  const timestamp = Date.parse(updatedAt);
+  return Number.isFinite(timestamp) && Date.now() - timestamp > PROCESSING_LEASE_MS;
 }
 
 async function createOrFindProfile(supabase: any, input: BotConversaContractInput) {
@@ -119,14 +126,24 @@ async function createOrFindProfile(supabase: any, input: BotConversaContractInpu
   return { userId, isExisting: false };
 }
 
-async function createProcess(supabase: any, userId: string, input: BotConversaContractInput) {
+async function createOrFindProcess(supabase: any, userId: string, input: BotConversaContractInput) {
+  const { data: existing, error: lookupError } = await supabase.from('brand_processes')
+    .select('id').eq('source_event_id', input.event_id).maybeSingle();
+  if (lookupError) throw new Error('process_lookup_failed');
+  if (existing?.id) return existing.id as string;
   const { data, error } = await supabase.from('brand_processes').insert({
     user_id: userId,
     brand_name: input.brand_name,
     business_area: input.business_area,
     status: 'em_andamento',
     pipeline_stage: 'assinou_contrato',
+    source_event_id: input.event_id,
   }).select('id').single();
+  if (error?.code === '23505') {
+    const { data: raced, error: racedError } = await supabase.from('brand_processes')
+      .select('id').eq('source_event_id', input.event_id).single();
+    if (!racedError && raced?.id) return raced.id as string;
+  }
   if (error) throw new Error('process_create_failed');
   return data.id as string;
 }
@@ -145,6 +162,13 @@ async function standardTemplate(supabase: any) {
 }
 
 async function createContract(supabase: any, userId: string, processId: string, input: BotConversaContractInput) {
+  const { data: existing, error: lookupError } = await supabase.from('contracts')
+    .select('id, contract_number, signature_token')
+    .eq('source_event_id', input.event_id).maybeSingle();
+  if (lookupError) throw new Error('contract_lookup_failed');
+  if (existing?.id && existing.signature_token) {
+    return { id: existing.id, contractNumber: existing.contract_number, token: existing.signature_token };
+  }
   const template = await standardTemplate(supabase);
   const now = new Date();
   const token = crypto.randomUUID();
@@ -176,7 +200,16 @@ async function createContract(supabase: any, userId: string, processId: string, 
     signature_expires_at: expiresAt.toISOString(),
     visible_to_client: true,
     suggested_classes: input.suggested_classes?.length ? { classes: input.suggested_classes, selected: input.suggested_classes } : null,
+    source_event_id: input.event_id,
   }).select('id, contract_number').single();
+  if (error?.code === '23505') {
+    const { data: raced, error: racedError } = await supabase.from('contracts')
+      .select('id, contract_number, signature_token')
+      .eq('source_event_id', input.event_id).single();
+    if (!racedError && raced?.id && raced.signature_token) {
+      return { id: raced.id, contractNumber: raced.contract_number, token: raced.signature_token };
+    }
+  }
   if (error || !data) throw new Error('contract_create_failed');
   const { error: auditError } = await supabase.from('signature_audit_log').insert({
     contract_id: data.id,
@@ -207,17 +240,22 @@ serve(async (req) => {
   let requestId = '';
   try {
     const { data: existing, error: existingError } = await supabase.from('botconversa_contract_requests')
-      .select('id, status, attempt_count, contract_id, contract_number, signature_token, user_id')
+      .select('id, status, attempt_count, contract_id, contract_number, signature_token, user_id, process_id, updated_at')
       .eq('event_id', input.event_id).maybeSingle();
     if (existingError) throw new Error('request_lookup_failed');
     if (existing) {
       const response = responseForExisting(existing);
       if (response) return response;
+      const canResume = existing.status === 'failed'
+        || (existing.status === 'processing' && isStaleProcessingRequest(existing.updated_at));
+      if (!canResume) return json({ error: 'Solicitação já está em processamento. Aguarde e não envie novamente.' }, 409);
       requestId = existing.id;
-      const { error } = await supabase.from('botconversa_contract_requests').update({
+      let claim = supabase.from('botconversa_contract_requests').update({
         status: 'processing', error_code: null, attempt_count: (existing.attempt_count || 0) + 1, updated_at: new Date().toISOString(),
-      }).eq('id', requestId).in('status', ['failed']);
-      if (error) return json({ error: 'Solicitação não pode ser retomada agora' }, 409);
+      }).eq('id', requestId).eq('status', existing.status);
+      if (existing.status === 'processing') claim = claim.eq('updated_at', existing.updated_at);
+      const { data: claimed, error } = await claim.select('id').maybeSingle();
+      if (error || !claimed) return json({ error: 'Solicitação não pode ser retomada agora' }, 409);
     } else {
       const { data: created, error } = await supabase.from('botconversa_contract_requests').insert({
         event_id: input.event_id, source: 'botconversa', flow_name: input.flow_name,
@@ -227,9 +265,10 @@ serve(async (req) => {
       if (error || !created) throw new Error('request_create_failed');
       requestId = created.id;
     }
-    let request = await supabase.from('botconversa_contract_requests').select('user_id, contract_id, contract_number, signature_token').eq('id', requestId).single();
+    let request = await supabase.from('botconversa_contract_requests').select('status, user_id, process_id, contract_id, contract_number, signature_token').eq('id', requestId).single();
     if (request.error) throw new Error('request_read_failed');
     let userId = request.data.user_id as string | null;
+    let processId = request.data.process_id as string | null;
     let contractId = request.data.contract_id as string | null;
     let contractNumber = request.data.contract_number as string | null;
     let signatureToken = request.data.signature_token as string | null;
@@ -239,8 +278,14 @@ serve(async (req) => {
       const { error } = await supabase.from('botconversa_contract_requests').update({ user_id: userId, updated_at: new Date().toISOString() }).eq('id', requestId);
       if (error) throw new Error('request_update_failed');
     }
+    if (!processId) {
+      processId = await createOrFindProcess(supabase, userId, input);
+      const { error } = await supabase.from('botconversa_contract_requests').update({
+        process_id: processId, updated_at: new Date().toISOString(),
+      }).eq('id', requestId);
+      if (error) throw new Error('request_update_failed');
+    }
     if (!contractId) {
-      const processId = await createProcess(supabase, userId, input);
       const contract = await createContract(supabase, userId, processId, input);
       contractId = contract.id;
       contractNumber = contract.contractNumber;
@@ -250,15 +295,17 @@ serve(async (req) => {
       }).eq('id', requestId);
       if (error) throw new Error('request_update_failed');
     }
-    const { error: completedError } = await supabase.from('botconversa_contract_requests').update({ status: 'completed', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', requestId);
-    if (completedError) throw new Error('request_complete_failed');
+    if (request.data.status !== 'completed') {
+      const { error: completedError } = await supabase.from('botconversa_contract_requests').update({ status: 'completed', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', requestId);
+      if (completedError) throw new Error('request_complete_failed');
+    }
     // Only a freshly created contract receives 201. The BotConversa success branch
     // may send exactly one WhatsApp message with this URL; duplicate deliveries get 409.
     return json({ success: true, data: { contract_id: contractId, contract_number: contractNumber, signature_url: toSignatureUrl(signatureToken!), recipient_name: input.full_name } }, 201);
   } catch (error) {
     const errorCode = error instanceof Error ? error.message : 'unexpected_error';
     console.error('BotConversa contract webhook failed', { requestId, errorCode });
-    if (requestId) await supabase.from('botconversa_contract_requests').update({ status: 'failed', error_code: errorCode, updated_at: new Date().toISOString() }).eq('id', requestId);
+    if (requestId) await supabase.from('botconversa_contract_requests').update({ status: 'failed', error_code: errorCode, updated_at: new Date().toISOString() }).eq('id', requestId).eq('status', 'processing');
     return json({ error: 'Não foi possível criar o contrato neste momento.', code: errorCode }, 500);
   }
 });
