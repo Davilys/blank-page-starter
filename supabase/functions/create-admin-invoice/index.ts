@@ -29,10 +29,6 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    if (!ASAAS_API_KEY) {
-      throw new Error('ASAAS_API_KEY not configured');
-    }
-
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error('Supabase configuration missing');
     }
@@ -60,6 +56,10 @@ serve(async (req) => {
 
     if (roleLookupError || !callerRole) {
       throw new Error("Apenas administradores podem executar esta ação");
+    }
+
+    if (!ASAAS_API_KEY) {
+      throw new Error('ASAAS_API_KEY not configured');
     }
 
     const rawData = await req.json();
