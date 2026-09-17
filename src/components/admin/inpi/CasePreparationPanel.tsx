@@ -419,7 +419,13 @@ export default function CasePreparationPanel({
   const sections = orientation?.sections as Record<string, unknown> | undefined;
   const listOf = (key: string): string[] => {
     const v = sections?.[key];
-    return Array.isArray(v) ? v.map(orientationItemText).filter(Boolean) : [];
+    if (Array.isArray(v)) return v.map(orientationItemText).filter(Boolean);
+    if (typeof v === 'string') return v.trim() ? [v.trim()] : [];
+    if (v && typeof v === 'object') {
+      const t = orientationItemText(v);
+      return t ? [t] : [];
+    }
+    return [];
   };
 
   const statusBadge = (s: ExtractionStatus) => {
