@@ -4286,7 +4286,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         open={invoiceSheetOpen}
         onOpenChange={setInvoiceSheetOpen}
         canManageFinance={canManageFinance}
-        onChanged={async () => { await fetchClientData(); onUpdate(); }}
+        onChanged={async () => { await autoAtribuirCliente('cobrou'); await fetchClientData(); onUpdate(); }}
       />
 
       {/* ─── NOVA FATURA ─── */}
@@ -4296,7 +4296,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
           onOpenChange={setNovaFaturaOpen}
           userId={client.id}
           clientName={client.full_name}
-          onCreated={async () => { await fetchClientData(); onUpdate(); }}
+          onCreated={async () => { await autoAtribuirCliente('cobrou'); await fetchClientData(); onUpdate(); }}
         />
       )}
 
