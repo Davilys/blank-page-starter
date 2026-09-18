@@ -127,28 +127,30 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="min-w-0 space-y-5 text-foreground">
       {/* Status / situation card */}
-      <section className={cn('relative overflow-hidden rounded-2xl border p-5 sm:p-6', tone.box)} aria-labelledby="search-result-title">
-        <div className="flex min-w-0 items-start gap-4">
-          <div className={cn('grid h-14 w-14 shrink-0 place-items-center rounded-full', tone.iconBox)}>
-            <Icon className={cn('h-8 w-8', tone.icon)} strokeWidth={2.6} />
+      <section className={cn('relative overflow-hidden rounded-2xl border p-4 sm:p-5', tone.box)} aria-labelledby="search-result-title">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-full', tone.iconBox)}>
+            <Icon className={cn('h-6 w-6', tone.icon)} strokeWidth={2.6} />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 id="search-result-title" className="text-xl font-black leading-tight sm:text-2xl">
-              {view.tone === 'success' ? 'Nenhuma ocorrência relevante encontrada' : view.title}
-            </h2>
-            <span className={cn('mt-2 inline-flex rounded-full border px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider', tone.badge)}>
-              Base oficial INPI
-            </span>
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <h2 id="search-result-title" className="text-base font-black leading-tight sm:text-lg">
+                {view.tone === 'success' ? 'Nenhuma ocorrência relevante encontrada' : view.title}
+              </h2>
+              <span className={cn('inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider', tone.badge)}>
+                Base oficial INPI
+              </span>
+            </div>
           </div>
         </div>
-        <div className="mt-4 space-y-2 sm:ml-[4.5rem]">
+        <div className="mt-3 space-y-1.5 sm:ml-[3.25rem]">
           {view.tone === 'success' ? (
             <>
-              <p className="text-base font-semibold leading-relaxed">Não identificamos ocorrência potencialmente conflitante nesta triagem preliminar.</p>
-              <p className="text-sm leading-relaxed text-muted-foreground">A análise técnica da WebMarcas realizará a conferência antes do protocolo. A consulta não garante registro.</p>
+              <p className="text-sm font-semibold leading-relaxed">Não identificamos ocorrência potencialmente conflitante nesta triagem preliminar.</p>
+              <p className="text-[13px] leading-relaxed text-muted-foreground">A análise técnica da WebMarcas realizará a conferência antes do protocolo. A consulta não garante registro.</p>
             </>
           ) : (
-            <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">{view.description}</p>
+            <p className="text-[13px] leading-relaxed text-muted-foreground sm:text-sm">{view.description}</p>
           )}
         </div>
       </section>
