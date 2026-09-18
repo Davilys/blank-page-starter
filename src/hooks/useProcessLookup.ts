@@ -200,5 +200,5 @@ export function useProcessLookup() {
     [run],
   );
 
-  return { get, ensure, refetch };
+  return { get, ensure, refetch, hydrate };
 }
