@@ -193,7 +193,7 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
             const label = {related: 'Potencialmente relacionados', pending: 'Necessitam conferência', other: 'Outros segmentos'}[group];
             const selected = analysis.items.filter(i => i.group === group);
             return <details key={group} className={cn('group', index > 0 && 'border-t border-border')}>
-              <summary className="flex min-h-20 cursor-pointer list-none items-center gap-3 py-3 [&::-webkit-details-marker]:hidden">
+              <summary className="flex min-h-16 cursor-pointer list-none items-center gap-3 py-3 [&::-webkit-details-marker]:hidden">
                 <span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-full', selected.length ? 'bg-accent/10 text-accent' : 'bg-success text-success-foreground')}>
                   {selected.length ? <AlertTriangle className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}
                 </span>
