@@ -49,7 +49,7 @@ interface Props {
 }
 
 export function InpiLookupPanel({ entry, onApplied, controller }: Props) {
-  const { get, ensure, refetch } = controller;
+  const { get, ensure, refetch, hydrate } = controller;
   const state: LookupState = get(entry.process_number);
   const [confirming, setConfirming] = useState<string | null>(null);
 
