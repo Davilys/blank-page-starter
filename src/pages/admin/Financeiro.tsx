@@ -834,7 +834,7 @@ export default function AdminFinanceiro() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-16">
+                  <TableCell colSpan={8} className="text-center py-16">
                     <div className="flex flex-col items-center gap-3">
                       <div className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
                       <p className="text-sm text-muted-foreground">Carregando faturas...</p>
@@ -843,7 +843,7 @@ export default function AdminFinanceiro() {
                 </TableRow>
               ) : invoices.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-16">
+                  <TableCell colSpan={8} className="text-center py-16">
                     <div className="flex flex-col items-center gap-2">
                       <DollarSign className="h-10 w-10 text-muted-foreground/30" />
                       <p className="text-muted-foreground">Nenhuma fatura encontrada</p>
@@ -886,6 +886,17 @@ export default function AdminFinanceiro() {
                             <span className="text-sm text-muted-foreground">
                               {invoice.cliente_nome || invoice.cliente_email || '—'}
                             </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-3.5">
+                          {invoice.user_id ? (
+                            <ResponsavelChip
+                              entidade="cliente"
+                              entidadeId={invoice.user_id}
+                              responsavel={responsaveisClientes[invoice.user_id]}
+                            />
+                          ) : (
+                            <span className="text-sm text-muted-foreground">—</span>
                           )}
                         </TableCell>
                         <TableCell className="hidden md:table-cell py-3.5">
