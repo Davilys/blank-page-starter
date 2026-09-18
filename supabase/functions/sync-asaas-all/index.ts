@@ -42,9 +42,11 @@ async function asaasGet(path: string) {
     headers: { access_token: ASAAS_API_KEY, "Content-Type": "application/json" },
   });
   const text = await res.text();
-  if (res.status === 429 || res.status >= 500) {
+  const bloqueioTemporario =
+    res.status === 403 && /limite de requisi|rate limit|temporariamente bloqueado/i.test(text);
+  if (res.status === 429 || res.status >= 500 || bloqueioTemporario) {
     const ra = Number(res.headers.get("retry-after") || 0);
-    throw new AsaasTemporario(`Asaas ${res.status}`, ra > 0 ? ra : 5);
+    throw new AsaasTemporario(`Asaas ${res.status}`, ra > 0 ? ra : bloqueioTemporario ? 60 : 5);
   }
   if (!res.ok) throw new Error(`Asaas ${res.status}: ${text.slice(0, 200)}`);
   return text ? JSON.parse(text) : null;
