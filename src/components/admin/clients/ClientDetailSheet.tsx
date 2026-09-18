@@ -816,19 +816,24 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError) throw sessionError;
       if (!session?.access_token) throw new Error('Usuário não autenticado');
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-client-documents-whatsapp`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client_id: client.id, document_ids: selected.map(d => d.id), process_id: client.process_id || null, publication_id: client.publicacao_id || null }),
-      });
-      const responseText = await response.text();
-      let result: { error?: string; message?: string; quantity?: number } = {};
-      try { result = responseText ? JSON.parse(responseText) : {}; } catch { result = {}; }
-      if (!response.ok || result.error) {
-        throw new Error(result.error || result.message || responseText || `Falha ao enviar documentos (HTTP ${response.status})`);
+      let sentCount = 0;
+      for (let index = 0; index < selected.length; index += 30) {
+        const batch = selected.slice(index, index + 30);
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-client-documents-whatsapp`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ client_id: client.id, document_ids: batch.map(d => d.id), process_id: client.process_id || null, publication_id: client.publicacao_id || null }),
+        });
+        const responseText = await response.text();
+        let result: { error?: string; message?: string; quantity?: number } = {};
+        try { result = responseText ? JSON.parse(responseText) : {}; } catch { result = {}; }
+        if (!response.ok || result.error) {
+          throw new Error(result.error || result.message || responseText || `Falha ao enviar documentos (HTTP ${response.status})`);
+        }
+        sentCount += result.quantity ?? batch.length;
       }
       setSelectedDocumentIds([]);
-      toast.success(`${result.quantity ?? selected.length} arquivo(s) enviado(s) para o WhatsApp`);
+      toast.success(`${sentCount} arquivo(s) enviado(s) para o WhatsApp`);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Erro ao enviar documentos');
     }
