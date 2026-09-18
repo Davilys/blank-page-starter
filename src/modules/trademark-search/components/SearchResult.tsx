@@ -127,23 +127,23 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="min-w-0 space-y-3 text-foreground">
       {/* Status / situation card */}
-      <section className={cn('relative overflow-hidden rounded-xl border p-2.5 sm:p-3', tone.box)} aria-labelledby="search-result-title">
-        <div className="flex min-w-0 items-start gap-2">
-          <div className={cn('grid h-8 w-8 shrink-0 place-items-center rounded-full', tone.iconBox)}>
-            <Icon className={cn('h-4 w-4', tone.icon)} strokeWidth={2.6} />
+      <section className={cn('relative overflow-hidden rounded-xl border p-3 sm:p-3.5', tone.box)} aria-labelledby="search-result-title">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-full', tone.iconBox)}>
+            <Icon className={cn('h-5 w-5', tone.icon)} strokeWidth={2.6} />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
-              <h2 id="search-result-title" className="text-[13px] font-black leading-tight sm:text-sm">
+            <div className="flex min-w-0 flex-wrap items-center justify-center gap-x-2 gap-y-0.5">
+              <h2 id="search-result-title" className="text-sm font-black leading-tight sm:text-base text-center">
                 {view.tone === 'success' ? 'Nenhuma ocorrência relevante encontrada' : view.title}
               </h2>
-              <span className={cn('inline-flex rounded-full border px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider', tone.badge)}>
+              <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider', tone.badge)}>
                 Base oficial INPI
               </span>
             </div>
           </div>
         </div>
-        <div className="mt-2 space-y-0.5 sm:ml-[2.5rem]">
+        <div className="mt-2.5 space-y-1 text-center">
           {view.tone === 'success' ? (
             <>
               <p className="text-xs font-semibold leading-snug">Não identificamos ocorrência potencialmente conflitante nesta triagem preliminar.</p>
@@ -157,26 +157,26 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
 
       {/* Summary cards */}
       <div className="grid min-w-0 grid-cols-2 gap-1.5 sm:grid-cols-3" aria-label="Resumo da consulta">
-        <div className="flex min-w-0 gap-1.5 rounded-lg border border-border bg-card p-1.5 shadow-sm">
+        <div className="flex min-w-0 gap-1.5 rounded-lg border border-border bg-card p-2 shadow-sm">
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-primary/10 text-primary"><FileText className="h-3 w-3" /></span>
           <div className="min-w-0">
-            <p className="text-[9px] font-bold uppercase leading-snug text-muted-foreground">Registros encontrados</p>
-            <p className="mt-0.5 text-xs font-black leading-none">{totalRecords}</p>
+            <p className="text-[10px] font-extrabold uppercase leading-snug text-muted-foreground">Registros encontrados</p>
+            <p className="mt-0.5 text-sm font-black leading-none">{totalRecords}</p>
             <p className="mt-0.5 text-[10px] text-muted-foreground">{totalRecords === 1 ? 'registro' : 'registros'}</p>
           </div>
         </div>
-        <div className="flex min-w-0 gap-1.5 rounded-lg border border-border bg-card p-1.5 shadow-sm">
+        <div className="flex min-w-0 gap-1.5 rounded-lg border border-border bg-card p-2 shadow-sm">
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-primary/10 text-primary"><Search className="h-3 w-3" /></span>
           <div className="min-w-0">
-            <p className="text-[9px] font-bold uppercase leading-snug text-muted-foreground">Tipo de busca</p>
-            <p className="mt-0.5 overflow-wrap-anywhere text-[10px] font-bold leading-snug">{searchType}</p>
+            <p className="text-[10px] font-extrabold uppercase leading-snug text-muted-foreground">Tipo de busca</p>
+            <p className="mt-0.5 overflow-wrap-anywhere text-[11px] font-bold leading-snug">{searchType}</p>
           </div>
         </div>
-        <div className="col-span-2 flex min-w-0 gap-1.5 rounded-lg border border-border bg-card p-1.5 shadow-sm sm:col-span-1">
+        <div className="col-span-2 flex min-w-0 gap-1.5 rounded-lg border border-border bg-card p-2 shadow-sm sm:col-span-1">
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-primary/10 text-primary"><CalendarDays className="h-3 w-3" /></span>
           <div className="min-w-0">
-            <p className="text-[9px] font-bold uppercase leading-snug text-muted-foreground">Consultado em</p>
-            <p className="mt-0.5 text-[10px] font-black leading-snug">{queriedDate}</p>
+            <p className="text-[10px] font-extrabold uppercase leading-snug text-muted-foreground">Consultado em</p>
+            <p className="mt-0.5 text-[11px] font-black leading-snug">{queriedDate}</p>
             {queriedTime && <p className="text-[10px] font-semibold text-muted-foreground">{queriedTime}</p>}
           </div>
         </div>
