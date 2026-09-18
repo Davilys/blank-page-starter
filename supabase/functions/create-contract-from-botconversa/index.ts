@@ -76,7 +76,7 @@ async function resolveAddressFromCep(input: BotConversaContractInput): Promise<B
       ...input,
       // Rural and broad-range CEPs may identify the district/city but have no
       // street. Preserve the verified locality and explicitly mark this case.
-      address: street ? `${street}, ${input.address_number}` : `Zona Rural, nº ${input.address_number}`,
+      address: street ? `${street}, ${input.address_number}` : `Área Rural, nº ${input.address_number}`,
       neighborhood,
       city,
       state,
