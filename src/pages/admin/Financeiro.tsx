@@ -124,6 +124,11 @@ const EMPTY_BILLING_DATA: BillingSituationData = {
 
 export default function AdminFinanceiro() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const clientIdsNaLista = useMemo(
+    () => Array.from(new Set(invoices.map((i) => i.user_id).filter((id): id is string => !!id))),
+    [invoices],
+  );
+  const responsaveisClientes = useResponsaveis('cliente', clientIdsNaLista);
   const [clients, setClients] = useState<Client[]>([]);
   const [asaasAccounts, setAsaasAccounts] = useState<AsaasAccount[]>([]);
   const [processes, setProcesses] = useState<Process[]>([]);
