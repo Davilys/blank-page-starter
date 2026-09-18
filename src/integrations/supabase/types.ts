@@ -465,6 +465,85 @@ export type Database = {
         }
         Relationships: []
       }
+      botconversa_contract_requests: {
+        Row: {
+          agent_name: string
+          attempt_count: number
+          completed_at: string | null
+          contract_id: string | null
+          contract_number: string | null
+          created_at: string
+          error_code: string | null
+          event_id: string
+          flow_name: string
+          id: string
+          process_id: string | null
+          signature_token: string | null
+          source: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          agent_name: string
+          attempt_count?: number
+          completed_at?: string | null
+          contract_id?: string | null
+          contract_number?: string | null
+          created_at?: string
+          error_code?: string | null
+          event_id: string
+          flow_name: string
+          id?: string
+          process_id?: string | null
+          signature_token?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          agent_name?: string
+          attempt_count?: number
+          completed_at?: string | null
+          contract_id?: string | null
+          contract_number?: string | null
+          created_at?: string
+          error_code?: string | null
+          event_id?: string
+          flow_name?: string
+          id?: string
+          process_id?: string | null
+          signature_token?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "botconversa_contract_requests_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "botconversa_contract_requests_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "brand_processes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "botconversa_contract_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brand_processes: {
         Row: {
           brand_name: string
@@ -482,6 +561,7 @@ export type Database = {
           perfex_project_id: string | null
           pipeline_stage: string | null
           process_number: string | null
+          source_event_id: string | null
           status: string | null
           updated_at: string | null
           user_id: string | null
@@ -502,6 +582,7 @@ export type Database = {
           perfex_project_id?: string | null
           pipeline_stage?: string | null
           process_number?: string | null
+          source_event_id?: string | null
           status?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -522,6 +603,7 @@ export type Database = {
           perfex_project_id?: string | null
           pipeline_stage?: string | null
           process_number?: string | null
+          source_event_id?: string | null
           status?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -1430,6 +1512,7 @@ export type Database = {
           signature_token: string | null
           signature_user_agent: string | null
           signed_at: string | null
+          source_event_id: string | null
           start_date: string | null
           subject: string | null
           suggested_classes: Json | null
@@ -1479,6 +1562,7 @@ export type Database = {
           signature_token?: string | null
           signature_user_agent?: string | null
           signed_at?: string | null
+          source_event_id?: string | null
           start_date?: string | null
           subject?: string | null
           suggested_classes?: Json | null
@@ -1528,6 +1612,7 @@ export type Database = {
           signature_token?: string | null
           signature_user_agent?: string | null
           signed_at?: string | null
+          source_event_id?: string | null
           start_date?: string | null
           subject?: string | null
           suggested_classes?: Json | null
