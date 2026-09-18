@@ -15,8 +15,12 @@ import TestimonialsSection from "@/components/sections/TestimonialsSection";
 import FAQSection from "@/components/sections/FAQSection";
 import CTASection from "@/components/sections/CTASection";
 import BlogPreviewSection from "@/components/sections/BlogPreviewSection";
+import { useTrademarkSearch } from "@/modules/trademark-search/useTrademarkSearch";
 
 const Index = () => {
+  const { state: searchState } = useTrademarkSearch();
+  const showingSearchResult = searchState.phase === 'completed' && Boolean(searchState.job);
+
   return (
     <div className="brand-public min-h-screen bg-background">
       <Helmet>
@@ -43,8 +47,8 @@ const Index = () => {
         <CTASection />
       </main>
       <Footer />
-      <WhatsAppButton />
-      <SocialProofNotification />
+      {!showingSearchResult && <WhatsAppButton />}
+      {!showingSearchResult && <SocialProofNotification />}
     </div>
   );
 };

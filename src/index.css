@@ -32,6 +32,10 @@
     --accent: 152 76% 45%;
     --accent-foreground: 0 0% 100%;
 
+    /* Success — reserved for confirmed positive states */
+    --success: 152 76% 35%;
+    --success-foreground: 0 0% 100%;
+
     /* Destructive */
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
@@ -193,6 +197,13 @@
   .brand-public .hero-blue-bg {
     background: var(--gradient-hero-blue);
     color: hsl(0 0% 100%);
+  }
+
+  @media (max-width: 767px) {
+    .brand-public .hero-blue-bg.search-result-active {
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+    }
   }
 
   /* Orange CTA utility */
