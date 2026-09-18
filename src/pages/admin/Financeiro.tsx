@@ -316,6 +316,8 @@ export default function AdminFinanceiro() {
 
   // Filtros, ordenação, busca e paginação são resolvidos no banco (RPC), nunca no navegador.
   const ownerFilter = !isMasterAdmin && currentUserId ? currentUserId : null;
+  // A aba "Vencidas" é liberada para todos os administradores (valores seguem restritos).
+  const listOwnerFilter = filterStatus === 'vencidas' ? null : ownerFilter;
 
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
@@ -325,9 +327,10 @@ export default function AdminFinanceiro() {
         p_situation: filterStatus,
         p_from: dateRange.from,
         p_to: dateRange.to,
-        p_owner: ownerFilter,
+        p_owner: listOwnerFilter,
         p_sort: sortKey,
         p_dir: sortDir,
+
         p_limit: PAGE_SIZE,
         p_offset: (page - 1) * PAGE_SIZE,
         p_account: billingFilters.account || null,
@@ -353,7 +356,7 @@ export default function AdminFinanceiro() {
       setTotalCount(0);
     }
     setLoading(false);
-  }, [debouncedSearch, filterStatus, dateRange.from, dateRange.to, ownerFilter, sortKey, sortDir, page, billingFilters]);
+  }, [debouncedSearch, filterStatus, dateRange.from, dateRange.to, listOwnerFilter, sortKey, sortDir, page, billingFilters]);
 
   const fetchTotals = useCallback(async () => {
     setBillingLoading(true);
@@ -386,10 +389,39 @@ export default function AdminFinanceiro() {
           composition: (category?.composition || []).map((item: any) => ({ ...item, amount: Number(item.amount || 0), count: Number(item.count || 0) })),
         };
       });
+      // Vencidas é liberada para todos os administradores: contagem global (sem filtro de dono)
+      if (ownerFilter) {
+        const { data: globalData, error: globalError } = await supabase.rpc('admin_billing_situation', {
+          p_from: dateRange.from,
+          p_to: dateRange.to,
+          p_owner: null,
+          p_account: billingFilters.account || null,
+          p_payment_method: billingFilters.paymentMethod || null,
+          p_client: billingFilters.client || null,
+          p_origin: billingFilters.origin || null,
+          p_due_from: billingFilters.dueFrom || null,
+          p_due_to: billingFilters.dueTo || null,
+          p_payment_from: billingFilters.paymentFrom || null,
+          p_payment_to: billingFilters.paymentTo || null,
+        });
+        const globalVencidas = !globalError ? ((globalData as any)?.categories?.vencidas || null) : null;
+        if (globalVencidas) {
+          normalized.categories.vencidas = {
+            ...EMPTY_BILLING_CATEGORY,
+            ...globalVencidas,
+            gross_amount: Number(globalVencidas.gross_amount || 0),
+            net_amount: globalVencidas.net_amount == null ? null : Number(globalVencidas.net_amount),
+            clients_count: Number(globalVencidas.clients_count || 0),
+            invoices_count: Number(globalVencidas.invoices_count || 0),
+            composition: (globalVencidas.composition || []).map((item: any) => ({ ...item, amount: Number(item.amount || 0), count: Number(item.count || 0) })),
+          };
+        }
+      }
       setBillingData({ ...normalized, total: Number(normalized.total || 0) });
     } catch (e) { console.warn('totais indisponíveis', e); }
     finally { setBillingLoading(false); }
   }, [dateRange.from, dateRange.to, ownerFilter, billingFilters]);
+
 
   useEffect(() => {
     if (currentUserId !== null) { fetchInvoices(); }
