@@ -30,17 +30,53 @@ function toSignatureUrl(token: string) {
   return `${base}/assinar/${token}`;
 }
 
+async function resolveAddressFromCep(input: BotConversaContractInput): Promise<BotConversaContractInput> {
+  const alreadyComplete = input.address.length >= 5 && input.neighborhood.length >= 2 &&
+    input.city.length >= 2 && /^[A-Z]{2}$/.test(input.state);
+  if (alreadyComplete) return input;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8_000);
+  try {
+    const response = await fetch(`https://viacep.com.br/ws/${digits(input.cep)}/json/`, {
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error('cep_lookup_failed');
+    const result = await response.json();
+    if (result?.erro) throw new Error('cep_not_found');
+    const street = typeof result?.logradouro === 'string' ? result.logradouro.trim() : '';
+    const neighborhood = typeof result?.bairro === 'string' ? result.bairro.trim() : '';
+    const city = typeof result?.localidade === 'string' ? result.localidade.trim() : '';
+    const state = typeof result?.uf === 'string' ? result.uf.trim().toUpperCase() : '';
+    if (!street || !neighborhood || !city || !/^[A-Z]{2}$/.test(state)) throw new Error('cep_address_incomplete');
+    return {
+      ...input,
+      address: `${street}, ${input.address_number}`,
+      neighborhood,
+      city,
+      state,
+      cep: digits(input.cep),
+    };
+  } catch (error) {
+    if (error instanceof Error && ['cep_not_found', 'cep_address_incomplete'].includes(error.message)) throw error;
+    throw new Error('cep_lookup_failed');
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function responseForExisting(request: any) {
   if (request.status === 'completed' && request.contract_id && request.signature_token) {
     return json({
-      success: false,
+      success: true,
       duplicate: true,
-      code: 'duplicate_request',
       data: {
         contract_id: request.contract_id,
         contract_number: request.contract_number,
+        signature_url: toSignatureUrl(request.signature_token),
       },
-    }, 409);
+    });
   }
   return null;
 }
@@ -199,7 +235,9 @@ async function createContract(supabase: any, userId: string, processId: string, 
     signature_token: token,
     signature_expires_at: expiresAt.toISOString(),
     visible_to_client: true,
-    suggested_classes: input.suggested_classes?.length ? { classes: input.suggested_classes, selected: input.suggested_classes } : null,
+    suggested_classes: input.suggested_classes?.length
+      ? { classes: input.suggested_classes, selected: [input.suggested_classes[0]] }
+      : null,
     source_event_id: input.event_id,
   }).select('id, contract_number').single();
   if (error?.code === '23505') {
@@ -229,7 +267,7 @@ serve(async (req) => {
   try { body = await req.json(); } catch { return json({ error: 'Corpo JSON inválido' }, 400); }
   const parsed = validateBotConversaContractInput(body);
   if (!parsed.data) return json({ error: 'Dados inválidos', fields: parsed.errors }, 422);
-  const input = parsed.data;
+  let input = parsed.data;
   if (input.flow_name !== '1- AT FINAL SEMANA' || input.agent_name !== 'Fernanda Atendimento') {
     return json({ error: 'Origem do fluxo não autorizada' }, 403);
   }
@@ -239,6 +277,7 @@ serve(async (req) => {
   const supabase = createClient(url, serviceKey, { auth: { persistSession: false } });
   let requestId = '';
   try {
+    input = await resolveAddressFromCep(input);
     const { data: existing, error: existingError } = await supabase.from('botconversa_contract_requests')
       .select('id, status, attempt_count, contract_id, contract_number, signature_token, user_id, process_id, updated_at')
       .eq('event_id', input.event_id).maybeSingle();
@@ -299,8 +338,8 @@ serve(async (req) => {
       const { error: completedError } = await supabase.from('botconversa_contract_requests').update({ status: 'completed', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', requestId);
       if (completedError) throw new Error('request_complete_failed');
     }
-    // Only a freshly created contract receives 201. The BotConversa success branch
-    // may send exactly one WhatsApp message with this URL; duplicate deliveries get 409.
+    // A freshly created contract receives 201. Replays return the same signature URL
+    // without creating another process or contract.
     return json({ success: true, data: { contract_id: contractId, contract_number: contractNumber, signature_url: toSignatureUrl(signatureToken!), recipient_name: input.full_name } }, 201);
   } catch (error) {
     const errorCode = error instanceof Error ? error.message : 'unexpected_error';
