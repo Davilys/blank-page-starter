@@ -177,6 +177,7 @@ export function useProcessLookup() {
       const result = await promise;
       inFlight.current.delete(key);
       attempted.current.add(key);
+      hydrated.current.add(key);
       setStates((s) => ({ ...s, [key]: result }));
       return result;
     },
