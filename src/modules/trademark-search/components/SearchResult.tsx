@@ -156,28 +156,28 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
       </section>
 
       {/* Summary cards */}
-      <div className="grid min-w-0 grid-cols-2 gap-2.5 sm:grid-cols-3" aria-label="Resumo da consulta">
-        <div className="flex min-w-0 gap-2.5 rounded-2xl border border-border bg-card p-2.5 shadow-sm">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><FileText className="h-4 w-4" /></span>
+      <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3" aria-label="Resumo da consulta">
+        <div className="flex min-w-0 gap-2 rounded-xl border border-border bg-card p-2 shadow-sm">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><FileText className="h-3.5 w-3.5" /></span>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase leading-snug text-muted-foreground">Registros encontrados</p>
-            <p className="mt-0.5 text-base font-black leading-none">{totalRecords}</p>
-            <p className="mt-0.5 text-sm text-muted-foreground">{totalRecords === 1 ? 'registro' : 'registros'}</p>
+            <p className="text-[10px] font-bold uppercase leading-snug text-muted-foreground">Registros encontrados</p>
+            <p className="mt-0.5 text-sm font-black leading-none">{totalRecords}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{totalRecords === 1 ? 'registro' : 'registros'}</p>
           </div>
         </div>
-        <div className="flex min-w-0 gap-2.5 rounded-2xl border border-border bg-card p-2.5 shadow-sm">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Search className="h-4 w-4" /></span>
+        <div className="flex min-w-0 gap-2 rounded-xl border border-border bg-card p-2 shadow-sm">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Search className="h-3.5 w-3.5" /></span>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase leading-snug text-muted-foreground">Tipo de busca</p>
-            <p className="mt-1 overflow-wrap-anywhere text-sm font-bold leading-snug">{searchType}</p>
+            <p className="text-[10px] font-bold uppercase leading-snug text-muted-foreground">Tipo de busca</p>
+            <p className="mt-0.5 overflow-wrap-anywhere text-xs font-bold leading-snug">{searchType}</p>
           </div>
         </div>
-        <div className="col-span-2 flex min-w-0 gap-2.5 rounded-2xl border border-border bg-card p-2.5 shadow-sm sm:col-span-1">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><CalendarDays className="h-4 w-4" /></span>
+        <div className="col-span-2 flex min-w-0 gap-2 rounded-xl border border-border bg-card p-2 shadow-sm sm:col-span-1">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><CalendarDays className="h-3.5 w-3.5" /></span>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase leading-snug text-muted-foreground">Consultado em</p>
-            <p className="mt-0.5 text-sm font-black leading-snug">{queriedDate}</p>
-            {queriedTime && <p className="text-sm font-semibold text-muted-foreground">{queriedTime}</p>}
+            <p className="text-[10px] font-bold uppercase leading-snug text-muted-foreground">Consultado em</p>
+            <p className="mt-0.5 text-xs font-black leading-snug">{queriedDate}</p>
+            {queriedTime && <p className="text-xs font-semibold text-muted-foreground">{queriedTime}</p>}
           </div>
         </div>
       </div>
