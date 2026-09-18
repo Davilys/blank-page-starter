@@ -1384,7 +1384,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-2xl p-0 overflow-hidden flex flex-col sm:!right-8 sm:!top-8 sm:!bottom-8 rounded-2xl">
+      <SheetContent className="w-full sm:max-w-2xl p-0 overflow-hidden flex flex-col sm:!right-8 sm:!top-8 sm:!bottom-8 sm:!h-auto rounded-2xl">
         {/* ──────────────────────────────── HEADER ────────────────────────── */}
         <div className={cn('relative overflow-hidden flex-shrink-0 bg-gradient-to-r', currentStage?.color || 'from-blue-600 to-blue-700')}>
           {/* Background pattern */}
