@@ -58,7 +58,8 @@ serve(async (req) => {
     return json({ error: 'Webhook Financeiro/Publicação Inicial não configurado' }, 503);
   }
   const normalizedPhone = String(profile.phone).replace(/\D/g, '').replace(/^0/, '');
-  const telefone = normalizedPhone.startsWith('55') ? normalizedPhone : `55${normalizedPhone}`;
+  const internationalPhone = normalizedPhone.startsWith('55') ? normalizedPhone : `55${normalizedPhone}`;
+  const telefone = `+${internationalPhone}`;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (typeof config.auth_token === 'string' && config.auth_token) headers.Authorization = `Bearer ${config.auth_token}`;
   const webhookResponse = await fetch(webhookUrl, { method: 'POST', headers, body: JSON.stringify({ telefone, nome: profile.full_name || 'Cliente', mensagem: message, tipo_notificacao: 'publicacao_documentos', arquivos: JSON.stringify(arquivos), quantidade_arquivos: String(arquivos.length), client_id: clientId, event_id: eventId, process_id: body.process_id || '', publication_id: body.publication_id || '' }) });
