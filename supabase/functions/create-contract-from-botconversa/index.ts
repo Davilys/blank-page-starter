@@ -36,23 +36,47 @@ async function resolveAddressFromCep(input: BotConversaContractInput): Promise<B
   if (alreadyComplete) return input;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8_000);
+  const timeout = setTimeout(() => controller.abort(), 12_000);
   try {
-    const response = await fetch(`https://viacep.com.br/ws/${digits(input.cep)}/json/`, {
-      headers: { Accept: 'application/json' },
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error('cep_lookup_failed');
-    const result = await response.json();
-    if (result?.erro) throw new Error('cep_not_found');
+    let result: any = null;
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${digits(input.cep)}/json/`, {
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+      });
+      if (response.ok) {
+        const viaCep = await response.json();
+        if (!viaCep?.erro) result = viaCep;
+      }
+    } catch {
+      // BrasilAPI is used below as a second provider when ViaCEP is unavailable.
+    }
+
+    if (!result) {
+      const response = await fetch(`https://brasilapi.com.br/api/cep/v2/${digits(input.cep)}`, {
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+      });
+      if (response.status === 404) throw new Error('cep_not_found');
+      if (!response.ok) throw new Error('cep_lookup_failed');
+      const brasilApi = await response.json();
+      result = {
+        logradouro: brasilApi?.street,
+        bairro: brasilApi?.neighborhood,
+        localidade: brasilApi?.city,
+        uf: brasilApi?.state,
+      };
+    }
     const street = typeof result?.logradouro === 'string' ? result.logradouro.trim() : '';
     const neighborhood = typeof result?.bairro === 'string' ? result.bairro.trim() : '';
     const city = typeof result?.localidade === 'string' ? result.localidade.trim() : '';
     const state = typeof result?.uf === 'string' ? result.uf.trim().toUpperCase() : '';
-    if (!street || !neighborhood || !city || !/^[A-Z]{2}$/.test(state)) throw new Error('cep_address_incomplete');
+    if (!neighborhood || !city || !/^[A-Z]{2}$/.test(state)) throw new Error('cep_address_incomplete');
     return {
       ...input,
-      address: `${street}, ${input.address_number}`,
+      // Rural and broad-range CEPs may identify the district/city but have no
+      // street. Preserve the verified locality and explicitly mark this case.
+      address: street ? `${street}, ${input.address_number}` : `Zona Rural, nº ${input.address_number}`,
       neighborhood,
       city,
       state,
