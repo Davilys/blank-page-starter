@@ -62,6 +62,9 @@ serve(async (req) => {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (typeof config.auth_token === 'string' && config.auth_token) headers.Authorization = `Bearer ${config.auth_token}`;
   const webhookResponse = await fetch(webhookUrl, { method: 'POST', headers, body: JSON.stringify({ telefone, nome: profile.full_name || 'Cliente', mensagem: message, tipo_notificacao: 'publicacao_documentos', arquivos: JSON.stringify(arquivos), quantidade_arquivos: String(arquivos.length), client_id: clientId, event_id: eventId, process_id: body.process_id || '', publication_id: body.publication_id || '' }) });
-  if (!webhookResponse.ok) return json({ error: `Webhook recusou o envio (HTTP ${webhookResponse.status})` }, 502);
+  if (!webhookResponse.ok) {
+    const detail = (await webhookResponse.text()).replace(/\s+/g, ' ').trim().slice(0, 300);
+    return json({ error: `Webhook recusou o envio (HTTP ${webhookResponse.status})${detail ? `: ${detail}` : ''}` }, 502);
+  }
   return json({ success: true, event_id: eventId, quantity: arquivos.length, files: arquivos.map((f: any) => f.nome) });
 });
