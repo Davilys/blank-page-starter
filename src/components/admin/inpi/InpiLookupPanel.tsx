@@ -79,6 +79,8 @@ export function InpiLookupPanel({ entry, onApplied, controller }: Props) {
   };
 
   useEffect(() => {
+    // Reexibe a última consulta gravada, mesmo após fechar e reabrir o processo.
+    void hydrate(entry.process_number);
     if (isIncomplete(entry)) ensure(entry.process_number, entry.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entry.id, entry.process_number]);
