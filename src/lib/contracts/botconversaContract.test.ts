@@ -24,6 +24,22 @@ describe('BotConversa contract payload', () => {
     expect(parsed.errors).toEqual([]);
     expect(parsed.data?.phone).toBe(phone);
   });
+  it('accepts only CEP and residence number so the backend can resolve the address', () => {
+    const { address, neighborhood, city, state, ...cepOnly } = valid;
+    const parsed = validateBotConversaContractInput({ ...cepOnly, numero_residencia: '2299' });
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.data?.address_number).toBe('2299');
+    expect(parsed.data?.address).toBe('');
+  });
+  it('does not require RG or company name when CNPJ is supplied', () => {
+    const parsed = validateBotConversaContractInput({ ...valid, cnpj: '60.869.686/0001-83' });
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.data).not.toHaveProperty('rg');
+  });
+  it('normalises conversational payment labels', () => {
+    expect(validateBotConversaContractInput({ ...valid, payment_method: 'Pix' }).data?.payment_method).toBe('avista');
+    expect(validateBotConversaContractInput({ ...valid, payment_method: '3x no Boleto' }).data?.payment_method).toBe('boleto3x');
+  });
   it('accepts the idempotency key exactly as BotConversa composes it', () => {
     const parsed = validateBotConversaContractInput({
       ...valid,
