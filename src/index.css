@@ -199,6 +199,13 @@
     color: hsl(0 0% 100%);
   }
 
+  @media (max-width: 767px) {
+    .brand-public .hero-blue-bg.search-result-active {
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+    }
+  }
+
   /* Orange CTA utility */
   .brand-public .btn-orange {
     background: var(--gradient-accent-orange);

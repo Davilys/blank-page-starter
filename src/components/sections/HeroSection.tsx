@@ -26,7 +26,7 @@ const HeroSection = () => {
   ];
 
   return (
-    <section id="home" className={cn("relative hero-blue-bg overflow-x-clip overflow-y-visible", showingResult && "max-md:bg-background max-md:text-foreground")}>
+    <section id="home" className={cn("relative hero-blue-bg overflow-x-clip overflow-y-visible", showingResult && "search-result-active max-md:text-foreground")}>
 
       <div className={cn("container mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16 relative z-10 max-w-7xl", showingResult && "max-md:px-3 max-md:pb-10 max-md:pt-20")}>
         {/* Two-column hero */}

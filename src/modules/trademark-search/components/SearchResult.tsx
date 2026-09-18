@@ -22,9 +22,11 @@ interface ConclusionView {
 function conclusionView(job: TrademarkSearchJob, brand: string): ConclusionView {
   const analysis = job.result?.activity_analysis;
   if (job.status === 'completed' && analysis) {
+    const hasRelated = analysis.counts.related > 0;
+    const hasPending = analysis.counts.pending > 0;
     return {
-      tone: analysis.counts.related ? 'warning' : 'neutral',
-      title: analysis.counts.related ? 'Ocorrências potencialmente relacionadas à sua atividade' : analysis.counts.pending ? 'Há ocorrências que precisam de conferência' : 'Nenhuma ocorrência relevante identificada nesta triagem',
+      tone: hasRelated || hasPending ? 'warning' : 'success',
+      title: hasRelated ? 'Ocorrências potencialmente relacionadas à sua atividade' : hasPending ? 'Há ocorrências que precisam de conferência' : 'Nenhuma ocorrência relevante encontrada',
       description: analysis.message + ' Antes do protocolo, a WebMarcas realizará a conferência técnica. A consulta não garante registro.',
       icon: analysis.counts.related ? AlertTriangle : HelpCircle,
     };
@@ -140,7 +142,7 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
           </div>
         </div>
         <div className="mt-4 space-y-2 sm:ml-[4.5rem]">
-          {view.tone === 'success' && analysis ? (
+          {view.tone === 'success' ? (
             <>
               <p className="text-base font-semibold leading-relaxed">Não identificamos ocorrência potencialmente conflitante nesta triagem preliminar.</p>
               <p className="text-sm leading-relaxed text-muted-foreground">A análise técnica da WebMarcas realizará a conferência antes do protocolo. A consulta não garante registro.</p>
