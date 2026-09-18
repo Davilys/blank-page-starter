@@ -4,7 +4,7 @@
 
 Na tabela do Financeiro, entre **Cliente** e **Valor**, passa a existir a coluna **Usuário**:
 
-- Se o cliente já tem um usuário responsável, aparece o nome dele (chip azul com iniciais).
+- Se o cliente já tem um usuário responsável, aparece o nome dele (chip azul com primeiro nome do usuário).
 - Se não tem, aparece o botão **"Sem responsável"** — ao clicar, abre a lista de administradores para atribuir.
 - A atribuição é por **cliente** (não por fatura), então todas as cobranças daquele cliente mostram o mesmo responsável.
 
