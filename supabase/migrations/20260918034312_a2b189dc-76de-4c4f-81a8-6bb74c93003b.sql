@@ -1,0 +1,4 @@
+ALTER TABLE public.responsavel_atribuicao DROP CONSTRAINT IF EXISTS responsavel_atribuicao_entidade_check;
+ALTER TABLE public.responsavel_atribuicao ADD CONSTRAINT responsavel_atribuicao_entidade_check CHECK (entidade = ANY (ARRAY['invoice'::text, 'devedor'::text, 'publicacao'::text, 'cliente'::text]));
+ALTER TABLE public.responsavel_historico DROP CONSTRAINT IF EXISTS responsavel_historico_entidade_check;
+ALTER TABLE public.responsavel_historico ADD CONSTRAINT responsavel_historico_entidade_check CHECK (entidade = ANY (ARRAY['invoice'::text, 'devedor'::text, 'publicacao'::text, 'cliente'::text]));
