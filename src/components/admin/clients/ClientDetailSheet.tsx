@@ -50,6 +50,7 @@ import { DataEnrichmentDialog } from './DataEnrichmentDialog';
 import { InvoiceActionsSheet, type InvoiceLike } from './InvoiceActionsSheet';
 import { NovaFaturaDialog } from './NovaFaturaDialog';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { atribuirResponsavel } from '@/hooks/useResponsaveis';
 import { classificarCobranca, LABEL_ORIGEM, type OrigemCobranca } from '@/lib/financeiro/statusCobranca';
 
 const MASTER_ADMIN_EMAIL = 'davillys@gmail.com';
