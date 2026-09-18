@@ -32,6 +32,10 @@
     --accent: 152 76% 45%;
     --accent-foreground: 0 0% 100%;
 
+    /* Success — reserved for confirmed positive states */
+    --success: 152 76% 35%;
+    --success-foreground: 0 0% 100%;
+
     /* Destructive */
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;

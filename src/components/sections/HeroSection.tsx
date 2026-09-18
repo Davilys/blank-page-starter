@@ -3,6 +3,8 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { TrademarkSearch } from "@/modules/trademark-search/components/TrademarkSearch";
+import { useTrademarkSearch } from "@/modules/trademark-search/useTrademarkSearch";
+import { cn } from "@/lib/utils";
 import ScribbleUnderline from "@/components/decorative/ScribbleUnderline";
 import WaveDivider from "@/components/decorative/WaveDivider";
 import Seal48h from "@/components/decorative/Seal48h";
@@ -13,6 +15,8 @@ import consultant3 from "@/assets/consultants/consultant-3.jpg";
 const HeroSection = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const { state } = useTrademarkSearch();
+  const showingResult = state.phase === 'completed' && Boolean(state.job);
 
   const trustPills = [
     { icon: Shield, label: "Protocolo em 48h" },
@@ -22,14 +26,14 @@ const HeroSection = () => {
   ];
 
   return (
-    <section id="home" className="relative hero-blue-bg overflow-x-clip overflow-y-visible">
+    <section id="home" className={cn("relative hero-blue-bg overflow-x-clip overflow-y-visible", showingResult && "max-md:bg-background max-md:text-foreground")}>
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16 relative z-10 max-w-7xl">
+      <div className={cn("container mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16 relative z-10 max-w-7xl", showingResult && "max-md:px-3 max-md:pb-10 max-md:pt-20")}>
         {/* Two-column hero */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
 
           {/* Left — Text */}
-          <div className="text-center lg:text-left order-1 lg:order-none">
+          <div className={cn("text-center lg:text-left order-1 lg:order-none", showingResult && "max-md:hidden")}>
             {/* Orange badge */}
             <div className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[hsl(20_100%_55%)] to-[hsl(14_100%_48%)] px-5 py-2.5 text-white shadow-[0_10px_24px_-8px_hsla(20,100%,45%,0.55)] mb-6 mx-auto lg:mx-0">
               <Zap className="w-4 h-4 fill-white" />
@@ -96,13 +100,13 @@ const HeroSection = () => {
           </div>
 
           {/* Right — Viability Search */}
-          <div className="relative w-full max-w-md mx-auto lg:max-w-none order-2 lg:order-none">
+          <div className={cn("relative w-full max-w-md mx-auto lg:max-w-none order-2 lg:order-none", showingResult && "max-md:max-w-none")}>
             {/* 48h floating seal */}
-            <Seal48h
+            {!showingResult && <Seal48h
               size={144}
               className="absolute -top-20 -right-4 sm:-top-24 sm:-right-6 md:-top-28 md:-right-10 z-20 scale-[0.8] lg:scale-100 origin-top-right"
-            />
-            <div className="relative rounded-[2rem] bg-white p-6 md:p-8 shadow-[0_28px_70px_-16px_rgba(11,22,60,0.4)]">
+            />}
+            <div className={cn("relative rounded-[2rem] bg-card p-6 md:p-8 shadow-[0_28px_70px_-16px_hsl(var(--foreground)/0.4)]", showingResult && "max-md:rounded-none max-md:bg-transparent max-md:p-0 max-md:shadow-none")}>
               <TrademarkSearch
                 variant="landing"
                 continueLabel="Continuar o registro"
@@ -112,7 +116,7 @@ const HeroSection = () => {
           </div>
 
           {/* Trust pills — mobile only, below viability search */}
-          <div className="flex lg:hidden flex-wrap gap-2.5 justify-center order-3">
+          <div className={cn("flex lg:hidden flex-wrap gap-2.5 justify-center order-3", showingResult && "max-md:hidden")}>
             {trustPills.map((p, i) => (
               <span
                 key={i}
@@ -128,7 +132,7 @@ const HeroSection = () => {
         </div>
 
       </div>
-      <WaveDivider className="absolute bottom-0 left-0 right-0 z-10" fill="hsl(var(--background))" />
+      {!showingResult && <WaveDivider className="absolute bottom-0 left-0 right-0 z-10" fill="hsl(var(--background))" />}
     </section>
   );
 };
