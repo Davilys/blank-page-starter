@@ -8,6 +8,7 @@ export interface BotConversaContractInput {
   email: string;
   phone: string;
   cpf: string;
+  address_number: string;
   address: string;
   neighborhood: string;
   city: string;
@@ -24,6 +25,14 @@ export interface BotConversaContractInput {
 
 export const digits = (value: string | null | undefined) => (value || '').replace(/\D/g, '');
 export const normaliseText = (value: unknown) => typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
+
+function normalisePayment(value: unknown): ContractPaymentMethod | '' {
+  const payment = normaliseText(value).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (['avista', 'a vista', 'pix'].includes(payment)) return 'avista';
+  if (['cartao6x', 'cartao', '6x no cartao'].includes(payment)) return 'cartao6x';
+  if (['boleto3x', 'boleto', '3x no boleto'].includes(payment)) return 'boleto3x';
+  return '';
+}
 
 export function isValidCpf(value: string): boolean {
   const cpf = digits(value);
@@ -50,7 +59,7 @@ export function isValidCnpj(value: string): boolean {
 
 export function validateBotConversaContractInput(value: unknown): { data?: BotConversaContractInput; errors: string[] } {
   const raw = value && typeof value === 'object' ? value as Record<string, unknown> : {};
-  const payment = normaliseText(raw.payment_method);
+  const payment = normalisePayment(raw.payment_method);
   const phoneFromContact = raw.phone ?? raw.contact_phone ?? raw.whatsapp ?? (raw.contact && typeof raw.contact === 'object' ? (raw.contact as Record<string, unknown>).phone : undefined);
   const data: BotConversaContractInput = {
     event_id: normaliseText(raw.event_id),
@@ -61,6 +70,7 @@ export function validateBotConversaContractInput(value: unknown): { data?: BotCo
     // Phone is always supplied by the BotConversa contact context, never requested by Fernanda.
     phone: normaliseText(phoneFromContact),
     cpf: normaliseText(raw.cpf),
+    address_number: normaliseText(raw.address_number ?? raw.residence_number ?? raw.numero_residencia ?? raw.numero ?? raw.number),
     address: normaliseText(raw.address),
     neighborhood: normaliseText(raw.neighborhood),
     city: normaliseText(raw.city),
@@ -85,12 +95,12 @@ export function validateBotConversaContractInput(value: unknown): { data?: BotCo
   if (!/^\d{10,11}$/.test(digits(data.phone))) errors.push('phone inválido');
   if (!isValidCpf(data.cpf)) errors.push('cpf inválido');
   if (!/^\d{8}$/.test(digits(data.cep))) errors.push('cep inválido');
-  if (data.address.length < 5 || data.neighborhood.length < 2 || data.city.length < 2 || !/^[A-Z]{2}$/.test(data.state)) errors.push('endereço inválido');
+  const hasCompleteAddress = data.address.length >= 5 && data.neighborhood.length >= 2 && data.city.length >= 2 && /^[A-Z]{2}$/.test(data.state);
+  if (!hasCompleteAddress && (data.address_number.length < 1 || data.address_number.length > 30)) errors.push('address_number inválido');
   if (data.brand_name.length < 2 || data.brand_name.length > 120) errors.push('brand_name inválido');
   if (data.business_area.length < 3 || data.business_area.length > 240) errors.push('business_area inválido');
   if (!['avista', 'cartao6x', 'boleto3x'].includes(data.payment_method)) errors.push('payment_method inválido');
   if (data.cnpj && !isValidCnpj(data.cnpj)) errors.push('cnpj inválido');
-  if (data.cnpj && !data.company_name) errors.push('company_name é obrigatório quando houver cnpj');
   if (data.custom_due_date && !/^\d{4}-\d{2}-\d{2}$/.test(data.custom_due_date)) errors.push('custom_due_date inválido');
   return errors.length ? { errors } : { data, errors };
 }
