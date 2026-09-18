@@ -84,11 +84,41 @@ export function useProcessLookup() {
   const [states, setStates] = useState<Record<string, LookupState>>({});
   const inFlight = useRef<Map<string, Promise<LookupState>>>(new Map());
   const attempted = useRef<Set<string>>(new Set());
+  const hydrated = useRef<Set<string>>(new Set());
 
   const get = useCallback(
     (processNumber: string): LookupState => states[processNumber] ?? EMPTY,
     [states],
   );
+
+  /**
+   * Carrega a última consulta gravada em rpi_process_lookups para o processo,
+   * sem chamar o INPI. Garante que o resultado persista entre aberturas do card.
+   */
+  const hydrate = useCallback(async (processNumber: string) => {
+    if (!isNineDigits(processNumber)) return;
+    const key = processNumber.trim();
+    if (hydrated.current.has(key)) return;
+    if (inFlight.current.has(key)) return;
+    hydrated.current.add(key);
+    const { data, error } = await supabase
+      .from('rpi_process_lookups')
+      .select(
+        'process_number, brand_name, holder, ncl_class, current_status, presentation, nature, class_status, specification, legal_representative, priority_date, filing_date, grant_date, expiry_date, source_url, source, detail_status, lookup_status, queried_at',
+      )
+      .eq('process_number', key)
+      .maybeSingle();
+    if (error || !data) return;
+    setStates((s) => {
+      const existing = s[key];
+      // Não sobrescreve uma consulta mais recente já carregada em memória.
+      if (existing && (existing.lookup || existing.loading)) return s;
+      return {
+        ...s,
+        [key]: { ...EMPTY, lookup: data as ProcessLookup, saved: true, fromCache: true },
+      };
+    });
+  }, []);
 
   const run = useCallback(
     async (processNumber: string, entryId: string, force = false): Promise<LookupState> => {
