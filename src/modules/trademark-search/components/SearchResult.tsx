@@ -28,7 +28,7 @@ function conclusionView(job: TrademarkSearchJob, brand: string): ConclusionView 
       tone: hasRelated || hasPending ? 'warning' : 'success',
       title: hasRelated ? 'Ocorrências potencialmente relacionadas à sua atividade' : hasPending ? 'Há ocorrências que precisam de conferência' : 'Nenhuma ocorrência relevante encontrada',
       description: analysis.message + ' Antes do protocolo, a WebMarcas realizará a conferência técnica. A consulta não garante registro.',
-      icon: analysis.counts.related ? AlertTriangle : HelpCircle,
+      icon: hasRelated || hasPending ? AlertTriangle : CheckCircle2,
     };
   }
   const conclusion = job.result?.conclusion;
