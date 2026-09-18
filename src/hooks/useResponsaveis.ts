@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-export type Entidade = "invoice" | "devedor" | "publicacao";
+export type Entidade = "invoice" | "devedor" | "publicacao" | "cliente";
 
 export interface ResponsavelInfo {
   user_id: string | null;

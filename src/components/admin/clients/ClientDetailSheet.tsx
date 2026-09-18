@@ -50,6 +50,7 @@ import { DataEnrichmentDialog } from './DataEnrichmentDialog';
 import { InvoiceActionsSheet, type InvoiceLike } from './InvoiceActionsSheet';
 import { NovaFaturaDialog } from './NovaFaturaDialog';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { atribuirResponsavel } from '@/hooks/useResponsaveis';
 import { classificarCobranca, LABEL_ORIGEM, type OrigemCobranca } from '@/lib/financeiro/statusCobranca';
 
 const MASTER_ADMIN_EMAIL = 'davillys@gmail.com';
@@ -434,6 +435,16 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
       handleQuickAction('processo');
     }
   }, [initialShowProcessDetails, client, open]);
+
+  /** Atribui o cliente ao usuário logado quando ele age no financeiro — só se ainda não houver responsável. */
+  const autoAtribuirCliente = async (acao: 'cobrou' | 'negociou' = 'cobrou') => {
+    if (!client?.id) return;
+    try {
+      await atribuirResponsavel('cliente', client.id, { somenteSeVazio: true, acao });
+    } catch (e) {
+      console.error('[autoAtribuirCliente]', e);
+    }
+  };
 
   const fetchClientData = async () => {
     if (!client) return;
@@ -4285,7 +4296,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
         open={invoiceSheetOpen}
         onOpenChange={setInvoiceSheetOpen}
         canManageFinance={canManageFinance}
-        onChanged={async () => { await fetchClientData(); onUpdate(); }}
+        onChanged={async () => { await autoAtribuirCliente('cobrou'); await fetchClientData(); onUpdate(); }}
       />
 
       {/* ─── NOVA FATURA ─── */}
@@ -4295,7 +4306,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
           onOpenChange={setNovaFaturaOpen}
           userId={client.id}
           clientName={client.full_name}
-          onCreated={async () => { await fetchClientData(); onUpdate(); }}
+          onCreated={async () => { await autoAtribuirCliente('cobrou'); await fetchClientData(); onUpdate(); }}
         />
       )}
 

@@ -30,6 +30,8 @@ import {
   type BillingSituationData,
   type BillingSituationKey,
 } from '@/components/admin/financeiro/BillingSituationSection';
+import { useResponsaveis } from '@/hooks/useResponsaveis';
+import { ResponsavelChip } from '@/components/admin/shared/ResponsavelChip';
 
 // Lazy load the heavy ClientDetailSheet — same component used in Clientes/Devedores/Publicações
 const ClientDetailSheet = lazy(() =>
@@ -122,6 +124,11 @@ const EMPTY_BILLING_DATA: BillingSituationData = {
 
 export default function AdminFinanceiro() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const clientIdsNaLista = useMemo(
+    () => Array.from(new Set(invoices.map((i) => i.user_id).filter((id): id is string => !!id))),
+    [invoices],
+  );
+  const responsaveisClientes = useResponsaveis('cliente', clientIdsNaLista);
   const [clients, setClients] = useState<Client[]>([]);
   const [asaasAccounts, setAsaasAccounts] = useState<AsaasAccount[]>([]);
   const [processes, setProcesses] = useState<Process[]>([]);
@@ -821,6 +828,7 @@ export default function AdminFinanceiro() {
               <TableRow className="border-border/60 bg-muted/30 hover:bg-muted/30">
                 <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold cursor-pointer select-none" onClick={() => toggleSort('descricao')}>Descrição{sortArrow('descricao')}</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold cursor-pointer select-none" onClick={() => toggleSort('cliente')}>Cliente{sortArrow('cliente')}</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Usuário</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold hidden md:table-cell cursor-pointer select-none" onClick={() => toggleSort('valor')}>Valor{sortArrow('valor')}</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold hidden md:table-cell cursor-pointer select-none" onClick={() => toggleSort('metodo')}>Método{sortArrow('metodo')}</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold hidden lg:table-cell cursor-pointer select-none" onClick={() => toggleSort('vencimento')}>Vencimento{sortArrow('vencimento')}</TableHead>
@@ -831,7 +839,7 @@ export default function AdminFinanceiro() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-16">
+                  <TableCell colSpan={8} className="text-center py-16">
                     <div className="flex flex-col items-center gap-3">
                       <div className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
                       <p className="text-sm text-muted-foreground">Carregando faturas...</p>
@@ -840,7 +848,7 @@ export default function AdminFinanceiro() {
                 </TableRow>
               ) : invoices.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-16">
+                  <TableCell colSpan={8} className="text-center py-16">
                     <div className="flex flex-col items-center gap-2">
                       <DollarSign className="h-10 w-10 text-muted-foreground/30" />
                       <p className="text-muted-foreground">Nenhuma fatura encontrada</p>
@@ -883,6 +891,17 @@ export default function AdminFinanceiro() {
                             <span className="text-sm text-muted-foreground">
                               {invoice.cliente_nome || invoice.cliente_email || '—'}
                             </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-3.5">
+                          {invoice.user_id ? (
+                            <ResponsavelChip
+                              entidade="cliente"
+                              entidadeId={invoice.user_id}
+                              responsavel={responsaveisClientes[invoice.user_id]}
+                            />
+                          ) : (
+                            <span className="text-sm text-muted-foreground">—</span>
                           )}
                         </TableCell>
                         <TableCell className="hidden md:table-cell py-3.5">
