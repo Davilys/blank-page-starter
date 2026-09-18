@@ -6,9 +6,15 @@ const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
+const cors = {
+  'Access-Control-Allow-Origin': 'https://davilys.github.io',
+  'Access-Control-Allow-Headers': 'authorization, content-type, apikey',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
-  headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
+  headers: { ...cors, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
 });
 
 async function requireAdmin(req: Request) {
@@ -39,6 +45,7 @@ function page() {
 }
 
 serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method === 'GET') return new Response(page(), { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
   if (req.method !== 'POST') return json({ error: 'Método não permitido' }, 405);
   const user = await requireAdmin(req);
