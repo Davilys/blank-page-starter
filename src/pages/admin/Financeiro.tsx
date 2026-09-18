@@ -30,6 +30,8 @@ import {
   type BillingSituationData,
   type BillingSituationKey,
 } from '@/components/admin/financeiro/BillingSituationSection';
+import { useResponsaveis } from '@/hooks/useResponsaveis';
+import { ResponsavelChip } from '@/components/admin/shared/ResponsavelChip';
 
 // Lazy load the heavy ClientDetailSheet — same component used in Clientes/Devedores/Publicações
 const ClientDetailSheet = lazy(() =>
@@ -821,6 +823,7 @@ export default function AdminFinanceiro() {
               <TableRow className="border-border/60 bg-muted/30 hover:bg-muted/30">
                 <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold cursor-pointer select-none" onClick={() => toggleSort('descricao')}>Descrição{sortArrow('descricao')}</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold cursor-pointer select-none" onClick={() => toggleSort('cliente')}>Cliente{sortArrow('cliente')}</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Usuário</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold hidden md:table-cell cursor-pointer select-none" onClick={() => toggleSort('valor')}>Valor{sortArrow('valor')}</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold hidden md:table-cell cursor-pointer select-none" onClick={() => toggleSort('metodo')}>Método{sortArrow('metodo')}</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider text-muted-foreground font-semibold hidden lg:table-cell cursor-pointer select-none" onClick={() => toggleSort('vencimento')}>Vencimento{sortArrow('vencimento')}</TableHead>
