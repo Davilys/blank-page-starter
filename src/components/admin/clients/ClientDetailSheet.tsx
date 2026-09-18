@@ -206,6 +206,8 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
   const [notes, setNotes] = useState<ClientNote[]>([]);
   const [appointments, setAppointments] = useState<ClientAppointment[]>([]);
   const [documents, setDocuments] = useState<ClientDocument[]>([]);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
+  const [sendingDocuments, setSendingDocuments] = useState(false);
   const [invoices, setInvoices] = useState<ClientInvoice[]>([]);
   const [acordos, setAcordos] = useState<any[]>([]);
   const [acordoParcelas, setAcordoParcelas] = useState<any[]>([]);
@@ -795,6 +797,28 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
       if (uploaded > 0) { toast.success(`${uploaded} arquivo(s) enviado(s)`); await fetchClientData(); } else { toast.warning('Nenhum arquivo foi enviado com sucesso'); }
     } catch (err: any) { console.error('[FileUpload] Unexpected error:', err); toast.error(`Erro inesperado: ${err.message}`); }
     finally { setUploading(false); }
+  };
+
+  const handleSendSelectedDocumentsWhatsApp = async () => {
+    if (!client) return;
+    const selected = documents.filter(d => selectedDocumentIds.includes(d.id) && !d._virtual);
+    if (!selected.length) { toast.error('Selecione pelo menos um arquivo para enviar'); return; }
+    if (!client.phone) { toast.error('Este cliente não possui telefone cadastrado'); return; }
+    setSendingDocuments(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Usuário não autenticado');
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-client-documents-whatsapp`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: client.id, document_ids: selected.map(d => d.id), process_id: client.process_id || null, publication_id: client.publicacao_id || null }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Falha ao enviar documentos');
+      toast.success(`${selected.length} arquivo(s) enviado(s) para o WhatsApp`);
+      setSelectedDocumentIds([]);
+    } catch (err: any) { toast.error(err?.message || 'Erro ao enviar documentos'); }
+    finally { setSendingDocuments(false); }
   };
 
   const handleDeleteDocument = async (doc: ClientDocument) => {
@@ -2932,9 +2956,10 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                     <div className="space-y-2">
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-xs text-muted-foreground">{documents.length} arquivo(s)</p>
-                        <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
-                          <Plus className="h-3 w-3" /> Adicionar
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          {selectedDocumentIds.length > 0 && <Button size="sm" className="h-7 text-xs gap-1" disabled={sendingDocuments} onClick={(e) => { e.stopPropagation(); handleSendSelectedDocumentsWhatsApp(); }}><MessageCircle className="h-3 w-3" />{sendingDocuments ? 'Enviando...' : `Enviar por WhatsApp (${selectedDocumentIds.length})`}</Button>}
+                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}><Plus className="h-3 w-3" /> Adicionar</Button>
+                        </div>
                       </div>
                       <AnimatePresence>
                         {documents.map(doc => (
@@ -2945,6 +2970,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                             exit={{ opacity: 0, x: -20 }}
                             className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card hover:bg-muted/20 transition-colors group"
                           >
+                            {!doc._virtual && <input type="checkbox" aria-label={`Selecionar ${doc.name}`} checked={selectedDocumentIds.includes(doc.id)} onChange={(e) => setSelectedDocumentIds(prev => e.target.checked ? [...prev, doc.id] : prev.filter(id => id !== doc.id))} className="h-4 w-4 rounded border-border text-primary shrink-0" />}
                             <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                               <DocIcon mime={doc.mime_type} />
                             </div>
