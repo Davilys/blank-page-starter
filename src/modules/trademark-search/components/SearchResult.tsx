@@ -175,7 +175,7 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
       {searches.length > 0 && (
         <details className="rounded-xl border border-border p-3" open={!analysis}>
         <summary className="cursor-pointer text-sm font-medium">Rastreabilidade: todas as buscas e correspondências textuais</summary>
-        <div className="space-y-2">
+        <div className="space-y-2 mt-2">
           {searches.map((s) => {
             const key = `${s.mode}:${s.term}`;
             const open = !!expanded[key];
@@ -184,7 +184,7 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
                 <button
                   type="button"
                   onClick={() => setExpanded((p) => ({ ...p, [key]: !open }))}
-                  className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/40"
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
                   aria-expanded={open}
                 >
                   <div className="flex items-center gap-2 min-w-0">
@@ -193,7 +193,7 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
                     <span className="text-xs text-muted-foreground truncate">“{s.term}”</span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-muted">{s.total} {s.total === 1 ? 'registro' : 'registros'}</span>
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-muted whitespace-nowrap">{s.total} {s.total === 1 ? 'registro' : 'registros'}</span>
                     {s.records.length > 0 && (open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />)}
                   </div>
                 </button>
