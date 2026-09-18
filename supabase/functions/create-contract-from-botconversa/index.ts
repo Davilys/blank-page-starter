@@ -30,6 +30,45 @@ function toSignatureUrl(token: string) {
   return `${base}/assinar/${token}`;
 }
 
+type SuggestedClasses = { classes: number[]; descriptions: string[]; selected: number[] };
+
+// This deliberately invokes the same classesOnly path used by the CRM's
+// "Gerar sugestão de classes" button.  BotConversa never chooses the classes:
+// it only supplies the brand and business area.
+async function generateSuggestedClasses(
+  supabaseUrl: string,
+  serviceKey: string,
+  input: BotConversaContractInput,
+): Promise<SuggestedClasses> {
+  const response = await fetch(`${supabaseUrl.replace(/\/+$/, '')}/functions/v1/inpi-viability-check`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${serviceKey}`,
+      apikey: serviceKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      brandName: input.brand_name,
+      businessArea: input.business_area,
+      classesOnly: true,
+    }),
+  });
+  if (!response.ok) throw new Error('class_suggestion_failed');
+  const result = await response.json();
+  const classes = Array.isArray(result?.classes)
+    ? result.classes.filter((item: unknown): item is number => Number.isInteger(item) && item >= 1 && item <= 45)
+    : [];
+  const descriptions = Array.isArray(result?.classDescriptions)
+    ? result.classDescriptions.map((item: unknown) => typeof item === 'string' ? item.trim() : '')
+    : [];
+  // The CRM generator guarantees three classes. Refuse to publish a contract
+  // without the client upsell choices rather than silently omitting them.
+  if (classes.length !== 3 || new Set(classes).size !== 3 || descriptions.length !== 3 || descriptions.some((item: string) => !item)) {
+    throw new Error('class_suggestion_invalid');
+  }
+  return { classes, descriptions, selected: [classes[0]] };
+}
+
 async function resolveAddressFromCep(input: BotConversaContractInput): Promise<BotConversaContractInput> {
   const alreadyComplete = input.address.length >= 5 && input.neighborhood.length >= 2 &&
     input.city.length >= 2 && /^[A-Z]{2}$/.test(input.state);
@@ -221,7 +260,13 @@ async function standardTemplate(supabase: any) {
   return template;
 }
 
-async function createContract(supabase: any, userId: string, processId: string, input: BotConversaContractInput) {
+async function createContract(
+  supabase: any,
+  userId: string,
+  processId: string,
+  input: BotConversaContractInput,
+  suggestedClasses: SuggestedClasses,
+) {
   const { data: existing, error: lookupError } = await supabase.from('contracts')
     .select('id, contract_number, signature_token')
     .eq('source_event_id', input.event_id).maybeSingle();
@@ -259,9 +304,9 @@ async function createContract(supabase: any, userId: string, processId: string, 
     signature_token: token,
     signature_expires_at: expiresAt.toISOString(),
     visible_to_client: true,
-    suggested_classes: input.suggested_classes?.length
-      ? { classes: input.suggested_classes, selected: [input.suggested_classes[0]] }
-      : null,
+    // Same persisted shape as Novo Contrato after "Gerar sugestão de classes".
+    // Only the principal class starts selected; the signing page offers the others.
+    suggested_classes: suggestedClasses,
     source_event_id: input.event_id,
   }).select('id, contract_number').single();
   if (error?.code === '23505') {
@@ -349,7 +394,8 @@ serve(async (req) => {
       if (error) throw new Error('request_update_failed');
     }
     if (!contractId) {
-      const contract = await createContract(supabase, userId, processId, input);
+      const suggestedClasses = await generateSuggestedClasses(url, serviceKey, input);
+      const contract = await createContract(supabase, userId, processId, input, suggestedClasses);
       contractId = contract.id;
       contractNumber = contract.contractNumber;
       signatureToken = contract.token;
