@@ -310,7 +310,10 @@ serve(async (req) => {
           if (error) throw new Error(`Falha ao atualizar cobrança ${p.id}: ${error.message}`);
           atualizadas++;
         } else {
-          const { error } = await admin.from("invoices").insert(registro);
+          // A cobrança pode já existir vinculada a outro usuário: upsert pelo id do Asaas.
+          const { error } = await admin
+            .from("invoices")
+            .upsert(registro, { onConflict: "asaas_invoice_id" });
           if (error) throw new Error(`Falha ao criar cobrança ${p.id}: ${error.message}`);
           criadas++;
         }
