@@ -127,54 +127,56 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="min-w-0 space-y-5 text-foreground">
       {/* Status / situation card */}
-      <section className={cn('relative overflow-hidden rounded-2xl border p-5 sm:p-6', tone.box)} aria-labelledby="search-result-title">
-        <div className="flex min-w-0 items-start gap-4">
-          <div className={cn('grid h-14 w-14 shrink-0 place-items-center rounded-full', tone.iconBox)}>
-            <Icon className={cn('h-8 w-8', tone.icon)} strokeWidth={2.6} />
+      <section className={cn('relative overflow-hidden rounded-2xl border p-4 sm:p-5', tone.box)} aria-labelledby="search-result-title">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-full', tone.iconBox)}>
+            <Icon className={cn('h-6 w-6', tone.icon)} strokeWidth={2.6} />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 id="search-result-title" className="text-xl font-black leading-tight sm:text-2xl">
-              {view.tone === 'success' ? 'Nenhuma ocorrência relevante encontrada' : view.title}
-            </h2>
-            <span className={cn('mt-2 inline-flex rounded-full border px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider', tone.badge)}>
-              Base oficial INPI
-            </span>
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <h2 id="search-result-title" className="text-base font-black leading-tight sm:text-lg">
+                {view.tone === 'success' ? 'Nenhuma ocorrência relevante encontrada' : view.title}
+              </h2>
+              <span className={cn('inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider', tone.badge)}>
+                Base oficial INPI
+              </span>
+            </div>
           </div>
         </div>
-        <div className="mt-4 space-y-2 sm:ml-[4.5rem]">
+        <div className="mt-3 space-y-1.5 sm:ml-[3.25rem]">
           {view.tone === 'success' ? (
             <>
-              <p className="text-base font-semibold leading-relaxed">Não identificamos ocorrência potencialmente conflitante nesta triagem preliminar.</p>
-              <p className="text-sm leading-relaxed text-muted-foreground">A análise técnica da WebMarcas realizará a conferência antes do protocolo. A consulta não garante registro.</p>
+              <p className="text-sm font-semibold leading-relaxed">Não identificamos ocorrência potencialmente conflitante nesta triagem preliminar.</p>
+              <p className="text-[13px] leading-relaxed text-muted-foreground">A análise técnica da WebMarcas realizará a conferência antes do protocolo. A consulta não garante registro.</p>
             </>
           ) : (
-            <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">{view.description}</p>
+            <p className="text-[13px] leading-relaxed text-muted-foreground sm:text-sm">{view.description}</p>
           )}
         </div>
       </section>
 
       {/* Summary cards */}
       <div className="grid min-w-0 grid-cols-2 gap-2.5 sm:grid-cols-3" aria-label="Resumo da consulta">
-        <div className="flex min-w-0 gap-3 rounded-2xl border border-border bg-card p-3.5 shadow-sm">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><FileText className="h-5 w-5" /></span>
+        <div className="flex min-w-0 gap-2.5 rounded-2xl border border-border bg-card p-2.5 shadow-sm">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><FileText className="h-4 w-4" /></span>
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase leading-snug text-muted-foreground">Registros encontrados</p>
-            <p className="mt-1 text-xl font-black leading-none">{totalRecords}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{totalRecords === 1 ? 'registro' : 'registros'}</p>
+            <p className="mt-0.5 text-base font-black leading-none">{totalRecords}</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">{totalRecords === 1 ? 'registro' : 'registros'}</p>
           </div>
         </div>
-        <div className="flex min-w-0 gap-3 rounded-2xl border border-border bg-card p-3.5 shadow-sm">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Search className="h-5 w-5" /></span>
+        <div className="flex min-w-0 gap-2.5 rounded-2xl border border-border bg-card p-2.5 shadow-sm">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Search className="h-4 w-4" /></span>
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase leading-snug text-muted-foreground">Tipo de busca</p>
-            <p className="mt-2 overflow-wrap-anywhere text-sm font-bold leading-snug">{searchType}</p>
+            <p className="mt-1 overflow-wrap-anywhere text-sm font-bold leading-snug">{searchType}</p>
           </div>
         </div>
-        <div className="col-span-2 flex min-w-0 gap-3 rounded-2xl border border-border bg-card p-3.5 shadow-sm sm:col-span-1">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><CalendarDays className="h-5 w-5" /></span>
+        <div className="col-span-2 flex min-w-0 gap-2.5 rounded-2xl border border-border bg-card p-2.5 shadow-sm sm:col-span-1">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><CalendarDays className="h-4 w-4" /></span>
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase leading-snug text-muted-foreground">Consultado em</p>
-            <p className="mt-1 text-sm font-black leading-snug">{queriedDate}</p>
+            <p className="mt-0.5 text-sm font-black leading-snug">{queriedDate}</p>
             {queriedTime && <p className="text-sm font-semibold text-muted-foreground">{queriedTime}</p>}
           </div>
         </div>
@@ -183,7 +185,7 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
       {analysis && (
         <section aria-labelledby="analysis-summary-title" className="space-y-3">
           <div>
-            <h2 id="analysis-summary-title" className="text-2xl font-black leading-tight">Resumo da análise</h2>
+            <h2 id="analysis-summary-title" className="text-xl font-black leading-tight">Resumo da análise</h2>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">Confira os detalhes de cada segmento da triagem preliminar.</p>
           </div>
           <div className="overflow-hidden rounded-2xl border border-border bg-card px-4 shadow-sm">
@@ -191,7 +193,7 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
             const label = {related: 'Potencialmente relacionados', pending: 'Necessitam conferência', other: 'Outros segmentos'}[group];
             const selected = analysis.items.filter(i => i.group === group);
             return <details key={group} className={cn('group', index > 0 && 'border-t border-border')}>
-              <summary className="flex min-h-20 cursor-pointer list-none items-center gap-3 py-3 [&::-webkit-details-marker]:hidden">
+              <summary className="flex min-h-16 cursor-pointer list-none items-center gap-3 py-3 [&::-webkit-details-marker]:hidden">
                 <span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-full', selected.length ? 'bg-accent/10 text-accent' : 'bg-success text-success-foreground')}>
                   {selected.length ? <AlertTriangle className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}
                 </span>
