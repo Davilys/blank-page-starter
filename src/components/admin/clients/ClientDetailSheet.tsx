@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -360,6 +361,8 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
 
   useEffect(() => {
     if (client && open) {
+      setSelectedDocumentIds([]);
+      setSendingDocuments(false);
       fetchClientData();
       loadAsaasPayments(client.id);
       setShowProcessDetails(false);
@@ -800,24 +803,35 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
   };
 
   const handleSendSelectedDocumentsWhatsApp = async () => {
-    if (!client) return;
+    if (!client || sendingDocuments) return;
     const selected = documents.filter(d => selectedDocumentIds.includes(d.id) && !d._virtual);
     if (!selected.length) { toast.error('Selecione pelo menos um arquivo para enviar'); return; }
-    if (!client.phone) { toast.error('Este cliente não possui telefone cadastrado'); return; }
+    const phone = String(profileData?.phone || client.phone || '').replace(/\D/g, '');
+    if (phone.length < 10 || phone.length > 13) {
+      toast.error(phone ? 'O telefone cadastrado é inválido' : 'Este cliente não possui telefone cadastrado');
+      return;
+    }
     setSendingDocuments(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
       if (!session?.access_token) throw new Error('Usuário não autenticado');
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-client-documents-whatsapp`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({ client_id: client.id, document_ids: selected.map(d => d.id), process_id: client.process_id || null, publication_id: client.publicacao_id || null }),
       });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || 'Falha ao enviar documentos');
-      toast.success(`${selected.length} arquivo(s) enviado(s) para o WhatsApp`);
+      const responseText = await response.text();
+      let result: { error?: string; message?: string; quantity?: number } = {};
+      try { result = responseText ? JSON.parse(responseText) : {}; } catch { result = {}; }
+      if (!response.ok || result.error) {
+        throw new Error(result.error || result.message || responseText || `Falha ao enviar documentos (HTTP ${response.status})`);
+      }
       setSelectedDocumentIds([]);
-    } catch (err: any) { toast.error(err?.message || 'Erro ao enviar documentos'); }
+      toast.success(`${result.quantity ?? selected.length} arquivo(s) enviado(s) para o WhatsApp`);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao enviar documentos');
+    }
     finally { setSendingDocuments(false); }
   };
 
@@ -2957,7 +2971,17 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-xs text-muted-foreground">{documents.length} arquivo(s)</p>
                         <div className="flex items-center gap-2">
-                          {selectedDocumentIds.length > 0 && <Button size="sm" className="h-7 text-xs gap-1" disabled={sendingDocuments} onClick={(e) => { e.stopPropagation(); handleSendSelectedDocumentsWhatsApp(); }}><MessageCircle className="h-3 w-3" />{sendingDocuments ? 'Enviando...' : `Enviar por WhatsApp (${selectedDocumentIds.length})`}</Button>}
+                          {selectedDocumentIds.length > 0 && (
+                            <Button
+                              size="sm"
+                              className="h-8 text-xs gap-1.5"
+                              disabled={sendingDocuments}
+                              onClick={(e) => { e.stopPropagation(); void handleSendSelectedDocumentsWhatsApp(); }}
+                            >
+                              {sendingDocuments ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}
+                              {sendingDocuments ? 'Enviando...' : `Enviar por WhatsApp (${selectedDocumentIds.length})`}
+                            </Button>
+                          )}
                           <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}><Plus className="h-3 w-3" /> Adicionar</Button>
                         </div>
                       </div>
@@ -2970,7 +2994,16 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                             exit={{ opacity: 0, x: -20 }}
                             className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card hover:bg-muted/20 transition-colors group"
                           >
-                            {!doc._virtual && <input type="checkbox" aria-label={`Selecionar ${doc.name}`} checked={selectedDocumentIds.includes(doc.id)} onChange={(e) => setSelectedDocumentIds(prev => e.target.checked ? [...prev, doc.id] : prev.filter(id => id !== doc.id))} className="h-4 w-4 rounded border-border text-primary shrink-0" />}
+                            {!doc._virtual && (
+                              <Checkbox
+                                aria-label={`Selecionar ${doc.name}`}
+                                checked={selectedDocumentIds.includes(doc.id)}
+                                disabled={sendingDocuments}
+                                onCheckedChange={(checked) => setSelectedDocumentIds(prev => checked
+                                  ? (prev.includes(doc.id) ? prev : [...prev, doc.id])
+                                  : prev.filter(id => id !== doc.id))}
+                              />
+                            )}
                             <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                               <DocIcon mime={doc.mime_type} />
                             </div>
