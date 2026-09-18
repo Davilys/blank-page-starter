@@ -226,6 +226,7 @@ serve(async (req) => {
       if (existente) return json({ success: true, already: true, invoice_id: existente.id, invoice_url: existente.invoice_url });
 
       const { data: criada, error: criarErr } = await admin.functions.invoke("create-admin-invoice", {
+        headers: { Authorization: authHeader },
         body: {
           user_id: userId,
           description: descricao,

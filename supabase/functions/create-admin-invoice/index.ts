@@ -29,15 +29,34 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    if (!ASAAS_API_KEY) {
-      throw new Error('ASAAS_API_KEY not configured');
-    }
-
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error('Supabase configuration missing');
     }
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Security: administrative actions require a valid admin session.
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      throw new Error("Não autorizado");
+    }
+
+    const token = authHeader.slice("Bearer ".length);
+    const { data: { user: caller }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !caller) {
+      throw new Error("Não autorizado");
+    }
+
+    const { data: hasFinancialPermission, error: permissionError } = await supabaseAdmin
+      .rpc("has_financial_permission", { _user_id: caller.id });
+
+    if (permissionError || hasFinancialPermission !== true) {
+      throw new Error("Sem permissão financeira para executar esta ação");
+    }
+
+    if (!ASAAS_API_KEY) {
+      throw new Error('ASAAS_API_KEY not configured');
+    }
 
     const rawData = await req.json();
     // Support both field naming conventions
