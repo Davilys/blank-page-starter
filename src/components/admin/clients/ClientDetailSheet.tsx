@@ -436,6 +436,16 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
     }
   }, [initialShowProcessDetails, client, open]);
 
+  /** Atribui o cliente ao usuário logado quando ele age no financeiro — só se ainda não houver responsável. */
+  const autoAtribuirCliente = async (acao: 'cobrou' | 'negociou' = 'cobrou') => {
+    if (!client?.id) return;
+    try {
+      await atribuirResponsavel('cliente', client.id, { somenteSeVazio: true, acao });
+    } catch (e) {
+      console.error('[autoAtribuirCliente]', e);
+    }
+  };
+
   const fetchClientData = async () => {
     if (!client) return;
     setLoading(true);
