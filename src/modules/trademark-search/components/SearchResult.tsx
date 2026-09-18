@@ -185,7 +185,7 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
       {analysis && (
         <section aria-labelledby="analysis-summary-title" className="space-y-3">
           <div>
-            <h2 id="analysis-summary-title" className="text-2xl font-black leading-tight">Resumo da análise</h2>
+            <h2 id="analysis-summary-title" className="text-xl font-black leading-tight">Resumo da análise</h2>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">Confira os detalhes de cada segmento da triagem preliminar.</p>
           </div>
           <div className="overflow-hidden rounded-2xl border border-border bg-card px-4 shadow-sm">
