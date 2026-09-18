@@ -35,10 +35,18 @@ serve(async (req) => {
   const arquivos = docs.map((d: any) => ({ nome: d.name, url: d.file_url, tipo: d.mime_type || 'application/octet-stream', tamanho: d.file_size || 0 }));
   const eventId = `publicacao-documentos-${clientId}-${crypto.randomUUID()}`;
   const message = `Olá, ${profile.full_name || 'cliente'}. Enviamos ${arquivos.length} documento(s) referente(s) à atualização do seu processo. Confira os arquivos abaixo e, se precisar, agende um atendimento com nossa equipe.`;
-  const { data: settings } = await admin.from('system_settings').select('value').eq('key', 'botconversa').maybeSingle();
+  // This action must be isolated from the generic CRM notification webhook,
+  // which belongs to the Atendimento company. Never fall back to that config.
+  const { data: settings } = await admin
+    .from('system_settings')
+    .select('value')
+    .eq('key', 'botconversa_financeiro_publicacao')
+    .maybeSingle();
   const config = (settings?.value || {}) as Record<string, unknown>;
   const webhookUrl = typeof config.webhook_url === 'string' ? config.webhook_url : '';
-  if (config.enabled === false || !webhookUrl) return json({ error: 'Webhook do BotConversa não configurado' }, 503);
+  if (config.enabled !== true || !webhookUrl) {
+    return json({ error: 'Webhook Financeiro/Publicação Inicial não configurado' }, 503);
+  }
   const normalizedPhone = String(profile.phone).replace(/\D/g, '').replace(/^0/, '');
   const telefone = normalizedPhone.startsWith('55') ? normalizedPhone : `55${normalizedPhone}`;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
