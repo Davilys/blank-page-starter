@@ -114,36 +114,36 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
     : `Olá! Consultei a marca ${brandName} (${businessArea}) no site da WebMarcas e quero uma análise da equipe. Protocolo da consulta: ${job.job_id}.`;
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5 text-foreground">
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4 text-foreground">
+      {/* Status / situation card */}
       <div className={cn('rounded-2xl border p-5 flex items-start gap-4', tone.box)}>
-        <div className="p-2.5 rounded-xl bg-background border border-border/60 shrink-0">
-          <Icon className={cn('w-6 h-6', tone.icon)} />
+        <div className="grid place-items-center w-11 h-11 rounded-full bg-background border border-border/60 shrink-0">
+          <Icon className={cn('w-5 h-5', tone.icon)} />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <h3 className="text-base font-bold">{view.title}</h3>
-            <span className={cn('text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border', tone.badge)}>
-              Base oficial INPI
-            </span>
-          </div>
+          <h3 className="text-base font-bold leading-snug mb-2">{view.title}</h3>
+          <span className={cn('inline-block text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border mb-2', tone.badge)}>
+            Base oficial INPI
+          </span>
           <p className="text-sm text-muted-foreground leading-relaxed">{view.description}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div className="rounded-xl border border-border bg-card p-3">
+      {/* Summary cards — uniform, aligned */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-stretch">
+        <div className="rounded-xl border border-border bg-card p-3 flex flex-col justify-between min-h-[68px]">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Marca</p>
-          <p className="text-sm font-bold truncate">{brandName}</p>
+          <p className="text-sm font-bold truncate" title={brandName}>{brandName}</p>
         </div>
-        <div className="rounded-xl border border-border bg-card p-3">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{analysis ? 'Relacionadas à atividade' : 'Correspondências textuais'}</p>
+        <div className="rounded-xl border border-border bg-card p-3 flex flex-col justify-between min-h-[68px]">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Registros</p>
           <p className="text-sm font-bold">{analysis ? analysis.counts.related : totalRecords}</p>
         </div>
-        <div className="rounded-xl border border-border bg-card p-3">
+        <div className="rounded-xl border border-border bg-card p-3 flex flex-col justify-between min-h-[68px]">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Buscas</p>
           <p className="text-sm font-bold">{searches.length > 0 ? searches.map((s) => s.mode).join(' + ') : '—'}</p>
         </div>
-        <div className="rounded-xl border border-border bg-card p-3">
+        <div className="rounded-xl border border-border bg-card p-3 flex flex-col justify-between min-h-[68px]">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Consultado em</p>
           <p className="text-sm font-bold">{queriedAt ?? '—'}</p>
         </div>
@@ -175,7 +175,7 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
       {searches.length > 0 && (
         <details className="rounded-xl border border-border p-3" open={!analysis}>
         <summary className="cursor-pointer text-sm font-medium">Rastreabilidade: todas as buscas e correspondências textuais</summary>
-        <div className="space-y-2">
+        <div className="space-y-2 mt-2">
           {searches.map((s) => {
             const key = `${s.mode}:${s.term}`;
             const open = !!expanded[key];
@@ -184,7 +184,7 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
                 <button
                   type="button"
                   onClick={() => setExpanded((p) => ({ ...p, [key]: !open }))}
-                  className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/40"
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
                   aria-expanded={open}
                 >
                   <div className="flex items-center gap-2 min-w-0">
@@ -193,7 +193,7 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
                     <span className="text-xs text-muted-foreground truncate">“{s.term}”</span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-muted">{s.total} {s.total === 1 ? 'registro' : 'registros'}</span>
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-muted whitespace-nowrap">{s.total} {s.total === 1 ? 'registro' : 'registros'}</span>
                     {s.records.length > 0 && (open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />)}
                   </div>
                 </button>
