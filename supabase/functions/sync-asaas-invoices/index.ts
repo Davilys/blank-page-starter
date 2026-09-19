@@ -68,9 +68,16 @@ serve(async (req) => {
 
     let synced = 0;
     let removed = 0;
+    let processed = 0;
     const errors: string[] = [];
 
+    // Orçamento de tempo: a função é encerrada pela plataforma em 150s.
+    const startedAt = Date.now();
+    const TIME_BUDGET_MS = 110_000;
+
     for (const invoice of pendingInvoices) {
+      if (Date.now() - startedAt > TIME_BUDGET_MS) break;
+      processed++;
       try {
         // Query Asaas API
         const asaasResponse = await fetch(
