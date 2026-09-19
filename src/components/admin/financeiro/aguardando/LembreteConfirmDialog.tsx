@@ -41,7 +41,31 @@ export default function LembreteConfirmDialog({ open, onOpenChange, invoices, on
       const batchId = crypto.randomUUID();
       const agora = Date.now();
 
-      const rows = invoices.map((inv, i) => ({
+      // Evita duplicar quem já está aguardando envio na fila
+      const { data: jaNaFila } = await supabase
+        .from("lembrete_fila")
+        .select("invoice_id, asaas_payment_id")
+        .in("status", ["pendente", "processando"]);
+
+      const invoicesNaFila = new Set((jaNaFila ?? []).map((r) => r.invoice_id).filter(Boolean) as string[]);
+      const asaasNaFila = new Set((jaNaFila ?? []).map((r) => r.asaas_payment_id).filter(Boolean) as string[]);
+
+      const novos = invoices.filter((inv) => {
+        if (inv.id && invoicesNaFila.has(inv.id)) return false;
+        if (!inv.id && inv.asaas_payment_id && asaasNaFila.has(inv.asaas_payment_id)) return false;
+        return true;
+      });
+
+      const ignorados = invoices.length - novos.length;
+
+      if (novos.length === 0) {
+        toast.info("Todas as faturas selecionadas já estão aguardando envio na fila.");
+        onDone?.();
+        onOpenChange(false);
+        return;
+      }
+
+      const rows = novos.map((inv, i) => ({
         invoice_id: inv.id ?? null,
         asaas_payment_id: inv.asaas_payment_id ?? null,
         tipo: inv.tipo,
@@ -53,17 +77,11 @@ export default function LembreteConfirmDialog({ open, onOpenChange, invoices, on
         created_by: userRes?.user?.id ?? null,
       }));
 
-      const { data, error } = await supabase
-        .from("lembrete_fila")
-        .upsert(rows, { ignoreDuplicates: true })
-        .select("id");
-
+      const { error } = await supabase.from("lembrete_fila").insert(rows);
       if (error) throw error;
 
-      const inseridos = data?.length ?? 0;
-      const ignorados = rows.length - inseridos;
       toast.success(
-        `${inseridos} lembrete(s) na fila — 1 a cada ${intervalo} min.` +
+        `${rows.length} lembrete(s) na fila — 1 a cada ${intervalo} min.` +
           (ignorados > 0 ? ` ${ignorados} já estava(m) aguardando envio.` : "")
       );
       onDone?.();
