@@ -2,15 +2,16 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Clock, ArrowLeft, CalendarClock, ListChecks, Loader2, Bell, RefreshCw, History } from "lucide-react";
+import { Clock, ArrowLeft, CalendarClock, ListChecks, Loader2, Bell, RefreshCw, History, Hourglass } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
 const AguardandoTab = lazy(() => import("@/components/admin/financeiro/aguardando/AguardandoTab"));
 const HistoricoLembretesTab = lazy(() => import("@/components/admin/financeiro/aguardando/HistoricoLembretesTab"));
+const FilaLembretesTab = lazy(() => import("@/components/admin/financeiro/aguardando/FilaLembretesTab"));
 
-type TabKey = "d0" | "d3" | "all" | "historico";
+type TabKey = "d0" | "d3" | "all" | "fila" | "historico";
 
 export default function FinanceiroAguardando() {
   const navigate = useNavigate();
