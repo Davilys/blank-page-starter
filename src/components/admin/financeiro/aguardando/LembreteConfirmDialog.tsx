@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Loader2, Send, Mail, MessageCircle, AlertTriangle } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Send, Mail, MessageCircle, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -22,105 +23,135 @@ type Props = {
   onDone?: () => void;
 };
 
+const INTERVALOS = [3, 5, 10, 15];
+
+function horaPrevista(minutos: number) {
+  const d = new Date(Date.now() + minutos * 60 * 1000);
+  return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
 export default function LembreteConfirmDialog({ open, onOpenChange, invoices, onDone }: Props) {
-  const [sending, setSending] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [currentIdx, setCurrentIdx] = useState(0);
-  const [currentName, setCurrentName] = useState<string>("");
-  const [stats, setStats] = useState({ ok: 0, fail: 0, skip: 0 });
+  const [enfileirando, setEnfileirando] = useState(false);
+  const [intervalo, setIntervalo] = useState(5);
 
-  const runSend = async () => {
-    setSending(true);
-    setProgress(0);
-    setStats({ ok: 0, fail: 0, skip: 0 });
-    let ok = 0, fail = 0, skip = 0;
-    for (let i = 0; i < invoices.length; i++) {
-      const inv = invoices[i];
-      setCurrentIdx(i + 1);
-      setCurrentName(inv.cliente_nome || "Cliente");
-      try {
-        const { data, error } = await supabase.functions.invoke("lembrar-fatura-vencendo", {
-          body: {
-            invoice_id: inv.id ?? undefined,
-            asaas_payment_id: inv.asaas_payment_id ?? undefined,
-            tipo: inv.tipo,
-            origin: "manual_admin",
-          },
-        });
-        if (error) { fail++; }
-        else if ((data as any)?.skipped) { skip++; }
-        else { ok++; }
-      } catch { fail++; }
-      setStats({ ok, fail, skip });
-      setProgress(Math.round(((i + 1) / invoices.length) * 100));
+  const enfileirar = async () => {
+    setEnfileirando(true);
+    try {
+      const { data: userRes } = await supabase.auth.getUser();
+      const batchId = crypto.randomUUID();
+      const agora = Date.now();
 
-      // Delay de 1 minuto entre envios (a 1ª sai imediata). Sem delay em envio único.
-      if (invoices.length > 1 && i < invoices.length - 1) {
-        await new Promise((r) => setTimeout(r, 60_000));
+      // Evita duplicar quem já está aguardando envio na fila
+      const { data: jaNaFila } = await supabase
+        .from("lembrete_fila")
+        .select("invoice_id, asaas_payment_id")
+        .in("status", ["pendente", "processando"]);
+
+      const invoicesNaFila = new Set((jaNaFila ?? []).map((r) => r.invoice_id).filter(Boolean) as string[]);
+      const asaasNaFila = new Set((jaNaFila ?? []).map((r) => r.asaas_payment_id).filter(Boolean) as string[]);
+
+      const novos = invoices.filter((inv) => {
+        if (inv.id && invoicesNaFila.has(inv.id)) return false;
+        if (!inv.id && inv.asaas_payment_id && asaasNaFila.has(inv.asaas_payment_id)) return false;
+        return true;
+      });
+
+      const ignorados = invoices.length - novos.length;
+
+      if (novos.length === 0) {
+        toast.info("Todas as faturas selecionadas já estão aguardando envio na fila.");
+        onDone?.();
+        onOpenChange(false);
+        return;
       }
+
+      const rows = novos.map((inv, i) => ({
+        invoice_id: inv.id ?? null,
+        asaas_payment_id: inv.asaas_payment_id ?? null,
+        tipo: inv.tipo,
+        cliente_nome: inv.cliente_nome ?? null,
+        scheduled_at: new Date(agora + i * intervalo * 60 * 1000).toISOString(),
+        status: "pendente",
+        batch_id: batchId,
+        interval_minutes: intervalo,
+        created_by: userRes?.user?.id ?? null,
+      }));
+
+      const { error } = await supabase.from("lembrete_fila").insert(rows);
+      if (error) throw error;
+
+      toast.success(
+        `${rows.length} lembrete(s) na fila — 1 a cada ${intervalo} min.` +
+          (ignorados > 0 ? ` ${ignorados} já estava(m) aguardando envio.` : "")
+      );
+      onDone?.();
+      onOpenChange(false);
+    } catch (e) {
+      toast.error(`Falha ao enfileirar: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setEnfileirando(false);
     }
-    setSending(false);
-    toast.success(`Envio concluído: ${ok} enviadas · ${skip} puladas · ${fail} falhas`);
-    onDone?.();
-    onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!sending) onOpenChange(v); }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!enfileirando) onOpenChange(v); }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Enviar lembretes de vencimento</DialogTitle>
           <DialogDescription>
-            {invoices.length} fatura(s) selecionada(s). O envio é <strong>real e imediato</strong> por Email + WhatsApp.
+            {invoices.length} fatura(s) selecionada(s). Os envios entram em uma <strong>fila no servidor</strong> e saem
+            um por vez, respeitando o intervalo escolhido.
           </DialogDescription>
         </DialogHeader>
 
-        {!sending ? (
-          <div className="space-y-3 py-2">
-            <div className="rounded-lg border bg-muted/20 p-3 text-sm space-y-2">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Mail className="h-4 w-4" /> Email
-                <MessageCircle className="h-4 w-4 ml-2 text-emerald-500" /> WhatsApp
-              </div>
-              <div className="text-xs text-muted-foreground">Clientes que receberão o lembrete:</div>
-              <ul className="text-xs space-y-1">
-                {invoices.slice(0, 5).map((i) => (
-                  <li key={i.id ?? i.asaas_payment_id ?? i.cliente_nome}>• {i.cliente_nome || "Cliente"}</li>
+        <div className="space-y-3 py-2">
+          <div className="rounded-lg border bg-muted/20 p-3 text-sm space-y-2">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Mail className="h-4 w-4" /> Email
+              <MessageCircle className="h-4 w-4 ml-2 text-emerald-500" /> WhatsApp
+            </div>
+            <div className="text-xs text-muted-foreground">Clientes que receberão o lembrete:</div>
+            <ul className="text-xs space-y-1">
+              {invoices.slice(0, 5).map((i, idx) => (
+                <li key={i.id ?? i.asaas_payment_id ?? idx}>• {i.cliente_nome || "Cliente"}</li>
+              ))}
+              {invoices.length > 5 && (
+                <li className="text-muted-foreground">…e mais {invoices.length - 5}</li>
+              )}
+            </ul>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Intervalo entre envios</Label>
+            <Select value={String(intervalo)} onValueChange={(v) => setIntervalo(Number(v))}>
+              <SelectTrigger className="h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {INTERVALOS.map((m) => (
+                  <SelectItem key={m} value={String(m)}>{m} minutos</SelectItem>
                 ))}
-                {invoices.length > 5 && (
-                  <li className="text-muted-foreground">…e mais {invoices.length - 5}</li>
-                )}
-              </ul>
-            </div>
-            {invoices.length > 1 && (
-              <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-md p-2">
-                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>Envios sequenciais: o 1º sai imediatamente e os demais com intervalo de 1 minuto entre cada cliente. Não feche a janela.</span>
-              </div>
-            )}
+              </SelectContent>
+            </Select>
           </div>
-        ) : (
-          <div className="space-y-3 py-2">
-            <div className="text-sm">
-              Enviando <strong>{currentIdx}</strong> de <strong>{invoices.length}</strong>
-              <span className="text-muted-foreground"> — {currentName}</span>
-            </div>
-            <Progress value={progress} />
-            <div className="flex gap-3 text-xs text-muted-foreground">
-              <span>✅ {stats.ok} enviadas</span>
-              <span>⏭ {stats.skip} puladas</span>
-              <span>❌ {stats.fail} falhas</span>
-            </div>
+
+          <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/30 border rounded-md p-2">
+            <Clock className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>
+              O 1º sai por volta de {horaPrevista(0)} e o último por volta de{" "}
+              {horaPrevista((invoices.length - 1) * intervalo)}. Você pode fechar a tela — o envio continua no servidor,
+              dentro do horário comercial (08h–18h, seg–sex). Acompanhe na aba <strong>Fila</strong>.
+            </span>
           </div>
-        )}
+        </div>
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={enfileirando}>
             Cancelar
           </Button>
-          <Button onClick={runSend} disabled={sending || invoices.length === 0}>
-            {sending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
-            {sending ? "Enviando..." : `Enviar agora (${invoices.length})`}
+          <Button onClick={enfileirar} disabled={enfileirando || invoices.length === 0}>
+            {enfileirando ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+            {enfileirando ? "Enfileirando..." : `Colocar na fila (${invoices.length})`}
           </Button>
         </DialogFooter>
       </DialogContent>
