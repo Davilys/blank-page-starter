@@ -205,13 +205,18 @@ serve(async (req) => {
         synced,
         removed,
         marked_crm,
+        processed,
+        remaining: Math.max(0, pendingInvoices.length - processed),
+        partial: processed < pendingInvoices.length,
         total: pendingInvoices.length,
         errors: errors.length > 0 ? errors : undefined,
-        message: synced > 0
-          ? `${synced} atualizada(s)${removed ? ` · ${removed} removida(s)` : ''} de ${pendingInvoices.length}`
-          : removed > 0
-            ? `${removed} fatura(s) removida(s) (não existem mais no Asaas)`
-            : 'Nenhuma fatura precisou ser atualizada',
+        message: processed < pendingInvoices.length
+          ? `${synced} atualizada(s) de ${processed} verificada(s) · ${pendingInvoices.length - processed} restante(s), clique novamente para continuar`
+          : synced > 0
+            ? `${synced} atualizada(s)${removed ? ` · ${removed} removida(s)` : ''} de ${pendingInvoices.length}`
+            : removed > 0
+              ? `${removed} fatura(s) removida(s) (não existem mais no Asaas)`
+              : 'Nenhuma fatura precisou ser atualizada',
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
