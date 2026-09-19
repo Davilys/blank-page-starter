@@ -3783,6 +3783,60 @@ export type Database = {
         }
         Relationships: []
       }
+      lembrete_fila: {
+        Row: {
+          asaas_payment_id: string | null
+          attempts: number
+          batch_id: string | null
+          cliente_nome: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          interval_minutes: number
+          invoice_id: string | null
+          last_error: string | null
+          scheduled_at: string
+          sent_at: string | null
+          status: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          asaas_payment_id?: string | null
+          attempts?: number
+          batch_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          interval_minutes?: number
+          invoice_id?: string | null
+          last_error?: string | null
+          scheduled_at?: string
+          sent_at?: string | null
+          status?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          asaas_payment_id?: string | null
+          attempts?: number
+          batch_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          interval_minutes?: number
+          invoice_id?: string | null
+          last_error?: string | null
+          scheduled_at?: string
+          sent_at?: string | null
+          status?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       login_history: {
         Row: {
           id: string
