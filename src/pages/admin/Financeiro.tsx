@@ -316,8 +316,8 @@ export default function AdminFinanceiro() {
 
   // Filtros, ordenação, busca e paginação são resolvidos no banco (RPC), nunca no navegador.
   const ownerFilter = !isMasterAdmin && currentUserId ? currentUserId : null;
-  // A aba "Vencidas" é liberada para todos os administradores (valores seguem restritos).
-  const listOwnerFilter = filterStatus === 'vencidas' ? null : ownerFilter;
+  // "Vencidas" e "Aguardando pagamento" são liberadas para todos os administradores (valores seguem restritos).
+  const listOwnerFilter = (filterStatus === 'vencidas' || filterStatus === 'aguardando') ? null : ownerFilter;
 
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
