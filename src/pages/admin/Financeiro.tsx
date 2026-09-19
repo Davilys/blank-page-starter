@@ -389,7 +389,7 @@ export default function AdminFinanceiro() {
           composition: (category?.composition || []).map((item: any) => ({ ...item, amount: Number(item.amount || 0), count: Number(item.count || 0) })),
         };
       });
-      // Vencidas é liberada para todos os administradores: contagem global (sem filtro de dono)
+      // Vencidas e Aguardando são liberadas para todos os administradores: contagem global (sem filtro de dono)
       if (ownerFilter) {
         const { data: globalData, error: globalError } = await supabase.rpc('admin_billing_situation', {
           p_from: dateRange.from,
@@ -404,18 +404,20 @@ export default function AdminFinanceiro() {
           p_payment_from: billingFilters.paymentFrom || null,
           p_payment_to: billingFilters.paymentTo || null,
         });
-        const globalVencidas = !globalError ? ((globalData as any)?.categories?.vencidas || null) : null;
-        if (globalVencidas) {
-          normalized.categories.vencidas = {
-            ...EMPTY_BILLING_CATEGORY,
-            ...globalVencidas,
-            gross_amount: Number(globalVencidas.gross_amount || 0),
-            net_amount: globalVencidas.net_amount == null ? null : Number(globalVencidas.net_amount),
-            clients_count: Number(globalVencidas.clients_count || 0),
-            invoices_count: Number(globalVencidas.invoices_count || 0),
-            composition: (globalVencidas.composition || []).map((item: any) => ({ ...item, amount: Number(item.amount || 0), count: Number(item.count || 0) })),
-          };
-        }
+        const globalCats = !globalError ? ((globalData as any)?.categories || {}) : {};
+        const normalizeCat = (c: any) => c ? {
+          ...EMPTY_BILLING_CATEGORY,
+          ...c,
+          gross_amount: Number(c.gross_amount || 0),
+          net_amount: c.net_amount == null ? null : Number(c.net_amount),
+          clients_count: Number(c.clients_count || 0),
+          invoices_count: Number(c.invoices_count || 0),
+          composition: (c.composition || []).map((item: any) => ({ ...item, amount: Number(item.amount || 0), count: Number(item.count || 0) })),
+        } : null;
+        const globalVencidas = normalizeCat(globalCats.vencidas);
+        if (globalVencidas) normalized.categories.vencidas = globalVencidas;
+        const globalAguardando = normalizeCat(globalCats.aguardando);
+        if (globalAguardando) normalized.categories.aguardando = globalAguardando;
       }
       setBillingData({ ...normalized, total: Number(normalized.total || 0) });
     } catch (e) { console.warn('totais indisponíveis', e); }
