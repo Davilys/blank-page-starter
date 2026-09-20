@@ -16,8 +16,11 @@ export const createPdfParser = (): DocumentParser => ({
   async parse(file) {
     try {
       const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-      const workerSrc = (await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url")).default;
-      pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+      // Worker embutido via Blob — não depende do arquivo separado pdf.worker.
+      const workerRaw = (await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?raw")).default;
+      pdfjs.GlobalWorkerOptions.workerSrc = URL.createObjectURL(
+        new Blob([workerRaw], { type: "text/javascript" }),
+      );
 
       const bytes = new Uint8Array(await file.arrayBuffer());
       const pdf = await pdfjs.getDocument({ data: bytes }).promise;

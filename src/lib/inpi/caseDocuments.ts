@@ -145,8 +145,13 @@ export async function sha256HexOfText(text: string): Promise<string> {
 /** Carrega o pdf.js com worker — mesma biblioteca já usada no projeto. */
 export async function loadPdfJs() {
   const lib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  const workerSrc = (await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')).default;
-  lib.GlobalWorkerOptions.workerSrc = workerSrc;
+  // Worker embutido via Blob (em vez de arquivo separado com hash): o nome do
+  // arquivo pdf.worker muda a cada build e quebrava a leitura quando a
+  // hospedagem publicava os arquivos de forma parcial ou com versões misturadas.
+  const workerRaw = (await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?raw')).default;
+  lib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(
+    new Blob([workerRaw], { type: 'text/javascript' }),
+  );
   return lib;
 }
 
