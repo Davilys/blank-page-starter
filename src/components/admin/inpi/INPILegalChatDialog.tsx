@@ -18,9 +18,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
-import pdfWorkerSrc from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
+import pdfWorkerRaw from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?raw';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
+// Worker embutido via Blob — não depende do arquivo separado pdf.worker,
+// cujo hash muda a cada build e quebrava a leitura em deploy parcial/antigo.
+pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(
+  new Blob([pdfWorkerRaw], { type: 'text/javascript' }),
+);
 
 interface Message {
   id: string;
