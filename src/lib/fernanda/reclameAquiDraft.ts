@@ -1,9 +1,9 @@
 /** Reclame Aqui objection package. The accusatory audio is never approved here. */
-export const RECLAME_AQUI_SAFE_TEXT = `A WebMarcas atua há mais de sete anos e já atendeu mais de 12 mil clientes. No Reclame Aqui, todas as reclamações recebidas foram respondidas e não há nenhuma aguardando resposta, como mostram os dados públicos nos prints abaixo.
+export const RECLAME_AQUI_SAFE_TEXT = `Os dados públicos do Reclame Aqui precisam ser verificados no momento da resposta, porque os números podem mudar. No retrato observado em 21/09/2026, a página mostrava 13 reclamações no histórico geral, 5 nos últimos 6 meses, 100% respondidas e nenhuma aguardando resposta.
 
-Algumas reclamações tratam de valores e taxas adicionais, por isso hoje fazemos questão de explicar por áudio e por escrito, antes da contratação, o que está incluso nos honorários e quais custos podem existir durante o processo.
+Algumas manifestações tratam de valores e taxas adicionais, por isso fazemos questão de explicar por áudio e por escrito, antes da contratação, o que está incluso nos honorários e quais custos podem existir durante o processo.
 
-Mesmo com um volume alto de clientes, levamos cada manifestação a sério e permanecemos à disposição para esclarecer qualquer dúvida.`;
+Levamos cada manifestação a sério e permanecemos à disposição para esclarecer qualquer dúvida.`;
 
 export const RECLAME_AQUI_PACKAGE = Object.freeze({
   status: 'blocked_pending_evidence_and_caroline' as const,
@@ -13,7 +13,10 @@ export const RECLAME_AQUI_PACKAGE = Object.freeze({
   imageAssetIds: [null, null, null] as (string | null)[],
   safeFallbackText: RECLAME_AQUI_SAFE_TEXT,
   closingQuestion: 'Ficou alguma dúvida sobre isso?',
-  blockers: ['public_evidence_not_verified', 'caroline_approval_missing'],
+  observedSnapshot: { asOf: '2026-09-21', totalHistory: 13, lastSixMonths: 5, responseRatePercent: 100, awaitingResponse: 0 },
+  commercialClaimsPendingApproval: ['mais de sete anos', 'mais de 12 mil clientes'],
+  evidenceImagesAreHistoricalOnly: true,
+  blockers: ['public_evidence_not_found', 'process_number_or_document_missing', 'caroline_approval_missing'],
 });
 
 export type ReclameAquiAction =
@@ -25,7 +28,11 @@ export function detectsReclameAquiIntent(message: string) {
   return /reclame\s*aqui|reclama[cç][aã]o|voc[eê]s t[eê]m reclama[cç][aã]o|vi uma reclama[cç][aã]o/i.test(message);
 }
 
-/** Safe fallback is usable only when all three evidence images are privately configured. */
+export function formatVerifiedReclameAquiSnapshot(snapshot: { asOf: string; totalHistory: number; lastSixMonths: number; responseRatePercent: number; awaitingResponse: number }) {
+  return `Dados verificados em ${snapshot.asOf}: ${snapshot.totalHistory} reclamações no histórico geral, ${snapshot.lastSixMonths} nos últimos 6 meses, ${snapshot.responseRatePercent}% respondidas e ${snapshot.awaitingResponse} aguardando resposta.`;
+}
+
+/** Images are historical context only, never proof of a current count or alleged coordination. */
 export function planSafeReclameAquiFallback(imageAssetIds: string[]): ReclameAquiAction[] {
   if (imageAssetIds.length !== 3 || imageAssetIds.some((id) => !id.trim())) throw new Error('three_images_required');
   return [

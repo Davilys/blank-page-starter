@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   RECLAME_AQUI_PACKAGE, RECLAME_AQUI_SAFE_TEXT, detectsReclameAquiIntent,
-  planApprovedReclameAquiPackage, planSafeReclameAquiFallback, recordReclameAquiDelivery,
+  planApprovedReclameAquiPackage, planSafeReclameAquiFallback, recordReclameAquiDelivery, formatVerifiedReclameAquiSnapshot,
 } from './reclameAquiDraft';
 
 describe('Reclame Aqui objection package', () => {
@@ -10,8 +10,17 @@ describe('Reclame Aqui objection package', () => {
   });
   it('keeps accusatory audio blocked without evidence and Caroline approval', () => {
     expect(RECLAME_AQUI_PACKAGE.status).toBe('blocked_pending_evidence_and_caroline');
-    expect(RECLAME_AQUI_PACKAGE.blockers).toEqual(['public_evidence_not_verified', 'caroline_approval_missing']);
+    expect(RECLAME_AQUI_PACKAGE.blockers).toEqual(['public_evidence_not_found', 'process_number_or_document_missing', 'caroline_approval_missing']);
     expect(planApprovedReclameAquiPackage()).toEqual([]);
+  });
+  it('stores the observed snapshot without the obsolete count of eight', () => {
+    expect(RECLAME_AQUI_PACKAGE.observedSnapshot).toEqual({ asOf: '2026-09-21', totalHistory: 13, lastSixMonths: 5, responseRatePercent: 100, awaitingResponse: 0 });
+    expect(RECLAME_AQUI_SAFE_TEXT).not.toMatch(/\b8\b|oito/i);
+    expect(formatVerifiedReclameAquiSnapshot(RECLAME_AQUI_PACKAGE.observedSnapshot)).toContain('13 reclamações');
+  });
+  it('treats longevity and client-volume claims as pending commercial claims', () => {
+    expect(RECLAME_AQUI_PACKAGE.commercialClaimsPendingApproval).toEqual(['mais de sete anos', 'mais de 12 mil clientes']);
+    expect(RECLAME_AQUI_SAFE_TEXT).not.toMatch(/sete anos|12 mil/i);
   });
   it('uses safe text, exactly three images, then the exact closing question', () => {
     const plan = planSafeReclameAquiFallback(['img-1', 'img-2', 'img-3']);
