@@ -139,9 +139,15 @@ jobs:
           CREATE TABLE storage.objects(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),bucket_id text,name text,owner uuid);
           CREATE FUNCTION storage.foldername(name text) RETURNS text[] LANGUAGE sql IMMUTABLE AS $$ SELECT string_to_array(regexp_replace(name, '/[^/]*$', ''), '/') $$;
           SQL
-          for f in preview/fernanda/supabase/migrations/*.sql; do
-            timeout 90s psql "$PREVIEW_PGURL?options=-c%20statement_timeout=60000" -v ON_ERROR_STOP=1 -f "$f"
-          done
+          preview_sql=$(mktemp)
+          cat preview/fernanda/supabase/migrations/*.sql > "$preview_sql"
+          sed -i -e '/^SET transaction_timeout =/d' -e "/set_config('search_path', '', false)/d" "$preview_sql"
+          psql "$PREVIEW_PGURL" -v ON_ERROR_STOP=1 <<'SQL'
+          ALTER TABLE storage.buckets ADD COLUMN IF NOT EXISTS public boolean NOT NULL DEFAULT false;
+          CREATE OR REPLACE FUNCTION storage.foldername(name text) RETURNS text[]
+          LANGUAGE sql IMMUTABLE AS $$ SELECT string_to_array(regexp_replace(name, '/[^/]*$', ''), '/') $$;
+          SQL
+          timeout 360s psql "$PREVIEW_PGURL" -v ON_ERROR_STOP=1 -f "$preview_sql"
           psql "$PREVIEW_PGURL" -v ON_ERROR_STOP=1 <<'SQL'
           DO $$
           DECLARE n integer;
