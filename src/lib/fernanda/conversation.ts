@@ -2,6 +2,12 @@ export const FERNANDA_FLOW = '1- INSTINC' as const;
 export const PRESERVED_FLOW = '1- AT FINAL SEMANA' as const;
 
 export type PaymentMethod = 'avista' | 'cartao6x' | 'boleto3x';
+export const COLLECTION_OPENING = 'Preciso destes dados para te enviar a proposta personalizada e, aprovando, iniciar o registro no INPI:' as const;
+
+export const COLLECTION_FIELD_ORDER = [
+  'fullName', 'cpf', 'cep', 'addressNumber', 'email', 'brandName', 'businessArea', 'cnpj', 'paymentMethod',
+] as const;
+
 export type Stage =
   | 'discover_name' | 'discover_brand' | 'discover_business' | 'check_exact_mark'
   | 'recommend_classes' | 'collect_email' | 'collect_cpf' | 'collect_cep'
@@ -74,6 +80,30 @@ const questions: Partial<Record<Stage, string>> = {
   collect_address_number: 'Qual é o número do endereço?',
   choose_payment: `Qual forma você prefere: ${PRICES.avista.display} no PIX, ${PRICES.cartao6x.display} no cartão ou ${PRICES.boleto3x.display} no boleto?`,
 };
+
+
+const collectionQuestions: Record<(typeof COLLECTION_FIELD_ORDER)[number], string> = {
+  fullName: 'Qual é o seu nome completo?',
+  cpf: 'Qual é o seu CPF?',
+  cep: 'Qual é o CEP?',
+  addressNumber: 'Qual é o número da residência?',
+  email: 'Qual é o seu e-mail?',
+  brandName: 'Qual é o nome da marca?',
+  businessArea: 'Qual é o ramo de atividade da marca?',
+  cnpj: 'A empresa tem CNPJ? Se tiver, qual é?',
+  paymentMethod: `Qual forma você prefere: ${PRICES.avista.display} no PIX, ${PRICES.boleto3x.display} no boleto ou ${PRICES.cartao6x.display} no cartão?`,
+};
+
+export function nextCollectionQuestion(memory: Memory) {
+  for (const field of COLLECTION_FIELD_ORDER) {
+    if (field === 'cnpj') {
+      if (memory.cnpj === undefined) return { field, question: collectionQuestions[field] };
+      continue;
+    }
+    if (memory[field] === undefined || memory[field] === '') return { field, question: collectionQuestions[field] };
+  }
+  return null;
+}
 
 export function nextQuestion(conversation: Conversation): string | null {
   return conversation.pendingQuestion || questions[conversation.stage] || null;

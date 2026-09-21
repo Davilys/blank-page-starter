@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  PRICES, canCreateContract, cancelFollowUpsOnInbound, contractReadiness, followUpSchedule,
+  PRICES, COLLECTION_OPENING, COLLECTION_FIELD_ORDER, canCreateContract, cancelFollowUpsOnInbound, contractReadiness, followUpSchedule,
   hasExactlyOneQuestion, markContractLinkSent, mergeCapturedMemory, closeConversation, markContractRequested, nextQuestion,
-  requestCarolineEscalation, shouldEscalateToCaroline, type Conversation,
+  requestCarolineEscalation, shouldEscalateToCaroline, nextCollectionQuestion, type Conversation,
 } from './conversation';
 
 const base: Conversation = { conversationId: 'c1', subscriberId: 's1', stage: 'discover_name', memory: {} };
@@ -27,6 +27,16 @@ describe('Fernanda continuous conversation core', () => {
     const text = mergeCapturedMemory(base, { brandName: 'Aurora' });
     const audio = mergeCapturedMemory(base, { brandName: 'Aurora' });
     expect(audio).toEqual(text);
+  });
+  it('uses the supplied collection opening and exact field order while skipping known data', () => {
+    expect(COLLECTION_OPENING).toBe('Preciso destes dados para te enviar a proposta personalizada e, aprovando, iniciar o registro no INPI:');
+    expect(COLLECTION_FIELD_ORDER).toEqual(['fullName','cpf','cep','addressNumber','email','brandName','businessArea','cnpj','paymentMethod']);
+    expect(nextCollectionQuestion({ fullName: 'Ana', cpf: '52998224725' })).toEqual({ field: 'cep', question: 'Qual é o CEP?' });
+    expect(nextCollectionQuestion({ ...complete, cnpj: null })).toBeNull();
+  });
+  it('never includes phone in collection fields or questions', () => {
+    expect(COLLECTION_FIELD_ORDER).not.toContain('phoneFromSubscriber');
+    expect(JSON.stringify(COLLECTION_FIELD_ORDER)).not.toMatch(/phone|telefone/i);
   });
   it('uses the exact approved prices', () => {
     expect(PRICES.avista.total).toBe(699);

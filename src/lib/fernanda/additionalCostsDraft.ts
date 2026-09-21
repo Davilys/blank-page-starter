@@ -4,6 +4,8 @@
  * The audio bytes are not committed to the repository; only their integrity
  * metadata is recorded so the private original can be attached at deploy time.
  */
+import { COLLECTION_OPENING } from './conversation';
+
 export const ADDITIONAL_COSTS_DRAFT = Object.freeze({
   status: 'blocked_pending_caroline_approval' as const,
   intent: 'additional_costs' as const,
@@ -24,6 +26,45 @@ export const ADDITIONAL_COSTS_DRAFT = Object.freeze({
 export type DeliveryAction =
   | { kind: 'audio'; sha256: string; mimeType: string }
   | { kind: 'text'; body: string };
+
+export const COSTS_FOLLOW_UP = Object.freeze({
+  minDelayMs: 30_000,
+  maxDelayMs: 40_000,
+  clarificationQuestion: 'Até aqui, ficou alguma dúvida?',
+  continuationQuestion: 'Perfeito! Vamos dar sequência ao processo de registro?',
+  collectionOpening: COLLECTION_OPENING,
+});
+
+export type CostsFollowUpStage = 'waiting_delay' | 'waiting_clarification' | 'waiting_continuation' | 'ready_for_collection';
+
+export function costsFollowUpAfterDelivery(deliveredAt: Date, delayMs: number) {
+  if (delayMs < COSTS_FOLLOW_UP.minDelayMs || delayMs > COSTS_FOLLOW_UP.maxDelayMs) throw new Error('delay_outside_30_40_seconds');
+  return { stage: 'waiting_delay' as const, dueAt: new Date(deliveredAt.getTime() + delayMs).toISOString() };
+}
+
+export function clarificationPrompt(now: Date, dueAt: string) {
+  if (now.getTime() < Date.parse(dueAt)) return null;
+  return COSTS_FOLLOW_UP.clarificationQuestion;
+}
+
+export function acceptsNoRemainingDoubt(message: string) {
+  return /^(?:n[aã]o(?:,?\s*(?:ficou|tenho|tudo certo|est[aá] tudo certo))?|tudo certo|entendi|ficou claro|ok|sim,?\s*(?:tudo certo|entendi))\b/i.test(message.trim());
+}
+
+export function acceptsContinueRegistration(message: string) {
+  return /^(?:sim|vamos|pode|quero|claro|bora|ok)\b/i.test(message.trim());
+}
+
+export function nextCostsFollowUp(stage: CostsFollowUpStage, message?: string) {
+  if (stage === 'waiting_clarification' && message && acceptsNoRemainingDoubt(message)) {
+    return { stage: 'waiting_continuation' as const, message: COSTS_FOLLOW_UP.continuationQuestion };
+  }
+  if (stage === 'waiting_continuation' && message && acceptsContinueRegistration(message)) {
+    // The user has not supplied the exact collection-opening copy yet.
+    return { stage: 'ready_for_collection' as const, message: COSTS_FOLLOW_UP.collectionOpening };
+  }
+  return { stage, message: null };
+}
 
 export function detectsAdditionalCostIntent(message: string) {
   return /(?:algo|mais|extra|adicional|outra).*(?:pagar|pagamento|custo|taxa|valor)|(?:taxa|custo|valor|honor[aá]rio).*(?:inpi|extra|adicional|depois|inclus)|(?:quanto).*(?:total|final)|(?:exig[eê]ncia|publica[cç][aã]o)|(?:o que|que).*(?:inclus)/i.test(message);
