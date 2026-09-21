@@ -9,6 +9,8 @@ describe('additional-costs official draft transport', () => {
     'Tem algo a mais para pagar?',
     'Qual é o custo total com as taxas do INPI?',
     'Tem algum valor extra depois?',
+    'O que está incluso nos honorários?',
+    'E se tiver exigência ou publicação?',
   ])('detects the additional-cost intent: %s', (message) => {
     expect(detectsAdditionalCostIntent(message)).toBe(true);
   });
@@ -19,8 +21,9 @@ describe('additional-costs official draft transport', () => {
     expect(planAdditionalCostsDelivery(false).map((item) => item.kind)).toEqual(['text']);
   });
   it('keeps the content blocked while legal and boleto conflicts remain', () => {
-    expect(ADDITIONAL_COSTS_DRAFT.status).toBe('blocked_pending_approval');
-    expect(ADDITIONAL_COSTS_DRAFT.blockers).toContain('boleto_398_conflicts_with_approved_399');
+    expect(ADDITIONAL_COSTS_DRAFT.status).toBe('blocked_pending_caroline_approval');
+    expect(ADDITIONAL_COSTS_DRAFT.blockers).toEqual(['diario_oficial_requires_caroline_rpi_validation']);
+    expect(ADDITIONAL_COSTS_DRAFT.blocks[0]).toContain('3x de R$399 no boleto');
     expect(approvedAdditionalCostsDelivery(true)).toEqual([]);
   });
   it('pins the private source audio by hash without committing its bytes', () => {
