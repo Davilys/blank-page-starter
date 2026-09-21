@@ -56,27 +56,26 @@ jobs:
           SQL
           psql "$PGURL" -v ON_ERROR_STOP=1 -f /tmp/webmarcas-bootstrap.sql
 
-      - name: Criar stub exploratório da relação legada
+      - name: Restaurar DDL fiel da relação legada
         run: |
-          echo 'EXPLORATORY ONLY: inpiknowledgebase.id type/default are unknown; text/no-default is a hypothesis.'
           psql "$PGURL" -v ON_ERROR_STOP=1 <<'SQL'
+          -- Verified read-only from production information_schema.columns on 2026-09-21.
           CREATE TABLE public.inpiknowledgebase (
-            id text PRIMARY KEY,
-            category text NOT NULL,
-            content text NOT NULL,
+            id uuid PRIMARY KEY,
+            category varchar NOT NULL,
             title text NOT NULL,
-            created_at timestamptz,
-            updated_at timestamptz,
-            is_active boolean,
-            priority integer,
-            raw_html text,
-            source_date date,
+            content text NOT NULL,
             source_url text,
-            tags text[],
-            valid_until date
+            source_date date,
+            valid_until date,
+            is_active boolean DEFAULT true,
+            priority integer DEFAULT 1,
+            tags text[] DEFAULT '{}'::text[],
+            raw_html text,
+            created_at timestamptz DEFAULT now(),
+            updated_at timestamptz DEFAULT now()
           );
           SQL
-
       - name: Reproduzir 93 migrations remotas no Postgres efêmero
         run: psql "$PGURL" -v ON_ERROR_STOP=1 -f /tmp/webmarcas-canonical.sql
 
@@ -124,10 +123,8 @@ jobs:
           END $$;
           SQL
 
-      - name: Bloquear gate canônico após exploração
-        if: always()
+      - name: Registrar escopo do gate
         run: |
-          echo 'FAIL-CLOSED: exploratory stub was used for public.inpiknowledgebase.'
-          echo 'Canonical fidelity remains blocked by the unknown type/default of inpiknowledgebase.id.'
-          echo 'This run maps further gaps only and cannot authorize preview, merge, repair, or deployment.'
-          exit 1
+          echo 'Offline replay passed against the read-only snapshot captured on 2026-09-21.'
+          echo 'Legacy inpiknowledgebase DDL was verified by a read-only production catalog query.'
+          echo 'This gate does not assert zero live drift after the snapshot and does not deploy or mutate production.'
