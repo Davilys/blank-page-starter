@@ -48,7 +48,7 @@ jobs:
 
       - name: Aplicar bootstrap local pré-ledger
         run: |
-          sed -i '/^SET transaction_timeout =/d' /tmp/webmarcas-bootstrap.sql
+          sed -i -e '/^SET transaction_timeout =/d' -e "/set_config('search_path', '', false)/d" /tmp/webmarcas-bootstrap.sql
           psql "postgresql://supabase_admin:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 <<'SQL'
           ALTER TABLE storage.buckets ADD COLUMN IF NOT EXISTS public boolean NOT NULL DEFAULT false;
           CREATE OR REPLACE FUNCTION storage.foldername(name text) RETURNS text[]
