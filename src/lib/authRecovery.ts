@@ -18,7 +18,9 @@ export function isAuthSessionError(error: unknown): boolean {
   if (!error) return false;
   const anyErr = error as { message?: string; code?: string; status?: number; __isAuthError?: boolean };
   const msg = (anyErr.message || String(error) || '').toLowerCase();
-  const code = (anyErr.code || '').toLowerCase();
+  // Supabase/PostgREST errors may expose numeric codes. Normalize before comparing
+  // so the error boundary never throws while handling the original UI error.
+  const code = String(anyErr.code ?? '').toLowerCase();
   if (anyErr.__isAuthError) return true;
   if (anyErr.status === 401) return true;
   return (
