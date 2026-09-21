@@ -87,7 +87,8 @@ jobs:
             supabase/migrations/20260917130000_add_botconversa_contract_requests.sql \
             supabase/migrations/20260917150000_harden_botconversa_contract_idempotency.sql \
             supabase/migrations/20260921130500_add_botconversa_contract_callback_status.sql \
-            supabase/migrations/20260921163500_webmarcas_continuous_agent_queue.sql
+            supabase/migrations/20260921163500_webmarcas_continuous_agent_queue.sql \
+            supabase/migrations/20260921203000_harden_fernanda_state_followups.sql
           do
             test -f "$f"
             psql "$PGURL" -v ON_ERROR_STOP=1 -f "$f"
@@ -114,6 +115,12 @@ jobs:
             IF to_regprocedure('public.claim_webmarcas_agent_followup()') IS NULL THEN
               RAISE EXCEPTION 'missing claim_webmarcas_agent_followup';
             END IF;
+            IF to_regprocedure('public.ingest_webmarcas_agent_event(text,text,text,text,text,text,timestamp with time zone)') IS NULL THEN
+              RAISE EXCEPTION 'missing ingest_webmarcas_agent_event';
+            END IF;
+            IF to_regprocedure('public.schedule_webmarcas_agent_followups(text,timestamp with time zone)') IS NULL THEN
+              RAISE EXCEPTION 'missing schedule_webmarcas_agent_followups';
+            END IF;
             IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='uq_brand_processes_source_event_id') THEN
               RAISE EXCEPTION 'missing brand process idempotency index';
             END IF;
@@ -121,6 +128,40 @@ jobs:
               RAISE EXCEPTION 'missing contract idempotency index';
             END IF;
           END $$;
+          SQL
+
+      - name: Testar estado contínuo, follow-ups e idempotência
+        run: |
+          psql "$PGURL" -v ON_ERROR_STOP=1 <<'SQL'
+          BEGIN;
+          INSERT INTO public.webmarcas_agent_conversations(conversation_id,subscriber_id,phone)
+          VALUES ('ci-conversation','ci-subscriber','5511999999999');
+          SELECT public.schedule_webmarcas_agent_followups('ci-conversation','2026-09-21T12:00:00Z');
+          DO $$
+          BEGIN
+            IF (SELECT array_agg(due_at ORDER BY step) FROM public.webmarcas_agent_followups WHERE conversation_id='ci-conversation') <>
+               ARRAY['2026-09-21T12:10:00Z'::timestamptz,'2026-09-22T12:00:00Z'::timestamptz,'2026-09-26T12:00:00Z'::timestamptz] THEN
+              RAISE EXCEPTION 'follow-up schedule mismatch';
+            END IF;
+          END $$;
+          SELECT public.ingest_webmarcas_agent_event('ci-event-0001','ci-conversation','ci-subscriber','5511999999999','text','Olá','2026-09-21T12:05:00Z');
+          DO $$
+          BEGIN
+            IF EXISTS (SELECT 1 FROM public.webmarcas_agent_followups WHERE conversation_id='ci-conversation' AND status <> 'cancelled') THEN
+              RAISE EXCEPTION 'inbound did not cancel every follow-up';
+            END IF;
+            IF (SELECT count(*) FROM public.webmarcas_agent_messages WHERE event_id='ci-event-0001') <> 1 THEN
+              RAISE EXCEPTION 'inbound message missing';
+            END IF;
+          END $$;
+          SELECT public.ingest_webmarcas_agent_event('ci-event-0001','ci-conversation','ci-subscriber','5511999999999','text','Olá','2026-09-21T12:05:00Z');
+          DO $$
+          BEGIN
+            IF (SELECT count(*) FROM public.webmarcas_agent_messages WHERE event_id='ci-event-0001') <> 1 THEN
+              RAISE EXCEPTION 'duplicate inbound event was not idempotent';
+            END IF;
+          END $$;
+          ROLLBACK;
           SQL
 
       - name: Validar história sanitizada exclusiva da preview
