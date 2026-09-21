@@ -36,6 +36,15 @@ export function followUpSchedule(from: Date) {
   return FOLLOW_UP_DELAYS_MS.map((delay, index) => ({ step: index + 1, dueAt: new Date(from.getTime() + delay).toISOString() }));
 }
 
+export function mergeCapturedMemory(conversation: Conversation, captured: Partial<Memory>): Conversation {
+  const memory = { ...conversation.memory, ...Object.fromEntries(Object.entries(captured).filter(([, value]) => value !== undefined && value !== '')) };
+  return { ...conversation, memory };
+}
+
+export function closeConversation(conversation: Conversation, occurredAt: string): Conversation {
+  return { ...cancelFollowUpsOnInbound(conversation, occurredAt), stage: 'closed', pendingQuestion: undefined };
+}
+
 export function cancelFollowUpsOnInbound(conversation: Conversation, occurredAt: string): Conversation {
   return { ...conversation, lastInboundAt: occurredAt, followupsCancelledAt: occurredAt };
 }

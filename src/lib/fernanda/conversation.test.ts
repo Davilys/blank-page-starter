@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   PRICES, canCreateContract, cancelFollowUpsOnInbound, contractReadiness, followUpSchedule,
-  hasExactlyOneQuestion, markContractLinkSent, markContractRequested, nextQuestion,
+  hasExactlyOneQuestion, markContractLinkSent, mergeCapturedMemory, closeConversation, markContractRequested, nextQuestion,
   requestCarolineEscalation, shouldEscalateToCaroline, type Conversation,
 } from './conversation';
 
@@ -17,6 +17,16 @@ describe('Fernanda continuous conversation core', () => {
     expect(nextQuestion(base)).toBe('Como você prefere que eu te chame?');
     expect(hasExactlyOneQuestion(nextQuestion(base)!)).toBe(true);
     expect(nextQuestion({ ...base, stage: 'collect_email' })).not.toMatch(/telefone|whatsapp/i);
+  });
+  it('keeps previously collected memory and accepts several anticipated fields without repeating them', () => {
+    const first = mergeCapturedMemory(base, { fullName: 'Ana', brandName: 'Aurora', businessArea: 'Café' });
+    const second = mergeCapturedMemory(first, { email: 'ana@example.com', brandName: undefined });
+    expect(second.memory).toMatchObject({ fullName: 'Ana', brandName: 'Aurora', businessArea: 'Café', email: 'ana@example.com' });
+  });
+  it('uses the same state transition for transcribed audio and text payloads', () => {
+    const text = mergeCapturedMemory(base, { brandName: 'Aurora' });
+    const audio = mergeCapturedMemory(base, { brandName: 'Aurora' });
+    expect(audio).toEqual(text);
   });
   it('uses the exact approved prices', () => {
     expect(PRICES.avista.total).toBe(699);
@@ -44,6 +54,11 @@ describe('Fernanda continuous conversation core', () => {
   it('blocks contract creation until all collected state and exact search are ready', () => {
     expect(contractReadiness({ ...complete, exactSearchCompleted: undefined }).missing).toContain('exactSearchCompleted');
     expect(canCreateContract({ ...base, stage: 'ready_for_contract', memory: complete })).toBe(true);
+  });
+  it('closes on opt-out and cancels follow-ups', () => {
+    const closed = closeConversation({ ...base, pendingQuestion: 'Posso continuar?' }, '2026-09-21T12:00:00Z');
+    expect(closed).toMatchObject({ stage: 'closed', followupsCancelledAt: '2026-09-21T12:00:00Z' });
+    expect(closed.pendingQuestion).toBeUndefined();
   });
   it('creates the contract before the link can be marked as sent', () => {
     const requested = markContractRequested({ ...base, stage: 'ready_for_contract', memory: complete });

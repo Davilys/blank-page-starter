@@ -169,6 +169,9 @@ jobs:
         run: |
           set -euo pipefail
           ./preview/fernanda/verify-sanitized.sh
+          cmp --silent \
+            supabase/migrations/20260921203000_harden_fernanda_state_followups.sql \
+            preview/fernanda/supabase/migrations/20260921203000_harden_fernanda_state_followups.sql
           # Exact deploy history is derived only from the already-green canonical replay.
           # CI validates byte-equivalence after removing the documented external effects.
           python3 - <<'PY'
@@ -202,3 +205,25 @@ jobs:
           echo 'Offline replay passed against the read-only snapshot captured on 2026-09-21.'
           echo 'Legacy inpiknowledgebase DDL was verified by a read-only production catalog query.'
           echo 'This gate does not assert zero live drift after the snapshot and does not deploy or mutate production.'
+
+
+  fernanda-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependências em runner efêmero
+        run: |
+          corepack enable
+          pnpm install --no-frozen-lockfile --ignore-scripts
+      - name: Testar núcleo Fernanda e contrato
+        run: pnpm exec vitest run src/lib/fernanda/conversation.test.ts src/lib/contracts/botconversaContract.test.ts
+      - name: Verificar TypeScript
+        run: pnpm exec tsc --noEmit
+      - name: Build Vite conclusivo no runner
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: pnpm run build
