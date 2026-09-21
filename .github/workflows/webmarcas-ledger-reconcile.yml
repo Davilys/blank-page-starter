@@ -36,6 +36,19 @@ jobs:
           cat supabase/canonical-remote/replay.part-03.sql >> /tmp/webmarcas-canonical.sql
           echo 'd0a20aba5119549eb6b096b144c1e3e35cff13fa1631f69992dd2f697d6cb7ba  /tmp/webmarcas-canonical.sql' | sha256sum -c -
 
+      - name: Reconstruir bootstrap local pré-ledger
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'ae4877792aa9f5a16b4a68d1c63fa3716e787431b235504209d815f6440cd2b0  supabase/canonical-remote/bootstrap-local-pre-remote.manifest.json' | sha256sum -c -
+          test "$(jq -r '.count' supabase/canonical-remote/bootstrap-local-pre-remote.manifest.json)" -eq 105
+          for part in 00 01 02 03 04; do head -c -1 "supabase/canonical-remote/bootstrap.part-${part}.sql"; done > /tmp/webmarcas-bootstrap.sql
+          cat supabase/canonical-remote/bootstrap.part-05.sql >> /tmp/webmarcas-bootstrap.sql
+          echo 'ba6e8f9bc17c079ddc01c7ec9390b50af03f6301652ebd1a71fbd0a8e47c346a  /tmp/webmarcas-bootstrap.sql' | sha256sum -c -
+
+      - name: Aplicar bootstrap local pré-ledger
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 -f /tmp/webmarcas-bootstrap.sql
+
       - name: Reproduzir 93 migrations remotas no Postgres efêmero
         run: psql "$PGURL" -v ON_ERROR_STOP=1 -f /tmp/webmarcas-canonical.sql
 
