@@ -152,9 +152,9 @@ jobs:
               'webmarcas_agent_inbox','webmarcas_agent_conversations','webmarcas_agent_messages',
               'webmarcas_agent_followups','webmarcas_agent_tool_calls');
             IF n <> 7 THEN RAISE EXCEPTION 'preview expected 7 queue tables, found %', n; END IF;
-            IF EXISTS (SELECT 1 FROM cron.job) THEN RAISE EXCEPTION 'preview must have zero scheduled jobs'; END IF;
           END $$;
           SQL
+          test "$(psql "$PREVIEW_PGURL" -Atc "SELECT count(*) FROM cron.job")" -eq 0
 
       - name: Registrar escopo do gate
         run: |
