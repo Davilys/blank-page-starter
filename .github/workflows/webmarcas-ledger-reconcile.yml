@@ -49,12 +49,10 @@ jobs:
       - name: Aplicar bootstrap local pré-ledger
         run: |
           sed -i '/^SET transaction_timeout =/d' /tmp/webmarcas-bootstrap.sql
-          psql "$PGURL" -v ON_ERROR_STOP=1 <<'SQL'
-          SET ROLE supabase_storage_admin;
+          psql "postgresql://supabase_admin:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 <<'SQL'
           ALTER TABLE storage.buckets ADD COLUMN IF NOT EXISTS public boolean NOT NULL DEFAULT false;
           CREATE OR REPLACE FUNCTION storage.foldername(name text) RETURNS text[]
           LANGUAGE sql IMMUTABLE AS $$ SELECT string_to_array(regexp_replace(name, '/[^/]*$', ''), '/') $$;
-          RESET ROLE;
           SQL
           psql "$PGURL" -v ON_ERROR_STOP=1 -f /tmp/webmarcas-bootstrap.sql
 
