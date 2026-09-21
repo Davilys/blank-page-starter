@@ -1,0 +1,18 @@
+{
+  "event_id": "instinc-contact-5511999999999-contract-v1",
+  "flow_name": "1- INSTINC",
+  "agent_name": "Instinc WebMarcas",
+  "full_name": "Maria da Silva",
+  "email": "maria@example.com",
+  "contact": { "phone": "(11) 99999-9999" },
+  "cpf": "529.982.247-25",
+  "address_number": "123",
+  "address": "Rua Exemplo, 123",
+  "neighborhood": "Centro",
+  "city": "São Paulo",
+  "state": "SP",
+  "cep": "01001-000",
+  "brand_name": "Marca Exemplo",
+  "business_area": "Fabricação e venda de cosméticos próprios",
+  "payment_method": "pix"
+}
