@@ -151,3 +151,27 @@ export function renderStandardContract(template: string, input: BotConversaContr
   };
   return Object.entries(values).reduce((rendered, [key, replacement]) => rendered.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), replacement), template);
 }
+
+export type ContractClassSuggestions = { classes: number[]; descriptions: string[]; selected: number[] };
+
+/** Keep aligned class/description pairs, de-duplicate classes, and preselect only the principal class. */
+export function normaliseClassSuggestions(value: unknown): ContractClassSuggestions | null {
+  const result = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const rawClasses = Array.isArray(result.classes) ? result.classes : [];
+  const rawDescriptions = Array.isArray(result.classDescriptions) ? result.classDescriptions : [];
+  const seen = new Set<number>();
+  const suggestions = rawClasses.flatMap((item: unknown, index: number) => {
+    if (!Number.isInteger(item) || (item as number) < 1 || (item as number) > 45 || seen.has(item as number)) return [];
+    const description = typeof rawDescriptions[index] === 'string' ? rawDescriptions[index].trim() : '';
+    if (!description) return [];
+    seen.add(item as number);
+    return [{ classNumber: item as number, description }];
+  });
+  if (suggestions.length < 1 || suggestions.length > 3) return null;
+  const classes = suggestions.map((item) => item.classNumber);
+  return {
+    classes,
+    descriptions: suggestions.map((item) => item.description),
+    selected: [classes[0]],
+  };
+}
