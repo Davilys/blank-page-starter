@@ -220,7 +220,7 @@ jobs:
           corepack enable
           pnpm install --no-frozen-lockfile --ignore-scripts
       - name: Testar núcleo Fernanda e contrato
-        run: pnpm exec vitest run src/lib/fernanda/conversation.test.ts src/lib/contracts/botconversaContract.test.ts
+        run: pnpm exec vitest run src/lib/fernanda/*.test.ts src/lib/contracts/botconversaContract.test.ts
       - name: Verificar TypeScript
         run: pnpm exec tsc --noEmit
       - name: Build Vite conclusivo no runner

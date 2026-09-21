@@ -11,7 +11,7 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:fernanda": "vitest run src/lib/fernanda/conversation.test.ts src/lib/contracts/botconversaContract.test.ts"
+    "test:fernanda": "vitest run src/lib/fernanda/*.test.ts src/lib/contracts/botconversaContract.test.ts"
   },
   "dependencies": {
     "@emoji-mart/data": "^1.2.1",
