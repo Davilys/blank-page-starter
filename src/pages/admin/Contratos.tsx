@@ -825,7 +825,7 @@ export default function AdminContratos() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3 }}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0"
             >
               <Button variant="outline" size="icon" onClick={refreshContracts} className="rounded-xl hover:bg-muted/80">
                 <RefreshCw className="h-4 w-4" />
