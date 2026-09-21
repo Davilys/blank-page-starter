@@ -1,0 +1,3 @@
+# Isolated preview only. No Edge Functions are present in this working directory.
+[db.seed]
+enabled = false
