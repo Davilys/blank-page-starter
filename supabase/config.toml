@@ -19,7 +19,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.create-admin-user]
-verify_jwt = false
+verify_jwt = true
 
 [functions.inpi-viability-check]
 verify_jwt = false
@@ -88,7 +88,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.create-admin-invoice]
-verify_jwt = false
+verify_jwt = true
 
 [functions.sync-meta-campaigns]
 verify_jwt = false
@@ -155,3 +155,6 @@ verify_jwt = false
 
 [functions.review-inpi-draft]
 verify_jwt = false
+
+[functions.create-client-user]
+verify_jwt = true

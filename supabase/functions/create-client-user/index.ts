@@ -68,6 +68,29 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Security: administrative actions require a valid admin session.
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      throw new Error("Não autorizado");
+    }
+
+    const token = authHeader.slice("Bearer ".length);
+    const { data: { user: caller }, error: callerAuthError } = await supabase.auth.getUser(token);
+    if (callerAuthError || !caller) {
+      throw new Error("Não autorizado");
+    }
+
+    const { data: callerRole, error: roleLookupError } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", caller.id)
+      .eq("role", "admin")
+      .maybeSingle();
+
+    if (roleLookupError || !callerRole) {
+      throw new Error("Apenas administradores podem executar esta ação");
+    }
+
     // Normalize CPF/CNPJ for consistent lookup
     const normalizedCpfCnpj = normalizeCpfCnpj(cpf_cnpj);
 
