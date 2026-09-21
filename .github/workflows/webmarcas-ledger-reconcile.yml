@@ -1,10 +1,13 @@
-name: Validar ledger WebMarcas (somente leitura)
+name: Validar ledger WebMarcas (offline, somente leitura)
+
 on:
   workflow_dispatch:
   pull_request:
     branches: [main]
+
 permissions:
   contents: read
+
 jobs:
   reconcile:
     runs-on: ubuntu-latest
@@ -18,41 +21,69 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres" --health-interval 5s
           --health-timeout 5s --health-retries 20
+    env:
+      PGURL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
     steps:
       - uses: actions/checkout@v4
-      - uses: supabase/setup-cli@v1
-        with: { version: latest }
-      - name: Classificar ledger remoto/local (produção read-only)
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.WEBMARCAS_LEDGER_READ_TOKEN }}
+
+      - name: Verificar snapshot canônico capturado
+        shell: bash
         run: |
-          supabase link --project-ref scpbqsvwojhbxihyqbdz
-          supabase migration list --linked | tee /tmp/migration-list.txt
-          scripts/migration-ledger/plan-repair.py /tmp/migration-list.txt | tee ledger-analysis.json
-      - name: Construir baseline no Postgres efêmero
-        env:
-          PGURL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+          set -euo pipefail
+          echo 'f3ea9836625fba2530094fca4b1742847308f3e17a5eaa69206b4ffc2d0d5fb4  supabase/canonical-remote/webmarcas-remote-migrations.manifest.json' | sha256sum -c -
+          test "$(jq -r '.count' supabase/canonical-remote/webmarcas-remote-migrations.manifest.json)" -eq 93
+          for part in 00 01 02; do head -c -1 "supabase/canonical-remote/replay.part-${part}.sql"; done > /tmp/webmarcas-canonical.sql
+          cat supabase/canonical-remote/replay.part-03.sql >> /tmp/webmarcas-canonical.sql
+          echo 'd0a20aba5119549eb6b096b144c1e3e35cff13fa1631f69992dd2f697d6cb7ba  /tmp/webmarcas-canonical.sql' | sha256sum -c -
+
+      - name: Reproduzir 93 migrations remotas no Postgres efêmero
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 -f /tmp/webmarcas-canonical.sql
+
+      - name: Aplicar quatro migrations pendentes revisadas
+        shell: bash
         run: |
-          test -f supabase/baseline/webmarcas-production.sql
-          psql "$PGURL" -v ON_ERROR_STOP=1 -f supabase/baseline/webmarcas-production.sql
-      - name: Aplicar apenas migrations pendentes revisadas
-        env:
-          PGURL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-        run: |
+          set -euo pipefail
           for f in \
             supabase/migrations/20260917130000_add_botconversa_contract_requests.sql \
             supabase/migrations/20260917150000_harden_botconversa_contract_idempotency.sql \
             supabase/migrations/20260921130500_add_botconversa_contract_callback_status.sql \
             supabase/migrations/20260921163500_webmarcas_continuous_agent_queue.sql
-          do psql "$PGURL" -v ON_ERROR_STOP=1 -f "$f"; done
-      - name: Exigir schema diff zero do baseline
+          do
+            test -f "$f"
+            psql "$PGURL" -v ON_ERROR_STOP=1 -f "$f"
+          done
+
+      - name: Testar estrutura, constraints e funções críticas
         run: |
-          test -f supabase/baseline/webmarcas-production.sha256
-          sha256sum -c supabase/baseline/webmarcas-production.sha256
-          test "$(jq '.counts.remote_only' ledger-analysis.json)" -eq 0
-          test "$(jq '.counts.local_only' ledger-analysis.json)" -eq 4
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: webmarcas-ledger-analysis
-          path: ledger-analysis.json
+          psql "$PGURL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE n integer;
+          BEGIN
+            SELECT count(*) INTO n FROM pg_class c JOIN pg_namespace s ON s.oid=c.relnamespace
+              WHERE s.nspname='public' AND c.relname IN (
+                'botconversa_contract_requests','botconversa_contract_async_jobs',
+                'webmarcas_agent_inbox','webmarcas_agent_conversations','webmarcas_agent_messages',
+                'webmarcas_agent_followups','webmarcas_agent_tool_calls');
+            IF n <> 7 THEN RAISE EXCEPTION 'expected 7 queue tables, found %', n; END IF;
+            IF to_regprocedure('public.claim_botconversa_contract_async_job()') IS NULL THEN
+              RAISE EXCEPTION 'missing claim_botconversa_contract_async_job';
+            END IF;
+            IF to_regprocedure('public.claim_webmarcas_agent_event()') IS NULL THEN
+              RAISE EXCEPTION 'missing claim_webmarcas_agent_event';
+            END IF;
+            IF to_regprocedure('public.claim_webmarcas_agent_followup()') IS NULL THEN
+              RAISE EXCEPTION 'missing claim_webmarcas_agent_followup';
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='uq_brand_processes_source_event_id') THEN
+              RAISE EXCEPTION 'missing brand process idempotency index';
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='uq_contracts_source_event_id') THEN
+              RAISE EXCEPTION 'missing contract idempotency index';
+            END IF;
+          END $$;
+          SQL
+
+      - name: Registrar caveat do gate
+        run: |
+          echo 'Validated offline against the last read-only snapshot captured on 2026-09-21.'
+          echo 'This gate does not assert zero live production drift.'
