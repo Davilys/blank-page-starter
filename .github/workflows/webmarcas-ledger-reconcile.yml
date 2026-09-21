@@ -1,0 +1,56 @@
+name: Validar ledger WebMarcas (somente leitura)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: supabase/postgres:15.8.1.085
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['54322:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s
+          --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with: { version: latest }
+      - name: Classificar ledger remoto/local (produção read-only)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.WEBMARCAS_LEDGER_READ_TOKEN }}
+        run: |
+          supabase link --project-ref scpbqsvwojhbxihyqbdz
+          supabase migration list --linked | tee /tmp/migration-list.txt
+          scripts/migration-ledger/plan-repair.py /tmp/migration-list.txt | tee ledger-analysis.json
+      - name: Construir baseline no Postgres efêmero
+        env:
+          PGURL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: |
+          test -f supabase/baseline/webmarcas-production.sql
+          psql "$PGURL" -v ON_ERROR_STOP=1 -f supabase/baseline/webmarcas-production.sql
+      - name: Aplicar apenas migrations pendentes revisadas
+        env:
+          PGURL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: |
+          for f in \
+            supabase/migrations/20260917130000_add_botconversa_contract_requests.sql \
+            supabase/migrations/20260917150000_harden_botconversa_contract_idempotency.sql \
+            supabase/migrations/20260921130500_add_botconversa_contract_callback_status.sql \
+            supabase/migrations/20260921163500_webmarcas_continuous_agent_queue.sql
+          do psql "$PGURL" -v ON_ERROR_STOP=1 -f "$f"; done
+      - name: Exigir schema diff zero do baseline
+        run: |
+          test -f supabase/baseline/webmarcas-production.sha256
+          sha256sum -c supabase/baseline/webmarcas-production.sha256
+          test "$(jq '.counts.remote_only' ledger-analysis.json)" -eq 0
+          test "$(jq '.counts.local_only' ledger-analysis.json)" -eq 4
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: webmarcas-ledger-analysis
+          path: ledger-analysis.json
