@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ADDITIONAL_COSTS_DRAFT, approvedAdditionalCostsDelivery, detectsAdditionalCostIntent,
-  planAdditionalCostsDelivery,
+  planAdditionalCostsDelivery, recordAdditionalCostsDelivery,
 } from './additionalCostsDraft';
 
 describe('additional-costs official draft transport', () => {
@@ -19,6 +19,11 @@ describe('additional-costs official draft transport', () => {
   });
   it('falls back to exact text only when audio is unavailable', () => {
     expect(planAdditionalCostsDelivery(false).map((item) => item.kind)).toEqual(['text']);
+  });
+  it('records both deliveries and treats four text blocks as mandatory even after audio failure', () => {
+    expect(recordAdditionalCostsDelivery('c1', 'sent', 4)).toMatchObject({ completed: true, audio: 'sent', textBlocksSent: 4 });
+    expect(recordAdditionalCostsDelivery('c1', 'failed', 4)).toMatchObject({ completed: true, audio: 'failed', textBlocksSent: 4 });
+    expect(recordAdditionalCostsDelivery('c1', 'sent', 3).completed).toBe(false);
   });
   it('keeps the content blocked while legal and boleto conflicts remain', () => {
     expect(ADDITIONAL_COSTS_DRAFT.status).toBe('blocked_pending_caroline_approval');

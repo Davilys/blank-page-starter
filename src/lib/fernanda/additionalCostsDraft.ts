@@ -29,6 +29,28 @@ export function detectsAdditionalCostIntent(message: string) {
   return /(?:algo|mais|extra|adicional|outra).*(?:pagar|pagamento|custo|taxa|valor)|(?:taxa|custo|valor|honor[aá]rio).*(?:inpi|extra|adicional|depois|inclus)|(?:quanto).*(?:total|final)|(?:exig[eê]ncia|publica[cç][aã]o)|(?:o que|que).*(?:inclus)/i.test(message);
 }
 
+export type DeliveryReceipt = {
+  conversationId: string;
+  audio: 'sent' | 'failed' | 'unsupported' | 'not_attempted';
+  textBlocksSent: number;
+  completed: boolean;
+};
+
+export function recordAdditionalCostsDelivery(
+  conversationId: string,
+  audio: DeliveryReceipt['audio'],
+  textBlocksSent: number,
+): DeliveryReceipt {
+  if (textBlocksSent < 0 || textBlocksSent > ADDITIONAL_COSTS_DRAFT.blocks.length) throw new Error('invalid_text_block_count');
+  return {
+    conversationId,
+    audio,
+    textBlocksSent,
+    completed: textBlocksSent === ADDITIONAL_COSTS_DRAFT.blocks.length &&
+      (audio === 'sent' || audio === 'failed' || audio === 'unsupported'),
+  };
+}
+
 export function approvedAdditionalCostsDelivery(audioAvailable: boolean): DeliveryAction[] {
   if (ADDITIONAL_COSTS_DRAFT.status !== 'approved' as string) return [];
   const text = ADDITIONAL_COSTS_DRAFT.blocks.join('\n\n');
