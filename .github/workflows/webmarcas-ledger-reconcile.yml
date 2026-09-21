@@ -56,6 +56,27 @@ jobs:
           SQL
           psql "$PGURL" -v ON_ERROR_STOP=1 -f /tmp/webmarcas-bootstrap.sql
 
+      - name: Criar stub exploratório da relação legada
+        run: |
+          echo 'EXPLORATORY ONLY: inpiknowledgebase.id type/default are unknown; text/no-default is a hypothesis.'
+          psql "$PGURL" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE TABLE public.inpiknowledgebase (
+            id text PRIMARY KEY,
+            category text NOT NULL,
+            content text NOT NULL,
+            title text NOT NULL,
+            created_at timestamptz,
+            updated_at timestamptz,
+            is_active boolean,
+            priority integer,
+            raw_html text,
+            source_date date,
+            source_url text,
+            tags text[],
+            valid_until date
+          );
+          SQL
+
       - name: Reproduzir 93 migrations remotas no Postgres efêmero
         run: psql "$PGURL" -v ON_ERROR_STOP=1 -f /tmp/webmarcas-canonical.sql
 
@@ -103,7 +124,10 @@ jobs:
           END $$;
           SQL
 
-      - name: Registrar caveat do gate
+      - name: Bloquear gate canônico após exploração
+        if: always()
         run: |
-          echo 'Validated offline against the last read-only snapshot captured on 2026-09-21.'
-          echo 'This gate does not assert zero live production drift.'
+          echo 'FAIL-CLOSED: exploratory stub was used for public.inpiknowledgebase.'
+          echo 'Canonical fidelity remains blocked by the unknown type/default of inpiknowledgebase.id.'
+          echo 'This run maps further gaps only and cannot authorize preview, merge, repair, or deployment.'
+          exit 1
