@@ -3437,8 +3437,7 @@ ON CONFLICT (key) DO NOTHING;
 -- BEGIN LOCAL BOOTSTRAP 20260218224357_684c3bbc-9af3-48be-b19c-435aca19afb9.sql
 
 -- Garantir que notification_dispatch_logs existe com estrutura completa
-CREATE TABLE IF NOT EXIS
-TS public.notification_dispatch_logs (
+CREATE TABLE IF NOT EXISTS public.notification_dispatch_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   event_type text NOT NULL,
   channel text NOT NULL,
