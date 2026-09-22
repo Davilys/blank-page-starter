@@ -2884,8 +2884,7 @@ ALTER TABLE public.documents ADD CONSTRAINT documents_document_type_check CHECK 
 -- END MIGRATION 20260915193314
 
 -- BEGIN MIGRATION 20260915224230 20260915224230_e142082a-1d92-425c-9375-096ab8816b85.sql sha256=bb52dc423fcbdcc19e8aef7cdd887493025c2ccc61e07dcbbe3267280aacf3c7
--- FASE 1 — Recursos I
-NPI (três modalidades): base persistente, versionamento e log de IA.
+-- FASE 1 — Recursos INPI (três modalidades): base persistente, versionamento e log de IA.
 -- Migração ADITIVA: nenhuma tabela existente é alterada ou removida.
 
 CREATE TABLE IF NOT EXISTS public.inpi_resource_cases (
