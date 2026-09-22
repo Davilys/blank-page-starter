@@ -189,6 +189,7 @@ jobs:
           replay=replay.replace('\\set ON_ERROR_STOP on\n','',1)
           replay=replay.replace('CREATE TABLE IF NOT EXIS\nTS public.notification_dispatch_logs (','CREATE TABLE IF NOT EXISTS public.notification_dispatch_logs (',1)
           replay=replay.replace('DEFAULT gen\n_random_uuid()','DEFAULT gen_random_uuid()',1)
+          replay=replay.replace('public.admin_in\nvoices_list','public.admin_invoices_list',1)
           actual=Path('preview/fernanda/supabase/migrations/20260920000000_remote_ledger_sanitized.sql').read_text()
           actual=actual.removeprefix('-- PREVIEW-ONLY: external schedules/production routes removed.\n')
           actual=actual.replace('-- PREVIEW-SANITIZED: cron-sync-all-emails not scheduled; no outbound route.\n\n','')

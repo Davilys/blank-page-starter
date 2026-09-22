@@ -2135,8 +2135,7 @@ RETURNS text LANGUAGE sql IMMUTABLE SET search_path = public AS $$
 $$;
 
 REVOKE ALL ON FUNCTION public.admin_invoices_list(text, text, date, date, uuid, text, text, integer, integer) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.admin_in
-voices_list(text, text, date, date, uuid, text, text, integer, integer) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.admin_invoices_list(text, text, date, date, uuid, text, text, integer, integer) TO authenticated, service_role;
 
 REVOKE ALL ON FUNCTION public.admin_invoices_totals(date, date, uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.admin_invoices_totals(date, date, uuid) TO authenticated, service_role;;
