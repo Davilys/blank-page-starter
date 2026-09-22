@@ -1,8 +1,7 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
 function safeEqual(a:string,b:string){if(!a||!b||a.length!==b.length)return false;let d=0;for(let i=0;i<a.length;i+=1)d|=a.charCodeAt(i)^b.charCodeAt(i);return d===0;}
 const text=(v:unknown)=>typeof v==='string'?v.trim():'';
-serve(async(req)=>{
+Deno.serve(async(req)=>{
  if(req.method!=='POST')return json({error:'Método não permitido'},405);
  const expected=Deno.env.get('BOTCONVERSA_CONTRACT_WEBHOOK_SECRET')||'';
  const received=req.headers.get('x-botconversa-contract-secret')||'';

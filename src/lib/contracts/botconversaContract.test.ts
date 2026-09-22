@@ -67,17 +67,3 @@ describe('BotConversa contract payload', () => {
     expect(html).not.toContain('<img src=x');
   });
 });
-
-describe('preview dry-run contract', () => {
-  it('uses an unmistakably synthetic payload shape', () => {
-    const result = validateBotConversaContractInput({
-      event_id: 'TESTE-FERNANDA-0001', flow_name: '1- INSTINC', agent_name: 'Fernanda Atendimento',
-      full_name: 'TESTE Cliente Fernanda', email: 'fernanda@example.invalid', phone: '11999999999',
-      cpf: '52998224725', cep: '01001000', address_number: '100', address: 'Rua Teste, 100',
-      neighborhood: 'Centro', city: 'São Paulo', state: 'SP', brand_name: 'TESTE MARCA',
-      business_area: 'Cafeteria sintética', payment_method: 'pix',
-    });
-    expect(result.errors).toEqual([]);
-    expect(result.data).toMatchObject({ event_id: 'TESTE-FERNANDA-0001', flow_name: '1- INSTINC', payment_method: 'avista' });
-  });
-});

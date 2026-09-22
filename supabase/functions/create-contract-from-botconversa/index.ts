@@ -337,30 +337,6 @@ serve(async (req) => {
   const parsed = validateBotConversaContractInput(body);
   if (!parsed.data) return json({ error: 'Dados inválidos', fields: parsed.errors }, 422);
   let input = parsed.data;
-  const dryRunRequested = req.headers.get('x-webmarcas-dry-run') === '1';
-  if (dryRunRequested) {
-    const isSynthetic = input.event_id.startsWith('TESTE-') && input.full_name.startsWith('TESTE ') &&
-      input.email.endsWith('@example.invalid') && input.flow_name === '1- INSTINC' &&
-      input.agent_name === 'Fernanda Atendimento';
-    if (!isSynthetic) return json({ error: 'Dry-run exige dados sintéticos TESTE' }, 422);
-    return json({
-      success: true,
-      dry_run: true,
-      no_effects: true,
-      validated: {
-        event_id: input.event_id,
-        flow_name: input.flow_name,
-        agent_name: input.agent_name,
-        payment_method: input.payment_method,
-        brand_name: input.brand_name,
-      },
-      blocked_actions: [
-        'profile_write', 'process_write', 'contract_write', 'signature_link',
-        'class_suggestion', 'cep_lookup', 'charge', 'gru', 'power_of_attorney',
-        'inpi', 'external_fetch',
-      ],
-    });
-  }
   if (input.flow_name !== '1- AT FINAL SEMANA' || input.agent_name !== 'Fernanda Atendimento') {
     return json({ error: 'Origem do fluxo não autorizada' }, 403);
   }
