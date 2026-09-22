@@ -207,6 +207,11 @@ jobs:
           set -euo pipefail
           createdb --maintenance-db="$PGURL" fernanda_preview
           preview_url='postgresql://postgres:postgres@127.0.0.1:54322/fernanda_preview'
+          psql "$preview_url" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE SCHEMA IF NOT EXISTS extensions;
+          CREATE SCHEMA IF NOT EXISTS auth;
+          CREATE SCHEMA IF NOT EXISTS storage;
+          SQL
           for f in preview/fernanda/supabase/migrations/*.sql; do
             echo "Applying $f"
             psql "$preview_url" -v ON_ERROR_STOP=1 -f "$f"
