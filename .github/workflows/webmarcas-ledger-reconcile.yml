@@ -186,9 +186,6 @@ jobs:
             a=replay.index(start); b=replay.index(end,a)
             replay=replay[:a]+replay[b:]
           replay=replay.replace('https://scpbqsvwojhbxihyqbdz.supabase.co/storage/v1/object/public/documents/','preview-disabled://documents/')
-          # The Supabase migration runner executes SQL directly. The canonical capture contains
-          # one psql-only fail-fast directive, so preview deployment omits that client command.
-          replay=replay.removeprefix('\\set ON_ERROR_STOP on\n')
           actual=Path('preview/fernanda/supabase/migrations/20260920000000_remote_ledger_sanitized.sql').read_text()
           actual=actual.removeprefix('-- PREVIEW-ONLY: external schedules/production routes removed.\n')
           actual=actual.replace('-- PREVIEW-SANITIZED: cron-sync-all-emails not scheduled; no outbound route.\n\n','')
