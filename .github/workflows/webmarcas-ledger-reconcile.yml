@@ -205,7 +205,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          createdb "$PGURL" fernanda_preview
+          createdb --maintenance-db="$PGURL" fernanda_preview
           preview_url='postgresql://postgres:postgres@127.0.0.1:54322/fernanda_preview'
           for f in preview/fernanda/supabase/migrations/*.sql; do
             echo "Applying $f"
