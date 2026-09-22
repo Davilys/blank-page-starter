@@ -2,7 +2,6 @@
 -- Canonical WebMarcas remote migration replay
 -- Generated from the 93 migrations captured read-only on 2026-09-21.
 -- This file is for ephemeral PostgreSQL validation only. Never apply to production.
-\set ON_ERROR_STOP on
 
 -- BEGIN MIGRATION 20260326202928 20260326202928_.sql sha256=e9fe29df3cefd98cafd5b468acafeba1b39d0bc52cb43e97a816cf9f8a5e63ea
 CREATE POLICY "Admins can insert profiles"

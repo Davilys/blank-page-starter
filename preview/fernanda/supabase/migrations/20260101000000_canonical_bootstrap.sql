@@ -1,7 +1,6 @@
 -- PREVIEW-ONLY sanitized canonical bootstrap. Never merge/deploy to production.
 -- Offline bootstrap from repository-local migrations before the first captured remote ledger version.
 -- Ephemeral CI only. Never apply to production.
-\set ON_ERROR_STOP on
 
 -- BEGIN LOCAL BOOTSTRAP 20260107210351_remix_migration_from_pg_dump.sql
 CREATE EXTENSION IF NOT EXISTS "pg_graphql";

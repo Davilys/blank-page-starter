@@ -9,6 +9,11 @@ fi
 if rg -n -i '"enabled"[[:space:]]*:[[:space:]]*true|"(api_key|auth_token|webhook_url)"[[:space:]]*:[[:space:]]*"[^[:space:]" ]+' "$root/supabase"; then
   echo 'FAIL: enabled provider or populated integration field found' >&2; exit 1
 fi
+# Supabase's migration runner executes SQL directly, not through a psql client.
+# Any line-leading backslash is therefore an incompatible psql meta-command.
+if rg -n '^[[:space:]]*\\' "$root/supabase/migrations"; then
+  echo 'FAIL: psql meta-command found in Supabase migration history' >&2; exit 1
+fi
 # Exact effect markers expected to be absent.
 test "$(rg -i -c 'cron\.schedule' "$root/supabase/migrations" || true)" = ""
 test "$(rg -i -c 'net\.http' "$root/supabase/migrations" || true)" = ""

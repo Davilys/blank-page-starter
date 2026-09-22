@@ -186,6 +186,9 @@ jobs:
             a=replay.index(start); b=replay.index(end,a)
             replay=replay[:a]+replay[b:]
           replay=replay.replace('https://scpbqsvwojhbxihyqbdz.supabase.co/storage/v1/object/public/documents/','preview-disabled://documents/')
+          # The Supabase migration runner executes SQL directly. The canonical capture contains
+          # one psql-only fail-fast directive, so preview deployment omits that client command.
+          replay=replay.removeprefix('\\set ON_ERROR_STOP on\n')
           actual=Path('preview/fernanda/supabase/migrations/20260920000000_remote_ledger_sanitized.sql').read_text()
           actual=actual.removeprefix('-- PREVIEW-ONLY: external schedules/production routes removed.\n')
           actual=actual.replace('-- PREVIEW-SANITIZED: cron-sync-all-emails not scheduled; no outbound route.\n\n','')
@@ -199,6 +202,17 @@ jobs:
           SELECT count(*) FROM cron.job;
           ROLLBACK;
           SQL
+
+      - name: Reproduzir a história exata da preview no runner do PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          createdb "$PGURL" fernanda_preview
+          preview_url='postgresql://postgres:postgres@127.0.0.1:54322/fernanda_preview'
+          for f in preview/fernanda/supabase/migrations/*.sql; do
+            echo "Applying $f"
+            psql "$preview_url" -v ON_ERROR_STOP=1 -f "$f"
+          done
 
       - name: Registrar escopo do gate
         run: |
