@@ -186,6 +186,7 @@ jobs:
             a=replay.index(start); b=replay.index(end,a)
             replay=replay[:a]+replay[b:]
           replay=replay.replace('https://scpbqsvwojhbxihyqbdz.supabase.co/storage/v1/object/public/documents/','preview-disabled://documents/')
+          replay=replay.replace('\\set ON_ERROR_STOP on\n\n','',1)
           actual=Path('preview/fernanda/supabase/migrations/20260920000000_remote_ledger_sanitized.sql').read_text()
           actual=actual.removeprefix('-- PREVIEW-ONLY: external schedules/production routes removed.\n')
           actual=actual.replace('-- PREVIEW-SANITIZED: cron-sync-all-emails not scheduled; no outbound route.\n\n','')
