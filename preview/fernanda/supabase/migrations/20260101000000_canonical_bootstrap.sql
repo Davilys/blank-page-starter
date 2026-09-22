@@ -4609,8 +4609,7 @@ UPDATE public.profiles SET assigned_to = '1ca389a4-bb64-4ff5-97ab-0a214ccab4b8' 
 -- Marketing Intelligence tables
 
 CREATE TABLE public.marketing_config (
-  id uuid PRIMARY KEY DEFAULT gen
-_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   meta_pixel_id text,
   meta_business_id text,
   is_connected boolean NOT NULL DEFAULT false,

@@ -15,7 +15,7 @@ if grep -RInE '^[[:space:]]*\\' "$root/supabase/migrations"; then
   echo 'FAIL: psql meta-command found in Supabase migration history' >&2; exit 1
 fi
 # Reject SQL keywords split by generated chunk boundaries.
-if grep -RInE '^[[:space:]]*(TS|STS|BLE|ATE|ERT|LECT)[[:space:]]' "$root/supabase/migrations"; then
+if grep -RInE '^[[:space:]]*(TS|STS|BLE|ATE|ERT|LECT|_random_uuid)[[:space:]]' "$root/supabase/migrations"; then
   echo 'FAIL: split SQL keyword found in Supabase migration history' >&2; exit 1
 fi
 # Exact effect markers expected to be absent.
