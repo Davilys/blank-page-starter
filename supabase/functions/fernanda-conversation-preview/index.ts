@@ -1,13 +1,20 @@
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
 function safeEqual(a:string,b:string){if(!a||!b||a.length!==b.length)return false;let d=0;for(let i=0;i<a.length;i+=1)d|=a.charCodeAt(i)^b.charCodeAt(i);return d===0;}
-const text=(v:unknown)=>typeof v==='string'?v.trim():'';
+const str=(v:unknown)=>typeof v==='string'?v.trim():'';
+const docTypes=new Set(['application/pdf','text/plain','application/vnd.openxmlformats-officedocument.wordprocessingml.document']);
 Deno.serve(async(req)=>{
  if(req.method!=='POST')return json({error:'Método não permitido'},405);
- const expected=Deno.env.get('BOTCONVERSA_CONTRACT_WEBHOOK_SECRET')||'';
- const received=req.headers.get('x-botconversa-contract-secret')||'';
+ const expected=Deno.env.get('FERNANDA_PREVIEW_WEBHOOK_SECRET')||'',received=req.headers.get('x-fernanda-preview-secret')||'';
  if(!expected||!safeEqual(received,expected))return json({error:'Não autorizado'},401);
- let body:Record<string,unknown>;try{body=await req.json();}catch{return json({error:'Corpo JSON inválido'},400);}
- const eventId=text(body.event_id),flowName=text(body.flow_name),subscriberId=text(body.subscriber_id),message=text(body.message);
- if(req.headers.get('x-webmarcas-dry-run')!=='1'||!eventId.startsWith('TESTE-')||flowName!=='1- INSTINC'||!subscriberId.startsWith('TESTE-')||!message.startsWith('TESTE '))return json({error:'Preview conversacional aceita somente homologação TESTE sem efeitos'},422);
- return json({success:true,dry_run:true,no_effects:true,event_id:eventId,flow_name:flowName,subscriber_id:subscriberId,reply:'TESTE OK: Fernanda recebeu a mensagem na preview sem gravar nem chamar serviços externos.',blocked_actions:['database_write','botconversa_send','contract','signature','charge','gru','power_of_attorney','inpi','external_fetch']});
+ if(req.headers.get('x-webmarcas-dry-run')!=='1')return json({error:'Preview exige dry-run sem efeitos'},422);
+ let b:Record<string,any>;try{b=await req.json();}catch{return json({error:'Corpo JSON inválido'},400);}
+ const eventId=str(b.event_id),flow=str(b.flow_name),subscriber=str(b.subscriber_id),conversation=str(b.conversation_id),phone=str(b.phone),input=b.input||{},kind=str(input.kind),errors:string[]=[];
+ if(!eventId.startsWith('TESTE-'))errors.push('event_id'); if(flow!=='1- INSTINC')errors.push('flow_name'); if(!subscriber.startsWith('TESTE-'))errors.push('subscriber_id'); if(!conversation.startsWith('TESTE-'))errors.push('conversation_id'); if(!/^TESTE-[0-9A-Za-z_-]{3,80}$/.test(phone))errors.push('phone');
+ let content=''; if(kind==='text')content=str(input.text);else if(kind==='audio')content=str(input.transcript);else if(kind==='document'){const a=input.attachment||{};content=str(a.extracted_text);if(!str(a.id).startsWith('TESTE-'))errors.push('attachment.id');if(!str(a.filename)||/[\\/]/.test(str(a.filename)))errors.push('attachment.filename');if(!docTypes.has(str(a.mime_type)))errors.push('attachment.mime_type');if(!Number.isSafeInteger(a.size_bytes)||a.size_bytes<1||a.size_bytes>10000000)errors.push('attachment.size_bytes');}else errors.push('input.kind');
+ if(!content.startsWith('TESTE '))errors.push('input.content');if(errors.length)return json({error:'Payload de homologação inválido',fields:errors},422);
+ const memory=b.memory&&typeof b.memory==='object'?{...b.memory}:{},prior=Array.isArray(memory.processedEventIds)?memory.processedEventIds.filter((x:unknown)=>typeof x==='string').slice(-49):[],duplicate=prior.includes(eventId);if(!duplicate)prior.push(eventId);
+ const caroline=/(oposi[cç][aã]o|recurso|processo judicial|notifica[cç][aã]o extrajudicial|cess[aã]o|licenciamento)/i.test(content),contractReady=memory.stage==='ready_for_contract'&&memory.contract_gates_satisfied===true;
+ const reply=duplicate?'TESTE OK: evento já processado; nenhum comando novo foi criado.':caroline?'Essa questão precisa da Caroline. Posso verificar uma opção concreta de horário com ela para você?':'Qual é o nome exato da marca que você quer registrar?';const now=new Date().toISOString(),anchor=Date.parse(now);
+ const commands=duplicate?[]:[{type:'reply_same_conversation',conversation_id:conversation,subscriber_id:subscriber,text:reply,dry_run:true},...(caroline?[{type:'handoff_caroline',conversation_id:conversation,reason:'complex_legal_matter',dry_run:true}]:[]),...(contractReady?[{type:'request_new_contract_path',conversation_id:conversation,idempotency_key:`contract:${eventId}`,dry_run:true}]:[]),{type:'replace_followups',conversation_id:conversation,due_at:[600000,86400000,432000000].map(ms=>new Date(anchor+ms).toISOString()),dry_run:true}];
+ return json({success:true,dry_run:true,no_effects:true,duplicate,event_id:eventId,conversation_id:conversation,input_kind:kind,next_state:{...memory,processedEventIds:prior,lastInputKind:kind,lastInboundAt:now,stage:caroline?'waiting_caroline':memory.stage||'discovery'},reply_plan:{text:reply,question_count:(reply.match(/\?/g)||[]).length},commands,blocked_actions:['database_write','botconversa_send','contract_create','signature','charge','gru','power_of_attorney','inpi','external_fetch']});
 });
