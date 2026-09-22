@@ -217,6 +217,7 @@ jobs:
             | psql "$preview_url" -v ON_ERROR_STOP=1
           psql "$preview_url" -v ON_ERROR_STOP=1 <<'SQL'
           ALTER TABLE auth.users ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+          CREATE PUBLICATION supabase_realtime;
           SQL
           for f in preview/fernanda/supabase/migrations/*.sql; do
             echo "Applying $f"
