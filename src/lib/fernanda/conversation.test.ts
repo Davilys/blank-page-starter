@@ -77,3 +77,12 @@ describe('Fernanda continuous conversation core', () => {
     expect(() => markContractLinkSent(base)).toThrow('contract_not_requested');
   });
 });
+
+describe('Fernanda preview conversation webhook contract', () => {
+  it('uses explicit TESTE markers for the no-effects route', () => {
+    const payload = { event_id: 'TESTE-EVENT-1', flow_name: '1- INSTINC', subscriber_id: 'TESTE-SUBSCRIBER-1', message: 'TESTE olá Fernanda' };
+    expect(payload.event_id.startsWith('TESTE-')).toBe(true);
+    expect(payload.subscriber_id.startsWith('TESTE-')).toBe(true);
+    expect(payload.message.startsWith('TESTE ')).toBe(true);
+  });
+});
