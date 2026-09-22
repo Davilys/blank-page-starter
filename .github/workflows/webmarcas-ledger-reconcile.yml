@@ -213,7 +213,7 @@ jobs:
           CREATE SCHEMA IF NOT EXISTS extensions;
           CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
           SQL
-          pg_dump "$PGURL" --schema=auth --schema=storage --schema-only --no-owner --no-privileges \
+          pg_dump "$PGURL" --schema=auth --schema=storage --section=pre-data --no-owner --no-privileges \
             | psql "$preview_url" -v ON_ERROR_STOP=1
           for f in preview/fernanda/supabase/migrations/*.sql; do
             echo "Applying $f"
