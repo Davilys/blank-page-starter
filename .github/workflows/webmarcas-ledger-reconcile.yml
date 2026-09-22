@@ -209,11 +209,12 @@ jobs:
           preview_url='postgresql://postgres:postgres@127.0.0.1:54322/fernanda_preview'
           # A real Supabase branch already has platform-owned auth/storage schemas.
           # Reproduce that baseline without copying any application data or public schema.
-          pg_dump "$PGURL" --schema=auth --schema=storage --schema-only --no-owner --no-privileges \
-            | psql "$preview_url" -v ON_ERROR_STOP=1
           psql "$preview_url" -v ON_ERROR_STOP=1 <<'SQL'
           CREATE SCHEMA IF NOT EXISTS extensions;
+          CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
           SQL
+          pg_dump "$PGURL" --schema=auth --schema=storage --schema-only --no-owner --no-privileges \
+            | psql "$preview_url" -v ON_ERROR_STOP=1
           for f in preview/fernanda/supabase/migrations/*.sql; do
             echo "Applying $f"
             psql "$preview_url" -v ON_ERROR_STOP=1 -f "$f"
