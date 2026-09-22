@@ -16,7 +16,7 @@ export type Stage =
 
 export type Memory = {
   fullName?: string; brandName?: string; businessArea?: string; email?: string;
-  cpf?: string; cep?: string; addressNumber?: string; paymentMethod?: PaymentMethod;
+  cpf?: string; cep?: string; addressNumber?: string; cnpj?: string | null; paymentMethod?: PaymentMethod;
   suggestedClasses?: number[]; principalClass?: number; exactSearchCompleted?: boolean;
   phoneFromSubscriber?: string; carolineReason?: string;
 };
