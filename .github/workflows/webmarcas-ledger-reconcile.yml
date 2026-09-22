@@ -215,7 +215,7 @@ jobs:
           CREATE SCHEMA IF NOT EXISTS extensions;
           CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
           SQL
-          pg_dump "$PGURL" --schema=auth --schema=storage --section=pre-data --no-owner --no-privileges \
+          pg_dump "$PGURL" --schema=auth --schema=storage --schema=cron --section=pre-data --no-owner --no-privileges \
             | psql "$preview_url" -v ON_ERROR_STOP=1
           psql "$preview_url" -v ON_ERROR_STOP=1 <<'SQL'
           ALTER TABLE auth.users ADD CONSTRAINT users_pkey PRIMARY KEY (id);
@@ -225,7 +225,11 @@ jobs:
           SQL
           for f in preview/fernanda/supabase/migrations/*.sql; do
             echo "Applying $f"
-            psql "$preview_url" -v ON_ERROR_STOP=1 -f "$f"
+            # pg_cron is platform-owned and already provisioned in real branches. The service
+            # image binds it to database postgres, so omit only its CREATE EXTENSION statement
+            # after restoring the platform cron schema above.
+            sed '/^CREATE EXTENSION IF NOT EXISTS pg_cron;$/d' "$f" \
+              | psql "$preview_url" -v ON_ERROR_STOP=1
           done
 
       - name: Registrar escopo do gate
