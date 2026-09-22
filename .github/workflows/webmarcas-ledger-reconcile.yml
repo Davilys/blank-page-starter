@@ -230,7 +230,7 @@ jobs:
             # pg_cron is platform-owned and already provisioned in real branches. The service
             # image binds it to database postgres, so omit only its CREATE EXTENSION statement
             # after restoring the platform cron schema above.
-            sed '/^CREATE EXTENSION IF NOT EXISTS pg_cron;$/d' "$f" \
+            sed -e '/^CREATE EXTENSION IF NOT EXISTS pg_cron;$/d' -e 's/^CREATE EXTENSION IF NOT EXISTS pg_cron; //' "$f" \
               | psql "$preview_url" -v ON_ERROR_STOP=1
           done
 
