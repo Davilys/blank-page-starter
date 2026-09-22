@@ -215,6 +215,9 @@ jobs:
           SQL
           pg_dump "$PGURL" --schema=auth --schema=storage --section=pre-data --no-owner --no-privileges \
             | psql "$preview_url" -v ON_ERROR_STOP=1
+          psql "$preview_url" -v ON_ERROR_STOP=1 <<'SQL'
+          ALTER TABLE auth.users ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+          SQL
           for f in preview/fernanda/supabase/migrations/*.sql; do
             echo "Applying $f"
             psql "$preview_url" -v ON_ERROR_STOP=1 -f "$f"
