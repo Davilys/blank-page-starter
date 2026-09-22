@@ -1,0 +1,263 @@
+name: Validar ledger WebMarcas (offline, somente leitura)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: supabase/postgres:15.8.1.085
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['54322:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s
+          --health-timeout 5s --health-retries 20
+    env:
+      PGURL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verificar snapshot canônico capturado
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'f3ea9836625fba2530094fca4b1742847308f3e17a5eaa69206b4ffc2d0d5fb4  supabase/canonical-remote/webmarcas-remote-migrations.manifest.json' | sha256sum -c -
+          test "$(jq -r '.count' supabase/canonical-remote/webmarcas-remote-migrations.manifest.json)" -eq 93
+          for part in 00 01 02; do head -c -1 "supabase/canonical-remote/replay.part-${part}.sql"; done > /tmp/webmarcas-canonical.sql
+          cat supabase/canonical-remote/replay.part-03.sql >> /tmp/webmarcas-canonical.sql
+          echo 'd0a20aba5119549eb6b096b144c1e3e35cff13fa1631f69992dd2f697d6cb7ba  /tmp/webmarcas-canonical.sql' | sha256sum -c -
+
+      - name: Reconstruir bootstrap local pré-ledger
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'ae4877792aa9f5a16b4a68d1c63fa3716e787431b235504209d815f6440cd2b0  supabase/canonical-remote/bootstrap-local-pre-remote.manifest.json' | sha256sum -c -
+          test "$(jq -r '.count' supabase/canonical-remote/bootstrap-local-pre-remote.manifest.json)" -eq 105
+          for part in 00 01 02 03 04; do head -c -1 "supabase/canonical-remote/bootstrap.part-${part}.sql"; done > /tmp/webmarcas-bootstrap.sql
+          cat supabase/canonical-remote/bootstrap.part-05.sql >> /tmp/webmarcas-bootstrap.sql
+          echo 'ba6e8f9bc17c079ddc01c7ec9390b50af03f6301652ebd1a71fbd0a8e47c346a  /tmp/webmarcas-bootstrap.sql' | sha256sum -c -
+
+      - name: Aplicar bootstrap local pré-ledger
+        run: |
+          sed -i -e '/^SET transaction_timeout =/d' -e "/set_config('search_path', '', false)/d" /tmp/webmarcas-bootstrap.sql
+          psql "postgresql://supabase_admin:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 <<'SQL'
+          ALTER TABLE storage.buckets ADD COLUMN IF NOT EXISTS public boolean NOT NULL DEFAULT false;
+          CREATE OR REPLACE FUNCTION storage.foldername(name text) RETURNS text[]
+          LANGUAGE sql IMMUTABLE AS $$ SELECT string_to_array(regexp_replace(name, '/[^/]*$', ''), '/') $$;
+          SQL
+          psql "$PGURL" -v ON_ERROR_STOP=1 -f /tmp/webmarcas-bootstrap.sql
+
+      - name: Restaurar DDL fiel da relação legada
+        run: |
+          psql "$PGURL" -v ON_ERROR_STOP=1 <<'SQL'
+          -- Verified read-only from production information_schema.columns on 2026-09-21.
+          CREATE TABLE public.inpiknowledgebase (
+            id uuid PRIMARY KEY,
+            category varchar NOT NULL,
+            title text NOT NULL,
+            content text NOT NULL,
+            source_url text,
+            source_date date,
+            valid_until date,
+            is_active boolean DEFAULT true,
+            priority integer DEFAULT 1,
+            tags text[] DEFAULT '{}'::text[],
+            raw_html text,
+            created_at timestamptz DEFAULT now(),
+            updated_at timestamptz DEFAULT now()
+          );
+          SQL
+      - name: Reproduzir 93 migrations remotas no Postgres efêmero
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 -f /tmp/webmarcas-canonical.sql
+
+      - name: Aplicar quatro migrations pendentes revisadas
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in \
+            supabase/migrations/20260917130000_add_botconversa_contract_requests.sql \
+            supabase/migrations/20260917150000_harden_botconversa_contract_idempotency.sql \
+            supabase/migrations/20260921130500_add_botconversa_contract_callback_status.sql \
+            supabase/migrations/20260921163500_webmarcas_continuous_agent_queue.sql \
+            supabase/migrations/20260921203000_harden_fernanda_state_followups.sql
+          do
+            test -f "$f"
+            psql "$PGURL" -v ON_ERROR_STOP=1 -f "$f"
+          done
+
+      - name: Testar estrutura, constraints e funções críticas
+        run: |
+          psql "$PGURL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE n integer;
+          BEGIN
+            SELECT count(*) INTO n FROM pg_class c JOIN pg_namespace s ON s.oid=c.relnamespace
+              WHERE s.nspname='public' AND c.relname IN (
+                'botconversa_contract_requests','botconversa_contract_async_jobs',
+                'webmarcas_agent_inbox','webmarcas_agent_conversations','webmarcas_agent_messages',
+                'webmarcas_agent_followups','webmarcas_agent_tool_calls');
+            IF n <> 7 THEN RAISE EXCEPTION 'expected 7 queue tables, found %', n; END IF;
+            IF to_regprocedure('public.claim_botconversa_contract_async_job()') IS NULL THEN
+              RAISE EXCEPTION 'missing claim_botconversa_contract_async_job';
+            END IF;
+            IF to_regprocedure('public.claim_webmarcas_agent_event()') IS NULL THEN
+              RAISE EXCEPTION 'missing claim_webmarcas_agent_event';
+            END IF;
+            IF to_regprocedure('public.claim_webmarcas_agent_followup()') IS NULL THEN
+              RAISE EXCEPTION 'missing claim_webmarcas_agent_followup';
+            END IF;
+            IF to_regprocedure('public.ingest_webmarcas_agent_event(text,text,text,text,text,text,timestamp with time zone)') IS NULL THEN
+              RAISE EXCEPTION 'missing ingest_webmarcas_agent_event';
+            END IF;
+            IF to_regprocedure('public.schedule_webmarcas_agent_followups(text,timestamp with time zone)') IS NULL THEN
+              RAISE EXCEPTION 'missing schedule_webmarcas_agent_followups';
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='uq_brand_processes_source_event_id') THEN
+              RAISE EXCEPTION 'missing brand process idempotency index';
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='uq_contracts_source_event_id') THEN
+              RAISE EXCEPTION 'missing contract idempotency index';
+            END IF;
+          END $$;
+          SQL
+
+      - name: Testar estado contínuo, follow-ups e idempotência
+        run: |
+          psql "$PGURL" -v ON_ERROR_STOP=1 <<'SQL'
+          BEGIN;
+          INSERT INTO public.webmarcas_agent_conversations(conversation_id,subscriber_id,phone)
+          VALUES ('ci-conversation','ci-subscriber','5511999999999');
+          SELECT public.schedule_webmarcas_agent_followups('ci-conversation','2026-09-21T12:00:00Z');
+          DO $$
+          BEGIN
+            IF (SELECT array_agg(due_at ORDER BY step) FROM public.webmarcas_agent_followups WHERE conversation_id='ci-conversation') <>
+               ARRAY['2026-09-21T12:10:00Z'::timestamptz,'2026-09-22T12:00:00Z'::timestamptz,'2026-09-26T12:00:00Z'::timestamptz] THEN
+              RAISE EXCEPTION 'follow-up schedule mismatch';
+            END IF;
+          END $$;
+          SELECT public.ingest_webmarcas_agent_event('ci-event-0001','ci-conversation','ci-subscriber','5511999999999','text','Olá','2026-09-21T12:05:00Z');
+          DO $$
+          BEGIN
+            IF EXISTS (SELECT 1 FROM public.webmarcas_agent_followups WHERE conversation_id='ci-conversation' AND status <> 'cancelled') THEN
+              RAISE EXCEPTION 'inbound did not cancel every follow-up';
+            END IF;
+            IF (SELECT count(*) FROM public.webmarcas_agent_messages WHERE event_id='ci-event-0001') <> 1 THEN
+              RAISE EXCEPTION 'inbound message missing';
+            END IF;
+          END $$;
+          SELECT public.ingest_webmarcas_agent_event('ci-event-0001','ci-conversation','ci-subscriber','5511999999999','text','Olá','2026-09-21T12:05:00Z');
+          DO $$
+          BEGIN
+            IF (SELECT count(*) FROM public.webmarcas_agent_messages WHERE event_id='ci-event-0001') <> 1 THEN
+              RAISE EXCEPTION 'duplicate inbound event was not idempotent';
+            END IF;
+          END $$;
+          ROLLBACK;
+          SQL
+
+      - name: Validar história sanitizada exclusiva da preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./preview/fernanda/verify-sanitized.sh
+          cmp --silent \
+            supabase/migrations/20260921203000_harden_fernanda_state_followups.sql \
+            preview/fernanda/supabase/migrations/20260921203000_harden_fernanda_state_followups.sql
+          # Exact deploy history is derived only from the already-green canonical replay.
+          # CI validates byte-equivalence after removing the documented external effects.
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          root=Path('supabase/canonical-remote')
+          replay=''.join((root/f'replay.part-{i:02d}.sql').read_text() for i in range(4))
+          for start,end in [
+            ('-- Schedule sync every 2 minutes','-- END MIGRATION 20260503201743'),
+            ('-- remove jobs com mesmo nome para idempotência','-- END MIGRATION 20260507113910'),
+          ]:
+            a=replay.index(start); b=replay.index(end,a)
+            replay=replay[:a]+replay[b:]
+          replay=replay.replace('https://scpbqsvwojhbxihyqbdz.supabase.co/storage/v1/object/public/documents/','preview-disabled://documents/')
+          replay=replay.replace('\\set ON_ERROR_STOP on\n','',1)
+          replay=replay.replace('CREATE TABLE IF NOT EXIS\nTS public.notification_dispatch_logs (','CREATE TABLE IF NOT EXISTS public.notification_dispatch_logs (',1)
+          replay=replay.replace('DEFAULT gen\n_random_uuid()','DEFAULT gen_random_uuid()',1)
+          replay=replay.replace('public.admin_in\nvoices_list','public.admin_invoices_list',1)
+          replay=replay.replace('-- FASE 1 — Recursos I\nNPI (três modalidades):','-- FASE 1 — Recursos INPI (três modalidades):',1)
+          actual=Path('preview/fernanda/supabase/migrations/20260920000000_remote_ledger_sanitized.sql').read_text()
+          actual=actual.removeprefix('-- PREVIEW-ONLY: external schedules/production routes removed.\n')
+          actual=actual.replace('-- PREVIEW-SANITIZED: cron-sync-all-emails not scheduled; no outbound route.\n\n','')
+          actual=actual.replace('-- PREVIEW-SANITIZED: Asaas/email cron jobs not scheduled; no outbound route.\n\n','')
+          if actual != replay: raise SystemExit('sanitized replay differs beyond documented removals')
+          PY
+          # SQL syntax parse: PREPARE cannot cover DDL, so use PostgreSQL parser through a rolled-back transaction
+          # on the already-initialized ephemeral database. Effects never commit.
+          psql "$PGURL" -v ON_ERROR_STOP=1 <<'SQL'
+          BEGIN;
+          SELECT count(*) FROM cron.job;
+          ROLLBACK;
+          SQL
+
+      - name: Reproduzir a história exata da preview no runner do PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          createdb --maintenance-db="$PGURL" fernanda_preview
+          preview_url='postgresql://postgres:postgres@127.0.0.1:54322/fernanda_preview'
+          # A real Supabase branch already has platform-owned auth/storage schemas.
+          # Reproduce that baseline without copying any application data or public schema.
+          psql "$preview_url" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE SCHEMA IF NOT EXISTS extensions;
+          CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
+          SQL
+          pg_dump "$PGURL" --schema=auth --schema=storage --schema=cron --section=pre-data --no-owner --no-privileges \
+            | psql "$preview_url" -v ON_ERROR_STOP=1
+          psql "$preview_url" -v ON_ERROR_STOP=1 <<'SQL'
+          ALTER TABLE auth.users ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+          ALTER TABLE storage.buckets ADD CONSTRAINT buckets_pkey PRIMARY KEY (id);
+          ALTER TABLE storage.objects ADD CONSTRAINT objects_pkey PRIMARY KEY (id);
+          CREATE PUBLICATION supabase_realtime;
+          SQL
+          for f in preview/fernanda/supabase/migrations/*.sql; do
+            echo "Applying $f"
+            # pg_cron is platform-owned and already provisioned in real branches. The service
+            # image binds it to database postgres, so omit only its CREATE EXTENSION statement
+            # after restoring the platform cron schema above.
+            sed -e '/^CREATE EXTENSION IF NOT EXISTS pg_cron;$/d' -e 's/^CREATE EXTENSION IF NOT EXISTS pg_cron; //' "$f" \
+              | psql "$preview_url" -v ON_ERROR_STOP=1
+          done
+
+      - name: Registrar escopo do gate
+        run: |
+          echo 'Offline replay passed against the read-only snapshot captured on 2026-09-21.'
+          echo 'Legacy inpiknowledgebase DDL was verified by a read-only production catalog query.'
+          echo 'This gate does not assert zero live drift after the snapshot and does not deploy or mutate production.'
+
+
+  fernanda-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependências em runner efêmero
+        run: |
+          corepack enable
+          pnpm install --no-frozen-lockfile --ignore-scripts
+      - name: Testar núcleo Fernanda e contrato
+        run: pnpm exec vitest run src/lib/fernanda/*.test.ts src/lib/contracts/botconversaContract.test.ts
+      - name: Verificar TypeScript
+        run: pnpm exec tsc --noEmit
+      - name: Build Vite conclusivo no runner
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: pnpm run build
