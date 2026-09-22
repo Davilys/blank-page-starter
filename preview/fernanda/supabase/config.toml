@@ -1,3 +1,8 @@
 # Isolated preview only. No Edge Functions are present in this working directory.
 [db.seed]
 enabled = false
+
+# Exclusive dry-run webhook for synthetic Fernanda homologation.
+[functions.fernanda-conversation-preview]
+verify_jwt = false
+entrypoint = "./functions/fernanda-conversation-preview/index.ts"
