@@ -45,6 +45,8 @@ interface PublicacaoPrazosProps {
   onOpenDetail?: (pubId: string) => void;
   initialBucket?: Bucket;
   clients?: any[];
+  filtroResp?: string;
+  onFiltroRespChange?: (v: string) => void;
 }
 
 function computeDeadline(pub: any): string | null {
@@ -107,7 +109,7 @@ const ANDAMENTO_CFG: Record<Exclude<AndamentoStatus, null>, { label: string; tri
   },
 };
 
-export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDetail, initialBucket, clients = [] }: PublicacaoPrazosProps) {
+export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDetail, initialBucket, clients = [], filtroResp: filtroRespProp, onFiltroRespChange }: PublicacaoPrazosProps) {
   const [active, setActive] = useState<Bucket>(initialBucket || 'no_prazo');
   const [search, setSearch] = useState('');
   const queryClient = useQueryClient();
@@ -123,7 +125,15 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
   const pubIds = useMemo(() => publicacoes.map(p => p.id), [publicacoes]);
   const responsaveisMap = useResponsaveis('publicacao', pubIds);
   const { admins } = useAdminList();
-  const [filtroResp, setFiltroResp] = useState<string>('all'); // 'all' | userId | 'none'
+  const [filtroRespLocal, setFiltroRespLocal] = useState<string>('all'); // 'all' | userId | 'none'
+  const filtroResp = filtroRespProp ?? filtroRespLocal;
+  const setFiltroResp = (v: string) => { setFiltroRespLocal(v); onFiltroRespChange?.(v); };
+  const matchesResp = (p: any) => {
+    if (filtroResp === 'all') return true;
+    const client = p.client_id ? clientMap.get(p.client_id) : null;
+    const ownerId = (client as any)?.assigned_to || (client as any)?.created_by || null;
+    return filtroResp === 'none' ? !ownerId : ownerId === filtroResp;
+  };
   const [respPopoverOpen, setRespPopoverOpen] = useState(false);
 
   const loadSchedules = useCallback(async () => {
@@ -225,11 +235,12 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
 
   const counts = useMemo(() => {
     const c: Record<Bucket, number> = { no_prazo: 0, '30dias': 0, ultima_semana: 0, vencidos: 0, cumpridos: 0, desistiu: 0 };
-    eligible.forEach(p => { if (p._bucket && p._bucket !== 'cumpridos' && p._bucket !== 'desistiu') c[p._bucket as Bucket]++; });
-    c.cumpridos = cumpridosList.length;
-    c.desistiu = desistiuList.length;
+    eligible.forEach(p => { if (matchesResp(p) && p._bucket && p._bucket !== 'cumpridos' && p._bucket !== 'desistiu') c[p._bucket as Bucket]++; });
+    c.cumpridos = cumpridosList.filter(matchesResp).length;
+    c.desistiu = desistiuList.filter(matchesResp).length;
     return c;
-  }, [eligible, cumpridosList, desistiuList]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eligible, cumpridosList, desistiuList, filtroResp, clientMap]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -385,20 +396,19 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
   return (
     <div className="space-y-4">
       {/* Bucket tabs */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
         {BUCKETS.map(b => (
           <button
             key={b.id}
             onClick={() => setActive(b.id)}
             className={cn(
-              'p-3 rounded-xl border text-left transition-all',
+              'relative overflow-hidden p-4 rounded-2xl border bg-card text-left transition-all shadow-sm hover:shadow-md',
               active === b.id ? `ring-2 ${b.ring} border-transparent` : 'border-border hover:border-foreground/20'
             )}
           >
-            <div className="flex items-center justify-between">
-              <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', b.color)}>{b.label}</span>
-              <Badge variant="secondary" className="text-xs">{counts[b.id]}</Badge>
-            </div>
+            <span className={cn('absolute inset-x-0 top-0 h-1', b.color)} />
+            <div className="text-3xl font-extrabold tracking-tight text-foreground tabular-nums">{counts[b.id]}</div>
+            <span className={cn('mt-2 inline-block text-xs font-semibold px-2 py-0.5 rounded-full', b.color)}>{b.label}</span>
           </button>
         ))}
       </div>
