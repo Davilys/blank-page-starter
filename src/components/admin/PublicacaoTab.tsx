@@ -1121,7 +1121,8 @@ export default function PublicacaoTab() {
   // ─── KPI Stats ────
   const matchesResp = (p: any) => {
     if (filtroResp === 'all') return true;
-    const process = p.process_id ? processMap.get(p.process_id) : processNumberMap.get(normalizeProcessNumber(p.process_number_rpi));
+    const process = (p.process_id ? processMap.get(p.process_id) : null)
+      || processNumberMap.get(normalizeProcessNumber(p.process_number_rpi));
     const client = (p.client_id ? clientMap.get(p.client_id) : null) || (process?.user_id ? clientMap.get(process.user_id) : null);
     const ownerId = (client as any)?.assigned_to || (client as any)?.created_by || null;
     return filtroResp === 'none' ? !ownerId : ownerId === filtroResp;

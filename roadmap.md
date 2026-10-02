@@ -1,7 +1,7 @@
 # Roadmap — Recursos INPI (3 modalidades)
 
 ## Publicações — revisão solicitada
-- [ ] Ampliar a lista, aproximar “Ver gráficos” de “Nova” e auditar controles, filtros e sincronizações sem alterar regras existentes.
+- [x] Ampliar a lista, aproximar “Ver gráficos” de “Nova” e auditar controles, filtros e sincronizações sem alterar regras existentes.
 
 ## Em andamento
 - [x] Reabrir conferência pelo histórico (carregar caso ao editar recurso)
