@@ -344,6 +344,8 @@ export default function PublicacaoTab() {
 
   // New state for premium features
   const [viewMode, setViewMode] = useState<ViewMode>('prazos');
+  const [filtroResp, setFiltroResp] = useState<string>('all');
+  const [showCharts, setShowCharts] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('prazo');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -1111,6 +1113,13 @@ export default function PublicacaoTab() {
   }, [rpiEntryToUploadId, rpiUploadMap]);
 
   // ─── KPI Stats ────
+  const matchesResp = (p: any) => {
+    if (filtroResp === 'all') return true;
+    const client = p.client_id ? clientMap.get(p.client_id) : null;
+    const ownerId = (client as any)?.assigned_to || (client as any)?.created_by || null;
+    return filtroResp === 'none' ? !ownerId : ownerId === filtroResp;
+  };
+
   const kpiStats = useMemo(() => {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1122,12 +1131,22 @@ export default function PublicacaoTab() {
       const rp = pr || prByNum;
       return rp?.user_id ? !!clientMap.get(rp.user_id) : false;
     });
-    const total = withClient.length;
-    const urgentes = withClient.filter(p => { const d = getDaysLeft(p.proximo_prazo_critico); return d !== null && d >= 0 && d <= 7; }).length;
-    const atrasados = withClient.filter(p => { const d = getDaysLeft(p.proximo_prazo_critico); return d !== null && d < 0; }).length;
-    const deferidosMes = withClient.filter(p => p.status === 'deferimento' && p.data_decisao && isAfter(parseISO(p.data_decisao), startOfMonth)).length;
+    const scoped = withClient.filter(matchesResp);
+    const CLOSED_CUMPR = ['cumprido', 'desistiu', 'nao_respondeu', 'assinou_distrato'];
+    const CLOSED_STATUS = ['arquivado', 'certificado', 'certificados'];
+    const isOpen = (p: any) => !CLOSED_CUMPR.includes(p.cumprimento_status) && !CLOSED_STATUS.includes(String(p.status || '').toLowerCase());
+    const open = scoped.filter(isOpen);
+    const total = scoped.length;
+    const urgentes = open.filter(p => { const d = getDaysLeft(p.proximo_prazo_critico); return d !== null && d >= 0 && d <= 7; }).length;
+    const atrasados = open.filter(p => { const d = getDaysLeft(p.proximo_prazo_critico); return d !== null && d < 0; }).length;
+    const deferidosMes = scoped.filter(p => {
+      if (p.status !== 'deferimento') return false;
+      const ref = p.data_decisao || (p as any).data_publicacao_rpi;
+      return !!ref && !isBefore(parseISO(ref), startOfMonth);
+    }).length;
     return { total, urgentes, atrasados, deferidosMes };
-  }, [publicacoes, clientMap, processMap, processNumberMap]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publicacoes, clientMap, processMap, processNumberMap, filtroResp]);
 
   // ─── Status counts ────
   const statusCounts = useMemo(() => {
@@ -1422,67 +1441,84 @@ export default function PublicacaoTab() {
   const handleAutoLinkClients = async () => {
     setIsAutoLinking(true);
     try {
-      const allOrphans = publicacoes.filter(p => !p.client_id);
-      if (allOrphans.length === 0) {
-        toast.info('Todas as publicações já possuem cliente vinculado');
-        setIsAutoLinking(false);
-        return;
-      }
+      const allOrphans = publicacoes.filter(p => !p.client_id || !clientMap.get(p.client_id));
+      if (allOrphans.length === 0) { toast.info('Todas as publicações já possuem cliente vinculado'); return; }
 
-      // Step 1: Match by process_number (normalized)
-      const processByNumber = new Map<string, (typeof processes)[number]>();
-      processes.forEach((proc) => {
-        const key = normalizeProcessNumber(proc.process_number);
-        if (key && !processByNumber.has(key)) processByNumber.set(key, proc);
+      const norm = (v?: string | null) => (v || '').replace(/<[^>]+>/g, '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase().replace(/\b(LTDA|ME|EPP|EIRELI|S\/?A|MEI)\b/g, '').replace(/[^A-Z0-9]/g, '');
+      const digits = (v?: string | null) => (v || '').replace(/\D/g, '');
+      // Map key -> set of candidate {clientId, processId}
+      type Cand = { clientId: string; processId: string | null };
+      const add = (m: Map<string, Cand[]>, k: string, c: Cand) => { if (!k) return; const arr = m.get(k) || []; if (!arr.some(x => x.clientId === c.clientId)) arr.push(c); m.set(k, arr); };
+      const byNum = new Map<string, Cand[]>(), byBrand = new Map<string, Cand[]>(), byDoc = new Map<string, Cand[]>(), byName = new Map<string, Cand[]>(), byEmail = new Map<string, Cand[]>();
+      processes.forEach(proc => {
+        if (!proc.user_id || !clientMap.get(proc.user_id)) return;
+        add(byNum, normalizeProcessNumber(proc.process_number) || '', { clientId: proc.user_id, processId: proc.id });
+        add(byBrand, norm(proc.brand_name), { clientId: proc.user_id, processId: proc.id });
       });
-      let linkedByProcess = 0;
-      const stillOrphans: typeof allOrphans = [];
+      clients.forEach((c: any) => {
+        const d = digits(c.cpf_cnpj); if (d.length >= 11) add(byDoc, d, { clientId: c.id, processId: null });
+        add(byName, norm(c.full_name), { clientId: c.id, processId: null });
+        add(byName, norm(c.company_name), { clientId: c.id, processId: null });
+        if (c.email) add(byEmail, c.email.trim().toLowerCase(), { clientId: c.id, processId: null });
+      });
+      // Contracts: process link + signatory doc
+      const { data: contracts } = await supabase.from('contracts').select('user_id, process_id, signatory_cpf, signatory_cnpj, signatory_name, subject').not('user_id', 'is', null);
+      (contracts || []).forEach((ct: any) => {
+        if (!clientMap.get(ct.user_id)) return;
+        const proc = ct.process_id ? processMap.get(ct.process_id) : null;
+        if (proc) add(byNum, normalizeProcessNumber(proc.process_number) || '', { clientId: ct.user_id, processId: proc.id });
+        [ct.signatory_cpf, ct.signatory_cnpj].forEach(x => { const d = digits(x); if (d.length >= 11) add(byDoc, d, { clientId: ct.user_id, processId: null }); });
+        add(byName, norm(ct.signatory_name), { clientId: ct.user_id, processId: null });
+        add(byBrand, norm(ct.subject), { clientId: ct.user_id, processId: null });
+      });
+      // RPI: holder data by process number
+      const nums = allOrphans.map(p => p.process_number_rpi).filter(Boolean) as string[];
+      const rpiByNum = new Map<string, any>();
+      for (let i = 0; i < nums.length; i += 200) {
+        const { data } = await supabase.from('rpi_entries').select('process_number, holder_name, titulares, brand_name').in('process_number', nums.slice(i, i + 200));
+        (data || []).forEach((r: any) => rpiByNum.set(normalizeProcessNumber(r.process_number) || '', r));
+      }
 
+      const counts = { processo: 0, documento: 0, email: 0, marca: 0, titular: 0 };
+      let ambiguous = 0, notFound = 0;
       for (const pub of allOrphans) {
-        const key = normalizeProcessNumber(pub.process_number_rpi);
-        if (key) {
-          const proc = processByNumber.get(key);
-          if (proc && proc.user_id) {
-            const { error } = await supabase.from('publicacoes_marcas').update({ client_id: proc.user_id, process_id: proc.id }).eq('id', pub.id);
-            if (!error) { linkedByProcess++; continue; }
+        const numKey = normalizeProcessNumber(pub.process_number_rpi) || '';
+        const rpi = rpiByNum.get(numKey);
+        const titularesTxt = rpi?.titulares ? JSON.stringify(rpi.titulares) : '';
+        const docs = Array.from(new Set((titularesTxt.match(/\d[\d./-]{10,}\d/g) || []).map(digits).filter(d => d.length === 11 || d.length === 14)));
+        const emails = Array.from(new Set((titularesTxt.match(/[\w.+-]+@[\w-]+\.[\w.]+/g) || []).map(e => e.toLowerCase())));
+        const steps: [keyof typeof counts, Cand[] | undefined][] = [
+          ['processo', byNum.get(numKey)],
+          ['documento', docs.flatMap(d => byDoc.get(d) || [])],
+          ['email', emails.flatMap(e => byEmail.get(e) || [])],
+          ['marca', byBrand.get(norm(pub.brand_name_rpi || rpi?.brand_name))],
+          ['titular', byName.get(norm(rpi?.holder_name))],
+        ];
+        let done = false, sawAmbiguous = false;
+        for (const [kind, cands] of steps) {
+          const uniq = (cands || []).filter((c, i, arr) => arr.findIndex(x => x.clientId === c.clientId) === i);
+          if (uniq.length === 1) {
+            const upd: any = { client_id: uniq[0].clientId };
+            if (uniq[0].processId) upd.process_id = uniq[0].processId;
+            const { error } = await supabase.from('publicacoes_marcas').update(upd).eq('id', pub.id);
+            if (!error) { counts[kind]++; done = true; }
+            break;
           }
+          if (uniq.length > 1) sawAmbiguous = true;
         }
-        stillOrphans.push(pub);
+        if (!done) { if (sawAmbiguous) ambiguous++; else notFound++; }
       }
 
-      // Step 2: Match by brand_name (normalized, case-insensitive)
-      const normalizeBrand = (name: string) => name.replace(/<[^>]+>/g, '').trim().toUpperCase();
-      const brandNameMap = new Map<string, typeof processes[0]>();
-      for (const proc of processes) {
-        if (proc.brand_name && proc.user_id) {
-          const key = normalizeBrand(proc.brand_name);
-          if (key && !brandNameMap.has(key)) brandNameMap.set(key, proc);
-        }
-      }
-
-      let linkedByBrand = 0;
-      for (const pub of stillOrphans) {
-        if (pub.brand_name_rpi) {
-          const key = normalizeBrand(pub.brand_name_rpi);
-          const proc = brandNameMap.get(key);
-          if (proc && proc.user_id) {
-            const { error } = await supabase.from('publicacoes_marcas').update({ client_id: proc.user_id, process_id: proc.id }).eq('id', pub.id);
-            if (!error) linkedByBrand++;
-          }
-        }
-      }
-
-      const totalLinked = linkedByProcess + linkedByBrand;
-      const notFound = allOrphans.length - totalLinked;
-
+      const totalLinked = Object.values(counts).reduce((a, b) => a + b, 0);
       queryClient.invalidateQueries({ queryKey: ['publicacoes-marcas'] });
       if (totalLinked > 0) {
-        const details: string[] = [];
-        if (linkedByProcess > 0) details.push(`${linkedByProcess} por nº processo`);
-        if (linkedByBrand > 0) details.push(`${linkedByBrand} por nome da marca`);
-        toast.success(`✅ ${totalLinked} vinculadas (${details.join(', ')})`);
+        const labels: Record<string, string> = { processo: 'nº do processo', documento: 'CPF/CNPJ', email: 'e-mail', marca: 'nome da marca', titular: 'nome do titular' };
+        const details = Object.entries(counts).filter(([, v]) => v > 0).map(([k, v]) => `${v} por ${labels[k]}`);
+        toast.success(`${totalLinked} vinculada(s): ${details.join(', ')}`);
       }
-      if (notFound > 0) toast.info(`${notFound} publicação(ões) sem correspondência`);
+      if (ambiguous > 0) toast.warning(`${ambiguous} com mais de um cliente possível — vincular manualmente`);
+      if (notFound > 0) toast.info(`${notFound} sem correspondência nos cadastros`);
     } catch (err) {
       toast.error('Erro ao vincular clientes');
     } finally {
@@ -1735,8 +1771,6 @@ export default function PublicacaoTab() {
       )}
 
 
-      {/* ─── CHARTS (#2) ─── */}
-      <PublicacaoCharts publicacoes={publicacoes} />
 
       {/* Auto-sync is fully automatic — no manual banner needed */}
 
@@ -1960,6 +1994,8 @@ export default function PublicacaoTab() {
               processMap={processMap}
               clientMap={clientMap}
               clients={clients as any}
+              filtroResp={filtroResp}
+              onFiltroRespChange={setFiltroResp}
               onOpenDetail={(id) => {
                 const pub = publicacoes.find(p => p.id === id);
                 if (pub?.client_id) {
@@ -2474,6 +2510,13 @@ export default function PublicacaoTab() {
           onCreated={() => queryClient.invalidateQueries({ queryKey: ['publicacoes-marcas'] })}
         />
       )}
+      {/* ─── CHARTS (no final, recolhível) ─── */}
+      <div className="mt-6">
+        <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowCharts(v => !v)}>
+          <BarChart3 className="w-4 h-4" /> {showCharts ? 'Ocultar gráficos' : 'Ver gráficos'}
+        </Button>
+        {showCharts && <div className="mt-3"><PublicacaoCharts publicacoes={publicacoes} /></div>}
+      </div>
     </>
   );
 }
