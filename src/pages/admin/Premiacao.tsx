@@ -233,14 +233,28 @@ export default function Premiacao() {
         .eq('key', 'award_config')
         .maybeSingle();
       if (data?.value) {
-        return { ...DEFAULT_CONFIG, ...(data.value as unknown as AwardConfig) };
+        const s = data.value as unknown as Partial<AwardConfig>;
+        return {
+          ...DEFAULT_CONFIG,
+          ...s,
+          plans: {
+            premium: { ...DEFAULT_CONFIG.plans!.premium, ...(s.plans?.premium || {}) },
+            corporativo: { ...DEFAULT_CONFIG.plans!.corporativo, ...(s.plans?.corporativo || {}) },
+          },
+          registro_marca: { ...DEFAULT_CONFIG.registro_marca, ...(s.registro_marca || {}) },
+          publicacao: { ...DEFAULT_CONFIG.publicacao, ...(s.publicacao || {}) },
+          cobranca: { ...DEFAULT_CONFIG.cobranca, ...(s.cobranca || {}) },
+        } as AwardConfig;
       }
       return DEFAULT_CONFIG;
     },
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const cfg = awardConfig || DEFAULT_CONFIG;
+  const brandGoal = Number(cfg.registro_marca?.monthly_goal) || 30;
+  const pubGoal = Number(cfg.publicacao?.monthly_goal) || 50;
 
   const isMaster = currentUser?.email === cfg.master_admin_email;
 
@@ -596,20 +610,21 @@ export default function Premiacao() {
           <div className="text-[11px] text-muted-foreground space-y-0.5">
             {label === 'Registro de Marca' && (
               <>
-                <p>Antes da meta: R$ 50/marca</p>
-                <p>Após meta (à vista): R$ 100 | Parcelado: R$ 50</p>
+                <p>Antes da meta ({brandGoal}): {formatCurrency(cfg.registro_marca.base_rate)}/marca</p>
+                <p>Após meta (à vista): {formatCurrency(cfg.registro_marca.above_goal_avista_rate)} | Parcelado: {formatCurrency(cfg.registro_marca.above_goal_parcelado_rate)}</p>
               </>
             )}
             {label === 'Publicação' && (
               <>
-                <p>Até 49: R$ 50 cada</p>
-                <p>50 ou mais: R$ 100 cada</p>
+                <p>Até {pubGoal - 1}: {formatCurrency(cfg.publicacao.base_rate)} cada</p>
+                <p>{pubGoal} ou mais: {formatCurrency(cfg.publicacao.above_goal_rate)} cada</p>
               </>
             )}
             {label === 'Cobrança' && (
               <>
-                <p>R$199-397: R$10 | R$398-597: R$25</p>
-                <p>R$598-999: R$50 | R$1000+: R$75-100</p>
+                {(cfg.cobranca?.tiers || []).map((t, i) => (
+                  <p key={i}>R${t.min}-{t.max >= 99999 ? '+' : t.max}: {formatCurrency(t.rate)}</p>
+                ))}
               </>
             )}
           </div>
@@ -745,14 +760,14 @@ export default function Premiacao() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="essencial">Plano Essencial</SelectItem>
-                    <SelectItem value="premium">Plano Premium — R$ 100/marca</SelectItem>
-                    <SelectItem value="corporativo">Plano Corporativo — R$ 200/marca</SelectItem>
+                    <SelectItem value="premium">Plano Premium — {formatCurrency(cfg.plans?.premium?.rate_per_brand ?? 100)}/marca</SelectItem>
+                    <SelectItem value="corporativo">Plano Corporativo — {formatCurrency(cfg.plans?.corporativo?.rate_per_brand ?? 200)}/marca</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-[11px] text-muted-foreground">
-                  {formPlan === 'essencial' && 'Regra padrão: R$ 50/marca; após meta de 30 → R$ 100 (à vista) ou R$ 50 (parcelado).'}
-                  {formPlan === 'premium' && 'R$ 100 fixos por marca. Conta na meta de 30, mas o valor não muda após a meta.'}
-                  {formPlan === 'corporativo' && 'R$ 200 fixos por marca. Conta na meta de 30, mas o valor não muda após a meta.'}
+                  {formPlan === 'essencial' && `Regra padrão: ${formatCurrency(cfg.registro_marca.base_rate)}/marca; após meta de ${brandGoal} → ${formatCurrency(cfg.registro_marca.above_goal_avista_rate)} (à vista) ou ${formatCurrency(cfg.registro_marca.above_goal_parcelado_rate)} (parcelado).`}
+                  {formPlan === 'premium' && `${formatCurrency(cfg.plans?.premium?.rate_per_brand ?? 100)} fixos por marca. Conta na meta de ${brandGoal}, mas o valor não muda após a meta.`}
+                  {formPlan === 'corporativo' && `${formatCurrency(cfg.plans?.corporativo?.rate_per_brand ?? 200)} fixos por marca. Conta na meta de ${brandGoal}, mas o valor não muda após a meta.`}
                 </p>
               </div>
               <div className="space-y-1.5">
@@ -1037,14 +1052,14 @@ export default function Premiacao() {
                 icon={<FileText className="h-5 w-5" />}
                 label="Marcas"
                 value={String(totalBrands)}
-                sub={totalBrands >= 30 ? '✅ Meta atingida' : `Faltam ${30 - totalBrands}`}
+                sub={totalBrands >= brandGoal ? '✅ Meta atingida' : `Faltam ${brandGoal - totalBrands}`}
                 color="text-primary"
               />
               <StatCard
                 icon={<Megaphone className="h-5 w-5" />}
                 label="Publicações"
                 value={String(totalPubs)}
-                sub={totalPubs >= 50 ? '✅ Meta atingida' : `Faltam ${50 - totalPubs}`}
+                sub={totalPubs >= pubGoal ? '✅ Meta atingida' : `Faltam ${pubGoal - totalPubs}`}
                 color="text-purple-500"
               />
               <StatCard
@@ -1058,8 +1073,8 @@ export default function Premiacao() {
 
             {/* Goal breakdown */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <GoalCard label="Registro de Marca" current={totalBrands} target={30} premium={totalRegistroPremium} color="text-primary" icon={<FileText className="h-4 w-4" />} />
-              <GoalCard label="Publicação" current={totalPubs} target={50} premium={totalPublicacaoPremium} color="text-purple-500" icon={<Megaphone className="h-4 w-4" />} />
+              <GoalCard label="Registro de Marca" current={totalBrands} target={brandGoal} premium={totalRegistroPremium} color="text-primary" icon={<FileText className="h-4 w-4" />} />
+              <GoalCard label="Publicação" current={totalPubs} target={pubGoal} premium={totalPublicacaoPremium} color="text-purple-500" icon={<Megaphone className="h-4 w-4" />} />
               <GoalCard label="Cobrança" current={cobrancaEntries.length} target={20} premium={totalCobrancaPremium} color="text-orange-500" icon={<CreditCard className="h-4 w-4" />} />
             </div>
 
