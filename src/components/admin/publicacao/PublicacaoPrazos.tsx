@@ -239,12 +239,13 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
       eligible.filter(p => p._bucket === active);
     return source
       .filter(p => {
-        // Filtro de responsável
+        // Filtro de responsável: usuário dono do cliente (assigned_to, fallback created_by)
         if (filtroResp !== 'all') {
-          const respId = responsaveisMap[p.id]?.user_id || null;
+          const client = p.client_id ? clientMap.get(p.client_id) : null;
+          const ownerId = (client as any)?.assigned_to || (client as any)?.created_by || null;
           if (filtroResp === 'none') {
-            if (respId) return false;
-          } else if (respId !== filtroResp) {
+            if (ownerId) return false;
+          } else if (ownerId !== filtroResp) {
             return false;
           }
         }
@@ -258,7 +259,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
         );
       })
       .sort((a, b) => (a._days ?? 9999) - (b._days ?? 9999));
-  }, [eligible, cumpridosList, desistiuList, active, search, processMap, clientMap, filtroResp, responsaveisMap]);
+  }, [eligible, cumpridosList, desistiuList, active, search, processMap, clientMap, filtroResp]);
 
   const handleSetStatus = async (pub: any, status: AndamentoStatus) => {
     const { data: { user } } = await supabase.auth.getUser();
