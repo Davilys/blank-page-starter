@@ -1116,7 +1116,8 @@ export default function PublicacaoTab() {
   // ─── KPI Stats ────
   const matchesResp = (p: any) => {
     if (filtroResp === 'all') return true;
-    const client = p.client_id ? clientMap.get(p.client_id) : null;
+    const process = p.process_id ? processMap.get(p.process_id) : processNumberMap.get(normalizeProcessNumber(p.process_number_rpi));
+    const client = (p.client_id ? clientMap.get(p.client_id) : null) || (process?.user_id ? clientMap.get(process.user_id) : null);
     const ownerId = (client as any)?.assigned_to || (client as any)?.created_by || null;
     return filtroResp === 'none' ? !ownerId : ownerId === filtroResp;
   };
@@ -1159,9 +1160,10 @@ export default function PublicacaoTab() {
       const prByNum = !pr && (p as any).process_number_rpi ? processNumberMap.get(normalizeProcessNumber((p as any).process_number_rpi)) : null;
       const rp = pr || prByNum;
       return rp?.user_id ? !!clientMap.get(rp.user_id) : false;
-    }).forEach(p => { counts[p.status] = (counts[p.status] || 0) + 1; });
+    }).filter(matchesResp).forEach(p => { counts[p.status] = (counts[p.status] || 0) + 1; });
     return counts;
-  }, [publicacoes, clientMap, processMap, processNumberMap]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publicacoes, clientMap, processMap, processNumberMap, filtroResp]);
 
   // ─── Filtering + Sorting + Pagination ────
   const filtered = useMemo(() => {
@@ -1175,6 +1177,7 @@ export default function PublicacaoTab() {
       const resolvedProc = proc || procByNumber;
       const resolvedClient = directClient || (resolvedProc?.user_id ? clientMap.get(resolvedProc.user_id) : null);
       if (!resolvedClient) return false;
+      if (!matchesResp(pub)) return false;
       const client = resolvedClient;
       if (search) {
         const q = search.toLowerCase();
@@ -1196,14 +1199,15 @@ export default function PublicacaoTab() {
         const days = getDaysLeft(pub.proximo_prazo_critico);
         if (days === null) return filterPrazo === 'todos';
         if (filterPrazo === 'hoje' && days !== 0) return false;
-        if (filterPrazo === '7dias' && (days < 0 || days > 7)) return false;
+        if (filterPrazo === '7dias' && (days < 0 || days > 7 || (activeKpi === 'urgentes' && (['cumprido', 'desistiu', 'nao_respondeu', 'assinou_distrato'].includes((pub as any).cumprimento_status) || ['arquivado', 'certificado', 'certificados'].includes(String(pub.status || '').toLowerCase()))))) return false;
         if (filterPrazo === '30dias' && (days < 0 || days > 30)) return false;
-        if (filterPrazo === 'atrasados' && days >= 0) return false;
+        if (filterPrazo === 'atrasados' && (days >= 0 || (activeKpi === 'atrasados' && (['cumprido', 'desistiu', 'nao_respondeu', 'assinou_distrato'].includes((pub as any).cumprimento_status) || ['arquivado', 'certificado', 'certificados'].includes(String(pub.status || '').toLowerCase()))))) return false;
       }
       // Special KPI filter: "deferidos este mês"
       if (activeKpi === 'deferidosMes') {
         if (pub.status !== 'deferimento') return false;
-        if (!pub.data_decisao || !isAfter(parseISO(pub.data_decisao), startOfMonth)) return false;
+        const ref = pub.data_decisao || pub.data_publicacao_rpi;
+        if (!ref || isBefore(parseISO(ref), startOfMonth)) return false;
       }
       // Date range filter (#3)
       if (filterDateFrom || filterDateTo) {
@@ -1248,7 +1252,8 @@ export default function PublicacaoTab() {
     });
 
     return result;
-  }, [publicacoes, search, filterClient, filterStatus, filterPrazo, filterTipo, filterRpi, filterAdmin, filterDateFrom, filterDateTo, processMap, processNumberMap, clientMap, sortKey, sortDir, activeKpi, resolveRpiNumber]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publicacoes, search, filterClient, filterStatus, filterPrazo, filterTipo, filterRpi, filterAdmin, filterDateFrom, filterDateTo, processMap, processNumberMap, clientMap, sortKey, sortDir, activeKpi, filtroResp, resolveRpiNumber]);
 
   // Pagination (#10)
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
@@ -1258,7 +1263,7 @@ export default function PublicacaoTab() {
   }, [filtered, currentPage]);
 
   // Reset page when filters change
-  useEffect(() => { setCurrentPage(1); }, [search, filterClient, filterStatus, filterPrazo, filterTipo, filterRpi, filterAdmin, filterDateFrom, filterDateTo]);
+  useEffect(() => { setCurrentPage(1); setSelectedIds(new Set()); }, [search, filterClient, filterStatus, filterPrazo, filterTipo, filterRpi, filterAdmin, filterDateFrom, filterDateTo, filtroResp, activeKpi, viewMode]);
 
   const selected = useMemo(() => publicacoes.find(p => p.id === selectedId) || null, [publicacoes, selectedId]);
 
@@ -1319,11 +1324,13 @@ export default function PublicacaoTab() {
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === paginatedData.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(paginatedData.map(p => p.id)));
-    }
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      const pageIds = paginatedData.map(p => p.id);
+      if (pageIds.every(id => next.has(id))) pageIds.forEach(id => next.delete(id));
+      else pageIds.forEach(id => next.add(id));
+      return next;
+    });
   };
 
   const handleBulkStatusChange = async (newStatus: PubStatus) => {
@@ -1899,8 +1906,8 @@ export default function PublicacaoTab() {
         {/* ─── LISTA / KANBAN ─── */}
         <div className="flex-1 min-w-0 flex flex-col">
           {/* Header bar */}
-          <div className="flex items-center justify-between px-1 mb-3">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-1 mb-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
               <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => setShowFilters(true)}>
                 <Filter className="w-3.5 h-3.5" />
                 Filtros
@@ -1916,11 +1923,11 @@ export default function PublicacaoTab() {
                 <Badge variant="secondary" className="text-xs">{filtered.length}</Badge>
               </div>
               {/* Search autocomplete */}
-              <div className="relative">
+              <div className="relative min-w-0">
                 <div className="flex items-center">
                   <Search className="absolute left-2 w-3.5 h-3.5 text-muted-foreground z-10" />
                   <Input
-                    className="h-8 w-48 pl-7 text-xs"
+                    className="h-8 w-48 max-w-full pl-7 text-xs"
                     placeholder="Buscar cliente, marca..."
                     value={searchAutocomplete}
                     onChange={e => { setSearchAutocomplete(e.target.value); setShowSearchDropdown(true); }}
@@ -1967,10 +1974,15 @@ export default function PublicacaoTab() {
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => { resetCreateForm(); setShowCreate(true); }}>
-                <Plus className="w-3.5 h-3.5" /> Nova
-              </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-col items-stretch gap-1.5">
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => { resetCreateForm(); setShowCreate(true); }}>
+                  <Plus className="w-3.5 h-3.5" /> Nova
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1" aria-expanded={showCharts} onClick={() => setShowCharts(v => !v)}>
+                  <BarChart3 className="w-3.5 h-3.5" /> {showCharts ? 'Ocultar gráficos' : 'Ver gráficos'}
+                </Button>
+              </div>
               <div className="flex border rounded-md overflow-hidden">
                 <Button variant={viewMode === 'lista' ? 'default' : 'ghost'} size="sm" className="h-8 px-2.5 rounded-none" onClick={() => setViewMode('lista')} title="Lista">
                   <List className="w-3.5 h-3.5" />
@@ -2036,14 +2048,14 @@ export default function PublicacaoTab() {
           ) : (
             <Card className="border">
               <CardContent className="p-0">
-                <ScrollArea className="h-[calc(100vh-520px)]">
+                <ScrollArea className="h-[clamp(440px,calc(100dvh-220px),900px)]">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         {/* Bulk checkbox (#4) */}
                         <TableHead className="w-8">
                           <Checkbox
-                            checked={paginatedData.length > 0 && selectedIds.size === paginatedData.length}
+                            checked={paginatedData.length > 0 && paginatedData.every(p => selectedIds.has(p.id))}
                             onCheckedChange={toggleSelectAll}
                           />
                         </TableHead>
@@ -2511,13 +2523,8 @@ export default function PublicacaoTab() {
           onCreated={() => queryClient.invalidateQueries({ queryKey: ['publicacoes-marcas'] })}
         />
       )}
-      {/* ─── CHARTS (no final, recolhível) ─── */}
-      <div className="mt-6">
-        <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowCharts(v => !v)}>
-          <BarChart3 className="w-4 h-4" /> {showCharts ? 'Ocultar gráficos' : 'Ver gráficos'}
-        </Button>
-        {showCharts && <div className="mt-3"><PublicacaoCharts publicacoes={publicacoes} /></div>}
-      </div>
+      {/* Gráficos opcionais ficam abaixo da lista, sem reduzir sua área de trabalho. */}
+      {showCharts && <div className="mt-5"><PublicacaoCharts publicacoes={publicacoes} /></div>}
     </>
   );
 }
