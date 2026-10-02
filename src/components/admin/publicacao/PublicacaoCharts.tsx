@@ -137,8 +137,6 @@ export function PublicacaoCharts({ publicacoes }: Props) {
                   outerRadius={70}
                   paddingAngle={2}
                   dataKey="value"
-                  label={({ name, value }) => `${name} (${value})`}
-                  labelLine={false}
                 >
                   {statusData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -151,7 +149,7 @@ export function PublicacaoCharts({ publicacoes }: Props) {
             {statusData.map(s => (
               <div key={s.name} className="flex items-center gap-1 text-[10px]">
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.fill }} />
-                <span className="text-muted-foreground">{s.name}</span>
+                <span className="text-muted-foreground">{s.name} <strong className="text-foreground">{s.value}</strong></span>
               </div>
             ))}
           </div>
