@@ -13,6 +13,7 @@ import {
   ExternalLink, Trash2, Users, Zap, BellRing, Hash, Paperclip,
   ArrowUpDown, ArrowUp, ArrowDown, List, LayoutGrid, FileDown,
   ChevronLeft, Activity, Wallet, Receipt, FileCheck, TrendingUp, Star, Check, Package, CalendarClock,
+  BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
