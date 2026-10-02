@@ -1919,7 +1919,7 @@ export default function PublicacaoTab() {
                   </Badge>
                 )}
               </Button>
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground whitespace-nowrap">
                 <Newspaper className="w-4 h-4 text-primary" />
                 Publicações
                 <Badge variant="secondary" className="text-xs">{filtered.length}</Badge>
@@ -1929,7 +1929,7 @@ export default function PublicacaoTab() {
                 <div className="flex items-center">
                   <Search className="absolute left-2 w-3.5 h-3.5 text-muted-foreground z-10" />
                   <Input
-                    className="h-8 w-48 max-w-full pl-7 text-xs"
+                    className="h-8 w-48 max-w-full pl-7 text-sm"
                     placeholder="Buscar cliente, marca..."
                     value={searchAutocomplete}
                     onChange={e => { setSearchAutocomplete(e.target.value); setShowSearchDropdown(true); }}
@@ -2144,7 +2144,7 @@ export default function PublicacaoTab() {
                 </ScrollArea>
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between px-4 py-2 border-t">
-                    <span className="text-[10px] text-muted-foreground">{filtered.length} processos</span>
+                     <span className="text-xs text-muted-foreground">{filtered.length} processos</span>
                     <div className="flex items-center gap-1">
                       <Button variant="outline" size="sm" className="h-7 px-2" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
                         <ChevronLeft className="w-3 h-3" />
