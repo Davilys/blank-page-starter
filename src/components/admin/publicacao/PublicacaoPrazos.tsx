@@ -469,7 +469,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
 
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-auto h-[calc(100vh-500px)]">
+          <div className="overflow-auto h-[clamp(440px,calc(100dvh-220px),900px)]">
             <Table className="min-w-[1150px]">
               <TableHeader>
                 <TableRow>

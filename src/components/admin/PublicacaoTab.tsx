@@ -145,6 +145,11 @@ function getDaysLeft(dateStr: string | null): number | null {
   return differenceInDays(parseISO(dateStr), new Date());
 }
 
+function isOpenPublication(pub: Publicacao): boolean {
+  return !['cumprido', 'desistiu', 'nao_respondeu', 'assinou_distrato'].includes((pub as any).cumprimento_status)
+    && !['arquivado', 'certificado', 'certificados'].includes(String(pub.status || '').toLowerCase());
+}
+
 function getUrgencyBadge(days: number | null) {
   if (days === null) return { label: '—', variant: 'outline' as const, className: '' };
   if (days < 0) return { label: `${Math.abs(days)}d atrasado`, variant: 'destructive' as const, className: 'animate-pulse' };
@@ -1134,10 +1139,7 @@ export default function PublicacaoTab() {
       return rp?.user_id ? !!clientMap.get(rp.user_id) : false;
     });
     const scoped = withClient.filter(matchesResp);
-    const CLOSED_CUMPR = ['cumprido', 'desistiu', 'nao_respondeu', 'assinou_distrato'];
-    const CLOSED_STATUS = ['arquivado', 'certificado', 'certificados'];
-    const isOpen = (p: any) => !CLOSED_CUMPR.includes(p.cumprimento_status) && !CLOSED_STATUS.includes(String(p.status || '').toLowerCase());
-    const open = scoped.filter(isOpen);
+    const open = scoped.filter(isOpenPublication);
     const total = scoped.length;
     const urgentes = open.filter(p => { const d = getDaysLeft(p.proximo_prazo_critico); return d !== null && d >= 0 && d <= 7; }).length;
     const atrasados = open.filter(p => { const d = getDaysLeft(p.proximo_prazo_critico); return d !== null && d < 0; }).length;
@@ -1199,9 +1201,9 @@ export default function PublicacaoTab() {
         const days = getDaysLeft(pub.proximo_prazo_critico);
         if (days === null) return filterPrazo === 'todos';
         if (filterPrazo === 'hoje' && days !== 0) return false;
-        if (filterPrazo === '7dias' && (days < 0 || days > 7 || (activeKpi === 'urgentes' && (['cumprido', 'desistiu', 'nao_respondeu', 'assinou_distrato'].includes((pub as any).cumprimento_status) || ['arquivado', 'certificado', 'certificados'].includes(String(pub.status || '').toLowerCase()))))) return false;
+        if (filterPrazo === '7dias' && (days < 0 || days > 7 || (activeKpi === 'urgentes' && !isOpenPublication(pub)))) return false;
         if (filterPrazo === '30dias' && (days < 0 || days > 30)) return false;
-        if (filterPrazo === 'atrasados' && (days >= 0 || (activeKpi === 'atrasados' && (['cumprido', 'desistiu', 'nao_respondeu', 'assinou_distrato'].includes((pub as any).cumprimento_status) || ['arquivado', 'certificado', 'certificados'].includes(String(pub.status || '').toLowerCase()))))) return false;
+        if (filterPrazo === 'atrasados' && (days >= 0 || (activeKpi === 'atrasados' && !isOpenPublication(pub)))) return false;
       }
       // Special KPI filter: "deferidos este mês"
       if (activeKpi === 'deferidosMes') {
@@ -2121,7 +2123,9 @@ export default function PublicacaoTab() {
                               {pub.data_publicacao_rpi ? format(parseISO(pub.data_publicacao_rpi), 'dd/MM/yy') : '—'}
                             </TableCell>
                             <TableCell>
-                              {days !== null ? (
+                              {!isOpenPublication(pub) ? (
+                                <span className="text-xs text-muted-foreground">Encerrado</span>
+                              ) : days !== null ? (
                                 <span className={cn('text-[10px] font-semibold', days < 0 ? 'text-red-600' : days <= 7 ? 'text-amber-600' : 'text-muted-foreground')}>
                                   {days < 0 ? `${Math.abs(days)}d atrasado` : `${days}d`}
                                 </span>
