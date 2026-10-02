@@ -416,7 +416,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
               {filtroResp === 'all'
                 ? 'Todos os responsáveis'
                 : filtroResp === 'none'
-                ? 'Sem responsável'
+                ? 'Órfãos (sem usuário)'
                 : (admins.find(a => a.user_id === filtroResp)?.full_name?.split(' ')[0] || 'Responsável')}
               <ChevronDown className="h-3 w-3 ml-auto opacity-60" />
             </Button>
@@ -431,8 +431,8 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
                     <User className="h-3.5 w-3.5 mr-2" /> Todos
                     {filtroResp === 'all' && <Check className="h-3 w-3 ml-auto text-emerald-500" />}
                   </CommandItem>
-                  <CommandItem value="sem-responsavel" onSelect={() => { setFiltroResp('none'); setRespPopoverOpen(false); }}>
-                    <UserPlus className="h-3.5 w-3.5 mr-2" /> Sem responsável
+                  <CommandItem value="orfaos sem responsavel" onSelect={() => { setFiltroResp('none'); setRespPopoverOpen(false); }}>
+                    <UserPlus className="h-3.5 w-3.5 mr-2" /> Órfãos (sem usuário vinculado)
                     {filtroResp === 'none' && <Check className="h-3 w-3 ml-auto text-emerald-500" />}
                   </CommandItem>
                 </CommandGroup>
