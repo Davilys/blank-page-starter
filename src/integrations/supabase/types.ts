@@ -2421,6 +2421,108 @@ export type Database = {
         }
         Relationships: []
       }
+      fernanda_owner_canonical_inbox: {
+        Row: {
+          created_at: string
+          error_code: string | null
+          message: string
+          message_type: string
+          phone: string
+          provider_message_id: string
+          results: Json
+          source_message_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          error_code?: string | null
+          message: string
+          message_type: string
+          phone?: string
+          provider_message_id: string
+          results?: Json
+          source_message_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          error_code?: string | null
+          message?: string
+          message_type?: string
+          phone?: string
+          provider_message_id?: string
+          results?: Json
+          source_message_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      fernanda_owner_native_v2: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          error_code: string | null
+          event_id: string
+          profile_name: string
+          profile_source: string
+          results: Json
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          error_code?: string | null
+          event_id: string
+          profile_name: string
+          profile_source: string
+          results?: Json
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          error_code?: string | null
+          event_id?: string
+          profile_name?: string
+          profile_source?: string
+          results?: Json
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      fernanda_owner_welcome_tests: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          event_id: string
+          results: Json
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          event_id: string
+          results?: Json
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          event_id?: string
+          results?: Json
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       import_logs: {
         Row: {
           created_at: string
@@ -6119,6 +6221,267 @@ export type Database = {
         }
         Relationships: []
       }
+      webmarcas_agent_conversations: {
+        Row: {
+          collected_data: Json
+          conversation_id: string
+          created_at: string
+          pending_action: Json | null
+          phone: string
+          stage: string
+          subscriber_id: string
+          summary: string
+          updated_at: string
+        }
+        Insert: {
+          collected_data?: Json
+          conversation_id: string
+          created_at?: string
+          pending_action?: Json | null
+          phone: string
+          stage?: string
+          subscriber_id: string
+          summary?: string
+          updated_at?: string
+        }
+        Update: {
+          collected_data?: Json
+          conversation_id?: string
+          created_at?: string
+          pending_action?: Json | null
+          phone?: string
+          stage?: string
+          subscriber_id?: string
+          summary?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      webmarcas_agent_followups: {
+        Row: {
+          attempt_count: number
+          cancelled_at: string | null
+          conversation_id: string
+          created_at: string
+          due_at: string
+          error_code: string | null
+          id: string
+          sent_at: string | null
+          status: string
+          step: number
+          updated_at: string
+        }
+        Insert: {
+          attempt_count?: number
+          cancelled_at?: string | null
+          conversation_id: string
+          created_at?: string
+          due_at: string
+          error_code?: string | null
+          id?: string
+          sent_at?: string | null
+          status?: string
+          step: number
+          updated_at?: string
+        }
+        Update: {
+          attempt_count?: number
+          cancelled_at?: string | null
+          conversation_id?: string
+          created_at?: string
+          due_at?: string
+          error_code?: string | null
+          id?: string
+          sent_at?: string | null
+          status?: string
+          step?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webmarcas_agent_followups_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "webmarcas_agent_conversations"
+            referencedColumns: ["conversation_id"]
+          },
+        ]
+      }
+      webmarcas_agent_inbox: {
+        Row: {
+          attempt_count: number
+          conversation_id: string
+          created_at: string
+          error_code: string | null
+          event_id: string
+          id: string
+          message: string
+          message_type: string
+          occurred_at: string
+          phone: string
+          status: string
+          subscriber_id: string
+          updated_at: string
+        }
+        Insert: {
+          attempt_count?: number
+          conversation_id: string
+          created_at?: string
+          error_code?: string | null
+          event_id: string
+          id?: string
+          message: string
+          message_type: string
+          occurred_at: string
+          phone: string
+          status?: string
+          subscriber_id: string
+          updated_at?: string
+        }
+        Update: {
+          attempt_count?: number
+          conversation_id?: string
+          created_at?: string
+          error_code?: string | null
+          event_id?: string
+          id?: string
+          message?: string
+          message_type?: string
+          occurred_at?: string
+          phone?: string
+          status?: string
+          subscriber_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      webmarcas_agent_learned_answers: {
+        Row: {
+          answer: string | null
+          answered_at: string | null
+          answered_by: string | null
+          asked_count: number
+          first_asked_at: string
+          id: string
+          last_asked_at: string
+          question_norm: string
+          question_sample: string
+          source: string
+          status: string
+        }
+        Insert: {
+          answer?: string | null
+          answered_at?: string | null
+          answered_by?: string | null
+          asked_count?: number
+          first_asked_at?: string
+          id?: string
+          last_asked_at?: string
+          question_norm: string
+          question_sample: string
+          source?: string
+          status?: string
+        }
+        Update: {
+          answer?: string | null
+          answered_at?: string | null
+          answered_by?: string | null
+          asked_count?: number
+          first_asked_at?: string
+          id?: string
+          last_asked_at?: string
+          question_norm?: string
+          question_sample?: string
+          source?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      webmarcas_agent_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          event_id: string | null
+          id: string
+          role: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          event_id?: string | null
+          id?: string
+          role: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          event_id?: string | null
+          id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webmarcas_agent_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "webmarcas_agent_conversations"
+            referencedColumns: ["conversation_id"]
+          },
+        ]
+      }
+      webmarcas_agent_tool_calls: {
+        Row: {
+          consent_at: string | null
+          conversation_id: string
+          created_at: string
+          error_code: string | null
+          id: string
+          idempotency_key: string
+          request: Json
+          result: Json | null
+          status: string
+          tool: string
+          updated_at: string
+        }
+        Insert: {
+          consent_at?: string | null
+          conversation_id: string
+          created_at?: string
+          error_code?: string | null
+          id?: string
+          idempotency_key: string
+          request?: Json
+          result?: Json | null
+          status?: string
+          tool: string
+          updated_at?: string
+        }
+        Update: {
+          consent_at?: string | null
+          conversation_id?: string
+          created_at?: string
+          error_code?: string | null
+          id?: string
+          idempotency_key?: string
+          request?: Json
+          result?: Json | null
+          status?: string
+          tool?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webmarcas_agent_tool_calls_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "webmarcas_agent_conversations"
+            referencedColumns: ["conversation_id"]
+          },
+        ]
+      }
       whatsapp_config: {
         Row: {
           api_key: string
@@ -6261,6 +6624,101 @@ export type Database = {
         Returns: Json
       }
       calculate_predictive_score: { Args: { p_classe?: string }; Returns: Json }
+      cancel_webmarcas_agent_followups: {
+        Args: { p_conversation_id: string }
+        Returns: undefined
+      }
+      claim_fernanda_owner_canonical: {
+        Args: never
+        Returns: {
+          created_at: string
+          error_code: string | null
+          message: string
+          message_type: string
+          phone: string
+          provider_message_id: string
+          results: Json
+          source_message_id: string
+          status: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "fernanda_owner_canonical_inbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      claim_webmarcas_agent_conversation_events: {
+        Args: { p_conversation_id: string }
+        Returns: {
+          attempt_count: number
+          conversation_id: string
+          created_at: string
+          error_code: string | null
+          event_id: string
+          id: string
+          message: string
+          message_type: string
+          occurred_at: string
+          phone: string
+          status: string
+          subscriber_id: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "webmarcas_agent_inbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      claim_webmarcas_agent_event: {
+        Args: never
+        Returns: {
+          attempt_count: number
+          conversation_id: string
+          created_at: string
+          error_code: string | null
+          event_id: string
+          id: string
+          message: string
+          message_type: string
+          occurred_at: string
+          phone: string
+          status: string
+          subscriber_id: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "webmarcas_agent_inbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      claim_webmarcas_agent_followup: {
+        Args: never
+        Returns: {
+          attempt_count: number
+          cancelled_at: string | null
+          conversation_id: string
+          created_at: string
+          due_at: string
+          error_code: string | null
+          id: string
+          sent_at: string | null
+          status: string
+          step: number
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "webmarcas_agent_followups"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       classificar_cobranca: {
         Args: { p_due_date: string; p_status: string; p_sync_status: string }
         Returns: string
@@ -6288,6 +6746,27 @@ export type Database = {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
+        }
+        Returns: boolean
+      }
+      ingest_fernanda_owner_canonical: {
+        Args: {
+          p_provider: string
+          p_source: string
+          p_text: string
+          p_type: string
+        }
+        Returns: boolean
+      }
+      ingest_webmarcas_agent_event: {
+        Args: {
+          p_conversation_id: string
+          p_event_id: string
+          p_message: string
+          p_message_type: string
+          p_occurred_at: string
+          p_phone: string
+          p_subscriber_id: string
         }
         Returns: boolean
       }
@@ -6325,6 +6804,10 @@ export type Database = {
           _signatory_name: string
         }
         Returns: string
+      }
+      schedule_webmarcas_agent_followups: {
+        Args: { p_anchor?: string; p_conversation_id: string }
+        Returns: undefined
       }
       sync_intelligence_history: { Args: never; Returns: Json }
       verify_contract_by_hash: {
