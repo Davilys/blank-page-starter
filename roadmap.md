@@ -1,5 +1,8 @@
 # Roadmap — Recursos INPI (3 modalidades)
 
+## Publicações — revisão solicitada
+- [x] Ampliar a lista, aproximar “Ver gráficos” de “Nova” e auditar controles, filtros e sincronizações sem alterar regras existentes.
+
 ## Em andamento
 - [x] Reabrir conferência pelo histórico (carregar caso ao editar recurso)
 - [x] Conferência humana libera PDF sem carimbo (com confirmação explícita)

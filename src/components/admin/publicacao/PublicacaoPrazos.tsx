@@ -128,10 +128,24 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
   const [filtroRespLocal, setFiltroRespLocal] = useState<string>('all'); // 'all' | userId | 'none'
   const filtroResp = filtroRespProp ?? filtroRespLocal;
   const setFiltroResp = (v: string) => { setFiltroRespLocal(v); onFiltroRespChange?.(v); };
+  const processByNumber = useMemo(() => {
+    const map = new Map<string, any>();
+    processMap.forEach(proc => {
+      const number = String(proc?.process_number || '').replace(/\D/g, '');
+      if (number && !map.has(number)) map.set(number, proc);
+    });
+    return map;
+  }, [processMap]);
+  const ownerFor = (p: any) => {
+    const process = (p.process_id ? processMap.get(p.process_id) : null)
+      || processByNumber.get(String(p.process_number_rpi || '').replace(/\D/g, ''));
+    const client = (p.client_id ? clientMap.get(p.client_id) : null)
+      || (process?.user_id ? clientMap.get(process.user_id) : null);
+    return (client as any)?.assigned_to || (client as any)?.created_by || null;
+  };
   const matchesResp = (p: any) => {
     if (filtroResp === 'all') return true;
-    const client = p.client_id ? clientMap.get(p.client_id) : null;
-    const ownerId = (client as any)?.assigned_to || (client as any)?.created_by || null;
+    const ownerId = ownerFor(p);
     return filtroResp === 'none' ? !ownerId : ownerId === filtroResp;
   };
   const [respPopoverOpen, setRespPopoverOpen] = useState(false);
@@ -240,7 +254,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
     c.desistiu = desistiuList.filter(matchesResp).length;
     return c;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eligible, cumpridosList, desistiuList, filtroResp, clientMap]);
+  }, [eligible, cumpridosList, desistiuList, filtroResp, clientMap, processMap, processByNumber]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -252,8 +266,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
       .filter(p => {
         // Filtro de responsável: usuário dono do cliente (assigned_to, fallback created_by)
         if (filtroResp !== 'all') {
-          const client = p.client_id ? clientMap.get(p.client_id) : null;
-          const ownerId = (client as any)?.assigned_to || (client as any)?.created_by || null;
+          const ownerId = ownerFor(p);
           if (filtroResp === 'none') {
             if (ownerId) return false;
           } else if (ownerId !== filtroResp) {
@@ -270,7 +283,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
         );
       })
       .sort((a, b) => (a._days ?? 9999) - (b._days ?? 9999));
-  }, [eligible, cumpridosList, desistiuList, active, search, processMap, clientMap, filtroResp]);
+  }, [eligible, cumpridosList, desistiuList, active, search, processMap, processByNumber, clientMap, filtroResp]);
 
   const handleSetStatus = async (pub: any, status: AndamentoStatus) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -469,7 +482,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
 
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-auto h-[calc(100vh-500px)]">
+          <div className="overflow-auto h-[clamp(440px,calc(100dvh-220px),900px)]">
             <Table className="min-w-[1150px]">
               <TableHeader>
                 <TableRow>
