@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -625,6 +626,7 @@ function CobrancaSection({
 
 // ─── Main Component ──────────────────────────────
 export function AwardSettings() {
+  const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState<AwardConfig>(DEFAULT_CONFIG);
@@ -678,6 +680,7 @@ export function AwardSettings() {
         if (error) throw error;
       }
 
+      queryClient.invalidateQueries({ queryKey: ['award-config'] });
       toast.success('Configurações de premiação salvas!', {
         description: 'Os novos valores serão aplicados nos cálculos imediatamente.',
       });
