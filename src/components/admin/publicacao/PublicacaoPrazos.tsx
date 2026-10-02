@@ -259,7 +259,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
         );
       })
       .sort((a, b) => (a._days ?? 9999) - (b._days ?? 9999));
-  }, [eligible, cumpridosList, desistiuList, active, search, processMap, clientMap, filtroResp, responsaveisMap]);
+  }, [eligible, cumpridosList, desistiuList, active, search, processMap, clientMap, filtroResp]);
 
   const handleSetStatus = async (pub: any, status: AndamentoStatus) => {
     const { data: { user } } = await supabase.auth.getUser();
