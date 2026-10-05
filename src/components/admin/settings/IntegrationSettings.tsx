@@ -19,6 +19,7 @@ import {
 interface AsaasSettings { environment: 'sandbox' | 'production'; enabled: boolean; api_key: string; }
 interface EmailProviderSettings { enabled: boolean; provider: string; api_key: string; from_email: string; from_name: string; }
 interface BotconversaSettings { enabled: boolean; webhook_url: string; auth_token: string; test_phone: string; }
+interface BotconversaServiceAgentSettings extends BotconversaSettings { company_id: '8572'; }
 interface SmsSettings { enabled: boolean; provider: string; api_key: string; sender_name: string; test_phone: string; }
 interface OpenAISettings { enabled: boolean; api_key: string; model: string; }
 interface INPISettings { enabled: boolean; sync_interval_hours: number; last_sync_at: string | null; }
@@ -183,6 +184,29 @@ export function IntegrationSettings() {
     enabled: false, webhook_url: '', auth_token: '', test_phone: '',
   });
   const [testingBot, setTestingBot] = useState(false);
+  const serviceAgentBot = useSystemSetting<BotconversaServiceAgentSettings>('botconversa_service_agent', {
+    enabled: false, webhook_url: '', auth_token: '', test_phone: '', company_id: '8572',
+  });
+  const [testingServiceAgentBot, setTestingServiceAgentBot] = useState(false);
+
+  const testServiceAgentBot = async () => {
+    if (!serviceAgentBot.local.webhook_url) { toast.error('Configure a URL do webhook da companhia FINANCEIRO'); return; }
+    if (!serviceAgentBot.local.test_phone) { toast.error('Informe um telefone de teste'); return; }
+    setTestingServiceAgentBot(true);
+    try {
+      const { error } = await supabase.functions.invoke('send-multichannel-notification', {
+        body: {
+          event_type: 'service_agent_test',
+          channels: ['whatsapp'],
+          recipient: { nome: 'Teste WebMarcas', phone: serviceAgentBot.local.test_phone },
+          metadata: { company_id: '8572', source: 'integration_test' },
+          data: { mensagem_custom: 'Teste do webhook isolado BotConversa — FINANCEIRO (8572).' },
+        },
+      });
+      if (error) toast.error('Falha ao testar o webhook FINANCEIRO'); else toast.success('Webhook da companhia FINANCEIRO testado!');
+    } catch { toast.error('Erro ao testar webhook FINANCEIRO'); }
+    finally { setTestingServiceAgentBot(false); }
+  };
 
   const testBotConversa = async () => {
     if (!botconversa.local.webhook_url) { toast.error('Configure a URL do webhook primeiro'); return; }
@@ -409,6 +433,50 @@ export function IntegrationSettings() {
           </Button>
         </div>
         <StatusBadge ok={!!(botconversa.local.webhook_url)} />
+      </IntegrationCard>
+
+      {/* ── BotConversa — agente jurídico (companhia FINANCEIRO) ── */}
+      <IntegrationCard
+        icon={Brain}
+        iconColor="text-blue-500"
+        title="BotConversa — Agente de processos (FINANCEIRO 8572)"
+        description="Webhook exclusivo para eventos do botão Serviços. O webhook BotConversa deve iniciar o fluxo/agente de IA da companhia FINANCEIRO."
+        badge={serviceAgentBot.local.enabled && serviceAgentBot.local.webhook_url ? 'Configurado' : 'Inativo'}
+        badgeVariant={serviceAgentBot.local.enabled && serviceAgentBot.local.webhook_url ? 'default' : 'secondary'}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <Label>Ativar agente de processos</Label>
+            <p className="text-xs text-muted-foreground mt-0.5">Destino fixo: companhia FINANCEIRO — ID 8572</p>
+          </div>
+          <Switch checked={serviceAgentBot.local.enabled} onCheckedChange={v => serviceAgentBot.setLocal({ ...serviceAgentBot.local, enabled: v, company_id: '8572' })} />
+        </div>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>URL do webhook da companhia FINANCEIRO</Label>
+            <Input value={serviceAgentBot.local.webhook_url} onChange={e => serviceAgentBot.setLocal({ ...serviceAgentBot.local, webhook_url: e.target.value, company_id: '8572' })}
+              placeholder="URL do gatilho webhook do fluxo duplicado" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Token de autenticação (opcional)</Label>
+            <SecretInput value={serviceAgentBot.local.auth_token} onChange={v => serviceAgentBot.setLocal({ ...serviceAgentBot.local, auth_token: v, company_id: '8572' })} placeholder="Bearer token se necessário" savedValue={(serviceAgentBot.saved as BotconversaServiceAgentSettings).auth_token} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Telefone de teste (com DDD)</Label>
+            <Input value={serviceAgentBot.local.test_phone} onChange={e => serviceAgentBot.setLocal({ ...serviceAgentBot.local, test_phone: e.target.value, company_id: '8572' })} placeholder="5511999999999" />
+          </div>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={testServiceAgentBot} disabled={testingServiceAgentBot}>
+            {testingServiceAgentBot ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <MessageCircle className="h-4 w-4 mr-2" />}
+            Testar webhook FINANCEIRO
+          </Button>
+          <Button onClick={() => serviceAgentBot.save()} disabled={serviceAgentBot.isSaving}>
+            {serviceAgentBot.isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+            Salvar
+          </Button>
+        </div>
+        <StatusBadge ok={serviceAgentBot.local.enabled && !!serviceAgentBot.local.webhook_url} />
       </IntegrationCard>
 
       {/* ── SMS (Zenvia) ──────────────────────────────────── */}
