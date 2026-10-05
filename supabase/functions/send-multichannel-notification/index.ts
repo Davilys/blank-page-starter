@@ -314,7 +314,7 @@ const handler = async (req: Request): Promise<Response> => {
     const smsSettings = (smsRow.data?.value as Record<string, unknown>) ?? { enabled: false };
     const botSettings = (botRow.data?.value as Record<string, unknown>) ?? { enabled: false };
     const serviceAgentBotSettings = (serviceAgentBotRow.data?.value as Record<string, unknown>) ?? { enabled: false, company_id: '8572' };
-    const isServiceAgentEvent = event_type === 'inpi_service_update' || event_type === 'service_agent_test';
+    const isServiceAgentEvent = (payload.metadata as any)?.botconversa_route === 'service_agent_financeiro' || event_type === 'service_agent_test';
     const whatsappSettings = isServiceAgentEvent ? serviceAgentBotSettings : botSettings;
 
     // ── Resolve recipient ──────────────────────────────────────────────────────
@@ -415,10 +415,10 @@ const handler = async (req: Request): Promise<Response> => {
         const eventContext = isServiceAgentEvent ? {
           event_type,
           company_id: '8572',
-          agent_flow: event_type === 'inpi_service_update' ? 'inpi_process_update' : 'integration_test',
+          agent_flow: event_type === 'service_agent_test' ? 'integration_test' : 'inpi_process_update',
           conversation_key: `${resolvedUserId || resolvedPhone}:${String((payload.metadata as any)?.process_id || '')}`,
           process_context: (payload.metadata as any)?.process_context || undefined,
-          next_action: event_type === 'inpi_service_update' ? 'Explain the actual process update and offer a legal meeting.' : undefined,
+          next_action: event_type === 'service_agent_test' ? undefined : 'Explain the actual process update and offer a legal meeting.',
         } : {};
         const selectedWebhook = (whatsappSettings.webhook_url as string) || '';
         const selectedEnabled = whatsappSettings.enabled === true && (isServiceAgentEvent ? !!selectedWebhook : true);
