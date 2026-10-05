@@ -965,7 +965,9 @@ export function CreateContractDialog({ open, onOpenChange, onSuccess, leadId }: 
       // Calculate contract value: for new clients OR existing clients with standard template, use calculated value
       // For monitoramento, force R$ 59.00
       // For distrato com multa, use penalty_value
-      const contractValue = isMonitoramento
+      const contractValue = formData.document_type === 'procuracao'
+        ? null
+        : isMonitoramento
         ? 59.00
         : isDistratoMulta && formData.penalty_value
           ? parseFloat(formData.penalty_value)
