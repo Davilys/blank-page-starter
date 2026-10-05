@@ -442,14 +442,15 @@ const handler = async (req: Request): Promise<Response> => {
           processo_data_pub: asText(publicationRow.data_publicacao_rpi || publicationRow.data_decisao),
           processo_prazo: asText(publicationRow.proximo_prazo_critico || publicationRow.prazo_oposicao || processRow.next_step_date),
           processo_resumo: processSummary,
-          faturas_processo: JSON.stringify(invoiceRows.map((invoice: Record<string, unknown>) => ({
-            description: invoice.description,
-            amount: invoice.amount,
-            status: invoice.status,
-            due_date: invoice.due_date,
-            payment_method: invoice.payment_method,
-          }))).slice(0, 1800),
-          process_context: JSON.stringify(processContext).slice(0, 5000),
+          faturas_processo: invoiceRows.map((invoice: Record<string, unknown>) => {
+            const invoiceDescription = asText(invoice.description || 'Fatura');
+            const invoiceAmount = asText(invoice.amount);
+            const invoiceStatus = asText(invoice.status);
+            const invoiceDueDate = asText(invoice.due_date);
+            const invoiceMethod = asText(invoice.payment_method);
+            return `${invoiceDescription}: R$ ${invoiceAmount}; status ${invoiceStatus}; vencimento ${invoiceDueDate}; forma ${invoiceMethod}`;
+          }).join(' | ').slice(0, 1800),
+          process_context: processContext,
           next_action: event_type === 'service_agent_test' ? '' : 'Explain the actual process update and offer a legal meeting.',
         } : {};
         const selectedWebhook = (whatsappSettings.webhook_url as string) || '';
