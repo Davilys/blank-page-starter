@@ -5,16 +5,12 @@ import {
   Bot,
   CheckCircle2,
   ExternalLink,
-  FileSearch,
   Globe2,
   Headphones,
   Loader2,
-  MessageCircle,
   Scale,
   ShieldCheck,
   Sparkles,
-  Video,
-  Zap,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
