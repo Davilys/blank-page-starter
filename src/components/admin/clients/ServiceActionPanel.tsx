@@ -496,10 +496,17 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
       await supabase.functions.invoke('send-multichannel-notification', {
         body: {
           user_id: client.id,
-          event_type: 'inpi_service_update',
+          event_type: isDistrato
+            ? 'distrato_enviado'
+            : isArquivado
+              ? 'arquivamento'
+              : isSpecialClient
+                ? 'notificacao_sem_cobranca'
+                : 'cobranca_gerada',
           channels: notifChannels,
           custom_message: finalWhatsappMessage,
           metadata: {
+            botconversa_route: 'service_agent_financeiro',
             company_id: '8572',
             process_id: client.process_id || null,
             process_context: processContext,
