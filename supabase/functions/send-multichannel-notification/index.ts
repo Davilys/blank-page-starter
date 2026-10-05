@@ -305,13 +305,17 @@ const handler = async (req: Request): Promise<Response> => {
     const supabase           = createClient(supabaseUrl, supabaseServiceKey);
 
     // ── Load channel settings ──────────────────────────────────────────────────
-    const [smsRow, botRow] = await Promise.all([
+    const [smsRow, botRow, serviceAgentBotRow] = await Promise.all([
       supabase.from('system_settings').select('value').eq('key', 'sms_provider').maybeSingle(),
       supabase.from('system_settings').select('value').eq('key', 'botconversa').maybeSingle(),
+      supabase.from('system_settings').select('value').eq('key', 'botconversa_service_agent').maybeSingle(),
     ]);
 
     const smsSettings = (smsRow.data?.value as Record<string, unknown>) ?? { enabled: false };
     const botSettings = (botRow.data?.value as Record<string, unknown>) ?? { enabled: false };
+    const serviceAgentBotSettings = (serviceAgentBotRow.data?.value as Record<string, unknown>) ?? { enabled: false, company_id: '8572' };
+    const isServiceAgentEvent = event_type === 'inpi_service_update' || event_type === 'service_agent_test';
+    const whatsappSettings = isServiceAgentEvent ? serviceAgentBotSettings : botSettings;
 
     // ── Resolve recipient ──────────────────────────────────────────────────────
     // Support multiple payload shapes:
@@ -406,8 +410,19 @@ const handler = async (req: Request): Promise<Response> => {
           ...(safeData.marca ? { marca: safeData.marca } : {}),
           ...(safeData.valor ? { valor: safeData.valor } : {}),
         };
-        const waOverride = (payload as any).whatsapp_webhook_override as string | undefined;
-        const waResult = await withRetry(() => sendWhatsApp(botSettings, resolvedPhone, resolvedNome, message, extra, waOverride));
+        // Service-agent events are routed exclusively to BotConversa company 8572 (FINANCEIRO).
+        // All other event types continue to use the existing company webhook unchanged.
+        const eventContext = isServiceAgentEvent ? {
+          event_type,
+          company_id: '8572',
+          agent_flow: event_type === 'inpi_service_update' ? 'inpi_process_update' : 'integration_test',
+          conversation_key: `${resolvedUserId || resolvedPhone}:${String((payload.metadata as any)?.process_id || '')}`,
+          process_context: (payload.metadata as any)?.process_context || undefined,
+          next_action: event_type === 'inpi_service_update' ? 'Explain the actual process update and offer a legal meeting.' : undefined,
+        } : {};
+        const selectedWebhook = (whatsappSettings.webhook_url as string) || '';
+        const selectedEnabled = whatsappSettings.enabled === true && (isServiceAgentEvent ? !!selectedWebhook : true);
+        const waResult = await withRetry(() => sendWhatsApp({ ...whatsappSettings, enabled: selectedEnabled }, resolvedPhone, resolvedNome, message, { ...extra, ...eventContext } as any));
         results.whatsapp = waResult;
         await logDispatch(supabase, event_type, 'whatsapp',
           waResult.success ? 'sent' : 'failed', rawPayload,
