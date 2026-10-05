@@ -466,22 +466,45 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
         finalWhatsappMessage = whatsappMessage.split('[LINK_BOLETO]').join(linkValue);
       }
 
-      // 3. Send multichannel notification (CRM + WhatsApp)
+      // Snapshot only the selected process and its latest linked INPI publication for the dedicated agent.
+      let processContext: Record<string, unknown> = {
+        cliente: client.full_name || null,
+        marca: client.brand_name || null,
+        numero_processo: client.process_number || null,
+        evento_selecionado: stage.id,
+        etapa_selecionada: stage.label,
+      };
+      if (client.process_id) {
+        const [{ data: processRow }, { data: publicationRow }, { data: processInvoices }] = await Promise.all([
+          supabase.from('brand_processes').select('brand_name,process_number,pipeline_stage,status,next_step,next_step_date,deposit_date,grant_date,expiry_date').eq('id', client.process_id).maybeSingle(),
+          supabase.from('publicacoes_marcas').select('status,tipo_publicacao,data_publicacao_rpi,data_decisao,prazo_oposicao,proximo_prazo_critico,descricao_prazo,rpi_number,process_number_rpi').eq('process_id', client.process_id).maybeSingle(),
+          supabase.from('invoices').select('description,amount,status,due_date,payment_date,invoice_url,payment_method').eq('user_id', client.id).eq('process_id', client.process_id).is('removida_em', null).order('created_at', { ascending: false }).limit(10),
+        ]);
+        processContext = {
+          ...processContext,
+          processo: processRow || null,
+          publicacao_inpi: publicationRow || null,
+          faturas_deste_processo: processInvoices || [],
+        };
+      }
+
+      // 3. CRM notification + dedicated BotConversa agent event (FINANCEIRO 8572).
+      // Never send this service-action WhatsApp through the publication company's webhook.
       const notifChannels: string[] = ['crm'];
       if (sendWhatsApp) notifChannels.push('whatsapp');
 
       await supabase.functions.invoke('send-multichannel-notification', {
         body: {
           user_id: client.id,
-          event_type: isDistrato
-            ? 'distrato_enviado'
-            : isArquivado
-              ? 'arquivamento'
-              : isSpecialClient
-                ? 'notificacao_sem_cobranca'
-                : 'cobranca_gerada',
+          event_type: 'inpi_service_update',
           channels: notifChannels,
           custom_message: finalWhatsappMessage,
+          metadata: {
+            company_id: '8572',
+            process_id: client.process_id || null,
+            process_context: processContext,
+            source: 'crm_client_file_services',
+          },
           data: {
             link: isDistrato ? distratoSignatureUrl : paymentLink,
             valor: String(valor),
