@@ -2421,6 +2421,60 @@ export type Database = {
         }
         Relationships: []
       }
+      fernanda_inbound_effects: {
+        Row: {
+          channel_id: string
+          claimed_at: string
+          company_id: string
+          conversation_id: string
+          effect: string
+          error_code: string | null
+          invoke_consumed_at: string | null
+          lease_token: string
+          provider_message_id: string
+          receipt: Json | null
+          reserve_usd: number | null
+          source_message_id: string
+          status: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          channel_id: string
+          claimed_at?: string
+          company_id: string
+          conversation_id: string
+          effect: string
+          error_code?: string | null
+          invoke_consumed_at?: string | null
+          lease_token?: string
+          provider_message_id: string
+          receipt?: Json | null
+          reserve_usd?: number | null
+          source_message_id: string
+          status: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          channel_id?: string
+          claimed_at?: string
+          company_id?: string
+          conversation_id?: string
+          effect?: string
+          error_code?: string | null
+          invoke_consumed_at?: string | null
+          lease_token?: string
+          provider_message_id?: string
+          receipt?: Json | null
+          reserve_usd?: number | null
+          source_message_id?: string
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
       fernanda_owner_canonical_inbox: {
         Row: {
           created_at: string
@@ -2460,6 +2514,161 @@ export type Database = {
         }
         Relationships: []
       }
+      fernanda_owner_collection_close: {
+        Row: {
+          audio_provider_id: string
+          claimed_at: string | null
+          close_seq: number
+          due_at: string
+          error_code: string | null
+          provider_message_id: string
+          receipt: Json | null
+          source_message_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          audio_provider_id: string
+          claimed_at?: string | null
+          close_seq: number
+          due_at: string
+          error_code?: string | null
+          provider_message_id: string
+          receipt?: Json | null
+          source_message_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          audio_provider_id?: string
+          claimed_at?: string | null
+          close_seq?: number
+          due_at?: string
+          error_code?: string | null
+          provider_message_id?: string
+          receipt?: Json | null
+          source_message_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      fernanda_owner_followup_episodes: {
+        Row: {
+          anchor_at: string
+          anchor_provider: string
+          anchor_source: string
+          created_at: string
+          document_id: string | null
+          document_kind: string | null
+          id: string
+          phone: string
+          runtime_stage: string | null
+          stage: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          anchor_at: string
+          anchor_provider: string
+          anchor_source: string
+          created_at?: string
+          document_id?: string | null
+          document_kind?: string | null
+          id?: string
+          phone: string
+          runtime_stage?: string | null
+          stage: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          anchor_at?: string
+          anchor_provider?: string
+          anchor_source?: string
+          created_at?: string
+          document_id?: string | null
+          document_kind?: string | null
+          id?: string
+          phone?: string
+          runtime_stage?: string | null
+          stage?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      fernanda_owner_followup_test_config: {
+        Row: {
+          enabled: boolean
+          expires_at: string
+          phone: string
+        }
+        Insert: {
+          enabled?: boolean
+          expires_at: string
+          phone: string
+        }
+        Update: {
+          enabled?: boolean
+          expires_at?: string
+          phone?: string
+        }
+        Relationships: []
+      }
+      fernanda_owner_followup_touches: {
+        Row: {
+          claimed_at: string | null
+          due_at: string
+          episode_id: string
+          error_code: string | null
+          generated_text: string | null
+          generation_model: string | null
+          generation_origin: string | null
+          generation_validation: string | null
+          receipt: Json | null
+          status: string
+          touch: number
+          updated_at: string
+        }
+        Insert: {
+          claimed_at?: string | null
+          due_at: string
+          episode_id: string
+          error_code?: string | null
+          generated_text?: string | null
+          generation_model?: string | null
+          generation_origin?: string | null
+          generation_validation?: string | null
+          receipt?: Json | null
+          status?: string
+          touch: number
+          updated_at?: string
+        }
+        Update: {
+          claimed_at?: string | null
+          due_at?: string
+          episode_id?: string
+          error_code?: string | null
+          generated_text?: string | null
+          generation_model?: string | null
+          generation_origin?: string | null
+          generation_validation?: string | null
+          receipt?: Json | null
+          status?: string
+          touch?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fernanda_owner_followup_touches_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "fernanda_owner_followup_episodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fernanda_owner_native_v2: {
         Row: {
           conversation_id: string
@@ -2496,6 +2705,45 @@ export type Database = {
         }
         Relationships: []
       }
+      fernanda_owner_semantic_calls: {
+        Row: {
+          call_day: string
+          created_at: string
+          decision: string | null
+          input_tokens: number | null
+          model: string
+          output_tokens: number | null
+          provider_message_id: string
+          source_message_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          call_day?: string
+          created_at?: string
+          decision?: string | null
+          input_tokens?: number | null
+          model: string
+          output_tokens?: number | null
+          provider_message_id: string
+          source_message_id: string
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          call_day?: string
+          created_at?: string
+          decision?: string | null
+          input_tokens?: number | null
+          model?: string
+          output_tokens?: number | null
+          provider_message_id?: string
+          source_message_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       fernanda_owner_welcome_tests: {
         Row: {
           conversation_id: string
@@ -2519,6 +2767,27 @@ export type Database = {
           event_id?: string
           results?: Json
           status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      fernanda_stt_budget: {
+        Row: {
+          day: string
+          limit_usd: number
+          reserved_usd: number
+          updated_at: string
+        }
+        Insert: {
+          day: string
+          limit_usd: number
+          reserved_usd?: number
+          updated_at?: string
+        }
+        Update: {
+          day?: string
+          limit_usd?: number
+          reserved_usd?: number
           updated_at?: string
         }
         Relationships: []
@@ -6623,10 +6892,59 @@ export type Database = {
         Args: { p_from?: string; p_owner?: string; p_to?: string }
         Returns: Json
       }
+      arm_fernanda_owner_close: {
+        Args: { p_episode: string; p_hours?: number }
+        Returns: boolean
+      }
+      arm_fernanda_owner_followups: {
+        Args: {
+          p_document?: string
+          p_kind?: string
+          p_provider: string
+          p_runtime_stage?: string
+          p_source: string
+          p_stage: string
+        }
+        Returns: string
+      }
       calculate_predictive_score: { Args: { p_classe?: string }; Returns: Json }
+      cancel_fernanda_owner_followups: { Args: never; Returns: boolean }
       cancel_webmarcas_agent_followups: {
         Args: { p_conversation_id: string }
         Returns: undefined
+      }
+      claim_fernanda_inbound_effect: {
+        Args: {
+          p_channel: string
+          p_company: string
+          p_conversation: string
+          p_effect: string
+          p_provider: string
+          p_source: string
+        }
+        Returns: {
+          channel_id: string
+          claimed_at: string
+          company_id: string
+          conversation_id: string
+          effect: string
+          error_code: string | null
+          invoke_consumed_at: string | null
+          lease_token: string
+          provider_message_id: string
+          receipt: Json | null
+          reserve_usd: number | null
+          source_message_id: string
+          status: string
+          updated_at: string
+          version: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "fernanda_inbound_effects"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       claim_fernanda_owner_canonical: {
         Args: never
@@ -6645,6 +6963,73 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "fernanda_owner_canonical_inbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      claim_fernanda_owner_close: {
+        Args: never
+        Returns: {
+          claimed_at: string | null
+          due_at: string
+          episode_id: string
+          error_code: string | null
+          generated_text: string | null
+          generation_model: string | null
+          generation_origin: string | null
+          generation_validation: string | null
+          receipt: Json | null
+          status: string
+          touch: number
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "fernanda_owner_followup_touches"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      claim_fernanda_owner_collection_close: {
+        Args: never
+        Returns: {
+          audio_provider_id: string
+          claimed_at: string | null
+          close_seq: number
+          due_at: string
+          error_code: string | null
+          provider_message_id: string
+          receipt: Json | null
+          source_message_id: string
+          status: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "fernanda_owner_collection_close"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      claim_fernanda_owner_followup: {
+        Args: never
+        Returns: {
+          claimed_at: string | null
+          due_at: string
+          episode_id: string
+          error_code: string | null
+          generated_text: string | null
+          generation_model: string | null
+          generation_origin: string | null
+          generation_validation: string | null
+          receipt: Json | null
+          status: string
+          touch: number
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "fernanda_owner_followup_touches"
           isOneToOne: false
           isSetofReturn: true
         }
@@ -6727,6 +7112,26 @@ export type Database = {
         Args: { p_due_date: string; p_status: string; p_sync_status: string }
         Returns: string
       }
+      consume_fernanda_owner_semantic: {
+        Args: { p_provider: string; p_source: string }
+        Returns: boolean
+      }
+      consume_fernanda_stt_invocation: {
+        Args: { p_company: string; p_provider: string; p_source: string }
+        Returns: boolean
+      }
+      finish_fernanda_inbound_effect: {
+        Args: {
+          p_company: string
+          p_effect: string
+          p_error: string
+          p_lease: string
+          p_receipt: Json
+          p_source: string
+          p_status: string
+        }
+        Returns: boolean
+      }
       get_annual_evolution: { Args: never; Returns: Json }
       get_auth_user_id_by_email: {
         Args: { lookup_email: string }
@@ -6797,6 +7202,15 @@ export type Database = {
       }
       recalculate_upsell_weights: { Args: never; Returns: Json }
       recheck_cobranca_reentry: { Args: never; Returns: number }
+      reserve_fernanda_stt: {
+        Args: {
+          p_company: string
+          p_lease: string
+          p_limit_usd: number
+          p_source: string
+        }
+        Returns: boolean
+      }
       resolve_contract_user_id: {
         Args: {
           _signatory_cnpj: string
