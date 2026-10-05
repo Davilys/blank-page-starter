@@ -2814,8 +2814,8 @@ export function CreateContractDialog({ open, onOpenChange, onSuccess, leadId }: 
                   </TabsContent>
                 </Tabs>
 
-                {/* Payment selection for standard contracts with existing clients (NOT for monitoramento) */}
-                {isStandardContractTemplate && !isMonitoramentoTemplate && formData.document_type !== 'distrato_multa' && formData.document_type !== 'distrato_sem_multa' && (
+                {/* Payment selection for standard contracts with existing clients (NOT for monitoramento or procuração) */}
+                {isStandardContractTemplate && !isMonitoramentoTemplate && formData.document_type !== 'distrato_multa' && formData.document_type !== 'distrato_sem_multa' && formData.document_type !== 'procuracao' && (
                   <div className="space-y-4 mt-4 p-4 bg-muted/30 rounded-lg border">
                     <div>
                       <Label className="font-medium">Forma de Pagamento *</Label>
