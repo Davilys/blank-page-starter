@@ -2389,7 +2389,7 @@ export function CreateContractDialog({ open, onOpenChange, onSuccess, leadId }: 
                         </div>
                       )}
 
-                      {formData.document_type !== 'distrato_multa' && (
+                      {formData.document_type !== 'distrato_multa' && formData.document_type !== 'procuracao' && (
                         <div className="space-y-2">
                           <Label>Valor do Documento</Label>
                           <Input
