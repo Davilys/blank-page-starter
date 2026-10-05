@@ -180,7 +180,7 @@ export function CreateContractDialog({ open, onOpenChange, onSuccess, leadId }: 
   const [currentTab, setCurrentTab] = useState('personal');
 
   // AI suggested classes state
-  const [suggestedClasses, setSuggestedClasses] = useState<{ classes: number[]; descriptions: string[] } | null>(null);
+  const [suggestedClasses, setSuggestedClasses] = useState<{ classes: number[]; descriptions: string[]; primaryClass?: number | null; source?: string } | null>(null);
   const [selectedClasses, setSelectedClasses] = useState<number[]>([]);
   const [loadingClasses, setLoadingClasses] = useState(false);
 
@@ -590,7 +590,10 @@ export function CreateContractDialog({ open, onOpenChange, onSuccess, leadId }: 
         setSuggestedClasses({
           classes: data.classes,
           descriptions: data.classDescriptions || [],
+          primaryClass: Number.isInteger(data.primaryClass) && data.classes.includes(data.primaryClass) ? data.primaryClass : null,
+          source: data.classSource,
         });
+        if (Number.isInteger(data.primaryClass) && data.classes.includes(data.primaryClass)) setSelectedClasses([data.primaryClass]);
         toast.success(`${data.classes.length} classes NCL sugeridas`);
       } else {
         toast.warning('Nenhuma classe sugerida retornada pela IA');
@@ -1022,9 +1025,9 @@ export function CreateContractDialog({ open, onOpenChange, onSuccess, leadId }: 
           ? { 
               classes: suggestedClasses?.classes || selectedClasses, 
               descriptions: suggestedClasses?.descriptions || selectedClasses.map(c => NCL_CLASS_DESCRIPTIONS[c] || `Classe ${c}`), 
-              selected: selectedClasses 
+              selected: selectedClasses, primary_class: suggestedClasses?.primaryClass || null, class_source: suggestedClasses?.source || null 
             }
-          : (suggestedClasses ? { classes: suggestedClasses.classes, descriptions: suggestedClasses.descriptions, selected: selectedClasses } : null),
+          : (suggestedClasses ? { classes: suggestedClasses.classes, descriptions: suggestedClasses.descriptions, selected: selectedClasses, primary_class: suggestedClasses?.primaryClass || null, class_source: suggestedClasses?.source || null } : null),
       } as any).select().single();
 
       if (error) throw error;
@@ -1899,7 +1902,7 @@ export function CreateContractDialog({ open, onOpenChange, onSuccess, leadId }: 
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center gap-2">
                                         <span className="font-medium text-sm">Classe {cls}</span>
-                                        {idx === 0 && (
+                                        {cls === suggestedClasses.primaryClass && (
                                           <Badge variant="default" className="text-[10px] px-1.5 py-0">
                                             Classe Principal
                                           </Badge>
@@ -3150,3 +3153,4 @@ export function CreateContractDialog({ open, onOpenChange, onSuccess, leadId }: 
     </Dialog>
   );
 }
+
