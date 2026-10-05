@@ -116,7 +116,7 @@ interface PaymentData {
   };
 }
 
-export default function AssinarDocumento() {
+function ProductionAssinarDocumento() {
   const { token } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -1033,3 +1033,50 @@ export default function AssinarDocumento() {
     </div>
   );
 }
+
+
+// Test capability route. This component never invokes production signing or payment.
+function TestDocumentPreview() {
+  const { token } = useParams<{ token: string }>();
+  const [doc, setDoc] = useState<{documentId:string;subject:string;text:string;csrf:string}|null>(null);
+  const [error, setError] = useState('');
+  const [ack, setAck] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const endpoint = `https://scpbqsvwojhbxihyqbdz.supabase.co/functions/v1/fernanda-test-document?token=${encodeURIComponent(token || '')}`;
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(endpoint, {signal:controller.signal,cache:'no-store'}).then(async response => {
+      if (!response.ok) throw new Error('Link de teste indisponível ou expirado.');
+      const data = await response.json();
+      if (data.mode !== 'test' || data.legalSignature !== false || !data.csrf || typeof data.text !== 'string') throw new Error('Documento de teste inválido.');
+      setDoc(data);
+    }).catch(err => { if (err.name !== 'AbortError') setError(err.message); });
+    return () => controller.abort();
+  }, [endpoint]);
+  const simulate = async () => {
+    if (!doc || !ack || busy || done) return;
+    setBusy(true);setError('');
+    try {
+      const response = await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({csrf:doc.csrf,test_ack:'yes'})});
+      if (!response.ok) throw new Error('O registro do teste não foi confirmado. Não tente novamente até verificar o estado.');
+      const result = await response.json();
+      if (result.accepted !== true || result.legalSignature !== false || result.paymentCreated !== false) throw new Error('Resultado do teste não confirmado.');
+      setDone(true);
+    } catch (err) {setError(err instanceof Error ? err.message : 'Falha no teste.');}
+    finally {setBusy(false);}
+  };
+  return <main className="min-h-screen bg-slate-100 p-4 sm:p-8"><section className="mx-auto max-w-4xl rounded-xl bg-white p-5 sm:p-8 shadow-sm">
+    <h1 className="text-2xl font-semibold">Documento de teste</h1>
+    <p className="my-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950">TESTE SEM VALOR JURÍDICO. Dados fictícios. Esta página registra somente uma assinatura simulada, não cria assinatura legal, cobrança ou protocolo no INPI.</p>
+    {error && <p role="alert" className="my-4 text-red-700">{error}</p>}
+    {!doc && !error && <p>Carregando documento de teste...</p>}
+    {doc && <><h2 className="mb-4 font-semibold">{doc.subject}</h2><div className="whitespace-pre-wrap break-words border-y py-6 text-sm leading-7">{doc.text}</div>
+      {done ? <p role="status" className="mt-6 rounded-lg bg-green-50 p-4 text-green-900">Assinatura simulada registrada. Sem assinatura legal e sem cobrança.</p> : <div className="mt-6 space-y-4"><label className="flex items-start gap-3"><input type="checkbox" checked={ack} onChange={e=>setAck(e.target.checked)} disabled={busy}/><span>Li o documento e confirmo que esta é somente uma simulação sem valor jurídico.</span></label><button type="button" disabled={!ack || busy || !!error} onClick={simulate} className="rounded-lg bg-slate-900 px-5 py-3 text-white disabled:opacity-40">{busy ? 'Registrando teste...' : 'Registrar assinatura simulada'}</button></div>}
+    </>}
+  </section></main>;
+}
+
+export default function AssinarDocumento() {
+  return new URLSearchParams(window.location.search).get('modo') === 'teste' ? <TestDocumentPreview /> : <ProductionAssinarDocumento />;
+  }
