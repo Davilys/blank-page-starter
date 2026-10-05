@@ -136,6 +136,7 @@ export default function Login() {
                 Esqueceu sua senha?
               </Link>
             </p>
+            <p>
               <Link to="/" className="text-muted-foreground hover:text-primary">
                 ← Voltar ao site
               </Link>
