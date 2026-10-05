@@ -61,7 +61,15 @@ export default function Login() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted flex items-center justify-center p-4">
+    <div className="relative min-h-screen bg-gradient-to-br from-background to-muted flex items-center justify-center p-4">
+      <Link
+        to="/admin/login"
+        title="Área do administrador"
+        aria-label="Área do administrador"
+        className="absolute right-4 top-4 sm:right-6 sm:top-6 inline-flex h-11 w-11 items-center justify-center rounded-full border border-border/60 bg-background/70 text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-primary/40 hover:bg-background hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <Lock className="h-5 w-5" />
+      </Link>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <Link to="/">
@@ -126,11 +134,6 @@ export default function Login() {
             <p>
               <Link to="/cliente/recuperar-senha" className="text-primary hover:underline">
                 Esqueceu sua senha?
-              </Link>
-            </p>
-            <p>
-              <Link to="/admin/login" className="text-primary hover:underline">
-                Área do Administrador →
               </Link>
             </p>
             <p>
