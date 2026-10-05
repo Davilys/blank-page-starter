@@ -749,12 +749,28 @@ export function CreateContractDialog({ open, onOpenChange, onSuccess, leadId }: 
       
       // Prepare variable values
       const nomeEmpresa = selectedProfile?.company_name || formData.signatory_name || selectedProfile?.full_name || '';
-      const cnpjValue = formData.signatory_cnpj || (selectedProfile?.cpf_cnpj?.replace(/[^\d]/g, '').length === 14 ? selectedProfile.cpf_cnpj : '') || '';
+      const cnpjValue = formData.signatory_cnpj || selectedProfile?.cnpj || (selectedProfile?.cpf_cnpj?.replace(/[^\d]/g, '').length === 14 ? selectedProfile.cpf_cnpj : '') || '';
       const nomeRepresentante = formData.signatory_name || selectedProfile?.full_name || '';
-      const cpfRepresentante = formData.signatory_cpf || (selectedProfile?.cpf_cnpj?.replace(/[^\d]/g, '').length === 11 ? selectedProfile.cpf_cnpj : '') || '';
+      const cpfRepresentante = formData.signatory_cpf || selectedProfile?.cpf || (selectedProfile?.cpf_cnpj?.replace(/[^\d]/g, '').length === 11 ? selectedProfile.cpf_cnpj : '') || '';
       
       // Replace all template variables with client data using robust replaceVar helper
       let result = selectedTemplate.content;
+      if (effectiveDocumentType === 'procuracao') {
+        const digits = cnpjValue.replace(/\D/g, '');
+        if (digits && (digits.length !== 14 || !selectedProfile?.company_name)) {
+          throw new Error('CNPJ ou razão social incompletos para procuração');
+        }
+        if (!digits) {
+          const companyText = '{{razao_social_ou_nome}} empresa brasileira, inscrita e registrada conforme as leis vigentes do Brasil, com sede na';
+          const companyIdentification = 'Devidamente inscrito no CNPJ sob Nº {{cnpj}}, neste ato representado por {{nome_representante}}, portador(a) do CPF Nº {{cpf_representante}}.';
+          if (!result.includes(companyText) || !result.includes(companyIdentification)) {
+            throw new Error('Modelo de procuração PF alterado: confira a identificação antes de gerar');
+          }
+          result = result.replace(companyText, '{{razao_social_ou_nome}}, pessoa física, com endereço na')
+            .replace(companyIdentification, 'Inscrita no CPF sob Nº {{cpf_representante}}.');
+        }
+        result = replaceVar(result, 'razao_social_ou_nome', digits ? selectedProfile?.company_name || '' : nomeRepresentante);
+      }
       
       // Company/Personal data
       result = replaceVar(result, 'nome_empresa', nomeEmpresa);
