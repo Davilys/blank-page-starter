@@ -12,8 +12,9 @@ A tela CRM salva o webhook dedicado na configuração `botconversa_service_agent
 
 - `telefone`, `nome`, `mensagem`: compatíveis com o envelope usado hoje;
 - `event_type`, `company_id: "8572"`, `agent_flow: "inpi_process_update"`;
-- `process_context`: dados do processo, publicação e faturas ligadas;
-- `conversation_key`: cliente + processo, para correlação no fluxo;
+- `process_context`: objeto completo do processo, publicação e faturas vinculadas;
+- `conversation_key` e `processo_id`: correlação da conversa com o processo selecionado;
+- campos simples para mapear nos campos personalizados do BotConversa: `processo_marca`, `processo_numero`, `processo_etapa`, `processo_data_pub`, `processo_prazo`, `processo_resumo` e `faturas_processo`;
 - `next_action`: orientar sobre a movimentação real e propor conversa com o jurídico.
 
 O webhook deve iniciar o fluxo duplicado em FINANCEIRO. O fluxo original “Publicação inicial” e o webhook da outra companhia não devem ser alterados.
