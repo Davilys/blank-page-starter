@@ -412,13 +412,45 @@ const handler = async (req: Request): Promise<Response> => {
         };
         // Service-agent events are routed exclusively to BotConversa company 8572 (FINANCEIRO).
         // All other event types continue to use the existing company webhook unchanged.
+        const serviceMetadata = (payload.metadata as any) || {};
+        const processContext = (serviceMetadata.process_context || {}) as Record<string, any>;
+        const processRow = (processContext.processo || {}) as Record<string, unknown>;
+        const publicationRow = (processContext.publicacao_inpi || {}) as Record<string, unknown>;
+        const invoiceRows = Array.isArray(processContext.faturas_deste_processo)
+          ? processContext.faturas_deste_processo
+          : [];
+        const asText = (value: unknown) => value == null ? '' : String(value);
+        const processSummary = [
+          processContext.etapa_selecionada,
+          processRow.status,
+          processRow.pipeline_stage,
+          processContext.marca || processRow.brand_name,
+          processContext.numero_processo || processRow.process_number,
+          publicationRow.tipo_publicacao || publicationRow.status,
+          publicationRow.data_publicacao_rpi || publicationRow.data_decisao,
+          publicationRow.proximo_prazo_critico || publicationRow.prazo_oposicao || processRow.next_step_date,
+        ].filter(Boolean).map(asText).join(' | ').slice(0, 1800);
         const eventContext = isServiceAgentEvent ? {
           event_type,
           company_id: '8572',
           agent_flow: event_type === 'service_agent_test' ? 'integration_test' : 'inpi_process_update',
-          conversation_key: `${resolvedUserId || resolvedPhone}:${String((payload.metadata as any)?.process_id || '')}`,
-          process_context: (payload.metadata as any)?.process_context || undefined,
-          next_action: event_type === 'service_agent_test' ? undefined : 'Explain the actual process update and offer a legal meeting.',
+          conversation_key: `${resolvedUserId || resolvedPhone}:${String(serviceMetadata.process_id || '')}`,
+          processo_id: asText(serviceMetadata.process_id),
+          processo_marca: asText(processContext.marca || processRow.brand_name),
+          processo_numero: asText(processContext.numero_processo || processRow.process_number),
+          processo_etapa: asText(processContext.etapa_selecionada || processRow.pipeline_stage || processRow.status || event_type),
+          processo_data_pub: asText(publicationRow.data_publicacao_rpi || publicationRow.data_decisao),
+          processo_prazo: asText(publicationRow.proximo_prazo_critico || publicationRow.prazo_oposicao || processRow.next_step_date),
+          processo_resumo: processSummary,
+          faturas_processo: JSON.stringify(invoiceRows.map((invoice: Record<string, unknown>) => ({
+            description: invoice.description,
+            amount: invoice.amount,
+            status: invoice.status,
+            due_date: invoice.due_date,
+            payment_method: invoice.payment_method,
+          }))).slice(0, 1800),
+          process_context: JSON.stringify(processContext).slice(0, 5000),
+          next_action: event_type === 'service_agent_test' ? '' : 'Explain the actual process update and offer a legal meeting.',
         } : {};
         const selectedWebhook = (whatsappSettings.webhook_url as string) || '';
         const selectedEnabled = whatsappSettings.enabled === true && (isServiceAgentEvent ? !!selectedWebhook : true);
