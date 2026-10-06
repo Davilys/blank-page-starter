@@ -547,7 +547,7 @@ const handler = async (req: Request): Promise<Response> => {
         // media requests are accepted do we call the webhook that starts the AI flow.
         const attachmentResult: { success: boolean; response?: string; error?: string; attempts: number } =
           isServiceAgentEvent && requestedAttachments.length > 0
-            ? await sendServiceAgentAttachments(String(serviceAgentBotSettings.api_key || ''), resolvedPhone, requestedAttachments)
+            ? await sendServiceAgentAttachments(Deno.env.get('BOTCONVERSA_FINANCEIRO_API_KEY') || '', resolvedPhone, requestedAttachments)
             : { success: true, attempts: 0 };
         const safeLogPayload = isServiceAgentEvent
           ? {
