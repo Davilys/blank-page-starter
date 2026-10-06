@@ -19,7 +19,7 @@ import {
 interface AsaasSettings { environment: 'sandbox' | 'production'; enabled: boolean; api_key: string; }
 interface EmailProviderSettings { enabled: boolean; provider: string; api_key: string; from_email: string; from_name: string; }
 interface BotconversaSettings { enabled: boolean; webhook_url: string; auth_token: string; test_phone: string; }
-interface BotconversaServiceAgentSettings extends BotconversaSettings { company_id: '8572'; api_key?: string; }
+interface BotconversaServiceAgentSettings extends BotconversaSettings { company_id: '8572'; }
 interface SmsSettings { enabled: boolean; provider: string; api_key: string; sender_name: string; test_phone: string; }
 interface OpenAISettings { enabled: boolean; api_key: string; model: string; }
 interface INPISettings { enabled: boolean; sync_interval_hours: number; last_sync_at: string | null; }
@@ -185,7 +185,7 @@ export function IntegrationSettings() {
   });
   const [testingBot, setTestingBot] = useState(false);
   const serviceAgentBot = useSystemSetting<BotconversaServiceAgentSettings>('botconversa_service_agent', {
-    enabled: false, webhook_url: '', auth_token: '', test_phone: '', company_id: '8572', api_key: '',
+    enabled: false, webhook_url: '', auth_token: '', test_phone: '', company_id: '8572',
   });
   const [testingServiceAgentBot, setTestingServiceAgentBot] = useState(false);
 
@@ -481,11 +481,6 @@ export function IntegrationSettings() {
           <Switch checked={serviceAgentBot.local.enabled} onCheckedChange={v => serviceAgentBot.setLocal({ ...serviceAgentBot.local, enabled: v, company_id: '8572' })} />
         </div>
         <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label>Chave API BotConversa FINANCEIRO (envio de anexos)</Label>
-            <SecretInput value={serviceAgentBot.local.api_key || ''} onChange={v => serviceAgentBot.setLocal({ ...serviceAgentBot.local, api_key: v, company_id: '8572' })} placeholder="API-KEY da companhia FINANCEIRO" savedValue={(serviceAgentBot.saved as BotconversaServiceAgentSettings).api_key} />
-            <p className="text-xs text-muted-foreground">Usada somente no servidor para enviar cada PDF antes de iniciar o fluxo. Não use a chave do Zapier.</p>
-          </div>
           <div className="space-y-1.5">
             <Label>URL do webhook da companhia FINANCEIRO</Label>
             <Input value={serviceAgentBot.local.webhook_url} onChange={e => serviceAgentBot.setLocal({ ...serviceAgentBot.local, webhook_url: e.target.value, company_id: '8572' })}
