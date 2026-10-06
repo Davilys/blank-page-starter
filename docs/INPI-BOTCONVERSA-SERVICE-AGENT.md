@@ -40,3 +40,13 @@ O webhook deve iniciar o fluxo duplicado em FINANCEIRO. O fluxo original “Publ
 - O telefone interno autorizado para teste está definido como `5511993110193`; a configuração `botconversa_service_agent` permanece desativada até validar a companhia 8572. Em Modo Teste do BotConversa, o webhook só captura a amostra e não envia mensagens.
 - Testar primeiro com número interno, confirmar que o webhook chega somente à companhia 8572 e validar anexos, fluxo, e-mail e notificação do CRM separadamente.
 - Só depois da validação, ativar o fluxo duplicado como principal. Manter reversão para a URL anterior até a aprovação dos testes.
+
+## Validação em 6 de outubro de 2026
+
+- Edge Function `send-multichannel-notification` versão 183 publicada; 15 testes automatizados com provedores simulados passaram. Não equivalem a teste de entrega real.
+- Webhook BotConversa 247235, “CRM — SERVIÇOS INPI — AGENTE IA — TESTE”, ativo em FINANCEIRO 8572. Amostra recebida com HTTP 200 e telefone/nome mais sete campos de processo mapeados antes de iniciar o fluxo 9306380.
+- Fluxo de teste: “AGENTE IA — ATUALIZAÇÃO DE PROCESSO (TESTE)”. Instrução inicial corrigida para não repetir a apresentação. Campo `processo_memoria` criado e configurado como destino do resumo; incluído nas instruções individuais para continuidade do mesmo processo.
+- O WhatsApp da companhia está conectado. Google Calendar aparece no catálogo nativo de aplicativos de IA, porém ainda com botão “Conectar”; a autorização Google e seleção da agenda do jurídico continuam pendentes.
+- A chave de API pode já existir no ambiente, pois a função anterior de documentos usa o mesmo segredo. Sua disponibilidade no envio novo ainda precisa de verificação; não afirmar que a chave está ausente sem teste.
+- A rota dedicada no CRM permanece desativada e a PR ainda não foi incorporada ao código principal. O webhook estar ativo não significa que o botão Serviços em produção já usa essa rota.
+- Ainda pendentes: teste ponta a ponta de PDF seguido de mensagem no número autorizado, agendamento/reagendamento e lembrete de uma hora, implementação e validação da sequência contextual de follow-ups, consulta atualizada ao ficheiro completo e publicação do frontend após validação.
