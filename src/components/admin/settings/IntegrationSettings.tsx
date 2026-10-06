@@ -231,7 +231,7 @@ export function IntegrationSettings() {
       if (error || !whatsappSent) {
         toast.error('O teste não confirmou o envio pelo WhatsApp. Confira a configuração e os logs.');
       } else {
-        toast.success('Webhook da companhia FINANCEIRO testado!');
+        toast.success('Requisição aceita pelo webhook FINANCEIRO. Em Modo Teste, ela apenas captura a amostra; para enviar mensagem real, o webhook precisa estar ativo.');
       }
     } catch { toast.error('Erro ao testar webhook FINANCEIRO'); }
     finally { setTestingServiceAgentBot(false); }
