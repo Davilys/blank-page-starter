@@ -106,6 +106,15 @@
     --shadow-button: 0 8px 20px rgba(237, 133, 52, 0.35);
   }
 
+  /* Administrative entry point — WebMarcas blue and orange identity */
+  .brand-admin {
+    --primary: 214 100% 45%;
+    --primary-foreground: 0 0% 100%;
+    --accent: 24 83% 57%;
+    --accent-foreground: 0 0% 100%;
+    --ring: 214 100% 45%;
+  }
+
   .brand-public h1,
   .brand-public h2,
   .brand-public .font-display {
