@@ -454,7 +454,17 @@ const handler = async (req: Request): Promise<Response> => {
           next_action: event_type === 'service_agent_test' ? '' : 'Explain the actual process update and offer a legal meeting.',
         } : {};
         const selectedWebhook = (whatsappSettings.webhook_url as string) || '';
-        const selectedEnabled = whatsappSettings.enabled === true && (isServiceAgentEvent ? !!selectedWebhook : true);
+        const normalizePhone = (value: unknown) => String(value || '').replace(/\\D/g, '');
+        const savedTestPhone = normalizePhone(serviceAgentBotSettings.test_phone);
+        const isAuthorizedServiceTest =
+          event_type === 'service_agent_test' &&
+          savedTestPhone.length >= 10 &&
+          normalizePhone(resolvedPhone) === savedTestPhone &&
+          !!selectedWebhook;
+        // A dedicated integration test may run while production routing stays disabled,
+        // but only to the exact phone saved as the internal test recipient.
+        const selectedEnabled = (whatsappSettings.enabled === true || isAuthorizedServiceTest) &&
+          (isServiceAgentEvent ? !!selectedWebhook : true);
         const waResult = await withRetry(() => sendWhatsApp({ ...whatsappSettings, enabled: selectedEnabled }, resolvedPhone, resolvedNome, message, { ...extra, ...eventContext } as any));
         results.whatsapp = waResult;
         await logDispatch(supabase, event_type, 'whatsapp',
