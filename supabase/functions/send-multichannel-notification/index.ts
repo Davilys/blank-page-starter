@@ -216,6 +216,79 @@ async function sendSMS(
   }
 }
 
+// ─── WhatsApp media for the dedicated FINANCEIRO service route ────────────────
+
+interface BotConversaAttachment {
+  url: string;
+  filename: string;
+}
+
+async function sendServiceAgentAttachments(
+  apiKey: string,
+  phone: string,
+  attachments: BotConversaAttachment[],
+): Promise<{ success: boolean; response?: string; error?: string; attempts: number }> {
+  if (attachments.length === 0) return { success: true, response: 'Sem anexos', attempts: 0 };
+  if (!apiKey.trim()) return { success: false, error: 'Chave API da companhia FINANCEIRO não configurada; nenhum fluxo foi iniciado.', attempts: 0 };
+
+  const digits = String(phone || '').replace(/\D/g, '').replace(/^0/, '');
+  const finalPhone = digits.startsWith('55') ? digits : `55${digits}`;
+  if (digits.length < 10) return { success: false, error: 'Telefone inválido para envio de anexos.', attempts: 0 };
+
+  for (const attachment of attachments) {
+    try {
+      const fileUrl = new URL(attachment.url);
+      if (fileUrl.protocol !== 'https:' || fileUrl.search || fileUrl.hash ||
+          !/\.(pdf|png|jpe?g|mp4|mp3|ogg)$/i.test(fileUrl.pathname)) {
+        return { success: false, error: `Anexo inválido para o BotConversa: ${attachment.filename}. A URL pública precisa terminar na extensão do arquivo.`, attempts: 0 };
+      }
+    } catch {
+      return { success: false, error: `URL inválida no anexo: ${attachment.filename}.`, attempts: 0 };
+    }
+  }
+
+  const base = 'https://backend.botconversa.com.br/api/v1/webhook';
+  const headers = { 'Content-Type': 'application/json', 'API-KEY': apiKey };
+  let lookupResponse: Response;
+  try {
+    lookupResponse = await fetch(`${base}/subscriber/get_by_phone/${finalPhone}/`, { method: 'GET', headers });
+  } catch (error) {
+    return { success: false, error: `Falha ao localizar contato na FINANCEIRO: ${(error as Error).message}`, attempts: 1 };
+  }
+  const lookupText = await lookupResponse.text();
+  if (!lookupResponse.ok) {
+    return { success: false, error: `Não foi possível localizar o contato na FINANCEIRO (HTTP ${lookupResponse.status}); nenhum arquivo ou fluxo foi enviado. ${lookupText.slice(0, 400)}`, attempts: 1 };
+  }
+
+  let subscriber: any;
+  try { subscriber = JSON.parse(lookupText); }
+  catch { return { success: false, error: 'Resposta inválida ao localizar o contato FINANCEIRO.', attempts: 1 }; }
+  const subscriberId = subscriber?.id ?? subscriber?.data?.id ?? subscriber?.subscriber?.id ?? subscriber?.data?.subscriber?.id;
+  if (!subscriberId) return { success: false, error: 'O contato não retornou um ID válido na companhia FINANCEIRO; nenhum arquivo ou fluxo foi enviado.', attempts: 1 };
+
+  let accepted = 0;
+  for (const attachment of attachments) {
+    try {
+      const response = await fetch(`${base}/subscriber/${encodeURIComponent(String(subscriberId))}/send_message/`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ type: 'file', value: attachment.url }),
+      });
+      const responseText = await response.text();
+      if (!response.ok) {
+        return { success: false, error: `BotConversa recusou o arquivo ${attachment.filename} (HTTP ${response.status}). O fluxo não será iniciado. ${responseText.slice(0, 400)}`, response: JSON.stringify({ accepted_files: accepted }), attempts: 1 };
+      }
+      accepted++;
+      // Preserve order in the recipient's conversation before the greeting flow begins.
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } catch (error) {
+      return { success: false, error: `Falha ao enviar ${attachment.filename}; o fluxo não será iniciado. ${(error as Error).message}`, response: JSON.stringify({ accepted_files: accepted }), attempts: 1 };
+    }
+  }
+
+  return { success: true, response: JSON.stringify({ accepted_files: accepted, delivery: 'accepted_by_botconversa_api' }), attempts: 1 };
+}
+
 // ─── WhatsApp via BotConversa ─────────────────────────────────────────────────
 
 async function sendWhatsApp(
@@ -430,6 +503,10 @@ const handler = async (req: Request): Promise<Response> => {
           publicationRow.data_publicacao_rpi || publicationRow.data_decisao,
           publicationRow.proximo_prazo_critico || publicationRow.prazo_oposicao || processRow.next_step_date,
         ].filter(Boolean).map(asText).join(' | ').slice(0, 1800);
+        const requestedAttachments = Array.isArray(serviceMetadata.whatsapp_attachments)
+          ? serviceMetadata.whatsapp_attachments.filter((item: any) =>
+              item && typeof item.url === 'string' && typeof item.filename === 'string')
+          : [];
         const eventContext = isServiceAgentEvent ? {
           event_type,
           company_id: '8572',
@@ -451,10 +528,11 @@ const handler = async (req: Request): Promise<Response> => {
             return `${invoiceDescription}: R$ ${invoiceAmount}; status ${invoiceStatus}; vencimento ${invoiceDueDate}; forma ${invoiceMethod}`;
           }).join(' | ').slice(0, 1800),
           process_context: processContext,
+          anexos_enviados: requestedAttachments.map((file: BotConversaAttachment) => file.filename).join(', '),
           next_action: event_type === 'service_agent_test' ? '' : 'Explain the actual process update and offer a legal meeting.',
         } : {};
         const selectedWebhook = (whatsappSettings.webhook_url as string) || '';
-        const normalizePhone = (value: unknown) => String(value || '').replace(/\\D/g, '');
+        const normalizePhone = (value: unknown) => String(value || '').replace(/\D/g, '');
         const savedTestPhone = normalizePhone(serviceAgentBotSettings.test_phone);
         const isAuthorizedServiceTest =
           event_type === 'service_agent_test' &&
@@ -465,10 +543,26 @@ const handler = async (req: Request): Promise<Response> => {
         // but only to the exact phone saved as the internal test recipient.
         const selectedEnabled = (whatsappSettings.enabled === true || isAuthorizedServiceTest) &&
           (isServiceAgentEvent ? !!selectedWebhook : true);
-        const waResult = await withRetry(() => sendWhatsApp({ ...whatsappSettings, enabled: selectedEnabled }, resolvedPhone, resolvedNome, message, { ...extra, ...eventContext } as any));
+        // Queue every attached document through the FINANCEIRO API first. Only if all
+        // media requests are accepted do we call the webhook that starts the AI flow.
+        const attachmentResult = isServiceAgentEvent && requestedAttachments.length > 0
+          ? await sendServiceAgentAttachments(String(serviceAgentBotSettings.api_key || ''), resolvedPhone, requestedAttachments)
+          : { success: true, attempts: 0 };
+        const safeLogPayload = isServiceAgentEvent
+          ? {
+              ...rawPayload,
+              metadata: {
+                ...serviceMetadata,
+                whatsapp_attachments: requestedAttachments.map((file: BotConversaAttachment) => ({ filename: file.filename })),
+              },
+            }
+          : rawPayload;
+        const waResult = attachmentResult.success
+          ? await withRetry(() => sendWhatsApp({ ...whatsappSettings, enabled: selectedEnabled }, resolvedPhone, resolvedNome, message, { ...extra, ...eventContext } as any))
+          : { ...attachmentResult, attempts: attachmentResult.attempts || 1 };
         results.whatsapp = waResult;
         await logDispatch(supabase, event_type, 'whatsapp',
-          waResult.success ? 'sent' : 'failed', rawPayload,
+          waResult.success ? 'sent' : 'failed', safeLogPayload,
           resolvedPhone, resolvedEmail, resolvedUserId,
           waResult.error, waResult.response, waResult.attempts);
       }
