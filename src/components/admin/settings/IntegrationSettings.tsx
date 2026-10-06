@@ -199,8 +199,32 @@ export function IntegrationSettings() {
           event_type: 'service_agent_test',
           channels: ['whatsapp'],
           recipient: { nome: 'Teste WebMarcas', phone: serviceAgentBot.local.test_phone },
-          metadata: { company_id: '8572', source: 'integration_test' },
-          data: { mensagem_custom: 'Teste do webhook isolado BotConversa — FINANCEIRO (8572).' },
+          metadata: {
+            company_id: '8572',
+            botconversa_route: 'service_agent_financeiro',
+            source: 'integration_test',
+            process_id: 'TESTE-FICTICIO',
+            process_context: {
+              cliente: 'Teste WebMarcas',
+              marca: 'MARCA FICTÍCIA TESTE',
+              numero_processo: '999999999',
+              etapa_selecionada: 'Despacho 003 — simulado',
+              processo: {
+                brand_name: 'MARCA FICTÍCIA TESTE',
+                process_number: '999999999',
+                pipeline_stage: 'Despacho 003 — simulado',
+                status: 'Teste fictício',
+                next_step_date: '2026-12-31',
+              },
+              publicacao_inpi: {
+                tipo_publicacao: 'Despacho 003 — simulado',
+                data_publicacao_rpi: '2026-10-06',
+                proximo_prazo_critico: '2026-12-31',
+              },
+              faturas_deste_processo: [],
+            },
+          },
+          custom_message: 'TESTE INTERNO: integração BotConversa FINANCEIRO 8572 com dados totalmente fictícios. Não é uma atualização real de processo.',
         },
       });
       const whatsappSent = (data as any)?.results?.whatsapp?.success === true;
