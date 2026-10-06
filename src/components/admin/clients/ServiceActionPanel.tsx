@@ -493,7 +493,7 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
       const notifChannels: string[] = ['crm'];
       if (sendWhatsApp) notifChannels.push('whatsapp');
 
-      await supabase.functions.invoke('send-multichannel-notification', {
+      const notificationDispatch = await supabase.functions.invoke('send-multichannel-notification', {
         body: {
           user_id: client.id,
           event_type: isDistrato
@@ -523,6 +523,8 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
           },
         },
       });
+      const whatsappDispatchConfirmed = !sendWhatsApp ||
+        (!notificationDispatch.error && (notificationDispatch.data as any)?.results?.whatsapp?.success === true);
 
       // 4. If email, also send rich email with attachments
       if (sendEmail && client.email) {
@@ -581,15 +583,19 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
         }) as any,
       });
 
-      toast.success(
-        isDistrato
-          ? 'Notificação de distrato enviada com sucesso!'
-          : isArquivado
-            ? 'Notificação de arquivamento enviada com sucesso!'
-            : isSpecialClient
-              ? 'Notificação enviada com sucesso (Cliente Especial — sem cobrança)!'
-              : 'Notificação e cobrança enviadas com sucesso!'
-      );
+      if (sendWhatsApp && !whatsappDispatchConfirmed) {
+        toast.error('O WhatsApp não foi confirmado. Verifique os logs da rota FINANCEIRO; o e-mail segue com o envio atual.');
+      } else {
+        toast.success(
+          isDistrato
+            ? 'Notificação de distrato enviada com sucesso!'
+            : isArquivado
+              ? 'Notificação de arquivamento enviada com sucesso!'
+              : isSpecialClient
+                ? 'Notificação enviada com sucesso (Cliente Especial — sem cobrança)!'
+                : 'Notificação e cobrança enviadas com sucesso!'
+        );
+      }
       onUpdate();
       onClose();
     } catch (err: any) {
