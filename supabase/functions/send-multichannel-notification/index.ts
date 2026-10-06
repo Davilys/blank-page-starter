@@ -377,6 +377,31 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase           = createClient(supabaseUrl, supabaseServiceKey);
 
+    const isServiceAgentEvent = (payload.metadata as any)?.botconversa_route === 'service_agent_financeiro' || event_type === 'service_agent_test';
+    if (isServiceAgentEvent) {
+      // This privileged CRM action must not be callable with a public/anonymous key.
+      const token = req.headers.get('Authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
+      if (!token) {
+        return new Response(JSON.stringify({ error: 'Autenticação do CRM obrigatória.' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const { data: authData, error: authError } = await supabase.auth.getUser(token);
+      if (authError || !authData?.user) {
+        return new Response(JSON.stringify({ error: 'Sessão do CRM inválida ou expirada.' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const { data: isAdmin, error: roleError } = await supabase.rpc('has_role', {
+        _user_id: authData.user.id, _role: 'admin',
+      });
+      if (roleError || isAdmin !== true) {
+        return new Response(JSON.stringify({ error: 'Acesso administrativo obrigatório para enviar serviços.' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     // ── Load channel settings ──────────────────────────────────────────────────
     const [smsRow, botRow, serviceAgentBotRow] = await Promise.all([
       supabase.from('system_settings').select('value').eq('key', 'sms_provider').maybeSingle(),
@@ -387,7 +412,6 @@ const handler = async (req: Request): Promise<Response> => {
     const smsSettings = (smsRow.data?.value as Record<string, unknown>) ?? { enabled: false };
     const botSettings = (botRow.data?.value as Record<string, unknown>) ?? { enabled: false };
     const serviceAgentBotSettings = (serviceAgentBotRow.data?.value as Record<string, unknown>) ?? { enabled: false, company_id: '8572' };
-    const isServiceAgentEvent = (payload.metadata as any)?.botconversa_route === 'service_agent_financeiro' || event_type === 'service_agent_test';
     const whatsappSettings = isServiceAgentEvent ? serviceAgentBotSettings : botSettings;
 
     // ── Resolve recipient ──────────────────────────────────────────────────────
@@ -560,8 +584,11 @@ const handler = async (req: Request): Promise<Response> => {
               },
             }
           : rawPayload;
+        // Preserve existing overrides for unrelated notifications; the service route
+        // always uses its dedicated FINANCEIRO webhook.
+        const waOverride = isServiceAgentEvent ? undefined : (payload as any).whatsapp_webhook_override;
         const waResult = attachmentResult.success
-          ? await withRetry(() => sendWhatsApp({ ...whatsappSettings, enabled: selectedEnabled }, resolvedPhone, resolvedNome, message, { ...extra, ...eventContext } as any))
+          ? await withRetry(() => sendWhatsApp({ ...whatsappSettings, enabled: selectedEnabled }, resolvedPhone, resolvedNome, message, { ...extra, ...eventContext } as any, waOverride))
           : { ...attachmentResult, attempts: attachmentResult.attempts || 1 };
         results.whatsapp = waResult;
         await logDispatch(supabase, event_type, 'whatsapp',
