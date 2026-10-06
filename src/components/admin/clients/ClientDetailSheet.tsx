@@ -995,8 +995,6 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
     if (currentFunnel === targetFunnel) { toast.info('Cliente já está neste funil'); setShowMoveDialog(false); return; }
     try {
       if (targetFunnel === 'juridico') {
-        const { data: contracts } = await supabase.from('contracts').select('id, signature_status').eq('user_id', client.id).eq('signature_status', 'signed').limit(1);
-        if (!contracts || contracts.length === 0) { toast.error('Cliente precisa ter um contrato assinado para ir ao funil jurídico'); return; }
         await supabase.from('profiles').update({ client_funnel_type: 'juridico' }).eq('id', client.id);
         if (client.process_id) await supabase.from('brand_processes').update({ pipeline_stage: 'protocolado' }).eq('id', client.process_id);
       } else {
