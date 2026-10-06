@@ -545,9 +545,10 @@ const handler = async (req: Request): Promise<Response> => {
           (isServiceAgentEvent ? !!selectedWebhook : true);
         // Queue every attached document through the FINANCEIRO API first. Only if all
         // media requests are accepted do we call the webhook that starts the AI flow.
-        const attachmentResult = isServiceAgentEvent && requestedAttachments.length > 0
-          ? await sendServiceAgentAttachments(String(serviceAgentBotSettings.api_key || ''), resolvedPhone, requestedAttachments)
-          : { success: true, attempts: 0 };
+        const attachmentResult: { success: boolean; response?: string; error?: string; attempts: number } =
+          isServiceAgentEvent && requestedAttachments.length > 0
+            ? await sendServiceAgentAttachments(String(serviceAgentBotSettings.api_key || ''), resolvedPhone, requestedAttachments)
+            : { success: true, attempts: 0 };
         const safeLogPayload = isServiceAgentEvent
           ? {
               ...rawPayload,
