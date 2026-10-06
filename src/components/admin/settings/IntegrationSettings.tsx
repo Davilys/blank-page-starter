@@ -194,7 +194,7 @@ export function IntegrationSettings() {
     if (!serviceAgentBot.local.test_phone) { toast.error('Informe um telefone de teste'); return; }
     setTestingServiceAgentBot(true);
     try {
-      const { error } = await supabase.functions.invoke('send-multichannel-notification', {
+      const { data, error } = await supabase.functions.invoke('send-multichannel-notification', {
         body: {
           event_type: 'service_agent_test',
           channels: ['whatsapp'],
@@ -203,7 +203,12 @@ export function IntegrationSettings() {
           data: { mensagem_custom: 'Teste do webhook isolado BotConversa — FINANCEIRO (8572).' },
         },
       });
-      if (error) toast.error('Falha ao testar o webhook FINANCEIRO'); else toast.success('Webhook da companhia FINANCEIRO testado!');
+      const whatsappSent = (data as any)?.results?.whatsapp?.success === true;
+      if (error || !whatsappSent) {
+        toast.error('O teste não confirmou o envio pelo WhatsApp. Confira a configuração e os logs.');
+      } else {
+        toast.success('Webhook da companhia FINANCEIRO testado!');
+      }
     } catch { toast.error('Erro ao testar webhook FINANCEIRO'); }
     finally { setTestingServiceAgentBot(false); }
   };
