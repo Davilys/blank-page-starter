@@ -34,6 +34,9 @@ O webhook deve iniciar o fluxo duplicado em FINANCEIRO. O fluxo original “Publ
 - A URL configurada no CRM deve pertencer ao webhook do fluxo duplicado em FINANCEIRO 8572.
 - O fluxo BotConversa deve mapear telefone/nome, dados de processo e contexto para o agente de IA.
 - A integração deve oferecer ações confiáveis para criar, atualizar e cancelar eventos no Google Calendar/Meet. O endpoint atual do CRM cria eventos, mas ainda não implementa atualização/cancelamento; isso precisa estar pronto antes de ativar reagendamento automatizado.
+- Configurar `BOTCONVERSA_FINANCEIRO_API_KEY` como segredo da Edge Function Supabase. A chave não pode ser guardada em `system_settings` nem exposta na tela administrativa.
+- Para envio ordenado dos documentos, o contato precisa existir na companhia FINANCEIRO e cada URL pública precisa terminar na extensão real do arquivo. A Edge Function envia os arquivos pela API do BotConversa em sequência e só depois chama o webhook do agente.
 - Configurar os templates aprovados necessários para iniciar ou retomar conversas fora da janela de atendimento do WhatsApp.
-- Testar primeiro com número interno, confirmar que o webhook chega somente à companhia 8572 e validar boleto, e-mail e notificação do CRM separadamente.
+- O telefone interno autorizado para teste está definido como `5511993110193`; a configuração `botconversa_service_agent` permanece desativada até validar a companhia 8572. Em Modo Teste do BotConversa, o webhook só captura a amostra e não envia mensagens.
+- Testar primeiro com número interno, confirmar que o webhook chega somente à companhia 8572 e validar anexos, fluxo, e-mail e notificação do CRM separadamente.
 - Só depois da validação, ativar o fluxo duplicado como principal. Manter reversão para a URL anterior até a aprovação dos testes.
