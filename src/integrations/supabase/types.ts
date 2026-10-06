@@ -3922,6 +3922,245 @@ export type Database = {
           },
         ]
       }
+      journey_document_bindings: {
+        Row: {
+          channel_id: string
+          company_id: string
+          conversation_id: string
+          document_id: string
+          document_kind: string
+          enabled: boolean
+          execution_mode: string
+          expected_signatory_cpf: string
+          expected_signatory_name: string
+          journey_id: string
+        }
+        Insert: {
+          channel_id: string
+          company_id: string
+          conversation_id: string
+          document_id: string
+          document_kind: string
+          enabled?: boolean
+          execution_mode?: string
+          expected_signatory_cpf: string
+          expected_signatory_name: string
+          journey_id: string
+        }
+        Update: {
+          channel_id?: string
+          company_id?: string
+          conversation_id?: string
+          document_id?: string
+          document_kind?: string
+          enabled?: boolean
+          execution_mode?: string
+          expected_signatory_cpf?: string
+          expected_signatory_name?: string
+          journey_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journey_document_bindings_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: true
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journey_simulated_signature_events: {
+        Row: {
+          actor_kind: string
+          channel_id: string
+          company_id: string
+          conversation_id: string
+          document_digest: string
+          document_id: string
+          document_kind: string
+          id: string
+          journey_id: string
+          legal_signature: boolean
+          owner_evidence_id: string
+          receipt: Json | null
+          simulated_at: string
+          state: string
+          test_run_id: string
+        }
+        Insert: {
+          actor_kind?: string
+          channel_id: string
+          company_id: string
+          conversation_id: string
+          document_digest: string
+          document_id: string
+          document_kind: string
+          id?: string
+          journey_id: string
+          legal_signature?: boolean
+          owner_evidence_id: string
+          receipt?: Json | null
+          simulated_at?: string
+          state?: string
+          test_run_id: string
+        }
+        Update: {
+          actor_kind?: string
+          channel_id?: string
+          company_id?: string
+          conversation_id?: string
+          document_digest?: string
+          document_id?: string
+          document_kind?: string
+          id?: string
+          journey_id?: string
+          legal_signature?: boolean
+          owner_evidence_id?: string
+          receipt?: Json | null
+          simulated_at?: string
+          state?: string
+          test_run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journey_simulated_signature_events_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journey_test_asaas_ledger: {
+        Row: {
+          actor_kind: string
+          amount: number
+          created_at: string
+          customer_id: string | null
+          document_id: string
+          evidence: Json
+          legal_signature: boolean
+          payment_id: string | null
+          source_event_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          actor_kind: string
+          amount: number
+          created_at?: string
+          customer_id?: string | null
+          document_id: string
+          evidence?: Json
+          legal_signature?: boolean
+          payment_id?: string | null
+          source_event_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          actor_kind?: string
+          amount?: number
+          created_at?: string
+          customer_id?: string | null
+          document_id?: string
+          evidence?: Json
+          legal_signature?: boolean
+          payment_id?: string | null
+          source_event_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journey_test_asaas_ledger_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: true
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journey_test_contract_recoveries: {
+        Row: {
+          created_at: string | null
+          evidence: Json
+          old_event_id: string
+          process_id: string
+          request_id: string
+          run_id: string
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          evidence: Json
+          old_event_id: string
+          process_id: string
+          request_id: string
+          run_id: string
+          status: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          evidence?: Json
+          old_event_id?: string
+          process_id?: string
+          request_id?: string
+          run_id?: string
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      journey_test_preview_links: {
+        Row: {
+          created_at: string
+          csrf: string
+          document_digest: string
+          document_id: string
+          enabled: boolean
+          expires_at: string
+          owner_evidence_id: string
+          test_run_id: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          csrf?: string
+          document_digest: string
+          document_id: string
+          enabled?: boolean
+          expires_at: string
+          owner_evidence_id: string
+          test_run_id: string
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          csrf?: string
+          document_digest?: string
+          document_id?: string
+          enabled?: boolean
+          expires_at?: string
+          owner_evidence_id?: string
+          test_run_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journey_test_preview_links_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_activities: {
         Row: {
           activity_type: string
@@ -7112,12 +7351,30 @@ export type Database = {
         Args: { p_due_date: string; p_status: string; p_sync_status: string }
         Returns: string
       }
+      commit_journey_simulated_signature: {
+        Args: {
+          p_document: string
+          p_html: string
+          p_owner_evidence: string
+          p_test_run: string
+        }
+        Returns: string
+      }
       consume_fernanda_owner_semantic: {
         Args: { p_provider: string; p_source: string }
         Returns: boolean
       }
       consume_fernanda_stt_invocation: {
         Args: { p_company: string; p_provider: string; p_source: string }
+        Returns: boolean
+      }
+      consume_profile4_known_contract_recovery: {
+        Args: {
+          p_area: string
+          p_request: string
+          p_run: string
+          p_source: string
+        }
         Returns: boolean
       }
       finish_fernanda_inbound_effect: {
