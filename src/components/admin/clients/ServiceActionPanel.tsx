@@ -510,6 +510,9 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
             company_id: '8572',
             process_id: client.process_id || null,
             process_context: processContext,
+            // Public CRM document URLs are sent by the server to BotConversa as WhatsApp files
+            // before the webhook starts the AI flow. Email attachments continue on send-email below.
+            whatsapp_attachments: docUrls.map(d => ({ url: d.url, filename: d.filename })),
             source: 'crm_client_file_services',
           },
           data: {
