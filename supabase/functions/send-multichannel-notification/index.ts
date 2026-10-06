@@ -546,9 +546,11 @@ const handler = async (req: Request): Promise<Response> => {
         // Queue every attached document through the FINANCEIRO API first. Only if all
         // media requests are accepted do we call the webhook that starts the AI flow.
         const attachmentResult: { success: boolean; response?: string; error?: string; attempts: number } =
-          isServiceAgentEvent && requestedAttachments.length > 0
-            ? await sendServiceAgentAttachments(Deno.env.get('BOTCONVERSA_FINANCEIRO_API_KEY') || '', resolvedPhone, requestedAttachments)
-            : { success: true, attempts: 0 };
+          !selectedEnabled && isServiceAgentEvent
+            ? { success: false, error: 'Rota FINANCEIRO desativada; nenhum anexo nem fluxo foi enviado.', attempts: 0 }
+            : isServiceAgentEvent && requestedAttachments.length > 0
+              ? await sendServiceAgentAttachments(Deno.env.get('BOTCONVERSA_FINANCEIRO_API_KEY') || '', resolvedPhone, requestedAttachments)
+              : { success: true, attempts: 0 };
         const safeLogPayload = isServiceAgentEvent
           ? {
               ...rawPayload,
