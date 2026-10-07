@@ -527,9 +527,14 @@ const handler = async (req: Request): Promise<Response> => {
           publicationRow.data_publicacao_rpi || publicationRow.data_decisao,
           publicationRow.proximo_prazo_critico || publicationRow.prazo_oposicao || processRow.next_step_date,
         ].filter(Boolean).map(asText).join(' | ').slice(0, 1800);
-        const requestedAttachments = Array.isArray(serviceMetadata.whatsapp_attachments)
-          ? serviceMetadata.whatsapp_attachments.filter((item: any) =>
-              item && typeof item.url === 'string' && typeof item.filename === 'string')
+        const rawAttachments = serviceMetadata.whatsapp_attachments;
+        const invalidAttachments = rawAttachments != null && (
+          !Array.isArray(rawAttachments) || rawAttachments.some((item: any) =>
+            !item || typeof item.url !== 'string' || !item.url.trim() ||
+            typeof item.filename !== 'string' || !item.filename.trim())
+        );
+        const requestedAttachments: BotConversaAttachment[] = Array.isArray(rawAttachments) && !invalidAttachments
+          ? rawAttachments
           : [];
         const eventContext = isServiceAgentEvent ? {
           event_type,
@@ -572,6 +577,8 @@ const handler = async (req: Request): Promise<Response> => {
         const attachmentResult: { success: boolean; response?: string; error?: string; attempts: number } =
           !selectedEnabled && isServiceAgentEvent
             ? { success: false, error: 'Rota FINANCEIRO desativada; nenhum anexo nem fluxo foi enviado.', attempts: 0 }
+            : isServiceAgentEvent && invalidAttachments
+              ? { success: false, error: 'Lista de anexos inválida ou incompleta; nenhum anexo nem fluxo foi enviado.', attempts: 0 }
             : isServiceAgentEvent && requestedAttachments.length > 0
               ? await sendServiceAgentAttachments(Deno.env.get('BOTCONVERSA_FINANCEIRO_API_KEY') || '', resolvedPhone, requestedAttachments)
               : { success: true, attempts: 0 };
@@ -588,7 +595,10 @@ const handler = async (req: Request): Promise<Response> => {
         // always uses its dedicated FINANCEIRO webhook.
         const waOverride = isServiceAgentEvent ? undefined : (payload as any).whatsapp_webhook_override;
         const waResult = attachmentResult.success
-          ? await withRetry(() => sendWhatsApp({ ...whatsappSettings, enabled: selectedEnabled }, resolvedPhone, resolvedNome, message, { ...extra, ...eventContext } as any, waOverride))
+          // A timeout/5xx may occur after the provider accepted the event. The
+          // service webhook has no idempotency contract, so never replay it
+          // automatically. Generic notification retry behavior is unchanged.
+          ? await withRetry(() => sendWhatsApp({ ...whatsappSettings, enabled: selectedEnabled }, resolvedPhone, resolvedNome, message, { ...extra, ...eventContext } as any, waOverride), isServiceAgentEvent ? 1 : 3)
           : { ...attachmentResult, attempts: attachmentResult.attempts || 1 };
         results.whatsapp = waResult;
         await logDispatch(supabase, event_type, 'whatsapp',
