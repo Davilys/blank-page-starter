@@ -41,12 +41,18 @@ O webhook deve iniciar o fluxo duplicado em FINANCEIRO. O fluxo original “Publ
 - Testar primeiro com número interno, confirmar que o webhook chega somente à companhia 8572 e validar anexos, fluxo, e-mail e notificação do CRM separadamente.
 - Só depois da validação, ativar o fluxo duplicado como principal. Manter reversão para a URL anterior até a aprovação dos testes.
 
-## Validação em 6 de outubro de 2026
+## Validação atualizada em 7 de outubro de 2026
 
-- Edge Function `send-multichannel-notification` versão 183 publicada; 15 testes automatizados com provedores simulados passaram. Não equivalem a teste de entrega real.
+- Edge Function `send-multichannel-notification` versão 184 publicada; 18 testes automatizados com provedores simulados passaram. Não equivalem a teste de entrega real.
 - Webhook BotConversa 247235, “CRM — SERVIÇOS INPI — AGENTE IA — TESTE”, ativo em FINANCEIRO 8572. Amostra recebida com HTTP 200 e telefone/nome mais sete campos de processo mapeados antes de iniciar o fluxo 9306380.
 - Fluxo de teste: “AGENTE IA — ATUALIZAÇÃO DE PROCESSO (TESTE)”. Instrução inicial corrigida para não repetir a apresentação. Campo `processo_memoria` criado e configurado como destino do resumo; incluído nas instruções individuais para continuidade do mesmo processo.
-- O WhatsApp da companhia está conectado. Google Calendar aparece no catálogo nativo de aplicativos de IA, porém ainda com botão “Conectar”; a autorização Google e seleção da agenda do jurídico continuam pendentes.
+- O WhatsApp da companhia está conectado. Google Calendar foi autorizado pelo usuário e a agenda `webpatentes@gmail.com` está selecionada e persistida no agente.
+- O bloco Inicial agora inicia diretamente o Assistente GPT. A saudação é gerada com os dados disponíveis; a simulação sem campos de CRM não exibiu campos vazios nem inventou atualização. O bloco Conteúdo antigo permanece desconectado do início.
+- Configurado expediente inicial de segunda a sexta, 09h–18h, e reuniões de 30 minutos no fuso America/Sao_Paulo. O agente só pode confirmar reserva após retorno técnico da agenda.
+- Na pré-visualização, a IA informou disponibilidade e retornou ID e link Meet para um evento técnico sem convidados em 08/10/2026, 10h–10h30 de Brasília. Ainda falta confirmação independente na agenda; não equivale a teste completo via WhatsApp.
+- O teste revelou que a conversa encerrava após a reserva. A regra de sucesso foi corrigida e persistida para encerrar somente por pedido explícito de conclusão, permitindo pedidos de reagendamento. A mudança ainda requer teste de reagendamento na mesma conversa.
+- Ao reiniciar a pré-visualização com outro contato sintético, a integração recusou ler o evento do contato anterior. A conta do conector de calendário disponível é outra (`davillys@gmail.com`), portanto não permite verificar a agenda do agente.
+- Evento técnico pendente de conferência/limpeza na agenda webpatentes: ID `p093kbvibffugvnc23br03bbgg`, título solicitado `TESTE INTEGRAÇÃO WEBMARCAS — remover após validação`, 08/10/2026 10h–10h30 America/Sao_Paulo. Não enviar convites.
 - A chave de API pode já existir no ambiente, pois a função anterior de documentos usa o mesmo segredo. Sua disponibilidade no envio novo ainda precisa de verificação; não afirmar que a chave está ausente sem teste.
 - A rota dedicada no CRM permanece desativada e a PR ainda não foi incorporada ao código principal. O webhook estar ativo não significa que o botão Serviços em produção já usa essa rota.
 - Ainda pendentes: teste ponta a ponta de PDF seguido de mensagem no número autorizado, agendamento/reagendamento e lembrete de uma hora, implementação e validação da sequência contextual de follow-ups, consulta atualizada ao ficheiro completo e publicação do frontend após validação.
