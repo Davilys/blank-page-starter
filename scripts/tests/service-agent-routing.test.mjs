@@ -54,7 +54,8 @@ async function dispatch(options = {}) {
         return new Response('{}', {status});
       }
       assert.ok([financeiro,original,'https://override.example.test/webhook'].includes(url), `Unexpected network request: ${url}`);
-      return new Response('{}', {status:200});
+      if (options.webhookThrows) throw new Error('Provider response lost');
+      return new Response('{}', {status:options.webhookStatus ?? 200});
     },
   });
   vm.runInContext(compiled, context);
@@ -106,6 +107,25 @@ test('invalid document URLs stop before lookup or webhook', async () => {
 });
 test('missing FINANCEIRO subscriber prevents file and flow sends', async () => {
   const r = await dispatch({missingSubscriber:true}); assert.equal(r.calls.length,1); assert.equal(r.body.results.whatsapp.success,false);
+});
+test('malformed attachment entries are rejected instead of silently omitted', async () => {
+  for (const attachments of [[files[0], {filename:'missing.pdf'}], {url:files[0].url}, [{url:files[0].url,filename:''}]]) {
+    const r = await dispatch({attachments});
+    assert.equal(r.calls.length,0); assert.equal(r.body.results.whatsapp.success,false);
+  }
+});
+test('ambiguous provider failure does not start duplicate service flows', async () => {
+  for (const options of [{webhookStatus:503}, {webhookThrows:true}]) {
+    const r = await dispatch(options);
+    assert.equal(r.body.results.whatsapp.success,false);
+    assert.equal(r.body.results.whatsapp.attempts,1);
+    assert.equal(r.calls.filter(c=>c.url===financeiro).length,1);
+    assert.equal(r.calls.filter(c=>c.url.includes('/send_message/')).length,2);
+  }
+});
+test('generic notifications retain their retry behavior', async () => {
+  const r = await dispatch({generic:true,webhookStatus:503});
+  assert.equal(r.calls.length,3); assert.equal(r.body.results.whatsapp.attempts,3);
 });
 test('files are submitted in input order before the dedicated webhook', async () => {
   const r = await dispatch();
