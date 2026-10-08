@@ -1,10 +1,11 @@
+import { useJuridicoStages, centralLabelMap, centralLabelRecord, centralLabelOptions } from '@/hooks/useJuridicoStages';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 
-const STATUS_LABELS: Record<string, string> = {
+const STATUS_LABELS: Record<string, string> = centralLabelRecord({
   '003': '003',
   oposicao: 'Oposição',
   exigencia_merito: 'Exigência de Mérito',
@@ -13,7 +14,7 @@ const STATUS_LABELS: Record<string, string> = {
   certificado: 'Certificado',
   renovacao: 'Renovação',
   arquivado: 'Arquivado',
-};
+});
 
 interface ExportData {
   cliente: string;

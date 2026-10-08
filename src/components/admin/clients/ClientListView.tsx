@@ -1,3 +1,4 @@
+import { useJuridicoStages, centralLabelMap, centralLabelRecord, centralLabelOptions } from '@/hooks/useJuridicoStages';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import type { ClientWithProcess } from './ClientKanbanBoard';
 
-const PIPELINE_STAGES: Record<string, { label: string; color: string; bg: string }> = {
+const PIPELINE_STAGES: Record<string, { label: string; color: string; bg: string }> = centralLabelMap({
   protocolado:    { label: 'Protocolado',    color: 'text-blue-400',    bg: 'bg-blue-500/10 border-blue-500/20' },
   '003':          { label: '003',            color: 'text-amber-400',   bg: 'bg-amber-500/10 border-amber-500/20' },
   oposicao:       { label: 'Oposição',       color: 'text-orange-400',  bg: 'bg-orange-500/10 border-orange-500/20' },
@@ -22,7 +23,7 @@ const PIPELINE_STAGES: Record<string, { label: string; color: string; bg: string
   assinou_contrato: { label: 'Assinou Contrato', color: 'text-primary',      bg: 'bg-primary/10 border-primary/20' },
   pagamento_pendente: { label: 'Pgto Pendente', color: 'text-amber-400',    bg: 'bg-amber-500/10 border-amber-500/20' },
   taxa_paga:        { label: 'Taxa Paga',        color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
-};
+});
 
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string; dot: string }> = {
   high:   { label: 'Alta',  color: 'text-red-400',    bg: 'bg-red-500/10 border-red-500/20',    dot: 'bg-red-400' },
@@ -37,6 +38,7 @@ interface ClientListViewProps {
 }
 
 export function ClientListView({ clients, loading, onClientClick }: ClientListViewProps) {
+  useJuridicoStages();
   const getStageBadge = (stage: string | null) => {
     const key = stage || 'protocolado';
     const cfg = PIPELINE_STAGES[key] || PIPELINE_STAGES.protocolado;

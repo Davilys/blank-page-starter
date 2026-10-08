@@ -128,3 +128,20 @@ export function useJuridicoStages() {
 
   return { stages, stageById };
 }
+/** Mapa id → nome (string) sempre lido do cadastro central, com o valor original como reserva. */
+export function centralLabelRecord(map: Record<string, string>): Record<string, string> {
+  return new Proxy(map, {
+    get: (target, prop) => {
+      if (typeof prop !== 'string' || !(prop in target)) return (target as any)[prop as any];
+      return getJuridicoStageLabel(prop, target[prop]);
+    },
+  });
+}
+
+/** Lista de opções {value,label} com rótulo sempre lido do cadastro central. */
+export function centralLabelOptions<T extends { value: string; label: string }>(opts: T[]): T[] {
+  return opts.map(o => {
+    const fallback = o.label;
+    return Object.defineProperty({ ...o }, 'label', { get: () => getJuridicoStageLabel(o.value, fallback), enumerable: true }) as T;
+  });
+}

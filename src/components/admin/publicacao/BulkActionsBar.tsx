@@ -1,3 +1,4 @@
+import { useJuridicoStages, centralLabelMap, centralLabelRecord, centralLabelOptions } from '@/hooks/useJuridicoStages';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -6,7 +7,7 @@ import { motion } from 'framer-motion';
 
 type PubStatus = '003' | 'oposicao' | 'exigencia_merito' | 'indeferimento' | 'deferimento' | 'certificado' | 'renovacao' | 'arquivado';
 
-const STATUS_OPTIONS: { value: PubStatus; label: string }[] = [
+const STATUS_OPTIONS: { value: PubStatus; label: string }[] = centralLabelOptions([
   { value: '003', label: '003' },
   { value: 'oposicao', label: 'Oposição' },
   { value: 'exigencia_merito', label: 'Exigência de Mérito' },
@@ -15,7 +16,7 @@ const STATUS_OPTIONS: { value: PubStatus; label: string }[] = [
   { value: 'certificado', label: 'Certificado' },
   { value: 'renovacao', label: 'Renovação' },
   { value: 'arquivado', label: 'Arquivado' },
-];
+]);
 
 interface Props {
   selectedCount: number;
@@ -26,6 +27,7 @@ interface Props {
 }
 
 export function BulkActionsBar({ selectedCount, onClearSelection, onBulkStatusChange, onBulkReminder, onBulkExport }: Props) {
+  useJuridicoStages();
   const [bulkStatus, setBulkStatus] = useState<PubStatus | ''>('');
 
   if (selectedCount === 0) return null;
