@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { GripVertical, Plus, Trash2, Pencil, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import { refreshJuridicoStages } from '@/hooks/useJuridicoStages';
 import type { FunnelType } from './ClientKanbanBoard';
 
 export interface AdminKanbanStage {
@@ -66,8 +67,11 @@ export function AdminKanbanConfig({ open, onOpenChange, stages: initialStages, f
       .upsert({ key: settingsKey, value: { stages: updated } as any }, { onConflict: 'key' });
 
     if (error) {
-      toast.error('Erro ao salvar configuração');
+      // Volta ao último estado salvo para não deixar nomes divergentes
+      setStages(initialStages);
+      toast.error('Não foi possível salvar as etapas. Nada foi alterado — tente novamente.');
     } else {
+      if (funnelType === 'juridico') await refreshJuridicoStages();
       toast.success('Etapas salvas');
       onSaved();
     }

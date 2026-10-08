@@ -30,7 +30,7 @@ import {
 import { format, addDays, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { calcAutoFields } from '@/components/admin/publicacao/helpers';
-import { useJuridicoStages } from '@/hooks/useJuridicoStages';
+import { useJuridicoStages, centralLabelOptions } from '@/hooks/useJuridicoStages';
 import { ProcessoIdentificadoRow, classifyEntry, entryDataState } from '@/components/admin/inpi/ProcessoIdentificadoRow';
 // PublicacaoTab moved to its own page at /admin/publicacao
 
@@ -113,7 +113,7 @@ interface Profile {
 }
 
 // ─── Constants ───────────────────────────────────────────────────────
-const DISPATCH_TYPE_OPTIONS = [
+const DISPATCH_TYPE_OPTIONS = centralLabelOptions([
   { value: '003', label: '003' },
   { value: 'oposicao', label: 'Oposição' },
   { value: 'exigencia_merito', label: 'Exigência de Mérito' },
@@ -123,7 +123,7 @@ const DISPATCH_TYPE_OPTIONS = [
   { value: 'renovacao', label: 'Renovação' },
   { value: 'distrato', label: 'Distrato' },
   { value: 'arquivado', label: 'Arquivado' },
-];
+]);
 
 const TAG_OPTIONS = [
   { value: 'pending', label: 'Aguardando', color: 'bg-muted text-muted-foreground' },
@@ -134,7 +134,7 @@ const TAG_OPTIONS = [
   { value: 'prazo_encerrado', label: 'Prazo encerrado', color: 'bg-red-500/10 text-red-600 dark:text-red-400' },
 ];
 
-const PIPELINE_STAGES = [
+const PIPELINE_STAGES = centralLabelOptions([
   { value: 'protocolado', label: 'Protocolado' },
   { value: '003', label: '003' },
   { value: 'oposicao', label: 'Oposição' },
@@ -146,7 +146,7 @@ const PIPELINE_STAGES = [
   { value: 'renovacao', label: 'Renovação' },
   { value: 'arquivado', label: 'Arquivado' },
   { value: 'distrato', label: 'Distrato' },
-];
+]);
 
 // Map pipeline stages to publicacao status
 const PIPELINE_TO_PUB_STATUS: Record<string, string> = {
@@ -276,6 +276,7 @@ async function resolveBrandProcessId(
 
 // ─── Main Component ──────────────────────────────────────────────────
 export default function RevistaINPI() {
+  useJuridicoStages();
   const [uploads, setUploads] = useState<RpiUpload[]>([]);
   const { stages: juridicoStages, stageById: juridicoStageById } = useJuridicoStages();
   const [uploadStats, setUploadStats] = useState<Record<string, { total: number; matched: number }>>({});

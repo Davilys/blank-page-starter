@@ -1,3 +1,4 @@
+import { centralLabelMap } from '@/hooks/useJuridicoStages';
 export type PubStatus = '003' | 'oposicao' | 'exigencia_merito' | 'indeferimento' | 'deferimento' | 'certificado' | 'renovacao' | 'arquivado';
 export type PubTipo = 'publicacao_rpi' | 'decisao' | 'certificado' | 'renovacao';
 export type PrazoFilter = 'todos' | 'hoje' | '7dias' | '30dias' | 'atrasados';
@@ -47,7 +48,7 @@ export interface LogEntry {
   created_at: string;
 }
 
-export const STATUS_CONFIG: Record<PubStatus, { label: string; color: string; bg: string }> = {
+export const STATUS_CONFIG: Record<PubStatus, { label: string; color: string; bg: string }> = centralLabelMap({
   '003': { label: '003', color: 'text-yellow-700 dark:text-yellow-400', bg: 'bg-yellow-100 dark:bg-yellow-900/40' },
   oposicao: { label: 'Oposição', color: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/40' },
   exigencia_merito: { label: 'Exigência de Mérito', color: 'text-violet-700 dark:text-violet-400', bg: 'bg-violet-100 dark:bg-violet-900/40' },
@@ -56,7 +57,7 @@ export const STATUS_CONFIG: Record<PubStatus, { label: string; color: string; bg
   certificado: { label: 'Certificado', color: 'text-teal-700 dark:text-teal-400', bg: 'bg-teal-100 dark:bg-teal-900/40' },
   renovacao: { label: 'Renovação', color: 'text-cyan-700 dark:text-cyan-400', bg: 'bg-cyan-100 dark:bg-cyan-900/40' },
   arquivado: { label: 'Arquivado', color: 'text-zinc-700 dark:text-zinc-400', bg: 'bg-zinc-100 dark:bg-zinc-900/40' },
-};
+}) as Record<PubStatus, { label: string; color: string; bg: string }>;
 
 export const TIPO_CONFIG: Record<PubTipo, string> = {
   publicacao_rpi: 'Publicação RPI',

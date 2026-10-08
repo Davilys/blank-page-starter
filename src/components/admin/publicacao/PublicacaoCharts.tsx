@@ -1,3 +1,4 @@
+import { useJuridicoStages, centralLabelMap, centralLabelRecord, centralLabelOptions } from '@/hooks/useJuridicoStages';
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -24,7 +25,7 @@ const STATUS_COLORS: Record<string, string> = {
   renovacao_pendente: 'hsl(25, 95%, 53%)',
 };
 
-const STATUS_LABELS: Record<string, string> = {
+const STATUS_LABELS: Record<string, string> = centralLabelRecord({
   '003': '003',
   oposicao: 'Oposição',
   exigencia_merito: 'Exig. Mérito',
@@ -33,13 +34,14 @@ const STATUS_LABELS: Record<string, string> = {
   certificado: 'Certificado',
   renovacao: 'Renovação',
   arquivado: 'Arquivado',
-};
+});
 
 interface Props {
   publicacoes: Publicacao[];
 }
 
 export function PublicacaoCharts({ publicacoes }: Props) {
+  useJuridicoStages();
   const monthlyData = useMemo(() => {
     const now = new Date();
     const months = Array.from({ length: 6 }, (_, i) => {

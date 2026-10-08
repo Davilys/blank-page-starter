@@ -14,7 +14,7 @@ export interface JuridicoStage {
 
 export const DEFAULT_JURIDICO_STAGES: JuridicoStage[] = [
   { id: 'protocolado', label: 'Protocolado' },
-  { id: '003', label: '003' },
+  { id: '003', label: 'PUBLICAÇÃO DESPACHO 003' },
   { id: 'oposicao', label: 'Oposição' },
   { id: 'exigencia_merito', label: 'Exigência de Mérito' },
   { id: 'indeferimento', label: 'Indeferimento' },
@@ -53,6 +53,52 @@ const fetchOnce = async (): Promise<JuridicoStage[]> => {
 
 export const refreshJuridicoStages = () => fetchOnce();
 
+// Aliases entre slugs de publicação e do Kanban (mesma etapa, ids diferentes)
+const STAGE_ID_ALIASES: Record<string, string[]> = {
+  certificado: ['certificados'],
+  certificados: ['certificado'],
+  arquivado: ['arquivados'],
+  exigencia_de_mrito: ['exigencia_merito'],
+  notificacao_extrajudicial: ['notificacao'],
+};
+
+/**
+ * Resolve o nome exibido de uma etapa do Jurídico a partir do cadastro central
+ * ("Configurar Etapas — Jurídico"). Use junto de `useJuridicoStages()` no componente
+ * para re-renderizar quando o nome mudar.
+ */
+export function getJuridicoStageLabel(id: string | null | undefined, fallback?: string): string {
+  if (!id) return fallback ?? '';
+  const list = cache?.stages ?? [];
+  const ids = [id, ...(STAGE_ID_ALIASES[id] ?? [])];
+  for (const candidate of ids) {
+    const found = list.find(s => s.id === candidate);
+    if (found?.label) return found.label;
+  }
+  return fallback ?? id;
+}
+
+/** Cria um objeto de configuração cujo `label` é sempre lido do cadastro central. */
+export function withCentralLabel<T extends { label: string }>(id: string, cfg: T): T {
+  const fallback = cfg.label;
+  return Object.defineProperty({ ...cfg }, 'label', {
+    get: () => getJuridicoStageLabel(id, fallback),
+    enumerable: true,
+  }) as T;
+}
+
+/** Aplica `withCentralLabel` a todas as entradas de um mapa id → config. */
+export function centralLabelMap<T extends { label: string }>(map: Record<string, T>): Record<string, T> {
+  const out: Record<string, T> = {};
+  for (const [id, cfg] of Object.entries(map)) out[id] = withCentralLabel(id, cfg);
+  return out;
+}
+
+if (typeof window !== 'undefined' && !cache) {
+  // Pré-carrega para que resolvers síncronos já tenham os nomes
+  fetchOnce().catch(() => {});
+}
+
 export function useJuridicoStages() {
   const [stages, setStages] = useState<JuridicoStage[]>(cache?.stages ?? DEFAULT_JURIDICO_STAGES);
 
@@ -81,4 +127,21 @@ export function useJuridicoStages() {
   stages.forEach(s => { stageById[s.id] = s; });
 
   return { stages, stageById };
+}
+/** Mapa id → nome (string) sempre lido do cadastro central, com o valor original como reserva. */
+export function centralLabelRecord(map: Record<string, string>): Record<string, string> {
+  return new Proxy(map, {
+    get: (target, prop) => {
+      if (typeof prop !== 'string' || !(prop in target)) return (target as any)[prop as any];
+      return getJuridicoStageLabel(prop, target[prop]);
+    },
+  });
+}
+
+/** Lista de opções {value,label} com rótulo sempre lido do cadastro central. */
+export function centralLabelOptions<T extends { value: string; label: string }>(opts: T[]): T[] {
+  return opts.map(o => {
+    const fallback = o.label;
+    return Object.defineProperty({ ...o }, 'label', { get: () => getJuridicoStageLabel(o.value, fallback), enumerable: true }) as T;
+  });
 }

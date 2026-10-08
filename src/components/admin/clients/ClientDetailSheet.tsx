@@ -33,7 +33,7 @@ import {
 import type { ClientWithProcess } from './ClientKanbanBoard';
 import { PIPELINE_STAGES, COMMERCIAL_PIPELINE_STAGES } from './ClientKanbanBoard';
 import { normalizePipelineStageId, sanitizePipelineStagesConfig } from '@/lib/pipelineStage';
-import { useJuridicoStages } from '@/hooks/useJuridicoStages';
+import { useJuridicoStages, centralLabelMap, getJuridicoStageLabel } from '@/hooks/useJuridicoStages';
 import { ServiceActionPanel } from './ServiceActionPanel';
 import { usePricing } from '@/hooks/usePricing';
 import { PLAN_CONFIG } from './ClientKanbanBoard';
@@ -1351,7 +1351,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
 
   const funnelType = client.client_funnel_type || 'juridico';
   const fallbackStages = funnelType === 'comercial' ? COMMERCIAL_PIPELINE_STAGES : PIPELINE_STAGES;
-  const activeStages = dynamicServiceStages || fallbackStages;
+  const activeStages = (funnelType === 'juridico' && juridicoStages.length > 0 ? juridicoStages : dynamicServiceStages) || fallbackStages;
   const currentStage = activeStages.find(s => s.id === (editData.pipeline_stage || client.pipeline_stage || 'protocolado'));
   const priCfg = PRIORITY_CONFIG[client.priority || 'medium'] || PRIORITY_CONFIG.medium;
   const initials = (client.full_name || 'C').trim().split(/\s+/).filter(Boolean).map(n => n[0] || '').slice(0, 2).join('').toUpperCase() || 'C';
@@ -1450,7 +1450,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                     {/* Publication status badge in header */}
                     {processPublicacoes.length > 0 && (() => {
                       const latestPub = processPublicacoes[0];
-                      const STATUS_HEADER: Record<string, { label: string; bg: string }> = {
+                      const STATUS_HEADER: Record<string, { label: string; bg: string }> = centralLabelMap({
                         depositada: { label: 'Depositada', bg: 'bg-blue-400/30' },
                         '003': { label: '003', bg: 'bg-yellow-400/30' },
                         oposicao: { label: 'Oposição', bg: 'bg-orange-400/30' },
@@ -1460,7 +1460,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                         certificado: { label: 'Certificado', bg: 'bg-teal-400/30' },
                         renovacao: { label: 'Renovação', bg: 'bg-cyan-400/30' },
                         arquivado: { label: 'Arquivado', bg: 'bg-zinc-400/30' },
-                      };
+                      });
                       const sCfg = STATUS_HEADER[latestPub.status] || STATUS_HEADER.depositada;
                       const dLeft = latestPub.proximo_prazo_critico ? Math.ceil((new Date(latestPub.proximo_prazo_critico).getTime() - Date.now()) / 86400000) : null;
                       return (
@@ -1803,7 +1803,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                         { key: 'data_certificado', label: 'Certificado', icon: Award, description: 'Emissão do certificado' },
                         { key: 'data_renovacao', label: 'Renovação (9 anos)', icon: RefreshCw, description: 'Prazo ordinário + 6m ord. + 6m extra' },
                       ] as const;
-                      const STATUS_CONFIG_INLINE: Record<string, { label: string; color: string; bg: string }> = {
+                      const STATUS_CONFIG_INLINE: Record<string, { label: string; color: string; bg: string }> = centralLabelMap({
                         depositada: { label: 'Depositada', color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/40' },
                         '003': { label: '003', color: 'text-yellow-700 dark:text-yellow-400', bg: 'bg-yellow-100 dark:bg-yellow-900/40' },
                         oposicao: { label: 'Oposição', color: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/40' },
@@ -1813,7 +1813,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                         certificado: { label: 'Certificado', color: 'text-teal-700 dark:text-teal-400', bg: 'bg-teal-100 dark:bg-teal-900/40' },
                         renovacao: { label: 'Renovação', color: 'text-cyan-700 dark:text-cyan-400', bg: 'bg-cyan-100 dark:bg-cyan-900/40' },
                         arquivado: { label: 'Arquivado', color: 'text-zinc-700 dark:text-zinc-400', bg: 'bg-zinc-100 dark:bg-zinc-900/40' },
-                      };
+                      });
                       const statusCfg = STATUS_CONFIG_INLINE[pub.status] || STATUS_CONFIG_INLINE.depositada;
                       const getDaysLeft = (dateStr: string | null): number | null => {
                         if (!dateStr) return null;
@@ -2235,7 +2235,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                         {processPublicacoes.slice(0, 5).map((pub: any) => {
                           const brandName = pub.brand_name_rpi || clientBrands.find((b: any) => b.id === pub.process_id)?.brand_name || '—';
                           const processNum = pub.process_number_rpi || clientBrands.find((b: any) => b.id === pub.process_id)?.process_number || '';
-                          const PUB_STATUS: Record<string, { label: string; color: string; bg: string }> = {
+                          const PUB_STATUS: Record<string, { label: string; color: string; bg: string }> = centralLabelMap({
                             depositada: { label: 'Depositada', color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/40' },
                             '003': { label: '003', color: 'text-yellow-700 dark:text-yellow-400', bg: 'bg-yellow-100 dark:bg-yellow-900/40' },
                             oposicao: { label: 'Oposição', color: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/40' },
@@ -2245,7 +2245,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                             certificado: { label: 'Certificado', color: 'text-teal-700 dark:text-teal-400', bg: 'bg-teal-100 dark:bg-teal-900/40' },
                             renovacao: { label: 'Renovação', color: 'text-cyan-700 dark:text-cyan-400', bg: 'bg-cyan-100 dark:bg-cyan-900/40' },
                             arquivado: { label: 'Arquivado', color: 'text-zinc-700 dark:text-zinc-400', bg: 'bg-zinc-100 dark:bg-zinc-900/40' },
-                          };
+                          });
                           const sCfg = PUB_STATUS[pub.status] || PUB_STATUS['003'];
                           const dLeft = pub.proximo_prazo_critico ? Math.ceil((new Date(pub.proximo_prazo_critico).getTime() - Date.now()) / 86400000) : null;
 
@@ -3569,7 +3569,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                                       {(() => {
                                         const linkedPub = processPublicacoes.find((p: any) => p.process_id === brand.id);
                                         if (!linkedPub) return null;
-                                        const BRAND_PUB_STATUS: Record<string, { label: string; color: string; bg: string }> = {
+                                        const BRAND_PUB_STATUS: Record<string, { label: string; color: string; bg: string }> = centralLabelMap({
                                           depositada: { label: 'Depositada', color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/40' },
                                           '003': { label: '003', color: 'text-yellow-700 dark:text-yellow-400', bg: 'bg-yellow-100 dark:bg-yellow-900/40' },
                                           oposicao: { label: 'Oposição', color: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/40' },
@@ -3579,7 +3579,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                                           certificado: { label: 'Certificado', color: 'text-teal-700 dark:text-teal-400', bg: 'bg-teal-100 dark:bg-teal-900/40' },
                                           renovacao: { label: 'Renovação', color: 'text-cyan-700 dark:text-cyan-400', bg: 'bg-cyan-100 dark:bg-cyan-900/40' },
                                           arquivado: { label: 'Arquivado', color: 'text-zinc-700 dark:text-zinc-400', bg: 'bg-zinc-100 dark:bg-zinc-900/40' },
-                                        };
+                                        });
                                         const bCfg = BRAND_PUB_STATUS[linkedPub.status] || BRAND_PUB_STATUS.depositada;
                                         const bDays = linkedPub.proximo_prazo_critico ? Math.ceil((new Date(linkedPub.proximo_prazo_critico).getTime() - Date.now()) / 86400000) : null;
                                         return (
@@ -4110,7 +4110,7 @@ export function ClientDetailSheet({ client: clientProp, open, onOpenChange, onUp
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {['003','oposicao','exigencia_merito','indeferimento','deferimento','certificado','renovacao','arquivado'].map(s => (
-                        <SelectItem key={s} value={s}>{s === '003' ? '003' : s.charAt(0).toUpperCase() + s.slice(1).replace('_', ' ')}</SelectItem>
+                        <SelectItem key={s} value={s}>{getJuridicoStageLabel(s, s === '003' ? '003' : s.charAt(0).toUpperCase() + s.slice(1).replace('_', ' '))}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
