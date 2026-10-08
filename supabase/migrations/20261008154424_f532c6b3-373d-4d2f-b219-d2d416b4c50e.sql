@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public.annuity_sync_financial() FROM PUBLIC, anon, authenticated;
