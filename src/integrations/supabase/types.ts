@@ -270,6 +270,233 @@ export type Database = {
         }
         Relationships: []
       }
+      annuity_campaigns: {
+        Row: {
+          amount_cents: number
+          contract_reference_date: string | null
+          created_at: string
+          created_by: string | null
+          daily_hour: number
+          daily_limit: number
+          exercicio: number
+          id: string
+          last_scan_at: string | null
+          period_label: string
+          scan_cursor: number
+          scan_done: boolean
+          scan_stats: Json
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount_cents?: number
+          contract_reference_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          daily_hour?: number
+          daily_limit?: number
+          exercicio: number
+          id?: string
+          last_scan_at?: string | null
+          period_label: string
+          scan_cursor?: number
+          scan_done?: boolean
+          scan_stats?: Json
+          start_date: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          contract_reference_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          daily_hour?: number
+          daily_limit?: number
+          exercicio?: number
+          id?: string
+          last_scan_at?: string | null
+          period_label?: string
+          scan_cursor?: number
+          scan_done?: boolean
+          scan_stats?: Json
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      annuity_daily_quota: {
+        Row: {
+          clients_used: number
+          day: string
+          emails_used: number
+          updated_at: string
+        }
+        Insert: {
+          clients_used?: number
+          day: string
+          emails_used?: number
+          updated_at?: string
+        }
+        Update: {
+          clients_used?: number
+          day?: string
+          emails_used?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      annuity_events: {
+        Row: {
+          action: string
+          actor: string | null
+          campaign_id: string | null
+          created_at: string
+          detail: Json
+          id: string
+          item_id: string | null
+        }
+        Insert: {
+          action: string
+          actor?: string | null
+          campaign_id?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          item_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor?: string | null
+          campaign_id?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          item_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "annuity_events_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "annuity_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "annuity_events_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "annuity_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      annuity_items: {
+        Row: {
+          amount_cents: number
+          asaas_payment_id: string | null
+          attempts: number
+          boleto_url: string | null
+          brands: string[]
+          campaign_id: string
+          client_email: string | null
+          client_id: string
+          client_name: string | null
+          contract_id: string | null
+          contract_ref_date: string | null
+          created_at: string
+          doc_digits: string | null
+          due_date: string | null
+          eligibility: string
+          email_sent_at: string | null
+          email_status: string
+          emitted_at: string | null
+          exercicio: number
+          financial_status: string
+          generation_status: string
+          id: string
+          invoice_id: string | null
+          last_error: string | null
+          lease_until: string | null
+          manual_at: string | null
+          manual_by: string | null
+          reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount_cents: number
+          asaas_payment_id?: string | null
+          attempts?: number
+          boleto_url?: string | null
+          brands?: string[]
+          campaign_id: string
+          client_email?: string | null
+          client_id: string
+          client_name?: string | null
+          contract_id?: string | null
+          contract_ref_date?: string | null
+          created_at?: string
+          doc_digits?: string | null
+          due_date?: string | null
+          eligibility?: string
+          email_sent_at?: string | null
+          email_status?: string
+          emitted_at?: string | null
+          exercicio: number
+          financial_status?: string
+          generation_status?: string
+          id?: string
+          invoice_id?: string | null
+          last_error?: string | null
+          lease_until?: string | null
+          manual_at?: string | null
+          manual_by?: string | null
+          reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          asaas_payment_id?: string | null
+          attempts?: number
+          boleto_url?: string | null
+          brands?: string[]
+          campaign_id?: string
+          client_email?: string | null
+          client_id?: string
+          client_name?: string | null
+          contract_id?: string | null
+          contract_ref_date?: string | null
+          created_at?: string
+          doc_digits?: string | null
+          due_date?: string | null
+          eligibility?: string
+          email_sent_at?: string | null
+          email_status?: string
+          emitted_at?: string | null
+          exercicio?: number
+          financial_status?: string
+          generation_status?: string
+          id?: string
+          invoice_id?: string | null
+          last_error?: string | null
+          lease_until?: string | null
+          manual_at?: string | null
+          manual_by?: string | null
+          reason?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "annuity_items_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "annuity_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       asaas_full_sync_runs: {
         Row: {
           ambiguidades: Json
@@ -7131,6 +7358,47 @@ export type Database = {
         Args: { p_from?: string; p_owner?: string; p_to?: string }
         Returns: Json
       }
+      annuity_claim_items: {
+        Args: { p_campaign: string; p_limit: number }
+        Returns: {
+          amount_cents: number
+          asaas_payment_id: string | null
+          attempts: number
+          boleto_url: string | null
+          brands: string[]
+          campaign_id: string
+          client_email: string | null
+          client_id: string
+          client_name: string | null
+          contract_id: string | null
+          contract_ref_date: string | null
+          created_at: string
+          doc_digits: string | null
+          due_date: string | null
+          eligibility: string
+          email_sent_at: string | null
+          email_status: string
+          emitted_at: string | null
+          exercicio: number
+          financial_status: string
+          generation_status: string
+          id: string
+          invoice_id: string | null
+          last_error: string | null
+          lease_until: string | null
+          manual_at: string | null
+          manual_by: string | null
+          reason: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "annuity_items"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      annuity_reserve_email: { Args: never; Returns: boolean }
       arm_fernanda_owner_close: {
         Args: { p_episode: string; p_hours?: number }
         Returns: boolean
