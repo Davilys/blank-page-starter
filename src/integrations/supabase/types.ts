@@ -285,6 +285,7 @@ export type Database = {
           scan_cursor: number
           scan_done: boolean
           scan_stats: Json
+          settings: Json
           start_date: string
           status: string
           updated_at: string
@@ -303,6 +304,7 @@ export type Database = {
           scan_cursor?: number
           scan_done?: boolean
           scan_stats?: Json
+          settings?: Json
           start_date: string
           status?: string
           updated_at?: string
@@ -321,6 +323,7 @@ export type Database = {
           scan_cursor?: number
           scan_done?: boolean
           scan_stats?: Json
+          settings?: Json
           start_date?: string
           status?: string
           updated_at?: string
@@ -418,6 +421,7 @@ export type Database = {
           generation_status: string
           id: string
           invoice_id: string | null
+          is_test: boolean
           last_error: string | null
           lease_until: string | null
           manual_at: string | null
@@ -449,6 +453,7 @@ export type Database = {
           generation_status?: string
           id?: string
           invoice_id?: string | null
+          is_test?: boolean
           last_error?: string | null
           lease_until?: string | null
           manual_at?: string | null
@@ -480,6 +485,7 @@ export type Database = {
           generation_status?: string
           id?: string
           invoice_id?: string | null
+          is_test?: boolean
           last_error?: string | null
           lease_until?: string | null
           manual_at?: string | null
@@ -496,6 +502,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      annuity_settings: {
+        Row: {
+          created_at: string
+          data: Json
+          id: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          id?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       asaas_full_sync_runs: {
         Row: {
@@ -7384,6 +7414,7 @@ export type Database = {
           generation_status: string
           id: string
           invoice_id: string | null
+          is_test: boolean
           last_error: string | null
           lease_until: string | null
           manual_at: string | null
