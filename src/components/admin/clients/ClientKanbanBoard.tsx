@@ -1,3 +1,4 @@
+import { useJuridicoStages } from '@/hooks/useJuridicoStages';
 import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { supabase as supabaseClient } from '@/integrations/supabase/client';
@@ -165,8 +166,11 @@ export function ClientKanbanBoard({ clients, onClientClick, onRefresh, filters, 
   }, [funnelType, stagesVersion]);
 
   // Select stages based on funnel type (dynamic > fallback)
+  const { stages: liveJuridicoStages } = useJuridicoStages();
   const fallbackStages = funnelType === 'comercial' ? COMMERCIAL_PIPELINE_STAGES : PIPELINE_STAGES;
-  const activePipelineStages = dynamicStages || fallbackStages;
+  const activePipelineStages = (funnelType === 'juridico' && liveJuridicoStages.length > 0
+    ? (liveJuridicoStages as unknown as typeof PIPELINE_STAGES[number][])
+    : dynamicStages) || fallbackStages;
   const defaultStage = funnelType === 'comercial' ? 'assinou_contrato' : (activePipelineStages[0]?.id || 'protocolado');
 
   // Apply filters
