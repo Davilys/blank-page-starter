@@ -212,7 +212,7 @@ const extRef = (item: any) => `anuidade:${item.exercicio}:${item.client_id}`;
 async function attachPayment(c: any, item: any, pay: any, actor: string | null, source: string) {
   const { data: inv } = await admin.from("invoices").upsert({
     user_id: item.client_id, asaas_invoice_id: pay.id, asaas_customer_id: pay.customer, contract_id: item.contract_id,
-    description: pay.description, amount: pay.value, status: pay.status || "PENDING", due_date: pay.dueDate,
+    description: pay.description, amount: pay.value, status: String(pay.status || "PENDING").toLowerCase(), due_date: pay.dueDate,
     payment_method: "boleto", invoice_url: pay.invoiceUrl || pay.bankSlipUrl, originado_pelo_crm: true, origem: "anuidade",
     ultima_sincronizacao_asaas: new Date().toISOString(),
   }, { onConflict: "asaas_invoice_id" }).select("id").single();

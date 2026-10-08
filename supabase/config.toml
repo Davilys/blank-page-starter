@@ -155,3 +155,6 @@ verify_jwt = false
 
 [functions.review-inpi-draft]
 verify_jwt = false
+
+[functions.annuity]
+verify_jwt = false
