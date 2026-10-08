@@ -53,6 +53,52 @@ const fetchOnce = async (): Promise<JuridicoStage[]> => {
 
 export const refreshJuridicoStages = () => fetchOnce();
 
+// Aliases entre slugs de publicação e do Kanban (mesma etapa, ids diferentes)
+const STAGE_ID_ALIASES: Record<string, string[]> = {
+  certificado: ['certificados'],
+  certificados: ['certificado'],
+  arquivado: ['arquivados'],
+  exigencia_de_mrito: ['exigencia_merito'],
+  notificacao_extrajudicial: ['notificacao'],
+};
+
+/**
+ * Resolve o nome exibido de uma etapa do Jurídico a partir do cadastro central
+ * ("Configurar Etapas — Jurídico"). Use junto de `useJuridicoStages()` no componente
+ * para re-renderizar quando o nome mudar.
+ */
+export function getJuridicoStageLabel(id: string | null | undefined, fallback?: string): string {
+  if (!id) return fallback ?? '';
+  const list = cache?.stages ?? [];
+  const ids = [id, ...(STAGE_ID_ALIASES[id] ?? [])];
+  for (const candidate of ids) {
+    const found = list.find(s => s.id === candidate);
+    if (found?.label) return found.label;
+  }
+  return fallback ?? id;
+}
+
+/** Cria um objeto de configuração cujo `label` é sempre lido do cadastro central. */
+export function withCentralLabel<T extends { label: string }>(id: string, cfg: T): T {
+  const fallback = cfg.label;
+  return Object.defineProperty({ ...cfg }, 'label', {
+    get: () => getJuridicoStageLabel(id, fallback),
+    enumerable: true,
+  }) as T;
+}
+
+/** Aplica `withCentralLabel` a todas as entradas de um mapa id → config. */
+export function centralLabelMap<T extends { label: string }>(map: Record<string, T>): Record<string, T> {
+  const out: Record<string, T> = {};
+  for (const [id, cfg] of Object.entries(map)) out[id] = withCentralLabel(id, cfg);
+  return out;
+}
+
+if (typeof window !== 'undefined' && !cache) {
+  // Pré-carrega para que resolvers síncronos já tenham os nomes
+  fetchOnce().catch(() => {});
+}
+
 export function useJuridicoStages() {
   const [stages, setStages] = useState<JuridicoStage[]>(cache?.stages ?? DEFAULT_JURIDICO_STAGES);
 
