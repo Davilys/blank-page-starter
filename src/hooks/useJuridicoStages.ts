@@ -14,7 +14,7 @@ export interface JuridicoStage {
 
 export const DEFAULT_JURIDICO_STAGES: JuridicoStage[] = [
   { id: 'protocolado', label: 'Protocolado' },
-  { id: '003', label: '003' },
+  { id: '003', label: 'PUBLICAÇÃO DESPACHO 003' },
   { id: 'oposicao', label: 'Oposição' },
   { id: 'exigencia_merito', label: 'Exigência de Mérito' },
   { id: 'indeferimento', label: 'Indeferimento' },
