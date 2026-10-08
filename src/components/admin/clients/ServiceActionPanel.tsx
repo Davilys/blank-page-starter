@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { X, Mail, MessageCircle, Upload, Loader2, Send, FileText, DollarSign, CreditCard, Paperclip, AlertCircle } from 'lucide-react';
 import { generateDistratoSemMultaContent } from '@/lib/documentTemplates';
+import { isDespacho003Stage, buildDespacho003EmailBody, buildDespacho003Subject, buildDespacho003InvoiceDescription, fillDespacho003Charge, missingDespacho003Fields } from '@/lib/despacho003';
 
 interface ServiceActionPanelProps {
   client: {
@@ -289,6 +290,8 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
   const isDistrato = stage.id === 'distrato';
   const isSpecialClient = !!client.is_special_client;
   const isNotificationOnly = isArquivado || isDistrato || isSpecialClient;
+  // Serviço do despacho 003 (com cobrança): e-mail e descrição próprios
+  const isDespacho003 = isDespacho003Stage(stage.id) && !isNotificationOnly;
   const [message, setMessage] = useState(() =>
     isDistrato
       ? generateDistratoEmail(client)
@@ -296,7 +299,9 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
         ? generateArquivadoEmail(client)
         : isSpecialClient
           ? generateEmailTemplateSemCobranca(client, stage)
-          : generateEmailTemplate(client, stage, SALARIO_MINIMO_2026)
+          : isDespacho003Stage(stage.id)
+            ? buildDespacho003EmailBody({ nomeEtapa: stage.label, nomeCliente: client.full_name, marca: client.brand_name, numeroProcesso: client.process_number })
+            : generateEmailTemplate(client, stage, SALARIO_MINIMO_2026)
   );
   const [whatsappMessage, setWhatsappMessage] = useState(() =>
     isDistrato
@@ -345,6 +350,13 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
       toast.error('Informe o valor da cobrança');
       return;
     }
+    if (isDespacho003) {
+      const missing = missingDespacho003Fields({ nomeEtapa: stage.label, nomeCliente: client.full_name, marca: client.brand_name, numeroProcesso: client.process_number, email: client.email, sendEmail });
+      if (missing.length) {
+        toast.error(`Preencha antes de enviar: ${missing.join(', ')}`);
+        return;
+      }
+    }
 
     setSending(true);
     try {
@@ -374,7 +386,9 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
           body: {
             user_id: client.id,
             process_id: client.process_id || null,
-            description: `Serviço: ${stage.label} - Exigência INPI`,
+            description: isDespacho003
+              ? buildDespacho003InvoiceDescription({ marca: client.brand_name!, numeroProcesso: client.process_number! })
+              : `Serviço: ${stage.label} - Exigência INPI`,
             payment_method: paymentType === 'avista' ? 'pix' : paymentMethod,
             payment_type: paymentType,
             installments: paymentType === 'parcelado' ? installments : 1,
@@ -462,7 +476,11 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
         finalWhatsappMessage = whatsappMessage.split(DISTRATO_LINK_PLACEHOLDER).join(distratoSignatureUrl || '(link indisponível)');
       } else {
         const linkValue = paymentLink || '(link indisponível)';
-        finalEmailMessage = message.split('[LINK_BOLETO]').join(linkValue);
+        finalEmailMessage = isDespacho003
+          ? (sendEmail
+              ? fillDespacho003Charge(message, { value: Number(invoiceData?.value) || valor, dueDate: invoiceData?.due_date || dueDateStr, link: paymentLink })
+              : message)
+          : message.split('[LINK_BOLETO]').join(linkValue);
         finalWhatsappMessage = whatsappMessage.split('[LINK_BOLETO]').join(linkValue);
       }
 
@@ -503,6 +521,8 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
                 ? `Arquivamento do processo – ${client.brand_name || 'Marca'} – WebMarcas`
                 : isSpecialClient
                   ? `Movimentação INPI – ${stage.label} – ${client.brand_name || 'Marca'} (Cliente Especial)`
+                  : isDespacho003
+                  ? buildDespacho003Subject({ nomeEtapa: stage.label, marca: client.brand_name! })
                   : `Exigência INPI – ${stage.label} – ${client.brand_name || 'Marca'}`,
             body: finalEmailMessage,
             attachments,
