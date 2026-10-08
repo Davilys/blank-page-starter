@@ -51,7 +51,9 @@ async function asaas(path: string, init: RequestInit = {}) {
   let body: any = null; try { body = text ? JSON.parse(text) : null; } catch { body = { raw: text.slice(0, 300) }; }
   if (!res.ok) {
     const msg = body?.errors?.[0]?.description || `Asaas ${res.status}`;
-    throw new AsaasError(msg, res.status, body, res.status >= 500 || res.status === 429);
+    const limited = res.status === 429 || (res.status === 403 && /limite de requisi|bloqueado/i.test(msg));
+    throw new AsaasError(limited ? "O Asaas limitou temporariamente as requisições. Aguarde alguns minutos e tente novamente." : msg,
+      limited ? 429 : res.status, body, res.status >= 500 || limited);
   }
   return body;
 }
@@ -260,6 +262,12 @@ async function processItem(c: any, item: any) {
     await sendItemEmail(c, { ...updated, attempts: item.attempts }, null);
   } catch (e) {
     const err = e as AsaasError;
+    if (err.status === 429) {
+      // Asaas rejeitou por limite: nada foi criado; devolve à fila para retomar depois.
+      await admin.from("annuity_items").update({ generation_status: "scheduled", last_error: err.message, lease_until: null }).eq("id", item.id);
+      await logEvent(c.id, item.id, null, "rate_limited", { error: err.message });
+      throw err;
+    }
     if (err.uncertain) {
       await admin.from("annuity_items").update({ generation_status: "reconciling", last_error: "Resultado em verificação. Aguarde antes de gerar manualmente.", lease_until: null }).eq("id", item.id);
       await logEvent(c.id, item.id, null, "reconciling", { error: err.message });
@@ -306,7 +314,17 @@ async function tick(): Promise<boolean> {
     while (Date.now() - started < BUDGET_MS) {
       const { data: batch } = await admin.rpc("annuity_claim_items", { p_campaign: c.id, p_limit: Math.min(10, c.daily_limit) });
       if (!batch?.length) break;
-      for (const it of batch) await processItem(c, it);
+      try {
+        for (const it of batch) await processItem(c, it);
+      } catch (e) {
+        if (e instanceof AsaasError && e.status === 429) {
+          // Limite do Asaas: libera o restante do lote e pausa; o cron horário retoma.
+          await admin.from("annuity_items").update({ generation_status: "scheduled", lease_until: null })
+            .in("id", batch.map((b: any) => b.id)).eq("generation_status", "processing");
+          return false;
+        }
+        throw e;
+      }
       more = true;
     }
     const { count } = await admin.from("annuity_items").select("id", { count: "exact", head: true })
@@ -542,6 +560,7 @@ serve(async (req) => {
     }
   } catch (e) {
     console.error("annuity error", e);
+    if (e instanceof AsaasError && e.status === 429) return json({ error: e.message, rate_limited: true, retry_after: 60 }, 429);
     return json({ error: (e as Error).message || "Erro inesperado" }, 500);
   }
 });
