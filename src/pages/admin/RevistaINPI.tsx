@@ -1,4 +1,3 @@
-import { useJuridicoStages, centralLabelOptions } from '@/hooks/useJuridicoStages';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useProcessLookup } from '@/hooks/useProcessLookup';
 import { InpiLookupPanel } from '@/components/admin/inpi/InpiLookupPanel';
@@ -31,7 +30,7 @@ import {
 import { format, addDays, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { calcAutoFields } from '@/components/admin/publicacao/helpers';
-import { useJuridicoStages } from '@/hooks/useJuridicoStages';
+import { useJuridicoStages, centralLabelOptions } from '@/hooks/useJuridicoStages';
 import { ProcessoIdentificadoRow, classifyEntry, entryDataState } from '@/components/admin/inpi/ProcessoIdentificadoRow';
 // PublicacaoTab moved to its own page at /admin/publicacao
 
