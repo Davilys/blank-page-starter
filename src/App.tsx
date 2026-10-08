@@ -164,6 +164,7 @@ const AdminDocumentos = lazyWithRetry(() => import("./pages/admin/Documentos"));
 const AdminFinanceiro = lazyWithRetry(() => import("./pages/admin/Financeiro"));
 const AdminFinanceiroVencidos = lazyWithRetry(() => import("./pages/admin/FinanceiroVencidos"));
 const AdminFinanceiroAguardando = lazyWithRetry(() => import("./pages/admin/FinanceiroAguardando"));
+const AdminFinanceiroAnuidade = lazyWithRetry(() => import("./pages/admin/FinanceiroAnuidade"));
 const AdminDevedores = lazyWithRetry(() => import("./pages/admin/Devedores"));
 const AdminNotificacoes = lazyWithRetry(() => import("./pages/admin/Notificacoes"));
 const AdminConfiguracoes = lazyWithRetry(() => import("./pages/admin/Configuracoes"));
@@ -389,6 +390,7 @@ const App = () => (
                 <Route path="financeiro" element={<AdminFinanceiro />} />
                 <Route path="financeiro/vencidos" element={<AdminFinanceiroVencidos />} />
                 <Route path="financeiro/aguardando" element={<AdminFinanceiroAguardando />} />
+                <Route path="financeiro/anuidade" element={<AdminFinanceiroAnuidade />} />
                 <Route path="devedores" element={<Navigate to="/admin/financeiro/vencidos" replace />} />
                 <Route path="notificacoes" element={<AdminNotificacoes />} />
                 <Route path="recursos-inpi" element={<AdminRecursosINPI />} />

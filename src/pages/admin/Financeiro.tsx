@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, lazy, Suspense, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   Search, Plus, CreditCard, CheckCircle, Wallet,
   QrCode, FileText, Loader2, ExternalLink, Copy, EyeOff, RefreshCw,
-  DollarSign, AlertTriangle, Zap
+  DollarSign, AlertTriangle, Zap, CalendarClock
 } from 'lucide-react';
 import { format, subMonths, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
@@ -137,6 +138,7 @@ export default function AdminFinanceiro() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const navigateTo = useNavigate();
   const { canViewFinancialValues, isMasterAdmin } = useCanViewFinancialValues();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
@@ -594,6 +596,9 @@ export default function AdminFinanceiro() {
               </Button>
               <Button variant="outline" size="sm" onClick={() => { fetchInvoices(); fetchTotals(); }} className="gap-2 border-border/60">
                 <RefreshCw className="h-4 w-4" /> Atualizar
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => navigateTo('/admin/financeiro/anuidade')} className="gap-2 border-primary/30 text-primary hover:bg-primary/10">
+                <CalendarClock className="h-4 w-4" /> Anuidades
               </Button>
               <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
                 <DialogTrigger asChild>
