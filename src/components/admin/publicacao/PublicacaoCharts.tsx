@@ -41,6 +41,7 @@ interface Props {
 }
 
 export function PublicacaoCharts({ publicacoes }: Props) {
+  useJuridicoStages();
   const monthlyData = useMemo(() => {
     const now = new Date();
     const months = Array.from({ length: 6 }, (_, i) => {

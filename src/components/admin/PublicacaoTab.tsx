@@ -330,6 +330,7 @@ function TimelineStep({ step, date, isCompleted, isOverdue }: {
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 export default function PublicacaoTab() {
+  useJuridicoStages();
   const queryClient = useQueryClient();
   const { stages: juridicoStages } = useJuridicoStages();
   const [selectedId, setSelectedId] = useState<string | null>(null);
