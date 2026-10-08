@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { GripVertical, Plus, Trash2, Pencil, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import { refreshJuridicoStages } from '@/hooks/useJuridicoStages';
 import type { FunnelType } from './ClientKanbanBoard';
 
 export interface AdminKanbanStage {
