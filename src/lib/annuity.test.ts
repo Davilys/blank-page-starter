@@ -12,6 +12,10 @@ describe("vencimento da anuidade (D+5, sex/sáb/dom → segunda)", () => {
     expect(calcAnnuityDueDate("2026-12-28")).toBe("2027-01-04"); // 02/01 sábado → segunda 04
     expect(calcAnnuityDueDate("2026-12-29")).toBe("2027-01-04"); // 03/01 domingo
   });
+  it("dias configuráveis e ajuste desligado", () => {
+    expect(calcAnnuityDueDate("2026-12-10", 3)).toBe("2026-12-14"); // 13 domingo → 14
+    expect(calcAnnuityDueDate("2026-12-13", 5, false)).toBe("2026-12-18");
+  });
   it("virada de mês", () => expect(calcAnnuityDueDate("2027-11-27")).toBe("2027-12-02"));
   it("início dinâmico por exercício", () => {
     expect(campaignStartDate(2026)).toBe("2026-12-10");
