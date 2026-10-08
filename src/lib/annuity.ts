@@ -1,10 +1,11 @@
 // Espelho das regras puras de supabase/functions/annuity/rules.ts (para exibição e testes).
-export function calcAnnuityDueDate(emission: string): string {
+export function calcAnnuityDueDate(emission: string, dueDays = 5, weekendShift = true): string {
   const [y, m, d] = emission.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d + 5));
-  const dow = dt.getUTCDay();
-  const shift = dow === 5 ? 3 : dow === 6 ? 2 : dow === 0 ? 1 : 0;
-  dt.setUTCDate(dt.getUTCDate() + shift);
+  const dt = new Date(Date.UTC(y, m - 1, d + dueDays));
+  if (weekendShift) {
+    const dow = dt.getUTCDay();
+    dt.setUTCDate(dt.getUTCDate() + (dow === 5 ? 3 : dow === 6 ? 2 : dow === 0 ? 1 : 0));
+  }
   return dt.toISOString().slice(0, 10);
 }
 

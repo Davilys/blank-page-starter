@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { buildAnnuityEmail, calcAnnuityDueDate, campaignStartDate, nowSaoPaulo } from "./rules.ts";
+import { buildAnnuityEmail, calcAnnuityDueDate, campaignStartDate, nowSaoPaulo, mergeSettings, validateSettings, periodLabel, boletoDescription, DEFAULT_SETTINGS, type AnnuitySettings } from "./rules.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,8 +13,16 @@ const ASAAS_API_KEY = Deno.env.get("ASAAS_API_KEY") || "";
 const ASAAS_BASE = (Deno.env.get("ASAAS_ENV") || "production").toLowerCase() === "sandbox"
   ? "https://api-sandbox.asaas.com/v3" : "https://api.asaas.com/v3";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
-const FROM = "WebMarcas <noreply@webmarcas.net>";
-const REPLY_TO = "ola@webmarcas.net";
+const fromOf = (s: AnnuitySettings) => `${s.sender_name} <noreply@webmarcas.net>`;
+
+async function defaultSettings(): Promise<AnnuitySettings> {
+  const { data } = await admin.from("annuity_settings").select("data").eq("id", 1).maybeSingle();
+  return mergeSettings(data?.data);
+}
+/** Configuração efetiva da campanha: cópia salva + colunas operacionais. */
+const campSettings = (c: any): AnnuitySettings => mergeSettings(c?.settings, {
+  amount_cents: c?.amount_cents, daily_hour: c?.daily_hour, daily_limit: c?.daily_limit,
+});
 const PAGE = 400;
 const BUDGET_MS = 100_000;
 
@@ -77,12 +85,13 @@ async function scanStep(c: any): Promise<boolean> {
   const list = profs || [];
   const ids = list.map((p) => p.id);
   const stats = { ...(c.scan_stats || {}) };
+  const cfg = campSettings(c);
   if (ids.length) {
     const [{ data: roles }, { data: contr }, { data: anuContr }, { data: procs }] = await Promise.all([
       admin.from("user_roles").select("user_id").in("user_id", ids),
       admin.from("contracts").select("id, user_id, document_type, signature_status, signed_at").in("user_id", ids),
       admin.from("contracts").select("id, user_id").in("user_id", ids).eq("document_type", "contract")
-        .eq("signature_status", "signed").ilike("contract_html", "%anuidade%"),
+        .eq("signature_status", "signed").ilike("contract_html", `%${cfg.clause_keyword}%`),
       admin.from("brand_processes").select("user_id, brand_name, pipeline_stage").in("user_id", ids),
     ]);
     const staff = new Set((roles || []).map((r) => r.user_id));
@@ -108,7 +117,7 @@ async function scanStep(c: any): Promise<boolean> {
       if (hasDistrato) { eligibility = "excluded"; reason = "Cliente excluído: distrato assinado."; gen = "excluded"; }
       else if (inDistratoStage) { eligibility = "review"; reason = "Cartão na etapa Distrato sem distrato assinado no CRM."; }
       else if (!signedMain.length) { eligibility = "review"; reason = "Sem contrato assinado no CRM."; }
-      else if (!anu) { eligibility = "review"; reason = "Cláusula de anuidade não localizada no contrato assinado."; }
+      else if (cfg.require_clause && !anu) { eligibility = "review"; reason = "Cláusula de anuidade não localizada no contrato assinado."; }
       else if (!validEmail(p.email)) { eligibility = "review"; reason = "E-mail de faturamento ausente ou inválido."; }
       else if (doc.length !== 11 && doc.length !== 14) { eligibility = "review"; reason = "CPF/CNPJ ausente ou inválido (necessário para o Asaas)."; }
       else if (seenDocs.has(doc)) { eligibility = "review"; reason = `Possível cadastro duplicado (mesmo CPF/CNPJ de ${seenDocs.get(doc) || "outro cliente"}).`; }
@@ -162,12 +171,12 @@ async function sendItemEmail(c: any, item: any, actor: string | null): Promise<s
     await admin.from("annuity_items").update({ email_status: "failed", last_error: "Serviço de e-mail não configurado." }).eq("id", item.id);
     return "failed";
   }
-  const { data: ok } = await admin.rpc("annuity_reserve_email");
+  const ok = item.__test ? true : (await admin.rpc("annuity_reserve_email")).data;
   if (ok !== true) { await admin.from("annuity_items").update({ email_status: "queued" }).eq("id", item.id); return "quota"; }
 
   let mail;
   try {
-    mail = buildAnnuityEmail({ exercicio: c.exercicio, nome: item.client_name, periodo: c.period_label, vencimento: item.due_date, link: item.boleto_url, valorCents: item.amount_cents });
+    mail = buildAnnuityEmail(campSettings(c), { exercicio: c.exercicio, nome: item.client_name, periodo: c.period_label, vencimento: item.due_date, link: item.boleto_url, valorCents: item.amount_cents, marcas: item.brands });
   } catch (e) {
     await admin.from("annuity_items").update({ email_status: "failed", last_error: (e as Error).message }).eq("id", item.id);
     return "failed";
@@ -177,7 +186,7 @@ async function sendItemEmail(c: any, item: any, actor: string | null): Promise<s
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": `anuidade-${item.id}-${item.attempts}-${today}` },
-      body: JSON.stringify({ from: FROM, to: [item.client_email], reply_to: [REPLY_TO], subject: mail.subject, html: mail.html, text: mail.text }),
+      body: JSON.stringify({ from: fromOf(campSettings(c)), to: [item.client_email], reply_to: [campSettings(c).reply_to], subject: mail.subject, html: mail.html, text: mail.text }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body?.message || `Falha no envio (${res.status})`);
@@ -243,7 +252,8 @@ async function processItem(c: any, item: any) {
       const today = nowSaoPaulo().date;
       pay = await asaas("/payments", { method: "POST", body: JSON.stringify({
         customer, billingType: "BOLETO", value: Number((item.amount_cents / 100).toFixed(2)),
-        dueDate: calcAnnuityDueDate(today), description: `Anuidade contratual WebMarcas — ${c.period_label}`,
+        dueDate: calcAnnuityDueDate(today, campSettings(c).due_days, campSettings(c).weekend_shift),
+        description: boletoDescription(campSettings(c), c.exercicio, c.period_label, item.brands),
         externalReference: extRef(item) }) });
     }
     const updated = await attachPayment(c, item, pay, null, "generated");
@@ -352,8 +362,10 @@ serve(async (req) => {
         const { data: existing } = await admin.from("annuity_campaigns").select("*").eq("exercicio", ex).maybeSingle();
         let c = existing;
         if (!c) {
+          const d = await defaultSettings();
           const { data, error } = await admin.from("annuity_campaigns").insert({
-            exercicio: ex, status: "scanning", start_date: campaignStartDate(ex), period_label: `Exercício ${ex}`,
+            exercicio: ex, status: "scanning", start_date: campaignStartDate(ex, d), period_label: periodLabel(d, ex),
+            amount_cents: d.amount_cents, daily_hour: d.daily_hour, daily_limit: d.daily_limit, settings: d,
             contract_reference_date: `${ex}-12-05`, created_by: user.id,
           }).select("*").single();
           if (error) throw error; c = data;
@@ -379,18 +391,72 @@ serve(async (req) => {
         if (action === "resume") chain();
         return json({ ok: true, status });
       }
-      case "config": {
-        const patch: any = {};
-        if (body.start_date && /^\d{4}-\d{2}-\d{2}$/.test(body.start_date)) patch.start_date = body.start_date;
-        if (Number.isInteger(body.daily_hour) && body.daily_hour >= 0 && body.daily_hour <= 23) patch.daily_hour = body.daily_hour;
-        if (Number.isInteger(body.daily_limit) && body.daily_limit >= 1 && body.daily_limit <= 200) patch.daily_limit = body.daily_limit;
-        if (Number.isInteger(body.amount_cents) && body.amount_cents > 0) patch.amount_cents = body.amount_cents;
-        if (typeof body.period_label === "string" && body.period_label.trim()) patch.period_label = body.period_label.trim().slice(0, 80);
-        await admin.from("annuity_campaigns").update(patch).eq("id", body.campaign_id);
-        if (patch.amount_cents) await admin.from("annuity_items").update({ amount_cents: patch.amount_cents })
-          .eq("campaign_id", body.campaign_id).in("generation_status", ["scheduled", "review"]);
-        await logEvent(body.campaign_id, null, user.id, "config_updated", patch);
+      case "get_settings": {
+        const d = await defaultSettings();
+        let camp: any = null;
+        if (body.campaign_id) {
+          const { data: c } = await admin.from("annuity_campaigns").select("*").eq("id", body.campaign_id).maybeSingle();
+          if (c) camp = { ...campSettings(c), start_date: c.start_date, period_label: c.period_label };
+        }
+        return json({ ok: true, defaults: d, campaign: camp, factory: DEFAULT_SETTINGS });
+      }
+      case "save_settings": {
+        const scope = String(body.scope || "default");
+        const s2 = mergeSettings(body.settings || {});
+        const problems = validateSettings(s2);
+        if (problems.length) return json({ error: problems.join(" "), problems }, 422);
+        if (scope === "default" || scope === "both") {
+          await admin.from("annuity_settings").upsert({ id: 1, data: s2, updated_by: user.id });
+          await logEvent(null, null, user.id, "settings_default_updated", s2);
+        }
+        if ((scope === "campaign" || scope === "both") && body.campaign_id) {
+          const patch: any = { settings: s2, amount_cents: s2.amount_cents, daily_hour: s2.daily_hour, daily_limit: s2.daily_limit };
+          if (typeof body.start_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.start_date)) patch.start_date = body.start_date;
+          if (typeof body.period_label === "string" && body.period_label.trim()) patch.period_label = body.period_label.trim().slice(0, 120);
+          await admin.from("annuity_campaigns").update(patch).eq("id", body.campaign_id);
+          await admin.from("annuity_items").update({ amount_cents: s2.amount_cents })
+            .eq("campaign_id", body.campaign_id).in("generation_status", ["scheduled", "review"]).is("asaas_payment_id", null);
+          await logEvent(body.campaign_id, null, user.id, "settings_campaign_updated", patch);
+        }
         return json({ ok: true });
+      }
+      case "real_test": {
+        const ex = Number(body.exercicio) || Number(nowSaoPaulo().date.slice(0, 4));
+        const { data: p } = await admin.from("profiles").select("id, full_name, email, cpf_cnpj, cpf, cnpj").eq("id", body.client_id).maybeSingle();
+        if (!p) return json({ error: "Cliente não encontrado" }, 404);
+        if (!validEmail(p.email)) return json({ error: "Cliente sem e-mail válido" }, 422);
+        const { data: c0 } = await admin.from("annuity_campaigns").select("*").eq("exercicio", ex).maybeSingle();
+        const cfg = c0 ? campSettings(c0) : await defaultSettings();
+        const c = { id: c0?.id || null, exercicio: ex, period_label: c0?.period_label || periodLabel(cfg, ex), settings: cfg,
+          amount_cents: cfg.amount_cents, daily_hour: cfg.daily_hour, daily_limit: cfg.daily_limit, created_by: user.id };
+        const { data: procs } = await admin.from("brand_processes").select("brand_name").eq("user_id", p.id);
+        const brands = [...new Set((procs || []).map((x: any) => x.brand_name).filter(Boolean))].slice(0, 20);
+        const ref = `anuidade-teste:${ex}:${p.id}`;
+        const customer = await ensureCustomer(p.id);
+        const found = await asaas(`/payments?externalReference=${encodeURIComponent(ref)}`);
+        let pay = (found?.data || []).find((x: any) => !x.deleted && !DEAD.includes(String(x.status)));
+        const today = nowSaoPaulo().date;
+        if (!pay) {
+          pay = await asaas("/payments", { method: "POST", body: JSON.stringify({
+            customer, billingType: "BOLETO", value: Number((cfg.amount_cents / 100).toFixed(2)),
+            dueDate: calcAnnuityDueDate(today, cfg.due_days, cfg.weekend_shift),
+            description: boletoDescription(cfg, ex, c.period_label, brands), externalReference: ref }) });
+        }
+        await admin.from("invoices").upsert({
+          user_id: p.id, asaas_invoice_id: pay.id, asaas_customer_id: pay.customer, description: pay.description, amount: pay.value,
+          status: String(pay.status || "PENDING").toLowerCase(), due_date: pay.dueDate, payment_method: "boleto",
+          invoice_url: pay.invoiceUrl || pay.bankSlipUrl, originado_pelo_crm: true, origem: "anuidade",
+          ultima_sincronizacao_asaas: new Date().toISOString(),
+        }, { onConflict: "asaas_invoice_id" });
+        const mail = buildAnnuityEmail(cfg, { exercicio: ex, nome: p.full_name, periodo: c.period_label, vencimento: pay.dueDate,
+          link: pay.invoiceUrl || pay.bankSlipUrl, valorCents: Math.round(Number(pay.value) * 100), marcas: brands });
+        const res = await fetch("https://api.resend.com/emails", { method: "POST",
+          headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ from: fromOf(cfg), to: [p.email.trim()], reply_to: [cfg.reply_to], subject: mail.subject, html: mail.html, text: mail.text }) });
+        const rb = await res.json().catch(() => ({}));
+        await logEvent(c.id, null, user.id, "real_test", { client_id: p.id, email: p.email, asaas_payment_id: pay.id, dueDate: pay.dueDate, email_ok: res.ok, provider_id: rb?.id || null });
+        return json({ ok: res.ok, asaas_payment_id: pay.id, invoice_url: pay.invoiceUrl, due_date: pay.dueDate, value: pay.value, email: p.email,
+          email_error: res.ok ? null : (rb?.message || `Falha no envio (${res.status})`) });
       }
       case "approve": case "exclude": {
         const { item, c } = await loadItem();
@@ -450,25 +516,24 @@ serve(async (req) => {
         const r = await sendItemEmail(c, item, user.id);
         return json({ ok: r === "accepted", result: r });
       }
-      case "preview": {
-        const { data: c } = await admin.from("annuity_campaigns").select("*").eq("id", body.campaign_id).maybeSingle();
-        const ex = c?.exercicio || Number(body.exercicio) || new Date().getFullYear();
+      case "preview": case "test_email": {
+        const { data: c } = body.campaign_id ? await admin.from("annuity_campaigns").select("*").eq("id", body.campaign_id).maybeSingle() : { data: null };
+        const cfg = body.settings ? mergeSettings(body.settings) : c ? campSettings(c) : await defaultSettings();
+        const ex = c?.exercicio || Number(body.exercicio) || Number(nowSaoPaulo().date.slice(0, 4));
         let item: any = null;
         if (body.item_id) ({ item } = await loadItem());
         const today = nowSaoPaulo().date;
-        const mail = buildAnnuityEmail({ exercicio: ex, nome: item?.client_name || "Nome do Cliente", periodo: c?.period_label || `Exercício ${ex}`,
-          vencimento: item?.due_date || calcAnnuityDueDate(today), link: item?.boleto_url || "https://www.asaas.com/i/exemplo", valorCents: item?.amount_cents || c?.amount_cents || 39800 });
-        return json({ ok: true, ...mail, sample: !item?.boleto_url });
-      }
-      case "test_email": {
+        const mail = buildAnnuityEmail(cfg, { exercicio: ex, nome: item?.client_name || "Nome do Cliente",
+          periodo: body.period_label || c?.period_label || periodLabel(cfg, ex),
+          vencimento: item?.due_date || calcAnnuityDueDate(today, cfg.due_days, cfg.weekend_shift),
+          link: item?.boleto_url || "https://www.asaas.com/i/exemplo", valorCents: item?.amount_cents || cfg.amount_cents,
+          marcas: item?.brands || ["MARCA EXEMPLO"] });
+        if (action === "preview") return json({ ok: true, ...mail, sample: !item?.boleto_url, problems: validateSettings(cfg) });
         const to = String(body.to || "").trim();
         if (!validEmail(to)) return json({ error: "E-mail interno inválido" }, 400);
-        const today = nowSaoPaulo().date;
-        const ex = Number(body.exercicio) || new Date().getFullYear();
-        const mail = buildAnnuityEmail({ exercicio: ex, nome: "Teste interno", periodo: `Exercício ${ex}`, vencimento: calcAnnuityDueDate(today), link: "https://www.webmarcas.net", valorCents: 39800 });
         const res = await fetch("https://api.resend.com/emails", { method: "POST",
           headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ from: FROM, to: [to], reply_to: [REPLY_TO], subject: `[TESTE] ${mail.subject}`, html: mail.html, text: mail.text }) });
+          body: JSON.stringify({ from: fromOf(cfg), to: [to], reply_to: [cfg.reply_to], subject: `[TESTE] ${mail.subject}`, html: mail.html, text: mail.text }) });
         if (!res.ok) return json({ error: `Falha no envio de teste (${res.status})` }, 502);
         await logEvent(null, null, user.id, "test_email", { to });
         return json({ ok: true });
