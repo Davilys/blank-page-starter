@@ -264,7 +264,7 @@ async function processItem(c: any, item: any) {
     const err = e as AsaasError;
     if (err.status === 429) {
       // Asaas rejeitou por limite: nada foi criado; devolve à fila para retomar depois.
-      await admin.from("annuity_items").update({ generation_status: "pending", last_error: err.message, lease_until: null }).eq("id", item.id);
+      await admin.from("annuity_items").update({ generation_status: "scheduled", last_error: err.message, lease_until: null }).eq("id", item.id);
       await logEvent(c.id, item.id, null, "rate_limited", { error: err.message });
       throw err;
     }
