@@ -51,7 +51,9 @@ async function asaas(path: string, init: RequestInit = {}) {
   let body: any = null; try { body = text ? JSON.parse(text) : null; } catch { body = { raw: text.slice(0, 300) }; }
   if (!res.ok) {
     const msg = body?.errors?.[0]?.description || `Asaas ${res.status}`;
-    throw new AsaasError(msg, res.status, body, res.status >= 500 || res.status === 429);
+    const limited = res.status === 429 || (res.status === 403 && /limite de requisi|bloqueado/i.test(msg));
+    throw new AsaasError(limited ? "O Asaas limitou temporariamente as requisições. Aguarde alguns minutos e tente novamente." : msg,
+      limited ? 429 : res.status, body, res.status >= 500 || limited);
   }
   return body;
 }
@@ -542,6 +544,7 @@ serve(async (req) => {
     }
   } catch (e) {
     console.error("annuity error", e);
+    if (e instanceof AsaasError && e.status === 429) return json({ error: e.message, rate_limited: true, retry_after: 60 }, 429);
     return json({ error: (e as Error).message || "Erro inesperado" }, 500);
   }
 });
