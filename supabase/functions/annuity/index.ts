@@ -262,6 +262,12 @@ async function processItem(c: any, item: any) {
     await sendItemEmail(c, { ...updated, attempts: item.attempts }, null);
   } catch (e) {
     const err = e as AsaasError;
+    if (err.status === 429) {
+      // Asaas rejeitou por limite: nada foi criado; devolve à fila para retomar depois.
+      await admin.from("annuity_items").update({ generation_status: "pending", last_error: err.message, lease_until: null }).eq("id", item.id);
+      await logEvent(c.id, item.id, null, "rate_limited", { error: err.message });
+      throw err;
+    }
     if (err.uncertain) {
       await admin.from("annuity_items").update({ generation_status: "reconciling", last_error: "Resultado em verificação. Aguarde antes de gerar manualmente.", lease_until: null }).eq("id", item.id);
       await logEvent(c.id, item.id, null, "reconciling", { error: err.message });
