@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { calcAnnuityDueDate, campaignStartDate, fmtBR, todaySaoPaulo } from '@/lib/annuity';
 import { cn } from '@/lib/utils';
+import { AnnuitySettingsDialog } from '@/components/admin/financeiro/AnnuitySettingsDialog';
 
 type Item = Record<string, any>;
 type Campaign = Record<string, any> | null;
@@ -98,7 +99,12 @@ export default function FinanceiroAnuidade() {
   const [events, setEvents] = useState<Item[]>([]);
   const [preview, setPreview] = useState<{ subject: string; html: string; sample?: boolean } | null>(null);
   const [cfgOpen, setCfgOpen] = useState(false);
-  const [cfg, setCfg] = useState({ start_date: '', daily_hour: 9, daily_limit: 200, amount: '398,00', period_label: '' });
+  const [defaults, setDefaults] = useState<Record<string, any>>({});
+  const [rtOpen, setRtOpen] = useState(false);
+  const [rtQuery, setRtQuery] = useState('');
+  const [rtResults, setRtResults] = useState<Item[]>([]);
+  const [rtClient, setRtClient] = useState<Item | null>(null);
+  const [rtResult, setRtResult] = useState<Item | null>(null);
   const [linkId, setLinkId] = useState('');
   const [linkEmailSent, setLinkEmailSent] = useState(false);
   const [testTo, setTestTo] = useState('');
@@ -118,6 +124,8 @@ export default function FinanceiroAnuidade() {
     } else setItems([]);
     const { data: q } = await supabase.from('annuity_daily_quota' as any).select('clients_used, emails_used').eq('day', todaySaoPaulo()).maybeSingle();
     setQuota((q as any) || { clients_used: 0, emails_used: 0 });
+    const { data: st } = await supabase.from('annuity_settings' as any).select('data').eq('id', 1).maybeSingle();
+    setDefaults(((st as any)?.data) || {});
     setLoading(false);
   }, [exercicio]);
 
@@ -149,7 +157,13 @@ export default function FinanceiroAnuidade() {
   };
 
   const today = todaySaoPaulo();
-  const startDate = campaign?.start_date || campaignStartDate(exercicio);
+  const startDate = campaign?.start_date || (() => {
+    const m = Number(defaults.start_month) || 12; const d = Number(defaults.start_day) || 10;
+    return defaults.start_month ? `${exercicio}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` : campaignStartDate(exercicio);
+  })();
+  const dueDays = Number(campaign?.settings?.due_days ?? defaults.due_days) || 5;
+  const weekendShift = (campaign?.settings?.weekend_shift ?? defaults.weekend_shift) !== false;
+  const amountCents = campaign?.amount_cents || defaults.amount_cents || 39800;
 
   const stats = useMemo(() => {
     const s = { total: items.length, elig: 0, excl: 0, review: 0, gen: 0, fail: 0, mail: 0, mailFail: 0, pend: 0, over: 0, paid: 0, sched: 0, paidCents: 0, openCents: 0 };
@@ -167,7 +181,7 @@ export default function FinanceiroAnuidade() {
     return s;
   }, [items]);
 
-  const dailyLimit = campaign?.daily_limit || 200;
+  const dailyLimit = campaign?.daily_limit || defaults.daily_limit || 200;
   const usedToday = quota?.clients_used || 0;
   const daysLeft = Math.ceil(stats.sched / dailyLimit);
   const forecast = (() => {
@@ -203,10 +217,11 @@ export default function FinanceiroAnuidade() {
     a.download = `anuidades-${exercicio}.csv`; a.click();
   };
 
-  const openCfg = () => {
-    setCfg({ start_date: campaign?.start_date || startDate, daily_hour: campaign?.daily_hour ?? 9, daily_limit: dailyLimit,
-      amount: ((campaign?.amount_cents || 39800) / 100).toFixed(2).replace('.', ','), period_label: campaign?.period_label || `Exercício ${exercicio}` });
-    setCfgOpen(true);
+  const searchClients = async (q: string) => {
+    setRtQuery(q);
+    if (q.trim().length < 3) { setRtResults([]); return; }
+    const { data } = await supabase.from('profiles').select('id, full_name, email, cpf_cnpj').or(`full_name.ilike.%${q.replace(/[%,()]/g, '')}%,email.ilike.%${q.replace(/[%,()]/g, '')}%`).limit(8);
+    setRtResults((data as any[]) || []);
   };
 
   const scanning = campaign && !campaign.scan_done;
@@ -275,7 +290,8 @@ export default function FinanceiroAnuidade() {
             <Button size="sm" variant="outline" className="gap-2" disabled={!!busy} onClick={() => run('resume', () => call('resume', { campaign_id: campaign.id }), 'Campanha retomada')}><Play className="h-4 w-4" /> Retomar</Button>)}
           {campaign && (
             <Button size="sm" variant="outline" className="gap-2" disabled={!!busy} onClick={() => run('rescan', () => call('rescan', { campaign_id: campaign.id }), 'Nova varredura iniciada (só adiciona clientes ausentes)')}><RefreshCw className="h-4 w-4" /> Nova varredura</Button>)}
-          <Button size="sm" variant="outline" className="gap-2" disabled={!campaign} onClick={openCfg}><Settings className="h-4 w-4" /> Configurações</Button>
+          <Button size="sm" variant="outline" className="gap-2" onClick={() => setCfgOpen(true)}><Settings className="h-4 w-4" /> Configurações</Button>
+          <Button size="sm" variant="outline" className="gap-2" onClick={() => { setRtOpen(true); setRtResult(null); }}><Mail className="h-4 w-4" /> Teste real com cliente</Button>
           <Button size="sm" variant="outline" className="gap-2" onClick={() => run('preview', async () => setPreview(await call('preview', { campaign_id: campaign?.id, exercicio })))}><Eye className="h-4 w-4" /> Prévia do e-mail</Button>
           <Button size="sm" variant="outline" className="gap-2" disabled={!items.length} onClick={exportCsv}><Download className="h-4 w-4" /> Exportar</Button>
           {campaign && !['cancelled', 'completed'].includes(campaign.status) && (
@@ -295,14 +311,14 @@ export default function FinanceiroAnuidade() {
                 {campaign && today < startDate && campaign.status !== 'cancelled' && <span className="ml-2 text-primary">Programado para {fmtBR(startDate)}</span>}
               </div>
               <div className="text-xs text-muted-foreground">
-                Início: {fmtBR(startDate)} às {String(campaign?.daily_hour ?? 9).padStart(2, '0')}h · Até {dailyLimit} clientes/dia · Valor {brl(campaign?.amount_cents || 39800)}
+                Início: {fmtBR(startDate)} às {String(campaign?.daily_hour ?? 9).padStart(2, '0')}h · Até {dailyLimit} clientes/dia · Valor {brl(amountCents)}
                 {campaign?.last_scan_at && <> · Última varredura: {new Date(campaign.last_scan_at).toLocaleString('pt-BR')}</>}
               </div>
             </div>
           </div>
           <div className="text-xs text-muted-foreground md:text-right max-w-md">
-            Vencimento: cinco dias corridos após a emissão. Se cair na sexta, sábado ou domingo, passa para segunda-feira.
-            <span className="block">Ex.: emissão hoje ({fmtBR(today)}) → vence {fmtBR(calcAnnuityDueDate(today))}.</span>
+            Vencimento: {dueDays} dias corridos após a emissão.{weekendShift && ' Se cair na sexta, sábado ou domingo, passa para segunda-feira.'}
+            <span className="block">Ex.: emissão hoje ({fmtBR(today)}) → vence {fmtBR(calcAnnuityDueDate(today, dueDays, weekendShift))}.</span>
           </div>
         </div>
         {campaign && (
@@ -478,7 +494,7 @@ export default function FinanceiroAnuidade() {
                 {['failed', 'manual'].includes(selected.generation_status) && (
                   <Card className="p-3 space-y-2">
                     <div className="flex items-center gap-2 font-medium"><Link2 className="h-4 w-4" /> Vincular cobrança manual</div>
-                    <p className="text-xs text-muted-foreground">Gere no Asaas: {brl(selected.amount_cents)}, boleto, “Anuidade contratual WebMarcas — {campaign?.period_label}”, vencimento {fmtBR(calcAnnuityDueDate(today))} (se emitido hoje).</p>
+                    <p className="text-xs text-muted-foreground">Gere no Asaas: {brl(selected.amount_cents)}, boleto, “Anuidade contratual WebMarcas — {campaign?.period_label}”, vencimento {fmtBR(calcAnnuityDueDate(today, dueDays, weekendShift))} (se emitido hoje).</p>
                     <Input placeholder="ID da cobrança (pay_...)" value={linkId} onChange={(e) => setLinkId(e.target.value)} />
                     <label className="flex items-center gap-2 text-xs"><Checkbox checked={linkEmailSent} onCheckedChange={(v) => setLinkEmailSent(!!v)} /> O e-mail já foi enviado pelo Asaas</label>
                     <Button size="sm" disabled={!linkId || !!busy} onClick={() => run('link', () => call('link_manual', { item_id: selected.id, payment_id: linkId, email_sent_in_asaas: linkEmailSent }), 'Cobrança vinculada')}>Vincular</Button>
@@ -518,26 +534,39 @@ export default function FinanceiroAnuidade() {
         </DialogContent>
       </Dialog>
 
-      {/* Configurações */}
-      <Dialog open={cfgOpen} onOpenChange={setCfgOpen}>
+      <AnnuitySettingsDialog open={cfgOpen} onOpenChange={setCfgOpen} call={call} campaign={campaign} exercicio={exercicio} onSaved={load} />
+
+      <Dialog open={rtOpen} onOpenChange={setRtOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Configurações — Exercício {exercicio}</DialogTitle></DialogHeader>
-          <div className="grid gap-3">
-            <div><Label>Período de referência</Label><Input value={cfg.period_label} onChange={(e) => setCfg({ ...cfg, period_label: e.target.value })} /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Início</Label><Input type="date" value={cfg.start_date} onChange={(e) => setCfg({ ...cfg, start_date: e.target.value })} /></div>
-              <div><Label>Horário diário (h)</Label><Input type="number" min={0} max={23} value={cfg.daily_hour} onChange={(e) => setCfg({ ...cfg, daily_hour: Number(e.target.value) })} /></div>
-              <div><Label>Limite diário (até 200)</Label><Input type="number" min={1} max={200} value={cfg.daily_limit} onChange={(e) => setCfg({ ...cfg, daily_limit: Number(e.target.value) })} /></div>
-              <div><Label>Valor (R$)</Label><Input value={cfg.amount} onChange={(e) => setCfg({ ...cfg, amount: e.target.value })} /></div>
+          <DialogHeader><DialogTitle>Teste real com cliente</DialogTitle></DialogHeader>
+          {rtResult ? (
+            <div className="space-y-2 text-sm">
+              <div className={cn('flex items-center gap-2 font-medium', rtResult.ok ? 'text-emerald-700' : 'text-destructive')}>
+                {rtResult.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                {rtResult.ok ? `Boleto gerado e e-mail enviado para ${rtResult.email}.` : `Boleto gerado. Falha no e-mail: ${rtResult.email_error}`}
+              </div>
+              <div>ID Asaas: <strong>{rtResult.asaas_payment_id}</strong></div>
+              <div>Valor: {Number(rtResult.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} · Vencimento: {fmtBR(rtResult.due_date)}</div>
+              {rtResult.invoice_url && <a className="text-primary underline" href={rtResult.invoice_url} target="_blank" rel="noreferrer">Abrir boleto</a>}
             </div>
-            <p className="text-xs text-muted-foreground">Alterações valem apenas para cobranças ainda não emitidas. Boletos já gerados não são modificados.</p>
-          </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">Emite um boleto REAL no Asaas com as configurações atuais e envia o e-mail real ao cliente escolhido. Não entra na fila nem consome a cota diária. Repetir para o mesmo cliente reaproveita o boleto.</p>
+              <Input placeholder="Buscar cliente por nome ou e-mail" value={rtQuery} onChange={(e) => searchClients(e.target.value)} />
+              <div className="space-y-1">
+                {rtResults.map((c) => (
+                  <button key={c.id} onClick={() => setRtClient(c)} className={cn('w-full rounded-lg border p-2 text-left text-xs', rtClient?.id === c.id ? 'border-primary bg-primary/5' : 'hover:bg-muted/50')}>
+                    <div className="font-semibold text-sm">{c.full_name}</div><div className="text-muted-foreground">{c.email} · {c.cpf_cnpj || 'sem CPF/CNPJ'}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <DialogFooter>
-            <Button disabled={!!busy} onClick={() => run('cfg', async () => {
-              const cents = Math.round(Number(cfg.amount.replace(/\./g, '').replace(',', '.')) * 100);
-              await call('config', { campaign_id: campaign?.id, start_date: cfg.start_date, daily_hour: cfg.daily_hour, daily_limit: Math.min(200, cfg.daily_limit), amount_cents: cents, period_label: cfg.period_label });
-              setCfgOpen(false);
-            }, 'Configurações salvas')}>Salvar</Button>
+            {!rtResult && <Button disabled={!rtClient || !!busy} onClick={async () => {
+              const r = await run('rt', () => call('real_test', { client_id: rtClient!.id, exercicio }));
+              if (r) setRtResult(r);
+            }}>{busy === 'rt' && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Emitir boleto e enviar e-mail</Button>}
           </DialogFooter>
         </DialogContent>
       </Dialog>
