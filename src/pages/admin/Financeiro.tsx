@@ -15,7 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   Search, Plus, CreditCard, CheckCircle, Wallet,
   QrCode, FileText, Loader2, ExternalLink, Copy, EyeOff, RefreshCw,
-  DollarSign, AlertTriangle, Zap
+  DollarSign, AlertTriangle, Zap, CalendarClock
 } from 'lucide-react';
 import { format, subMonths, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { useCanViewFinancialValues } from '@/hooks/useCanViewFinancialValues';
