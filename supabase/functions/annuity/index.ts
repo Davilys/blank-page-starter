@@ -314,7 +314,17 @@ async function tick(): Promise<boolean> {
     while (Date.now() - started < BUDGET_MS) {
       const { data: batch } = await admin.rpc("annuity_claim_items", { p_campaign: c.id, p_limit: Math.min(10, c.daily_limit) });
       if (!batch?.length) break;
-      for (const it of batch) await processItem(c, it);
+      try {
+        for (const it of batch) await processItem(c, it);
+      } catch (e) {
+        if (e instanceof AsaasError && e.status === 429) {
+          // Limite do Asaas: libera o restante do lote e pausa; o cron horário retoma.
+          await admin.from("annuity_items").update({ generation_status: "scheduled", lease_until: null })
+            .in("id", batch.map((b: any) => b.id)).eq("generation_status", "processing");
+          return false;
+        }
+        throw e;
+      }
       more = true;
     }
     const { count } = await admin.from("annuity_items").select("id", { count: "exact", head: true })
