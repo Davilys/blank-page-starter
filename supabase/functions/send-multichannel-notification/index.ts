@@ -193,20 +193,7 @@ async function sendSMS(
   if (!phone)  return { success: false, error: 'Telefone não informado' };
 
   const normalized = phone.replace(/\D/g, '').replace(/^0+/, '');
-  const finalPhone  = normalized.startsWith('55') && normalized.length >= 12 ? normalized : `55${normalized}`;
-  if (finalPhone.length < 12 || finalPhone.length > 13) {
-    return { success: false, error: `Telefone inválido (${phone}) — corrija o cadastro do cliente` };
-  }
-
-  // Financeiro: envio direto pela API oficial do BotConversa (entrega garantida
-  // no WhatsApp). O webhook do fluxo fica como reserva se a API falhar.
-  const apiKey = Deno.env.get('BOTCONVERSA_FINANCEIRO_API_KEY') || '';
-  if (webhookOverride && apiKey) {
-    const direct = await sendViaBotConversaApi(apiKey, `+${finalPhone}`, nome, message);
-    if (direct.success) return direct;
-    console.warn('[whatsapp] API BotConversa falhou, usando webhook:', direct.error);
-  }
-
+  const finalPhone  = normalized.startsWith('55') ? normalized : `55${normalized}`;
   const body = {
     from: { type: 'CHANNEL', number: (settings.sender_name as string) || 'WebMarcas' },
     to:   { type: 'SMS',     number: finalPhone },
