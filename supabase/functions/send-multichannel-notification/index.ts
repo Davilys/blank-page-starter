@@ -192,9 +192,8 @@ async function sendSMS(
   if (!apiKey) return { success: false, error: 'API Key Zenvia não configurada' };
   if (!phone)  return { success: false, error: 'Telefone não informado' };
 
-  const normalized = phone.replace(/\D/g, '').replace(/^0/, '');
+  const normalized = phone.replace(/\D/g, '').replace(/^0+/, '');
   const finalPhone  = normalized.startsWith('55') ? normalized : `55${normalized}`;
-
   const body = {
     from: { type: 'CHANNEL', number: (settings.sender_name as string) || 'WebMarcas' },
     to:   { type: 'SMS',     number: finalPhone },
@@ -218,6 +217,29 @@ async function sendSMS(
 
 // ─── WhatsApp via BotConversa ─────────────────────────────────────────────────
 
+const BC_API = 'https://backend.botconversa.com.br/api/v1/webhook';
+async function bc(path: string, apiKey: string, init: RequestInit = {}) {
+  const r = await fetch(`${BC_API}${path}`, { ...init, headers: { 'API-KEY': apiKey, 'Content-Type': 'application/json' } });
+  const t = await r.text();
+  if (!r.ok) throw new Error(`BotConversa API HTTP ${r.status}: ${t.slice(0, 200)}`);
+  return t ? JSON.parse(t) : {};
+}
+async function sendViaBotConversaApi(apiKey: string, phone: string, nome: string, message: string) {
+  try {
+    let sub: any = null;
+    try { sub = await bc(`/subscriber/get_by_phone/${encodeURIComponent(phone)}/`, apiKey); } catch (_) { sub = null; }
+    if (!sub?.id) {
+      const parts = (nome || 'Cliente').trim().split(/\s+/);
+      sub = await bc('/subscriber/', apiKey, { method: 'POST', body: JSON.stringify({ phone, first_name: parts[0], last_name: parts.slice(1).join(' ') || '-' }) });
+    }
+    if (!sub?.id) return { success: false, error: 'Contato não encontrado/criado no BotConversa' };
+    const res = await bc(`/subscriber/${sub.id}/send_message/`, apiKey, { method: 'POST', body: JSON.stringify({ type: 'text', value: message }) });
+    return { success: true, response: JSON.stringify({ via: 'api', subscriber: sub.id, res }) };
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+}
+
 async function sendWhatsApp(
   settings: Record<string, unknown>,
   phone: string,
@@ -233,8 +255,20 @@ async function sendWhatsApp(
   if (!webhookUrl) return { success: false, error: 'URL do Webhook BotConversa não configurada' };
   if (!phone)      return { success: false, error: 'Telefone não informado' };
 
-  const normalized = phone.replace(/\D/g, '').replace(/^0/, '');
-  const finalPhone  = normalized.startsWith('55') ? normalized : `55${normalized}`;
+  const normalized = phone.replace(/\D/g, '').replace(/^0+/, '');
+  const finalPhone  = normalized.startsWith('55') && normalized.length >= 12 ? normalized : `55${normalized}`;
+  if (finalPhone.length < 12 || finalPhone.length > 13) {
+    return { success: false, error: `Telefone inválido (${phone}) — corrija o cadastro do cliente` };
+  }
+
+  // Financeiro: envio direto pela API oficial do BotConversa (entrega garantida
+  // no WhatsApp). O webhook do fluxo fica como reserva se a API falhar.
+  const apiKey = Deno.env.get('BOTCONVERSA_FINANCEIRO_API_KEY') || '';
+  if (webhookOverride && apiKey) {
+    const direct = await sendViaBotConversaApi(apiKey, `+${finalPhone}`, nome, message);
+    if (direct.success) return direct;
+    console.warn('[whatsapp] API BotConversa falhou, usando webhook:', direct.error);
+  }
 
   const payload = { telefone: finalPhone, nome: nome || 'Cliente', mensagem: message, ...extraData };
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };

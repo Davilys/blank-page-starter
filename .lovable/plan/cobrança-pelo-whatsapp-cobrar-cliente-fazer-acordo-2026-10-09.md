@@ -42,4 +42,12 @@ Equipe WebMarcas
 
 - `cobrar-fatura-vencida` chama `send-multichannel-notification` com `whatsapp_webhook_override = FINANCEIRO_WEBHOOK`. O resultado gravado em `notification_dispatch_logs` é HTTP 200 com corpo `{}`, ou seja, o BotConversa aceitou a chamada.
 - A correção remove o override (ou o torna configurável), normaliza e valida o telefone e expõe `results.whatsapp` na resposta ao painel.
-- O mesmo ajuste vale para o envio do acordo (`FazerAcordoDialog`/`CobrarParcelaAcordoDialog`).
+- O mesmo ajuste vale para o envio do acordo (`FazerAcordoDialog`/`CobrarParcelaAcordoDialog`). PRECISO QUE MUDE A MSG DE WHATS PARA ESTA VERSAO OKAY ; Olá, *{primeiro nome}*! 😊
+  ⚠️ Sua fatura de *{valor}*, vencida em *{data}*, está em aberto.
+  🎁 *Pagando hoje via PIX, retiramos 100% das multas e juros!*
+  ✅ *Podemos confirmar seu pagamento hoje?*
+  🔑 *PIX:* 39.528.012/0001-29  
+  🔗 *Fatura:* {link do Asaas}
+  Após pagar, envie o comprovante. 😊
+  *Equipe WebMarcas*   
+- Está correto. Esse é o link do webhook que é pra disparar essa mensagem. Continuando, ela precisa ser enviada. Analise por que não está sendo disparada e enviada a mensagem no bot conversa. https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/17504/Z6cCNjvBc9uv/.  
