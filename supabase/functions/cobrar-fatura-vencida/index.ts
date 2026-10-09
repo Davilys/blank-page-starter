@@ -55,22 +55,19 @@ function fmtBRL(v: number) {
 
 function buildWhatsApp(nome: string, data: string, link: string, valor: string) {
   const first = (nome || "Cliente").split(" ")[0];
-  return `Olá, *${first}*, tudo bem?
+  return `Olá, *${first}*! 😊
 
-Identificamos que sua fatura no valor de *${valor}* com vencimento em *${data}* encontra-se em aberto.
+⚠️ Sua fatura de *${valor}*, vencida em *${data}*, está em aberto.
 
-Você consegue realizar o pagamento hoje?
-Preciso apenas da sua confirmação para atualizar nosso sistema.
+🎁 *Pagando hoje via PIX, retiramos 100% das multas e juros!*
 
-✅ Pagando hoje via PIX, conseguimos retirar multas e juros.
+✅ *Podemos confirmar seu pagamento hoje?*
 
-🔑 Chave PIX (CNPJ):
-*39.528.012/0001-29*
-${link ? `\n🔗 Link da fatura: ${link}\n` : ""}
-Após o pagamento, me envie o comprovante por aqui para que eu possa dar baixa no sistema, tudo bem?
+🔑 *PIX:* 39.528.012/0001-29${link ? `\n🔗 *Fatura:* ${link}` : ""}
 
-Atenciosamente,
-Equipe WebMarcas`;
+Após pagar, envie o comprovante. 😊
+
+*Equipe WebMarcas*`;
 }
 
 function buildEmailHtml(nome: string, data: string, link: string, valor: string) {
