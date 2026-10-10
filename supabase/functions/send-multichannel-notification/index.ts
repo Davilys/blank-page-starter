@@ -215,6 +215,79 @@ async function sendSMS(
   }
 }
 
+// ─── WhatsApp media for the dedicated FINANCEIRO service route ────────────────
+
+interface BotConversaAttachment {
+  url: string;
+  filename: string;
+}
+
+async function sendServiceAgentAttachments(
+  apiKey: string,
+  phone: string,
+  attachments: BotConversaAttachment[],
+): Promise<{ success: boolean; response?: string; error?: string; attempts: number }> {
+  if (attachments.length === 0) return { success: true, response: 'Sem anexos', attempts: 0 };
+  if (!apiKey.trim()) return { success: false, error: 'Chave API da companhia FINANCEIRO não configurada; nenhum fluxo foi iniciado.', attempts: 0 };
+
+  const digits = String(phone || '').replace(/\D/g, '').replace(/^0/, '');
+  const finalPhone = digits.startsWith('55') ? digits : `55${digits}`;
+  if (digits.length < 10) return { success: false, error: 'Telefone inválido para envio de anexos.', attempts: 0 };
+
+  for (const attachment of attachments) {
+    try {
+      const fileUrl = new URL(attachment.url);
+      if (fileUrl.protocol !== 'https:' || fileUrl.search || fileUrl.hash ||
+          !/\.(pdf|png|jpe?g|mp4|mp3|ogg)$/i.test(fileUrl.pathname)) {
+        return { success: false, error: `Anexo inválido para o BotConversa: ${attachment.filename}. A URL pública precisa terminar na extensão do arquivo.`, attempts: 0 };
+      }
+    } catch {
+      return { success: false, error: `URL inválida no anexo: ${attachment.filename}.`, attempts: 0 };
+    }
+  }
+
+  const base = 'https://backend.botconversa.com.br/api/v1/webhook';
+  const headers = { 'Content-Type': 'application/json', 'API-KEY': apiKey };
+  let lookupResponse: Response;
+  try {
+    lookupResponse = await fetch(`${base}/subscriber/get_by_phone/${finalPhone}/`, { method: 'GET', headers });
+  } catch (error) {
+    return { success: false, error: `Falha ao localizar contato na FINANCEIRO: ${(error as Error).message}`, attempts: 1 };
+  }
+  const lookupText = await lookupResponse.text();
+  if (!lookupResponse.ok) {
+    return { success: false, error: `Não foi possível localizar o contato na FINANCEIRO (HTTP ${lookupResponse.status}); nenhum arquivo ou fluxo foi enviado. ${lookupText.slice(0, 400)}`, attempts: 1 };
+  }
+
+  let subscriber: any;
+  try { subscriber = JSON.parse(lookupText); }
+  catch { return { success: false, error: 'Resposta inválida ao localizar o contato FINANCEIRO.', attempts: 1 }; }
+  const subscriberId = subscriber?.id ?? subscriber?.data?.id ?? subscriber?.subscriber?.id ?? subscriber?.data?.subscriber?.id;
+  if (!subscriberId) return { success: false, error: 'O contato não retornou um ID válido na companhia FINANCEIRO; nenhum arquivo ou fluxo foi enviado.', attempts: 1 };
+
+  let accepted = 0;
+  for (const attachment of attachments) {
+    try {
+      const response = await fetch(`${base}/subscriber/${encodeURIComponent(String(subscriberId))}/send_message/`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ type: 'file', value: attachment.url }),
+      });
+      const responseText = await response.text();
+      if (!response.ok) {
+        return { success: false, error: `BotConversa recusou o arquivo ${attachment.filename} (HTTP ${response.status}). O fluxo não será iniciado. ${responseText.slice(0, 400)}`, response: JSON.stringify({ accepted_files: accepted }), attempts: 1 };
+      }
+      accepted++;
+      // Preserve order in the recipient's conversation before the greeting flow begins.
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } catch (error) {
+      return { success: false, error: `Falha ao enviar ${attachment.filename}; o fluxo não será iniciado. ${(error as Error).message}`, response: JSON.stringify({ accepted_files: accepted }), attempts: 1 };
+    }
+  }
+
+  return { success: true, response: JSON.stringify({ accepted_files: accepted, delivery: 'accepted_by_botconversa_api' }), attempts: 1 };
+}
+
 // ─── WhatsApp via BotConversa ─────────────────────────────────────────────────
 
 const BC_API = 'https://backend.botconversa.com.br/api/v1/webhook';
@@ -338,14 +411,42 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase           = createClient(supabaseUrl, supabaseServiceKey);
 
+    const isServiceAgentEvent = (payload.metadata as any)?.botconversa_route === 'service_agent_financeiro' || event_type === 'service_agent_test';
+    if (isServiceAgentEvent) {
+      // This privileged CRM action must not be callable with a public/anonymous key.
+      const token = req.headers.get('Authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
+      if (!token) {
+        return new Response(JSON.stringify({ error: 'Autenticação do CRM obrigatória.' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const { data: authData, error: authError } = await supabase.auth.getUser(token);
+      if (authError || !authData?.user) {
+        return new Response(JSON.stringify({ error: 'Sessão do CRM inválida ou expirada.' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const { data: isAdmin, error: roleError } = await supabase.rpc('has_role', {
+        _user_id: authData.user.id, _role: 'admin',
+      });
+      if (roleError || isAdmin !== true) {
+        return new Response(JSON.stringify({ error: 'Acesso administrativo obrigatório para enviar serviços.' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     // ── Load channel settings ──────────────────────────────────────────────────
-    const [smsRow, botRow] = await Promise.all([
+    const [smsRow, botRow, serviceAgentBotRow] = await Promise.all([
       supabase.from('system_settings').select('value').eq('key', 'sms_provider').maybeSingle(),
       supabase.from('system_settings').select('value').eq('key', 'botconversa').maybeSingle(),
+      supabase.from('system_settings').select('value').eq('key', 'botconversa_service_agent').maybeSingle(),
     ]);
 
     const smsSettings = (smsRow.data?.value as Record<string, unknown>) ?? { enabled: false };
     const botSettings = (botRow.data?.value as Record<string, unknown>) ?? { enabled: false };
+    const serviceAgentBotSettings = (serviceAgentBotRow.data?.value as Record<string, unknown>) ?? { enabled: false, company_id: '8572' };
+    const whatsappSettings = isServiceAgentEvent ? serviceAgentBotSettings : botSettings;
 
     // ── Resolve recipient ──────────────────────────────────────────────────────
     // Support multiple payload shapes:
@@ -440,11 +541,102 @@ const handler = async (req: Request): Promise<Response> => {
           ...(safeData.marca ? { marca: safeData.marca } : {}),
           ...(safeData.valor ? { valor: safeData.valor } : {}),
         };
-        const waOverride = (payload as any).whatsapp_webhook_override as string | undefined;
-        const waResult = await withRetry(() => sendWhatsApp(botSettings, resolvedPhone, resolvedNome, message, extra, waOverride));
+        // Service-agent events are routed exclusively to BotConversa company 8572 (FINANCEIRO).
+        // All other event types continue to use the existing company webhook unchanged.
+        const serviceMetadata = (payload.metadata as any) || {};
+        const processContext = (serviceMetadata.process_context || {}) as Record<string, any>;
+        const processRow = (processContext.processo || {}) as Record<string, unknown>;
+        const publicationRow = (processContext.publicacao_inpi || {}) as Record<string, unknown>;
+        const invoiceRows = Array.isArray(processContext.faturas_deste_processo)
+          ? processContext.faturas_deste_processo
+          : [];
+        const asText = (value: unknown) => value == null ? '' : String(value);
+        const processSummary = [
+          processContext.etapa_selecionada,
+          processRow.status,
+          processRow.pipeline_stage,
+          processContext.marca || processRow.brand_name,
+          processContext.numero_processo || processRow.process_number,
+          publicationRow.tipo_publicacao || publicationRow.status,
+          publicationRow.data_publicacao_rpi || publicationRow.data_decisao,
+          publicationRow.proximo_prazo_critico || publicationRow.prazo_oposicao || processRow.next_step_date,
+        ].filter(Boolean).map(asText).join(' | ').slice(0, 1800);
+        const rawAttachments = serviceMetadata.whatsapp_attachments;
+        const invalidAttachments = rawAttachments != null && (
+          !Array.isArray(rawAttachments) || rawAttachments.some((item: any) =>
+            !item || typeof item.url !== 'string' || !item.url.trim() ||
+            typeof item.filename !== 'string' || !item.filename.trim())
+        );
+        const requestedAttachments: BotConversaAttachment[] = Array.isArray(rawAttachments) && !invalidAttachments
+          ? rawAttachments
+          : [];
+        const eventContext = isServiceAgentEvent ? {
+          event_type,
+          company_id: '8572',
+          agent_flow: event_type === 'service_agent_test' ? 'integration_test' : 'inpi_process_update',
+          conversation_key: `${resolvedUserId || resolvedPhone}:${String(serviceMetadata.process_id || '')}`,
+          processo_id: asText(serviceMetadata.process_id),
+          processo_marca: asText(processContext.marca || processRow.brand_name),
+          processo_numero: asText(processContext.numero_processo || processRow.process_number),
+          processo_etapa: asText(processContext.etapa_selecionada || processRow.pipeline_stage || processRow.status || event_type),
+          processo_data_pub: asText(publicationRow.data_publicacao_rpi || publicationRow.data_decisao),
+          processo_prazo: asText(publicationRow.proximo_prazo_critico || publicationRow.prazo_oposicao || processRow.next_step_date),
+          processo_resumo: processSummary,
+          faturas_processo: invoiceRows.map((invoice: Record<string, unknown>) => {
+            const invoiceDescription = asText(invoice.description || 'Fatura');
+            const invoiceAmount = asText(invoice.amount);
+            const invoiceStatus = asText(invoice.status);
+            const invoiceDueDate = asText(invoice.due_date);
+            const invoiceMethod = asText(invoice.payment_method);
+            return `${invoiceDescription}: R$ ${invoiceAmount}; status ${invoiceStatus}; vencimento ${invoiceDueDate}; forma ${invoiceMethod}`;
+          }).join(' | ').slice(0, 1800),
+          process_context: processContext,
+          anexos_enviados: requestedAttachments.map((file: BotConversaAttachment) => file.filename).join(', '),
+          next_action: event_type === 'service_agent_test' ? '' : 'Explain the actual process update and offer a legal meeting.',
+        } : {};
+        const selectedWebhook = (whatsappSettings.webhook_url as string) || '';
+        const normalizePhone = (value: unknown) => String(value || '').replace(/\D/g, '');
+        const savedTestPhone = normalizePhone(serviceAgentBotSettings.test_phone);
+        const isAuthorizedServiceTest =
+          event_type === 'service_agent_test' &&
+          savedTestPhone.length >= 10 &&
+          normalizePhone(resolvedPhone) === savedTestPhone &&
+          !!selectedWebhook;
+        // A dedicated integration test may run while production routing stays disabled,
+        // but only to the exact phone saved as the internal test recipient.
+        const selectedEnabled = (whatsappSettings.enabled === true || isAuthorizedServiceTest) &&
+          (isServiceAgentEvent ? !!selectedWebhook : true);
+        // Queue every attached document through the FINANCEIRO API first. Only if all
+        // media requests are accepted do we call the webhook that starts the AI flow.
+        const attachmentResult: { success: boolean; response?: string; error?: string; attempts: number } =
+          !selectedEnabled && isServiceAgentEvent
+            ? { success: false, error: 'Rota FINANCEIRO desativada; nenhum anexo nem fluxo foi enviado.', attempts: 0 }
+            : isServiceAgentEvent && invalidAttachments
+              ? { success: false, error: 'Lista de anexos inválida ou incompleta; nenhum anexo nem fluxo foi enviado.', attempts: 0 }
+            : isServiceAgentEvent && requestedAttachments.length > 0
+              ? await sendServiceAgentAttachments(Deno.env.get('BOTCONVERSA_FINANCEIRO_API_KEY') || '', resolvedPhone, requestedAttachments)
+              : { success: true, attempts: 0 };
+        const safeLogPayload = isServiceAgentEvent
+          ? {
+              ...rawPayload,
+              metadata: {
+                ...serviceMetadata,
+                whatsapp_attachments: requestedAttachments.map((file: BotConversaAttachment) => ({ filename: file.filename })),
+              },
+            }
+          : rawPayload;
+        // Preserve existing overrides for unrelated notifications; the service route
+        // always uses its dedicated FINANCEIRO webhook.
+        const waOverride = isServiceAgentEvent ? undefined : (payload as any).whatsapp_webhook_override;
+        const waResult = attachmentResult.success
+          // A timeout/5xx may occur after the provider accepted the event. The
+          // service webhook has no idempotency contract, so never replay it
+          // automatically. Generic notification retry behavior is unchanged.
+          ? await withRetry(() => sendWhatsApp({ ...whatsappSettings, enabled: selectedEnabled }, resolvedPhone, resolvedNome, message, { ...extra, ...eventContext } as any, waOverride), isServiceAgentEvent ? 1 : 3)
+          : { ...attachmentResult, attempts: attachmentResult.attempts || 1 };
         results.whatsapp = waResult;
         await logDispatch(supabase, event_type, 'whatsapp',
-          waResult.success ? 'sent' : 'failed', rawPayload,
+          waResult.success ? 'sent' : 'failed', safeLogPayload,
           resolvedPhone, resolvedEmail, resolvedUserId,
           waResult.error, waResult.response, waResult.attempts);
       }
