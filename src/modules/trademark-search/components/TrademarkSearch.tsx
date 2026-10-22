@@ -120,11 +120,13 @@ export function TrademarkSearch({ variant, onContinue, continueLabel }: Trademar
                     Consultar Viabilidade
                     <ArrowRight className="w-5 h-5" />
                   </button>
-                  <div className="flex items-center justify-center gap-2 pt-1 text-xs text-[hsl(215_16%_47%)]">
-                    <Lock className="w-3.5 h-3.5 text-emerald-600" />
-                    <span className="font-semibold text-[hsl(222_47%_11%)]">100% Seguro</span>
-                    <span className="opacity-40">·</span>
-                    <a href="/politica-privacidade" className="underline hover:text-[hsl(222_92%_54%)]">Política de privacidade</a>
+                  <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 pt-1 text-center text-[13px] leading-5 text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-semibold text-foreground">
+                      <Lock aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-success" />
+                      100% Seguro
+                    </span>
+                    <span aria-hidden="true" className="opacity-40">·</span>
+                    <a href="/politica-privacidade" className="underline underline-offset-2 hover:text-primary">Política de privacidade</a>
                   </div>
                 </form>
               </>
@@ -151,8 +153,8 @@ export function TrademarkSearch({ variant, onContinue, continueLabel }: Trademar
                 <Button type="submit" className="w-full h-12 rounded-xl font-bold text-base">
                   Consultar no INPI<ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
-                <p className="text-center text-xs text-muted-foreground inline-flex w-full items-center justify-center gap-1.5">
-                  <Lock className="w-3 h-3" />Consulta gratuita e sem compromisso
+                <p className="inline-flex w-full items-center justify-center gap-1.5 text-center text-[13px] leading-5 text-muted-foreground">
+                  <Lock aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /><span className="min-w-0">Consulta gratuita e sem compromisso</span>
                 </p>
               </form>
             )}
