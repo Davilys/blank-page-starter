@@ -16,7 +16,6 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import SocialProofNotification from "@/components/SocialProofNotification";
 import type { ViabilityResult } from "@/lib/api/viability";
 import type { PlanType } from "@/hooks/useContractTemplate";
-import Header from "@/components/layout/Header";
 import ScribbleUnderline from "@/components/decorative/ScribbleUnderline";
 import WhatsAppButton from "@/components/layout/WhatsAppButton";
 import Footer from "@/components/layout/Footer";
@@ -240,11 +239,9 @@ export default function Formulario() {
       {/* Social Proof Notifications */}
       <SocialProofNotification />
 
-      {/* Public Header (matches landing rebrand) */}
-      <Header />
 
       {/* Main content */}
-      <main className="relative z-10 w-full max-w-2xl mx-auto px-4 pt-28 md:pt-36 pb-10">
+      <main className="relative z-10 w-full max-w-2xl mx-auto px-4 pt-10 md:pt-14 pb-10">
         {/* Badge */}
         <div className="flex justify-center mb-5 animate-fade-in">
           <div
