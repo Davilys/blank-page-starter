@@ -76,6 +76,7 @@ import Index from "./pages/Index";
 
 // All other pages are lazy-loaded for code splitting
 const Registrar = lazyWithRetry(() => import("./pages/Registrar"));
+const Formulario = lazyWithRetry(() => import("./pages/Formulario"));
 const StatusPedido = lazyWithRetry(() => import("./pages/StatusPedido"));
 const Obrigado = lazyWithRetry(() => import("./pages/Obrigado"));
 const VerificarContrato = lazyWithRetry(() => import("./pages/VerificarContrato"));
@@ -227,6 +228,7 @@ const App = () => (
               )}
               <Route path="/registro" element={<Navigate to="/registrar" replace />} />
               <Route path="/registrar" element={<Registrar />} />
+              <Route path="/formulario" element={<Formulario />} />
               <Route path="/status-pedido" element={<StatusPedido />} />
               <Route path="/obrigado" element={<Obrigado />} />
               <Route path="/verificar-contrato" element={<VerificarContrato />} />
