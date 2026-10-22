@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Layers } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -103,9 +103,63 @@ const compSchema = z.object({
   state: z.string().length(2, "UF obrigatória"),
 });
 
+export interface ClassPickerProps {
+  suggested: number[];
+  descriptions: string[];
+  selected: number[];
+  onChange: (c: number[]) => void;
+  loading?: boolean;
+  onRetry?: () => void;
+}
+
+function ClassPicker({ suggested, descriptions, selected, onChange, loading, onRetry }: ClassPickerProps) {
+  const toggle = (c: number) => onChange(selected.includes(c) ? selected.filter((x) => x !== c) : [...selected, c]);
+  return (
+    <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10">
+          <Layers className="w-4 h-4 text-primary" aria-hidden />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">Classes NCL Sugeridas</p>
+          <p className="text-xs text-muted-foreground">A classe principal já vem marcada. Inclua as demais se quiser ampliar a proteção.</p>
+        </div>
+      </div>
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Identificando as classes do seu ramo…</div>
+      ) : suggested.length === 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+          <span>Classes NCL serão definidas com base no seu ramo de atividade.</span>
+          {onRetry && <Button type="button" variant="outline" size="sm" onClick={onRetry}>Tentar novamente</Button>}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {suggested.map((cls, idx) => {
+            const checked = selected.includes(cls);
+            return (
+              <label key={cls} htmlFor={`fcls-${cls}`} className={cn("flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all", checked ? "border-primary/40 bg-primary/5" : "border-border/50 bg-card hover:border-primary/20")}>
+                <input id={`fcls-${cls}`} type="checkbox" checked={checked} onChange={() => toggle(cls)} className="h-4 w-4 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">Classe NCL {cls}{idx === 0 && <span className="ml-2 text-[11px] font-semibold text-primary">Principal</span>}</p>
+                  <p className="text-xs text-muted-foreground break-words">{descriptions[idx] || `Classe ${cls}`}</p>
+                </div>
+              </label>
+            );
+          })}
+          {selected.length > 0 && (
+            <p className="pt-2 border-t border-border/50 text-xs text-muted-foreground">
+              {selected.length} classe{selected.length > 1 ? "s" : ""} selecionada{selected.length > 1 ? "s" : ""}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ComplementStep({
-  personal, brand, onNext, onBack,
-}: { personal: PersonalData; brand: BrandData; onNext: (p: PersonalData, b: BrandData) => void; onBack: () => void }) {
+  personal, brand, onNext, onBack, classes,
+}: { personal: PersonalData; brand: BrandData; onNext: (p: PersonalData, b: BrandData) => void; onBack: () => void; classes?: ClassPickerProps }) {
   const [p, setP] = useState(personal);
   const [b, setB] = useState(brand);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -195,6 +249,8 @@ export function ComplementStep({
           )}
         </AnimatePresence>
       </div>
+
+      {classes && <ClassPicker {...classes} />}
 
       <div className="flex gap-3 pt-2">
         <Button type="button" variant="outline" onClick={onBack} className="flex-1 h-12 rounded-xl">
