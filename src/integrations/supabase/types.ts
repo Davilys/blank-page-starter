@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.4"
   }
   public: {
     Tables: {
@@ -1566,6 +1566,41 @@ export type Database = {
             foreignKeyName: "contract_notes_contract_id_fkey"
             columns: ["contract_id"]
             isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contract_payment_operations: {
+        Row: {
+          claim_id: string
+          contract_id: string
+          created_at: string
+          response: Json | null
+          state: string
+          updated_at: string
+        }
+        Insert: {
+          claim_id: string
+          contract_id: string
+          created_at?: string
+          response?: Json | null
+          state: string
+          updated_at?: string
+        }
+        Update: {
+          claim_id?: string
+          contract_id?: string
+          created_at?: string
+          response?: Json | null
+          state?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_payment_operations_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: true
             referencedRelation: "contracts"
             referencedColumns: ["id"]
           },
@@ -7451,6 +7486,10 @@ export type Database = {
         Args: { p_conversation_id: string }
         Returns: undefined
       }
+      claim_contract_payment: {
+        Args: { p_claim_id: string; p_contract_id: string }
+        Returns: Json
+      }
       claim_fernanda_inbound_effect: {
         Args: {
           p_channel: string
@@ -7673,6 +7712,15 @@ export type Database = {
           p_request: string
           p_run: string
           p_source: string
+        }
+        Returns: boolean
+      }
+      finish_contract_payment: {
+        Args: {
+          p_claim_id: string
+          p_contract_id: string
+          p_response: Json
+          p_state: string
         }
         Returns: boolean
       }
