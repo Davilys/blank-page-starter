@@ -117,11 +117,39 @@ export default function Formulario() {
 
   const [quick, setQuick] = useState<QuickData>({ brandName: '', businessArea: '', fullName: '', email: '', phone: '' });
   const emptyPersonal = (q: QuickData): PersonalData => ({ fullName: q.fullName, email: q.email, phone: q.phone, cpf: '', cep: '', address: '', addressNumber: '', city: '', state: '', neighborhood: '' });
+  const [classesLoading, setClassesLoading] = useState(false);
+  const [classesArea, setClassesArea] = useState('');
+  const loadClasses = async (brandName: string, businessArea: string) => {
+    setClassesArea(businessArea);
+    setClassesLoading(true);
+    setSuggestedClasses([]);
+    setSuggestedClassDescriptions([]);
+    setSelectedClasses([]);
+    try {
+      const { data, error } = await supabase.functions.invoke('inpi-viability-check', {
+        body: { brandName, businessArea, classesOnly: true },
+      });
+      if (error) throw error;
+      const cls: number[] = Array.isArray(data?.classes) ? data.classes.slice(0, 3) : [];
+      const desc: string[] = Array.isArray(data?.classDescriptions) ? data.classDescriptions.slice(0, 3) : [];
+      setSuggestedClasses(cls);
+      setSuggestedClassDescriptions(desc);
+      setSelectedClasses(cls.length ? [cls[0]] : []);
+    } catch (e) {
+      console.error('Falha ao sugerir classes', e);
+    } finally {
+      setClassesLoading(false);
+    }
+  };
+
   const handleQuickNext = (q: QuickData) => {
     setQuick(q);
     setViabilityData({ brandName: q.brandName, businessArea: q.businessArea, result: { success: true, level: 'medium', title: '', description: '' } });
     setPersonalData((prev) => ({ ...(prev ?? emptyPersonal(q)), fullName: q.fullName, email: q.email, phone: q.phone }));
     setBrandData((prev) => ({ ...(prev ?? { hasCNPJ: false, cnpj: '', companyName: '' }), brandName: q.brandName, businessArea: q.businessArea }));
+    if (q.businessArea !== classesArea || (suggestedClasses.length === 0 && !classesLoading)) {
+      void loadClasses(q.brandName, q.businessArea);
+    }
     setStep(2);
   };
 
@@ -298,6 +326,14 @@ export default function Formulario() {
                 brand={brandData ?? { brandName: quick.brandName, businessArea: quick.businessArea, hasCNPJ: false, cnpj: '', companyName: '' }}
                 onNext={(p, b) => { setPersonalData(p); setBrandData(b); setStep(3); }}
                 onBack={() => setStep(1)}
+                classes={{
+                  suggested: suggestedClasses,
+                  descriptions: suggestedClassDescriptions,
+                  selected: selectedClasses,
+                  onChange: setSelectedClasses,
+                  loading: classesLoading,
+                  onRetry: () => loadClasses(quick.brandName, quick.businessArea),
+                }}
               />
             )}
 
