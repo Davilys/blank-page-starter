@@ -6,6 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const SIGNATURE_WEBHOOK = 'https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/9093/dtJVsg4sy39l/';
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -178,19 +180,13 @@ serve(async (req) => {
     }
 
     // Send via WhatsApp (Evolution API)
-    if (channels.includes('whatsapp') && recipientPhone) {
-      try {
-        // Fetch WhatsApp config
-        const { data: whatsappConfig } = await supabase
-          .from('whatsapp_config')
-          .select('*')
-          .eq('is_active', true)
-          .single();
-
-        if (whatsappConfig && whatsappConfig.server_url && whatsappConfig.api_key) {
-          const phoneNumber = recipientPhone.replace(/\D/g, '');
-          const formattedPhone = phoneNumber.startsWith('55') ? phoneNumber : `55${phoneNumber}`;
-
+    if (channels.includes('whatsapp')) {
+      if (!recipientPhone) {
+        results.push({ channel: 'whatsapp', success: false, error: 'Telefone não cadastrado' });
+      } else {
+        try {
+          const validade = contract.signature_expires_at
+            ? new Date(contract.signature_expires_at).toLocaleDateString('pt-BR') : '7 dias';
           const message = `🔔 *WebMarcas - Documento Pendente*
 
 Olá ${recipientName}!
@@ -201,36 +197,28 @@ Você possui um documento pendente de assinatura:
 Clique para assinar:
 ${signatureUrl}
 
-⚠️ Link válido até ${new Date(contract.signature_expires_at!).toLocaleDateString('pt-BR')}
+⚠️ Link válido até ${validade}
 
-Dúvidas? (11) 4200-1656`;
-
-          const whatsappResponse = await fetch(
-            `${whatsappConfig.server_url}/message/sendText/${whatsappConfig.instance_name}`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': whatsappConfig.api_key,
-              },
-              body: JSON.stringify({
-                number: formattedPhone,
-                text: message,
-              }),
-            }
-          );
-
-          results.push({ 
-            channel: 'whatsapp', 
-            success: whatsappResponse.ok,
-            error: whatsappResponse.ok ? undefined : 'Erro ao enviar WhatsApp'
+Dúvidas? (11) 91112-0225`;
+          const res = await fetch(`${supabaseUrl}/functions/v1/send-multichannel-notification`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
+            body: JSON.stringify({
+              event_type: 'link_assinatura_gerado',
+              channels: ['whatsapp'],
+              recipient: { nome: recipientName, email: recipientEmail, phone: recipientPhone, user_id: contract.user_id },
+              custom_message: message,
+              data: { link: signatureUrl, marca: contract.subject || '' },
+              whatsapp_webhook_override: SIGNATURE_WEBHOOK,
+            }),
           });
-        } else {
-          results.push({ channel: 'whatsapp', success: false, error: 'WhatsApp não configurado' });
+          const r = await res.json().catch(() => ({}));
+          const wa = r?.results?.whatsapp;
+          results.push({ channel: 'whatsapp', success: !!wa?.success, error: wa?.success ? undefined : (wa?.error || r?.error || 'Erro ao enviar WhatsApp') });
+        } catch (whatsappError) {
+          console.error('WhatsApp error:', whatsappError);
+          results.push({ channel: 'whatsapp', success: false, error: 'Erro ao enviar WhatsApp' });
         }
-      } catch (whatsappError) {
-        console.error('WhatsApp error:', whatsappError);
-        results.push({ channel: 'whatsapp', success: false, error: 'Erro ao enviar WhatsApp' });
       }
     }
 
@@ -250,7 +238,7 @@ Dúvidas? (11) 4200-1656`;
 
     return new Response(
       JSON.stringify({
-        success: true,
+        success: results.some(r => r.success),
         data: {
           results,
           signatureUrl,
