@@ -255,8 +255,13 @@ async function sendWhatsApp(
   if (!webhookUrl) return { success: false, error: 'URL do Webhook BotConversa não configurada' };
   if (!phone)      return { success: false, error: 'Telefone não informado' };
 
-  const normalized = phone.replace(/\D/g, '').replace(/^0+/, '');
-  const finalPhone  = normalized.startsWith('55') && normalized.length >= 12 ? normalized : `55${normalized}`;
+  let normalized = phone.replace(/\D/g, '').replace(/^0+/, '');
+  if (normalized.startsWith('55') && normalized.length >= 12) normalized = normalized.slice(2);
+  // DDD acima de 31 com 8 dígitos locais: cliente esqueceu o 9 → acrescenta.
+  if (normalized.length === 10 && Number(normalized.slice(0, 2)) > 31) {
+    normalized = `${normalized.slice(0, 2)}9${normalized.slice(2)}`;
+  }
+  const finalPhone = `55${normalized}`;
   if (finalPhone.length < 12 || finalPhone.length > 13) {
     return { success: false, error: `Telefone inválido (${phone}) — corrija o cadastro do cliente` };
   }
@@ -264,7 +269,7 @@ async function sendWhatsApp(
   // Financeiro: envio direto pela API oficial do BotConversa (entrega garantida
   // no WhatsApp). O webhook do fluxo fica como reserva se a API falhar.
   const apiKey = Deno.env.get('BOTCONVERSA_FINANCEIRO_API_KEY') || '';
-  if (webhookOverride && apiKey) {
+  if (webhookOverride && webhookOverride.includes('/catch/17504/') && apiKey) {
     const direct = await sendViaBotConversaApi(apiKey, `+${finalPhone}`, nome, message);
     if (direct.success) return direct;
     console.warn('[whatsapp] API BotConversa falhou, usando webhook:', direct.error);

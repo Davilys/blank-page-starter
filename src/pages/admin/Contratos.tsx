@@ -14,6 +14,7 @@ import {
   BadgeCheck, Wallet
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { sendSignatureRequestManual } from '@/lib/signatureRequest';
 import { format, isToday, isThisWeek, isThisMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ContractDetailSheet } from '@/components/admin/contracts/ContractDetailSheet';
@@ -175,6 +176,7 @@ const StatCard = ({
 export default function AdminContratos() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [search, setSearch] = useState('');
+  const [sendingSignatureId, setSendingSignatureId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [signatureFilter, setSignatureFilter] = useState<string>('all');
   const [statFilter, setStatFilter] = useState<'total' | 'signed' | 'pending' | 'paid'>('total');
@@ -460,6 +462,7 @@ export default function AdminContratos() {
             end_date,
             signature_status,
             signature_expires_at,
+            signature_token,
             signed_at,
             visible_to_client,
             user_id,
@@ -1346,9 +1349,22 @@ export default function AdminContratos() {
                               <Eye className="h-4 w-4 mr-2" />
                               Visualizar
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={sendingSignatureId === contract.id}
+                              onClick={async () => {
+                                setSendingSignatureId(contract.id);
+                                try {
+                                  await sendSignatureRequestManual(contract.id, !!(contract as any).signature_token);
+                                  refreshContracts();
+                                } catch (e: any) {
+                                  toast.error(e?.message || 'Erro ao enviar para assinatura');
+                                } finally {
+                                  setSendingSignatureId(null);
+                                }
+                              }}
+                            >
                               <Send className="h-4 w-4 mr-2" />
-                              Enviar para Assinatura
+                              {sendingSignatureId === contract.id ? 'Enviando...' : 'Enviar para Assinatura'}
                             </DropdownMenuItem>
                             <DropdownMenuItem 
                               onClick={() => handleDownloadPDF(contract.id)}

@@ -21,6 +21,7 @@ import {
   Activity, RefreshCw, Pen, Edit2, Lock, Files
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { reportChannelResults } from '@/lib/signatureRequest';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { DocumentRenderer, generateDocumentPrintHTML, getLogoBase64ForPDF } from '@/components/contracts/DocumentRenderer';
@@ -644,11 +645,10 @@ export function ContractDetailSheet({ contract, open, onOpenChange, onUpdate }: 
         },
         body: JSON.stringify({ contractId: contract.id, channels: ['email', 'whatsapp'], baseUrl: getProductionBaseUrl() }),
       });
-      const result = await response.json();
-      if (response.ok && result.success) {
-        toast.success('Solicitação de assinatura enviada!');
-        if (contract) fetchContractData(contract.id);
-      } else throw new Error(result.error || 'Erro ao enviar solicitação');
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Erro ao enviar solicitação');
+      reportChannelResults(result?.data?.results);
+      if (contract) fetchContractData(contract.id);
     } catch (error: any) {
       toast.error(error.message || 'Erro ao enviar solicitação');
     } finally {
