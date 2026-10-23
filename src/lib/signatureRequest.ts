@@ -30,7 +30,7 @@ export async function sendSignatureRequestManual(contractId: string, hasToken: b
   const base = import.meta.env.VITE_SUPABASE_URL;
   if (!hasToken) {
     const gen = await fetch(`${base}/functions/v1/generate-signature-link`, {
-      method: 'POST', headers, body: JSON.stringify({ contractId, expiresInDays: 7, baseUrl: productionBaseUrl() }),
+      method: 'POST', headers, body: JSON.stringify({ contractId, baseUrl: productionBaseUrl() }),
     });
     if (!gen.ok) throw new Error((await gen.json().catch(() => ({})))?.error || 'Erro ao gerar link de assinatura');
   }
