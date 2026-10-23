@@ -1,0 +1,565 @@
+{
+  "source": "captured read-only supabase migration fetch; WebMarcas project scpbqsvwojhbxihyqbdz",
+  "remote_ledger_sha256": "00f927c450382acff98963feaf862142db5081e86916314357401c68791ffacf",
+  "count": 93,
+  "migrations": [
+    {
+      "version": "20260326202928",
+      "file": "20260326202928_.sql",
+      "size": 145,
+      "sha256": "e9fe29df3cefd98cafd5b468acafeba1b39d0bc52cb43e97a816cf9f8a5e63ea"
+    },
+    {
+      "version": "20260327144218",
+      "file": "20260327144218_.sql",
+      "size": 144,
+      "sha256": "c0430209dc085441991e54530ea4461ed9ce07e9ddb325d6427f6fc1aab950e0"
+    },
+    {
+      "version": "20260331204303",
+      "file": "20260331204303_.sql",
+      "size": 93,
+      "sha256": "73b234fa9a197cdfb8fc5dbb888badea00c3ae4f77ca69169b0f46e7251bd7d6"
+    },
+    {
+      "version": "20260403123021",
+      "file": "20260403123021_.sql",
+      "size": 1468,
+      "sha256": "7ce46dd8a5594015a71fb53cdabc46d5645c4f97f2c67a875775c5cf290bfef9"
+    },
+    {
+      "version": "20260403123158",
+      "file": "20260403123158_.sql",
+      "size": 3103,
+      "sha256": "1048afad85e61b84c9fcf1946b5542f3cb357e3d2be8c2296a97ddca7d35176b"
+    },
+    {
+      "version": "20260403123303",
+      "file": "20260403123303_.sql",
+      "size": 606,
+      "sha256": "bd5ff74e81d3de06f2d22c4203c4da9d1ac28aaa417047f459831dd6901dbf65"
+    },
+    {
+      "version": "20260403123404",
+      "file": "20260403123404_.sql",
+      "size": 823,
+      "sha256": "3f14d8319cf0c839a9abaaa30c876b2405dc15ed7dae7ae84e4fe3c3cf20c3b5"
+    },
+    {
+      "version": "20260414182358",
+      "file": "20260414182358_.sql",
+      "size": 85,
+      "sha256": "69f9bba9572f48aacc70daac26b406d7ce732a5c89853905ccea876eda7e9e1f"
+    },
+    {
+      "version": "20260428051200",
+      "file": "20260428051200_.sql",
+      "size": 933,
+      "sha256": "bab2d128ed7d6822cd6831ffa27b515fdfc446229d0a0602c375032aa3572fb1"
+    },
+    {
+      "version": "20260429150604",
+      "file": "20260429150604_.sql",
+      "size": 540,
+      "sha256": "8b3ae15cba943e7dd0889bc8b7c325ec9cf39f7dc63d95643156f7c203553868"
+    },
+    {
+      "version": "20260429150737",
+      "file": "20260429150737_.sql",
+      "size": 1559,
+      "sha256": "3fc8112cf96511768353a25f75521a7fb42d38920f20780bf87d8c93c90cb156"
+    },
+    {
+      "version": "20260429155549",
+      "file": "20260429155549_.sql",
+      "size": 1185,
+      "sha256": "f6d7c9f1c43d781f609671d9db4995612690ddfbad1e9d623543d2a7a46b5d81"
+    },
+    {
+      "version": "20260430195258",
+      "file": "20260430195258_.sql",
+      "size": 157,
+      "sha256": "ab441c8f2a23955fa27692f184a28dc119f915b1fa7dc092078b4f16afa5d781"
+    },
+    {
+      "version": "20260502182453",
+      "file": "20260502182453_.sql",
+      "size": 1683,
+      "sha256": "12726d41a8f2918f79e83006b51d77062d798acf556588317f1b2d4aecdbe87e"
+    },
+    {
+      "version": "20260503201743",
+      "file": "20260503201743_.sql",
+      "size": 1978,
+      "sha256": "3d1920e3df36a798b9e2f3a0226fc0caad6544c614f4afe541a26a1ce004bbd3"
+    },
+    {
+      "version": "20260504234900",
+      "file": "20260504234900_.sql",
+      "size": 466,
+      "sha256": "60c6df29e944824659f8ec6372959af4483451e032eba511e7caf15d5ccd5559"
+    },
+    {
+      "version": "20260505172037",
+      "file": "20260505172037_.sql",
+      "size": 2957,
+      "sha256": "28ae11bbec51d55df115f88af741d2f8604f78c9298be8b2cda098059f4e3595"
+    },
+    {
+      "version": "20260505211447",
+      "file": "20260505211447_.sql",
+      "size": 324,
+      "sha256": "0e4f0d1c14cf63d0f1cf2440155e6d0eea6a638bbc0f7c80493df5898e71dd78"
+    },
+    {
+      "version": "20260505224835",
+      "file": "20260505224835_.sql",
+      "size": 1642,
+      "sha256": "077a8379a0cd1353d3ec7055711cb9d224cf60bbb36ec3aed78ce8594d73fff1"
+    },
+    {
+      "version": "20260505225451",
+      "file": "20260505225451_.sql",
+      "size": 1524,
+      "sha256": "7914a02477a75d9c153a17948b1d089fc309976ee6d8c710aa693b7b862b21fe"
+    },
+    {
+      "version": "20260506124736",
+      "file": "20260506124736_.sql",
+      "size": 2539,
+      "sha256": "09456a31d9dadee9e17b7eee9a8aa8493183cae2473aa2a42d0ece27f2819d47"
+    },
+    {
+      "version": "20260506155300",
+      "file": "20260506155300_.sql",
+      "size": 1811,
+      "sha256": "24ce81990ad358eeb3cc48e0e695e256f64a51be6feb91cf598f7abbaefc20df"
+    },
+    {
+      "version": "20260506162850",
+      "file": "20260506162850_.sql",
+      "size": 766,
+      "sha256": "f6d739cd5e00d4773aefe89473ca3f5ef9a66e897d182241bcebaa0b676df71d"
+    },
+    {
+      "version": "20260507032051",
+      "file": "20260507032051_.sql",
+      "size": 1620,
+      "sha256": "5f684877c524234946f24e2847769a5d138cb443e992f4f5dfefe3dbc7d6d50f"
+    },
+    {
+      "version": "20260507113533",
+      "file": "20260507113533_.sql",
+      "size": 2724,
+      "sha256": "3e432ade482ec761202e0db10acaafad6541d8cf30c73db93949c95c1897a433"
+    },
+    {
+      "version": "20260507113910",
+      "file": "20260507113910_.sql",
+      "size": 1779,
+      "sha256": "a701f6773c6faad55edb588c1f72a1906427d1b8cb4f50eb137f5483cecacdef"
+    },
+    {
+      "version": "20260507154227",
+      "file": "20260507154227_.sql",
+      "size": 1352,
+      "sha256": "2f78c0e1e0172380f8343d3af9bb94a8ee47a044d92ca64b7f18d6cf10ff9b99"
+    },
+    {
+      "version": "20260513142936",
+      "file": "20260513142936_.sql",
+      "size": 253,
+      "sha256": "aa4e86364d88e73cb233d4bb56def945179493a5990099b73fe07623f8d7f300"
+    },
+    {
+      "version": "20260513160028",
+      "file": "20260513160028_.sql",
+      "size": 712,
+      "sha256": "11e16da9485fccd2a619a3e0bd99e223778d94bb8ffa116c256ed2f09636df55"
+    },
+    {
+      "version": "20260513210305",
+      "file": "20260513210305_.sql",
+      "size": 148,
+      "sha256": "f86d281414dffecdefdfe3ba9ee7f2bf9df503489d65b72e5df879340b176735"
+    },
+    {
+      "version": "20260516163730",
+      "file": "20260516163730_.sql",
+      "size": 234,
+      "sha256": "875087b42b39fdbedef24d13f0bd80ad93091e40bee501eda6456a4ac3e1346f"
+    },
+    {
+      "version": "20260516182503",
+      "file": "20260516182503_.sql",
+      "size": 796,
+      "sha256": "c6521beb7b83ffb4ab7be34c65a9b0d3cb6b158240f68b1b8981b2c9d915effe"
+    },
+    {
+      "version": "20260522141221",
+      "file": "20260522141221_.sql",
+      "size": 333,
+      "sha256": "deb9ffe4042eecef010218739c3ccaadb14ad2474d9186c7a1c97e9930779a2b"
+    },
+    {
+      "version": "20260530163359",
+      "file": "20260530163359_.sql",
+      "size": 381,
+      "sha256": "450989f6f1f8f7e67db8751946f53b6c8252bb6f5f611f63d1e389d417387382"
+    },
+    {
+      "version": "20260610162901",
+      "file": "20260610162901_.sql",
+      "size": 345,
+      "sha256": "d1165cfb50dafafb6bc2d3c25c50c94223620638351eccb4fffa0cb48a55f770"
+    },
+    {
+      "version": "20260610164001",
+      "file": "20260610164001_.sql",
+      "size": 2379,
+      "sha256": "da5cababbc4eae601d4054619a2ba6571cb3d6e0b16320aaf5ec064d399e8b54"
+    },
+    {
+      "version": "20260610165147",
+      "file": "20260610165147_.sql",
+      "size": 1515,
+      "sha256": "34d19f14de3a568bd0207b58a92c2de18251478ff9899fe82d0604d119204dab"
+    },
+    {
+      "version": "20260610165636",
+      "file": "20260610165636_.sql",
+      "size": 156,
+      "sha256": "bfb218cd90a05dc5d1523e3d16e989689215d1031c16d2b8c0d676ec96f17714"
+    },
+    {
+      "version": "20260610180331",
+      "file": "20260610180331_.sql",
+      "size": 340,
+      "sha256": "8cdf20b9342df3b353422f4eab5ccb94081d0495c33a7ffc4e351b751ea6885c"
+    },
+    {
+      "version": "20260612044949",
+      "file": "20260612044949_.sql",
+      "size": 2203,
+      "sha256": "02a204bf05427399fb6ae0517e9fffdbc15b25e0d4d4bff18e8f2ea525aa0fcd"
+    },
+    {
+      "version": "20260612045058",
+      "file": "20260612045058_.sql",
+      "size": 2147,
+      "sha256": "191a800284df8fe299197f85c0c31a2d45d10187aa70209bce1e1e68bfa387a7"
+    },
+    {
+      "version": "20260620164157",
+      "file": "20260620164157_.sql",
+      "size": 2077,
+      "sha256": "776009090deaa6ea1218d50f87a313d41a8200f2b7cee2565537e962854ac1e1"
+    },
+    {
+      "version": "20260620194714",
+      "file": "20260620194714_.sql",
+      "size": 375,
+      "sha256": "32fdae7bc53c7f15aa35795d9b6724ef413f8297a23170ec5880784cab714e51"
+    },
+    {
+      "version": "20260623143535",
+      "file": "20260623143535_.sql",
+      "size": 1662,
+      "sha256": "f7a6e3113338152a0594bc966152f816a59d42dd1ba15d73b2c23d1fd8b024ad"
+    },
+    {
+      "version": "20260623155910",
+      "file": "20260623155910_.sql",
+      "size": 104,
+      "sha256": "b49b9b9cf21ccd74cab44d884e54f59a49e543483dd2e3ff5995d57bb50400ed"
+    },
+    {
+      "version": "20260625152856",
+      "file": "20260625152856_.sql",
+      "size": 394,
+      "sha256": "6e8d90a480c201b7cfabaabada905b19f7def9ae4da2683cd61e76456b92dd37"
+    },
+    {
+      "version": "20260627030227",
+      "file": "20260627030227_.sql",
+      "size": 210,
+      "sha256": "89c81aeb5e4573c754f988aa702d394308cca9c99d7df1e2f1f63dd32f54cf76"
+    },
+    {
+      "version": "20260629144353",
+      "file": "20260629144353_.sql",
+      "size": 369,
+      "sha256": "b53750f41e854347622754cb2be78c2ba7a3d0119595be67f59e5875336b6a84"
+    },
+    {
+      "version": "20260704224024",
+      "file": "20260704224024_20260704224016_2b36de2d-be19-4bdc-b424-eb5b10840a99.sql",
+      "size": 239,
+      "sha256": "556959efe4e38313e70b461e34fe1de2103869ea4ad3eb1b37d6f0994ec2f741"
+    },
+    {
+      "version": "20260708231419",
+      "file": "20260708231419_20260708231415_1cb324ba-9081-4a6d-927d-fc7091b5a50e.sql",
+      "size": 1023,
+      "sha256": "6a8395394732a3ab08ffc2d39c734d1f765b25f71bc4d9a6b48b75d2b563e20f"
+    },
+    {
+      "version": "20260708231520",
+      "file": "20260708231520_20260708231515_30fa2392-2402-461d-a4c9-bf59e4dfd6dc.sql",
+      "size": 941,
+      "sha256": "fa2dfcbbe0aa3cf76aa13c9f0d14f366a6acd18e260aee586207677f877c14d9"
+    },
+    {
+      "version": "20260715141754",
+      "file": "20260715141754_20260715141751_1598f497-bd5b-4980-968d-67a0ebad7c87.sql",
+      "size": 282,
+      "sha256": "5ff2c06a6e1c6d3110b4495582524e47b0bd4b2d3e31f31d9df6cbd4f39edc1e"
+    },
+    {
+      "version": "20260719031738",
+      "file": "20260719031738_20260719031735_ea27b733-1a2a-4fae-832c-07ba8fea6028.sql",
+      "size": 133,
+      "sha256": "4a5f3d415b457c2f6e41ff7526129eaa1dab7eda13b57776ec07fe1950b20dbf"
+    },
+    {
+      "version": "20260830172626",
+      "file": "20260830172626_d7dd31ae-6d78-4a70-97db-89c5f50f6391.sql",
+      "size": 640,
+      "sha256": "dadd3ea87d99e8859543350a6efaa7b8e8351420edb7c787db62743c58ef0fdb"
+    },
+    {
+      "version": "20260901151534",
+      "file": "20260901151534_62e5b059-374d-4b49-a5ee-883e6f7d3611.sql",
+      "size": 6611,
+      "sha256": "d1101f472d4d41e6753ab8d3d9525fe4dec0afd664bd830de8505d3d9fb6fc8b"
+    },
+    {
+      "version": "20260901151702",
+      "file": "20260901151702_79a1fee0-9f66-43f2-b9c2-05b40e3267f4.sql",
+      "size": 193,
+      "sha256": "fd11cf218635dbc7771588faed00cea1e7e494d9e7b6bf84fe3c114d760fa2e1"
+    },
+    {
+      "version": "20260901152820",
+      "file": "20260901152820_2fe5f286-55fc-437c-b29a-b55ba3038134.sql",
+      "size": 784,
+      "sha256": "141aed2b26075ccdfa27cf74650720c72a33d145d0aad5e72671ae93913735c6"
+    },
+    {
+      "version": "20260901154034",
+      "file": "20260901154034_201a6b1e-5f8d-4ea5-ac04-165419f43465.sql",
+      "size": 899,
+      "sha256": "9d93fcdd245803b3f45522b1ffa3020959a1b460780e265048a3599bc3e389a1"
+    },
+    {
+      "version": "20260907204142",
+      "file": "20260907204142_e9401029-234f-4dae-8659-2e3cbdb2bac1.sql",
+      "size": 510,
+      "sha256": "46ddc953243abd23ffd44966332bfa04c59cf765c4e3a7fec6bc86dd56feb4a8"
+    },
+    {
+      "version": "20260907210404",
+      "file": "20260907210404_ac7fedc0-2714-496f-8fab-6bf4015d5a87.sql",
+      "size": 221,
+      "sha256": "aac53597bdd79612f1f05388dd9ac62793427a2fa6a5a068980875e18424a123"
+    },
+    {
+      "version": "20260915122002",
+      "file": "20260915122002_db6c9911-2213-439f-a147-8c2a78c5484d.sql",
+      "size": 3567,
+      "sha256": "ba01ac535ad0b7e853ebe41bf1add94b6b640a63d80e12c07ffc85d89cc60a5f"
+    },
+    {
+      "version": "20260915124416",
+      "file": "20260915124416_f498d174-f1af-4f36-8df5-74f9b4e1b00a.sql",
+      "size": 182,
+      "sha256": "118be9892b3ce4b9ef795b31829607304df6eaf7f2a65dee58238779562567b0"
+    },
+    {
+      "version": "20260915130030",
+      "file": "20260915130030_aa905b96-bc81-4103-8843-40d3983e696a.sql",
+      "size": 1547,
+      "sha256": "a887190e13530de4920ca1da034556ba7ebe56a5a6c4fa7fe4ff30c5faf32eb1"
+    },
+    {
+      "version": "20260915134402",
+      "file": "20260915134402_82c46536-46b9-4240-872d-27d0153b98c3.sql",
+      "size": 9301,
+      "sha256": "edb47cb1b27b2a0626e0fe413e5fea3861386460dd8540d6d32ddb9c966edeb4"
+    },
+    {
+      "version": "20260915134433",
+      "file": "20260915134433_52975fa3-90d3-4ecc-a1a6-d43a67b0e14e.sql",
+      "size": 810,
+      "sha256": "01192c79d0badc0a1410adc0a9cec1b34de071fe6def57ae2ac8bf3a83348289"
+    },
+    {
+      "version": "20260915134613",
+      "file": "20260915134613_ceb0e543-d647-496a-88e5-e4b0986d2a68.sql",
+      "size": 580,
+      "sha256": "e0309a62cc5619a9299d9c511e448302c30d4b813663199044041ff1306f68c1"
+    },
+    {
+      "version": "20260915142432",
+      "file": "20260915142432_03f5f337-9a71-4dc3-a223-2a9e0f401fc3.sql",
+      "size": 13107,
+      "sha256": "291d8d35f0424ec58eeebb63e91e73409a31761cba0e703899879ff1187b4225"
+    },
+    {
+      "version": "20260915142750",
+      "file": "20260915142750_82b21db0-a4f4-4ebe-9610-1a330181753d.sql",
+      "size": 10919,
+      "sha256": "fdfb271e19a33ef8402c57d6c9d882c30446079d8ebca3c67217dab66b8e1fac"
+    },
+    {
+      "version": "20260915142924",
+      "file": "20260915142924_ee663141-d5ae-449a-84c8-ef97a3b764f6.sql",
+      "size": 4735,
+      "sha256": "5abf7393ae3a7fc3280ec48a82a6c7949ed65edab6c81e8316e991bf83dbaf5e"
+    },
+    {
+      "version": "20260915143004",
+      "file": "20260915143004_05af9c55-8f43-4c84-b58a-8ab2a966e870.sql",
+      "size": 1055,
+      "sha256": "70e643d9d4cbc7d7e8ff04208bd4d1a2538ba670d6d182a24fe92d79cee48c82"
+    },
+    {
+      "version": "20260915165901",
+      "file": "20260915165901_60e3c560-dc0b-4496-9d36-4014420e9eba.sql",
+      "size": 4186,
+      "sha256": "359836cdbc4835b48a9960ea47780e0327a2e616a32a1305eea52731cd344884"
+    },
+    {
+      "version": "20260915180443",
+      "file": "20260915180443_b4804e55-9a05-412d-aa86-4ba732827979.sql",
+      "size": 1994,
+      "sha256": "90b3e4adfe74be05739c4e57d146ef7fdc133c25172eccb2bda3e2c7b26f6214"
+    },
+    {
+      "version": "20260915182529",
+      "file": "20260915182529_31996f9f-f841-455d-b5d3-dea94a59092a.sql",
+      "size": 383,
+      "sha256": "0daae8c524d54285cbd94f7f688303bf6f8d74a610a5124624ab271621cfe66d"
+    },
+    {
+      "version": "20260915184437",
+      "file": "20260915184437_521b02ee-9144-4966-aa12-5d2336c2215e.sql",
+      "size": 3534,
+      "sha256": "495b55ec139eefd868664892d688104e84b97a66aedff174b1b33937aca604da"
+    },
+    {
+      "version": "20260915190034",
+      "file": "20260915190034_70997172-94e7-404f-9361-c84ec2786f94.sql",
+      "size": 1391,
+      "sha256": "748e209192498ff5b6e24976f847f435d59d96eb966b73acc0330d96a099d954"
+    },
+    {
+      "version": "20260915193314",
+      "file": "20260915193314_5c825490-c6dd-4d48-b716-2e08f197227d.sql",
+      "size": 440,
+      "sha256": "2a5df14105951bd87e669909e0c91f1904806ad76641614189aad10fab53f825"
+    },
+    {
+      "version": "20260915224230",
+      "file": "20260915224230_e142082a-1d92-425c-9375-096ab8816b85.sql",
+      "size": 7621,
+      "sha256": "bb52dc423fcbdcc19e8aef7cdd887493025c2ccc61e07dcbbe3267280aacf3c7"
+    },
+    {
+      "version": "20260915224428",
+      "file": "20260915224428_1db9fbe7-6acb-445f-a47e-5cf12d75720b.sql",
+      "size": 919,
+      "sha256": "64742d454784e87ec4db5370049a507aaf76c5a9efd47c508e488a6d9d81138f"
+    },
+    {
+      "version": "20260915233424",
+      "file": "20260915233424_d7bf7f67-8b59-42f5-88fc-2301977e47cc.sql",
+      "size": 1896,
+      "sha256": "89b603249a8033ed508497c1c0061ca3350cc594a4385ca9a2ff0dc14b7cc848"
+    },
+    {
+      "version": "20260915235150",
+      "file": "20260915235150_e837c536-253e-410e-b387-f103f3666f54.sql",
+      "size": 1470,
+      "sha256": "1806831d50bc0f81e5cda937ff8b8f367b510cd2ff3f202a8b39e9b59092f370"
+    },
+    {
+      "version": "20260916000016",
+      "file": "20260916000016_84306b80-064c-415e-957e-39158f4466b1.sql",
+      "size": 728,
+      "sha256": "1b45e633886ac279a15d7d951f79546cf502c283eed199ecba30323b175109de"
+    },
+    {
+      "version": "20260916003141",
+      "file": "20260916003141_45f2ec99-983e-4826-b4d9-3de0b7c423be.sql",
+      "size": 1299,
+      "sha256": "c7c9a72d8cb986d32a448955150848878a387e3a9302e95493337fd752bd520c"
+    },
+    {
+      "version": "20260916003204",
+      "file": "20260916003204_1c523fec-074f-4601-b272-d1a2c9654cc6.sql",
+      "size": 153,
+      "sha256": "d62352ff1c15a17359380aa2d05552d7f8570e260c017bcb6799a7bc4bb774a3"
+    },
+    {
+      "version": "20260916023714",
+      "file": "20260916023714_873caa6d-9413-4dd0-8092-0b7703d36ffc.sql",
+      "size": 1462,
+      "sha256": "36a4e064f6d77e1e8266903b13486cd95fc92a38d9c519f06514649098bcf7d6"
+    },
+    {
+      "version": "20260916032949",
+      "file": "20260916032949_7b74f120-0619-4a04-b63b-a79ccb2aef3b.sql",
+      "size": 1793,
+      "sha256": "13d5ce574704e2ba90fe32feeffc075721bc27b75249b41488cdef508e64d5a6"
+    },
+    {
+      "version": "20260916033043",
+      "file": "20260916033043_bee76c8f-552d-45fa-ae03-9bf04eb998e7.sql",
+      "size": 79,
+      "sha256": "abf93b597601d3a63802b5c2b385853d98b19ea012464fe7f99046fe334edd08"
+    },
+    {
+      "version": "20260916042801",
+      "file": "20260916042801_5af0266b-b3e1-4969-ae98-e6e995ab427f.sql",
+      "size": 618,
+      "sha256": "402b24eeecd4d3f390fcb9a5433752086ca209ba1e39bddc68da89883ba0ecd6"
+    },
+    {
+      "version": "20260916143415",
+      "file": "20260916143415_1a1f3f49-7092-4700-8ade-a10f4591415a.sql",
+      "size": 3970,
+      "sha256": "f3b9eb4ebb584ca66829574b87d54818ca812ee90a48fb1b15cfe906b3e634e9"
+    },
+    {
+      "version": "20260916143543",
+      "file": "20260916143543_4cf9a6ec-788c-4e7d-8f2f-690a39d1cfa0.sql",
+      "size": 1273,
+      "sha256": "e5472beebd19d131986972574977c492f416dc31f317d3d002d3498a98d4fa4e"
+    },
+    {
+      "version": "20260916151905",
+      "file": "20260916151905_b468db92-a137-43cc-aa11-26425ada152f.sql",
+      "size": 140,
+      "sha256": "bb155e2c6bcdeb363c0a9216992f66aa1eb5cd5e76458e81fe0a77811a6151ec"
+    },
+    {
+      "version": "20260918034312",
+      "file": "20260918034312_a2b189dc-76de-4c4f-81a8-6bb74c93003b.sql",
+      "size": 607,
+      "sha256": "5493d031364e48247d67cb2b4e7015aa5d2075cdbab7258241414394c1bd0c8f"
+    },
+    {
+      "version": "20260918192840",
+      "file": "20260918192840_4f87daf7-a247-4563-bfd6-7f14719f1408.sql",
+      "size": 628,
+      "sha256": "e27ee179665710cc8cb0dd5fa7915566a4bd2d5165f228e43cdf251c6fa6bfef"
+    },
+    {
+      "version": "20260919223758",
+      "file": "20260919223758_b532222e-2319-49cc-8e8a-2a033b0f633d.sql",
+      "size": 1710,
+      "sha256": "399a35102e110e044eda917cfd03b568d919921e816686056e6d2e68a0cd254d"
+    }
+  ]
+}
