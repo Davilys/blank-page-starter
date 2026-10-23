@@ -1,0 +1,58 @@
+# Integração do agente de processos — BotConversa FINANCEIRO (8572)
+
+## Objetivo
+
+A ação de serviço no ficheiro do cliente continua a criar a cobrança quando aplicável e a enviar e-mail/notificação do CRM com o tipo original. O WhatsApp dessa ação usa um destino separado, configurado para a companhia BotConversa **FINANCEIRO, ID 8572**. Os demais eventos permanecem na integração BotConversa já existente.
+
+O evento leva apenas o contexto do processo selecionado: nome do cliente, marca, número e etapa do processo, publicação RPI e prazos disponíveis no CRM, além das faturas vinculadas àquele processo. A automação não deve receber todos os dados cadastrais do cliente por padrão.
+
+## Payload do evento
+
+A tela CRM salva o webhook dedicado na configuração `botconversa_service_agent`. Ao acionar “Serviços”, o endpoint envia ao webhook:
+
+- `telefone`, `nome`, `mensagem`: compatíveis com o envelope usado hoje;
+- `event_type`, `company_id: "8572"`, `agent_flow: "inpi_process_update"`;
+- `process_context`: objeto completo do processo, publicação e faturas vinculadas;
+- `conversation_key` e `processo_id`: correlação da conversa com o processo selecionado;
+- campos simples para mapear nos campos personalizados do BotConversa: `processo_marca`, `processo_numero`, `processo_etapa`, `processo_data_pub`, `processo_prazo`, `processo_resumo` e `faturas_processo`;
+- `next_action`: orientar sobre a movimentação real e propor conversa com o jurídico.
+
+O webhook deve iniciar o fluxo duplicado em FINANCEIRO. O fluxo original “Publicação inicial” e o webhook da outra companhia não devem ser alterados.
+
+## Comportamento do agente
+
+1. Cumprimentar pelo primeiro nome e mencionar somente a movimentação real, marca, número do processo, data da publicação e prazo quando esses dados vierem preenchidos.
+2. Responder perguntas do cliente com base no contexto vinculado. Se o dado não estiver disponível, reconhecer isso e encaminhar para o jurídico, sem inventar status, prazo ou valor.
+3. Conduzir a conversa para uma reunião obrigatória de orientação jurídica. Oferecer Google Meet ou ligação, registrar o assunto e o horário escolhido.
+4. Se houver resposta, adaptar o diálogo ao contexto existente; parar follow-ups após confirmação, recusa definitiva, pedido de atendimento humano, opt-out ou conclusão.
+5. Reagendar atualizando o evento de calendário e substituindo lembretes antigos. Confirmar a reunião uma hora antes; a mensagem deve refletir a data e modalidade atuais.
+6. Se não houver resposta, programar tentativas para 1h, 3h, 24h (somente em horário comercial), 3 dias, 5 dias e 15 dias. Cada tentativa deve usar a etapa e o histórico atual da conversa, sem reiniciar com mensagem genérica. Aplicar a janela e os limites de envio aprovados para WhatsApp.
+7. No marco de 15 dias, criar uma minuta de notificação extrajudicial e encaminhar para revisão humana. Não enviar automaticamente documento jurídico sem validação do responsável.
+
+## Pré-requisitos de configuração
+
+- A URL configurada no CRM deve pertencer ao webhook do fluxo duplicado em FINANCEIRO 8572.
+- O fluxo BotConversa deve mapear telefone/nome, dados de processo e contexto para o agente de IA.
+- A integração deve oferecer ações confiáveis para criar, atualizar e cancelar eventos no Google Calendar/Meet. O endpoint atual do CRM cria eventos, mas ainda não implementa atualização/cancelamento; isso precisa estar pronto antes de ativar reagendamento automatizado.
+- Configurar `BOTCONVERSA_FINANCEIRO_API_KEY` como segredo da Edge Function Supabase. A chave não pode ser guardada em `system_settings` nem exposta na tela administrativa.
+- Para envio ordenado dos documentos, o contato precisa existir na companhia FINANCEIRO e cada URL pública precisa terminar na extensão real do arquivo. A Edge Function envia os arquivos pela API do BotConversa em sequência e só depois chama o webhook do agente. Se a rota dedicada estiver desativada, não envia documentos nem inicia o fluxo.
+- Configurar os templates aprovados necessários para iniciar ou retomar conversas fora da janela de atendimento do WhatsApp.
+- O telefone interno autorizado para teste está definido como `5511993110193`; a configuração `botconversa_service_agent` permanece desativada até validar a companhia 8572. Em Modo Teste do BotConversa, o webhook só captura a amostra e não envia mensagens.
+- Testar primeiro com número interno, confirmar que o webhook chega somente à companhia 8572 e validar anexos, fluxo, e-mail e notificação do CRM separadamente.
+- Só depois da validação, ativar o fluxo duplicado como principal. Manter reversão para a URL anterior até a aprovação dos testes.
+
+## Validação atualizada em 7 de outubro de 2026
+
+- Edge Function `send-multichannel-notification` versão 184 publicada; 18 testes automatizados com provedores simulados passaram. Não equivalem a teste de entrega real.
+- Webhook BotConversa 247235, “CRM — SERVIÇOS INPI — AGENTE IA — TESTE”, ativo em FINANCEIRO 8572. Amostra recebida com HTTP 200 e telefone/nome mais sete campos de processo mapeados antes de iniciar o fluxo 9306380.
+- Fluxo de teste: “AGENTE IA — ATUALIZAÇÃO DE PROCESSO (TESTE)”. Instrução inicial corrigida para não repetir a apresentação. Campo `processo_memoria` criado e configurado como destino do resumo; incluído nas instruções individuais para continuidade do mesmo processo.
+- O WhatsApp da companhia está conectado. Google Calendar foi autorizado pelo usuário e a agenda `webpatentes@gmail.com` está selecionada e persistida no agente.
+- O bloco Inicial agora inicia diretamente o Assistente GPT. A saudação é gerada com os dados disponíveis; a simulação sem campos de CRM não exibiu campos vazios nem inventou atualização. O bloco Conteúdo antigo permanece desconectado do início.
+- Configurado expediente inicial de segunda a sexta, 09h–18h, e reuniões de 30 minutos no fuso America/Sao_Paulo. O agente só pode confirmar reserva após retorno técnico da agenda.
+- Na pré-visualização, a IA informou disponibilidade e retornou ID e link Meet para um evento técnico sem convidados em 08/10/2026, 10h–10h30 de Brasília. Ainda falta confirmação independente na agenda; não equivale a teste completo via WhatsApp.
+- O teste revelou que a conversa encerrava após a reserva. A regra de sucesso foi corrigida e persistida para encerrar somente por pedido explícito de conclusão, permitindo pedidos de reagendamento. A mudança ainda requer teste de reagendamento na mesma conversa.
+- Ao reiniciar a pré-visualização com outro contato sintético, a integração recusou ler o evento do contato anterior. A conta do conector de calendário disponível é outra (`davillys@gmail.com`), portanto não permite verificar a agenda do agente.
+- Evento técnico pendente de conferência/limpeza na agenda webpatentes: ID `p093kbvibffugvnc23br03bbgg`, título solicitado `TESTE INTEGRAÇÃO WEBMARCAS — remover após validação`, 08/10/2026 10h–10h30 America/Sao_Paulo. Não enviar convites.
+- A chave de API pode já existir no ambiente, pois a função anterior de documentos usa o mesmo segredo. Sua disponibilidade no envio novo ainda precisa de verificação; não afirmar que a chave está ausente sem teste.
+- A rota dedicada no CRM permanece desativada e a PR ainda não foi incorporada ao código principal. O webhook estar ativo não significa que o botão Serviços em produção já usa essa rota.
+- Ainda pendentes: teste ponta a ponta de PDF seguido de mensagem no número autorizado, agendamento/reagendamento e lembrete de uma hora, implementação e validação da sequência contextual de follow-ups, consulta atualizada ao ficheiro completo e publicação do frontend após validação.

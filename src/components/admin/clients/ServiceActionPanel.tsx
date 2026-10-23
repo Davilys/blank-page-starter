@@ -484,11 +484,34 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
         finalWhatsappMessage = whatsappMessage.split('[LINK_BOLETO]').join(linkValue);
       }
 
-      // 3. Send multichannel notification (CRM + WhatsApp)
+      // Snapshot only the selected process and its latest linked INPI publication for the dedicated agent.
+      let processContext: Record<string, unknown> = {
+        cliente: client.full_name || null,
+        marca: client.brand_name || null,
+        numero_processo: client.process_number || null,
+        evento_selecionado: stage.id,
+        etapa_selecionada: stage.label,
+      };
+      if (client.process_id) {
+        const [{ data: processRow }, { data: publicationRow }, { data: processInvoices }] = await Promise.all([
+          supabase.from('brand_processes').select('brand_name,process_number,pipeline_stage,status,next_step,next_step_date,deposit_date,grant_date,expiry_date').eq('id', client.process_id).maybeSingle(),
+          supabase.from('publicacoes_marcas').select('status,tipo_publicacao,data_publicacao_rpi,data_decisao,prazo_oposicao,proximo_prazo_critico,descricao_prazo,rpi_number,process_number_rpi').eq('process_id', client.process_id).maybeSingle(),
+          supabase.from('invoices').select('description,amount,status,due_date,payment_date,invoice_url,payment_method').eq('user_id', client.id).eq('process_id', client.process_id).is('removida_em', null).order('created_at', { ascending: false }).limit(10),
+        ]);
+        processContext = {
+          ...processContext,
+          processo: processRow || null,
+          publicacao_inpi: publicationRow || null,
+          faturas_deste_processo: processInvoices || [],
+        };
+      }
+
+      // 3. CRM notification + dedicated BotConversa agent event (FINANCEIRO 8572).
+      // Never send this service-action WhatsApp through the publication company's webhook.
       const notifChannels: string[] = ['crm'];
       if (sendWhatsApp) notifChannels.push('whatsapp');
 
-      await supabase.functions.invoke('send-multichannel-notification', {
+      const notificationDispatch = await supabase.functions.invoke('send-multichannel-notification', {
         body: {
           user_id: client.id,
           event_type: isDistrato
@@ -500,6 +523,16 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
                 : 'cobranca_gerada',
           channels: notifChannels,
           custom_message: finalWhatsappMessage,
+          metadata: {
+            botconversa_route: 'service_agent_financeiro',
+            company_id: '8572',
+            process_id: client.process_id || null,
+            process_context: processContext,
+            // Public CRM document URLs are sent by the server to BotConversa as WhatsApp files
+            // before the webhook starts the AI flow. Email attachments continue on send-email below.
+            whatsapp_attachments: docUrls.map(d => ({ url: d.url, filename: d.filename })),
+            source: 'crm_client_file_services',
+          },
           data: {
             link: isDistrato ? distratoSignatureUrl : paymentLink,
             valor: String(valor),
@@ -508,6 +541,8 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
           },
         },
       });
+      const whatsappDispatchConfirmed = !sendWhatsApp ||
+        (!notificationDispatch.error && (notificationDispatch.data as any)?.results?.whatsapp?.success === true);
 
       // 4. If email, also send rich email with attachments
       if (sendEmail && client.email) {
@@ -568,15 +603,19 @@ export function ServiceActionPanel({ client, stage, onClose, onUpdate, alreadySe
         }) as any,
       });
 
-      toast.success(
-        isDistrato
-          ? 'Notificação de distrato enviada com sucesso!'
-          : isArquivado
-            ? 'Notificação de arquivamento enviada com sucesso!'
-            : isSpecialClient
-              ? 'Notificação enviada com sucesso (Cliente Especial — sem cobrança)!'
-              : 'Notificação e cobrança enviadas com sucesso!'
-      );
+      if (sendWhatsApp && !whatsappDispatchConfirmed) {
+        toast.error('O WhatsApp não foi confirmado. Verifique os logs da rota FINANCEIRO; o e-mail segue com o envio atual.');
+      } else {
+        toast.success(
+          isDistrato
+            ? 'Notificação de distrato enviada com sucesso!'
+            : isArquivado
+              ? 'Notificação de arquivamento enviada com sucesso!'
+              : isSpecialClient
+                ? 'Notificação enviada com sucesso (Cliente Especial — sem cobrança)!'
+                : 'Notificação e cobrança enviadas com sucesso!'
+        );
+      }
       onUpdate();
       onClose();
     } catch (err: any) {
