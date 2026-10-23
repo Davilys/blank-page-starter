@@ -462,6 +462,7 @@ export default function AdminContratos() {
             end_date,
             signature_status,
             signature_expires_at,
+            signature_token,
             signed_at,
             visible_to_client,
             user_id,
