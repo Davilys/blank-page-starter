@@ -3,9 +3,11 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
   contractValue,
   digits,
+  normaliseClassSuggestions,
   renderStandardContract,
   validateBotConversaContractInput,
   type BotConversaContractInput,
+  type ContractClassSuggestions,
 } from '../_shared/botconversaContract.ts';
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
@@ -30,7 +32,11 @@ function toSignatureUrl(token: string) {
   return `${base}/assinar/${token}`;
 }
 
-type SuggestedClasses = { classes: number[]; descriptions: string[]; selected: number[] };
+type SuggestedClasses = ContractClassSuggestions;
+
+// Keep the production flow working while the isolated development copy is validated.
+// The shared secret remains the authentication boundary; agent labels are observability only.
+const ALLOWED_FLOWS = new Set(['1- AT FINAL SEMANA', '1- INSTINC']);
 
 // This deliberately invokes the same classesOnly path used by the CRM's
 // "Gerar sugestão de classes" button.  BotConversa never chooses the classes:
@@ -55,18 +61,11 @@ async function generateSuggestedClasses(
   });
   if (!response.ok) throw new Error('class_suggestion_failed');
   const result = await response.json();
-  const classes = Array.isArray(result?.classes)
-    ? result.classes.filter((item: unknown): item is number => Number.isInteger(item) && item >= 1 && item <= 45)
-    : [];
-  const descriptions = Array.isArray(result?.classDescriptions)
-    ? result.classDescriptions.map((item: unknown) => typeof item === 'string' ? item.trim() : '')
-    : [];
-  // The CRM generator guarantees three classes. Refuse to publish a contract
-  // without the client upsell choices rather than silently omitting them.
-  if (classes.length !== 3 || new Set(classes).size !== 3 || descriptions.length !== 3 || descriptions.some((item: string) => !item)) {
-    throw new Error('class_suggestion_invalid');
-  }
-  return { classes, descriptions, selected: [classes[0]] };
+  // The domain rule is evidentiary, not a quota: keep every defensible result,
+  // from the principal class alone up to the three choices supported by signing.
+  const suggestions = normaliseClassSuggestions(result);
+  if (!suggestions) throw new Error('class_suggestion_invalid');
+  return suggestions;
 }
 
 async function resolveAddressFromCep(input: BotConversaContractInput): Promise<BotConversaContractInput> {
@@ -235,7 +234,8 @@ async function createOrFindProcess(supabase: any, userId: string, input: BotConv
     brand_name: input.brand_name,
     business_area: input.business_area,
     status: 'em_andamento',
-    pipeline_stage: 'assinou_contrato',
+    // Contract creation is not a signature. The signing function advances this later.
+    pipeline_stage: 'em_andamento',
     source_event_id: input.event_id,
   }).select('id').single();
   if (error?.code === '23505') {
@@ -337,7 +337,7 @@ serve(async (req) => {
   const parsed = validateBotConversaContractInput(body);
   if (!parsed.data) return json({ error: 'Dados inválidos', fields: parsed.errors }, 422);
   let input = parsed.data;
-  if (input.flow_name !== '1- AT FINAL SEMANA' || input.agent_name !== 'Fernanda Atendimento') {
+  if (!input.flow_name || !ALLOWED_FLOWS.has(input.flow_name)) {
     return json({ error: 'Origem do fluxo não autorizada' }, 403);
   }
   const url = Deno.env.get('SUPABASE_URL');
