@@ -176,6 +176,7 @@ const StatCard = ({
 export default function AdminContratos() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [search, setSearch] = useState('');
+  const [sendingSignatureId, setSendingSignatureId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [signatureFilter, setSignatureFilter] = useState<string>('all');
   const [statFilter, setStatFilter] = useState<'total' | 'signed' | 'pending' | 'paid'>('total');
