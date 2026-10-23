@@ -126,6 +126,7 @@ function ProductionAssinarDocumento() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
   const [signed, setSigned] = useState(false);
+  const [reviewMessage, setReviewMessage] = useState<string | null>(null);
   
   // Payment state
   const [showPayment, setShowPayment] = useState(false);
@@ -320,7 +321,7 @@ function ProductionAssinarDocumento() {
             'Content-Type': 'application/json',
             'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           },
-          body: JSON.stringify({ contractId: contract.id }),
+          body: JSON.stringify({ contractId: contract.id, signatureToken: token }),
         }
       );
 
@@ -328,6 +329,9 @@ function ProductionAssinarDocumento() {
 
       if (!response.ok || !result.success) {
         console.error('Payment creation error:', result);
+        if (response.status === 409 || response.status === 503) {
+          setReviewMessage(result.error || 'Cobrança aguardando conferência. Volte ao atendimento em que recebeu o link. Não tente criar outra cobrança.');
+        }
         toast.error(result.error || 'Erro ao criar cobrança');
         return;
       }
@@ -354,6 +358,13 @@ function ProductionAssinarDocumento() {
       return;
     }
 
+    if (extraSelectedClasses.length > 0) {
+      const message = 'Classes extras precisam de revisão da equipe no CRM. Peça o contrato atualizado no atendimento em que recebeu este link. Nenhuma assinatura ou cobrança foi feita.';
+      setReviewMessage(message);
+      toast.error(message);
+      return;
+    }
+    setReviewMessage(null);
     setSigning(true);
     try {
       const deviceInfo = {
@@ -390,6 +401,9 @@ function ProductionAssinarDocumento() {
       const result = await response.json();
 
       if (!response.ok || result.error) {
+        if (response.status === 409) {
+          setReviewMessage(result.error || 'Este documento precisa de revisão. Volte ao atendimento em que recebeu o link para pedir ajuda.');
+        }
         throw new Error(result.error || 'Erro ao assinar documento');
       }
 
@@ -409,7 +423,7 @@ function ProductionAssinarDocumento() {
           : 'contract';
 
         const signedHtml = generateSignedContractHtml(
-          displayContractHtml || contract.contract_html,
+          contract.contract_html,
           brandName,
           contract.signatory_name || '',
           contract.signatory_cpf || '',
@@ -775,7 +789,12 @@ function ProductionAssinarDocumento() {
               </p>
             </div>
 
-            <div className="flex justify-center gap-4 mb-8">
+            {reviewMessage && (
+              <div role="alert" className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                {reviewMessage}
+              </div>
+            )}
+            <div className="flex flex-col sm:flex-row justify-center gap-4 mb-8">
               <Button onClick={handleDownloadPDF} size="lg" className="bg-primary text-white hover:bg-primary/90">
                 <Download className="h-5 w-5 mr-2" />
                 Baixar PDF
@@ -934,6 +953,11 @@ function ProductionAssinarDocumento() {
                 </div>
               )}
 
+              {reviewMessage && (
+                <div role="alert" className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                  {reviewMessage}
+                </div>
+              )}
               {/* Terms Acceptance */}
               <div className="mb-6 p-4 bg-gray-50 rounded-lg">
                 <div className="flex items-start gap-3">
@@ -1079,4 +1103,4 @@ function TestDocumentPreview() {
 
 export default function AssinarDocumento() {
   return new URLSearchParams(window.location.search).get('modo') === 'teste' ? <TestDocumentPreview /> : <ProductionAssinarDocumento />;
-  }
+}
