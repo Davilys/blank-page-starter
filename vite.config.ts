@@ -14,6 +14,11 @@ export default defineConfig(({ mode }) => ({
     // Mantidos os demais pisos do default antigo; apenas Safari 14 -> 15.
     target: ["chrome87", "edge88", "es2020", "firefox78", "safari15"],
   },
+  optimizeDeps: {
+    // O otimizador de dependências da prévia herdava o piso safari14, que o
+    // esbuild 0.28 não consegue rebaixar, e derrubava o dev server ao subir.
+    esbuildOptions: { target: ["chrome87", "edge88", "es2020", "firefox78", "safari15"] },
+  },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
