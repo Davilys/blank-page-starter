@@ -10,8 +10,13 @@
 // Ordenação mutável (ex.: proximo_prazo_critico) NÃO pode ser cursor: por isso o
 // cursor é sempre id, e a ordem de exibição é reaplicada no cliente depois da carga.
 //
-// GARANTIAS: sem duplicados e sem omissões por deriva; linha inserida com id maior
-// durante a leitura entra nesta carga; deletada antes de o cursor passar não aparece.
+// GARANTIAS: sem duplicados e sem omissões por deriva. LIMITES TEMPORAIS (sem snapshot):
+//  - id novo MENOR que o cursor atual (inserido depois de a leitura passar pela posição)
+//    NÃO entra nesta carga — aparece na próxima; coerente, ele não existia quando passamos.
+//  - id novo MAIOR que o cursor entra apenas se inserido ANTES de a página correspondente
+//    ser lida; inserção após a última página lida não é capturada nesta carga.
+//  - linha deletada antes de o cursor alcançá-la não aparece (não existe mais) — inclusive
+//    a linha-cursor: o próximo pedido usa gt(cursor) e segue sem erro.
 // LIMITES: não é snapshot transacional; ids devem ser únicos e ordenáveis (uuid ok).
 // Fim de dados = página vazia; página curta adapta pageSize e continua (cap do servidor).
 export interface IdPageResult<T> {
@@ -39,20 +44,29 @@ export async function fetchAllById<T extends { id: string }>(
     if (error) throw error;
     const batch = data ?? [];
     if (batch.length === 0) break;
+    const lastId = batch[batch.length - 1].id;
+    // guarda: página sem progresso ou fora de ordem = erro imediato
+    // (sem guarda, um servidor quebrado repetiria a mesma página até maxPages).
+    if (cursor !== null && lastId <= cursor) {
+      throw new Error(`fetchAllById: página sem progresso ou fora de ordem (cursor ${cursor}, último id ${lastId}) — resultado INCONFIÁVEL`);
+    }
     for (const row of batch) {
       // guarda de deriva: se o servidor repetir uma linha (mutação durante a leitura),
       // dedupe por id mantém a primeira ocorrência sem inflar a lista.
       if (!seen.has(row.id)) { seen.add(row.id); all.push(row); }
     }
-    cursor = batch[batch.length - 1].id;
+    cursor = lastId;
     if (batch.length < size) size = batch.length;
   }
   return all;
 }
 
 // Comparador equivalente a PostgREST: order('proximo_prazo_critico', ascending, nullsFirst:false).
-// Usado para reaplicar no cliente a ordem que a query original pedia ao banco,
-// depois que a carga passa a ser por id. nulls por último; empate estável por id.
+// Coluna é DATE (migrations 20260225): PostgREST devolve 'YYYY-MM-DD' — comparação de
+// string ISO é comparação cronológica exata, sem fuso. nulls por último (nullsFirst:false).
+// DESempate: o banco NÃO define ordem entre datas iguais; aqui o empate é por id
+// (determinístico). Ou seja: o array é uma ordem VÁLIDA dentro do contrato original,
+// não necessariamente a mesma sequência física que o banco devolvia antes.
 export function comparePrazoCriticoAscNullsLast(
   a: { proximo_prazo_critico: string | null; id: string },
   b: { proximo_prazo_critico: string | null; id: string },

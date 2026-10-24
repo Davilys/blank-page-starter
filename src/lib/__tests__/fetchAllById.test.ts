@@ -13,9 +13,10 @@ function fakePostgrest(rows: Row[], serverCap: number) {
     fetchPage: async (afterId: string | null, limit: number) => {
       calls.push({ afterId, limit });
       const eff = Math.min(limit, serverCap);
+      // gt real do SQL: id > cursor (NÃO findIndex+1 — cursor deletado continua funcionando)
       const sorted = [...rows].sort((a, b) => (a.id < b.id ? -1 : 1));
-      const start = afterId === null ? 0 : sorted.findIndex(r => r.id === afterId) + 1;
-      return { data: sorted.slice(start, start + eff), error: null };
+      const rest = afterId === null ? sorted : sorted.filter(r => r.id > afterId);
+      return { data: rest.slice(0, eff), error: null };
     },
   };
 }
@@ -41,8 +42,8 @@ it('cap menor que pageSize (servidor capa abaixo do pedido): adapta e continua a
   expect(pg.calls[1].limit).toBe(777); // adaptou ao cap observado
 });
 
-it('deriva por inserção concorrente (id novo no meio da leitura) não duplica nem omite', async () => {
-  const base = rows2125.slice(0, 1500);
+it('inserção concorrente de ID NOVO antes do cursor: NÃO entra nesta carga (limite sem snapshot, declarado)', async () => {
+  const base = rows2125.slice(0, 1500).map(r => ({ ...r }));
   const pg = fakePostgrest(base, 1000);
   const orig = pg.fetchPage;
   let inseriu = false;
@@ -50,17 +51,59 @@ it('deriva por inserção concorrente (id novo no meio da leitura) não duplica 
     const r = await orig(afterId, limit);
     if (!inseriu && afterId !== null) {
       inseriu = true;
-      // inserção ANTES do cursor (id intermediário já ultrapassado): não deve reaparecer
-      base.push({ id: '00000000-0000-0000-0000-000000000750', proximo_prazo_critico: null });
-      // inserção DEPOIS do cursor: entra nesta carga (coerente: existia antes do fim da leitura)
-      base.push({ id: '00000000-0000-0000-0000-000000009999', proximo_prazo_critico: null });
+      // UUID NOVO (nunca existiu) com valor MENOR que o cursor atual — posição já lida
+      base.push({ id: '00000000-0000-0000-0000-000000000000', proximo_prazo_critico: null });
     }
     return r;
   };
   const all = await fetchAllById(pg.fetchPage, 1000);
-  expect(all.filter(r => r.id.endsWith('0750')).length).toBe(1); // original, sem duplicar
-  expect(all.some(r => r.id.endsWith('9999'))).toBe(true); // inserção posterior capturada
+  expect(all.some(r => r.id === '00000000-0000-0000-0000-000000000000')).toBe(false); // não entra — apareceria na próxima carga
+  expect(all.length).toBe(1500);
+});
+
+it('inserção de ID NOVO após o cursor, ANTES da página correspondente ser lida: entra nesta carga', async () => {
+  const base = rows2125.slice(0, 1500).map(r => ({ ...r }));
+  const pg = fakePostgrest(base, 1000);
+  const orig = pg.fetchPage;
+  let inseriu = false;
+  pg.fetchPage = async (afterId: string | null, limit: number) => {
+    if (!inseriu && afterId === null) {
+      inseriu = true; // insere durante a 1ª página, com id além do fim — posição ainda não lida
+      base.push({ id: 'ffffffff-ffff-ffff-ffff-ffffffffffff', proximo_prazo_critico: null });
+    }
+    return orig(afterId, limit);
+  };
+  const all = await fetchAllById(pg.fetchPage, 1000);
+  expect(all.some(r => r.id === 'ffffffff-ffff-ffff-ffff-ffffffffffff')).toBe(true);
   expect(new Set(all.map(r => r.id)).size).toBe(all.length);
+});
+
+it('linha-cursor DELETADA entre páginas: leitura segue por gt(cursor) sem erro e sem omissão', async () => {
+  const base = rows2125.slice(0, 1500).map(r => ({ ...r }));
+  const pg = fakePostgrest(base, 1000);
+  const orig = pg.fetchPage;
+  pg.fetchPage = async (afterId: string | null, limit: number) => {
+    const r = await orig(afterId, limit);
+    if (r.data.length > 0) {
+      const last = r.data[r.data.length - 1].id;
+      const idx = base.findIndex(x => x.id === last);
+      if (idx >= 0) base.splice(idx, 1); // deleta a linha que acabou de virar cursor
+    }
+    return r;
+  };
+  const all = await fetchAllById(pg.fetchPage, 1000);
+  expect(all.length).toBe(1500); // lidas antes da deleção: presentes; nada omitido à frente
+  expect(all.some(r => r.id === '00000000-0000-0000-0000-000000001000')).toBe(true);
+});
+
+it('guarda de progresso: página repetida/fora de ordem = ERRO imediato (não repete 1000 requests)', async () => {
+  let n = 0;
+  const quebrado = async () => {
+    n++;
+    return { data: rows2125.slice(0, 100), error: null }; // sempre a mesma página
+  };
+  await expect(fetchAllById(quebrado, 1000)).rejects.toThrow(/sem progresso|fora de ordem/);
+  expect(n).toBe(2); // 1ª página ok, 2ª detectada e abortada
 });
 
 it('erro da página propaga (não finge sucesso parcial)', async () => {
