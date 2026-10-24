@@ -292,7 +292,10 @@ export default function Registrar() {
           style={{ boxShadow: "var(--shadow-card-hero)" }}
         >
           <CardContent className="p-6 md:p-8">
-            <StepDashes total={6} current={step} />
+            {/* No celular, os traços de etapa só aparecem depois da busca (etapa 2 em diante). */}
+            <div className={step === 1 ? "hidden md:block" : undefined}>
+              <StepDashes total={6} current={step} />
+            </div>
             {step === 1 && (
               <TrademarkSearch
                 variant="checkout"
