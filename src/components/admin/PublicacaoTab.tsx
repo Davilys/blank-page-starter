@@ -881,6 +881,7 @@ export default function PublicacaoTab() {
   // ─── Runtime enrichment: sync missing data from linked brand_processes ───
   const enrichmentRef = useRef(false);
   useEffect(() => {
+    if (!PUBLICACOES_AUTOWRITE_ON_LOAD) return;
     if (enrichmentRef.current || isLoading || publicacoes.length === 0 || processes.length === 0) return;
 
     const processById = new Map(processes.map(p => [p.id, p]));

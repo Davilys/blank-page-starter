@@ -1,3 +1,4 @@
+import { PUBLICACOES_AUTOWRITE_ON_LOAD } from '@/lib/publicacoesAutoWrite';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { format, parseISO, differenceInDays, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -174,6 +175,7 @@ export function PublicacaoPrazos({ publicacoes, processMap, clientMap, onOpenDet
 
   // Atribuição automática por bucket de prazo (Caroline 60d → João 30d → Camila 7d)
   useEffect(() => {
+    if (!PUBLICACOES_AUTOWRITE_ON_LOAD) return;
     if (publicacoes.length === 0) return;
     // Aguarda o mapa de responsáveis carregar pelo menos uma vez
     const tarefas: Array<{ pubId: string; ownerId: string; ownerNome: string }> = [];
