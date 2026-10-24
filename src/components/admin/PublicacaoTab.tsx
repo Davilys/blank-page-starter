@@ -26,7 +26,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -2103,7 +2103,7 @@ export default function PublicacaoTab() {
                             </TableHead>
                           );
                         })}
-                        <TableHead className="w-10" />
+                        <TableHead className="hidden sm:table-cell w-10" />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -2162,7 +2162,7 @@ export default function PublicacaoTab() {
                                 </span>
                               ) : '—'}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="hidden sm:table-cell">
                               <Button variant="ghost" size="icon" className="h-6 w-6">
                                 <Eye className="w-3 h-3" />
                               </Button>
@@ -2172,6 +2172,7 @@ export default function PublicacaoTab() {
                       })}
                     </TableBody>
                   </Table>
+                  <ScrollBar orientation="horizontal" />
                 </ScrollArea>
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between px-4 py-2 border-t">
