@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { buildWhatsApp, buildEmailHtml, buildSubject, TIPOS_LEMBRETE, type TipoLembrete } from "../_shared/lembreteTemplates.ts";
+import { buildWhatsApp, buildEmailHtml, buildSubject, temClausulaInadimplencia, TIPOS_LEMBRETE, type TipoLembrete } from "../_shared/lembreteTemplates.ts";
 import { PAID_STATUSES } from "../_shared/crmCobranca.ts";
 
 const corsHeaders = {
@@ -202,8 +202,13 @@ serve(async (req) => {
     const quando = tipo === "d0" ? "hoje" : "em 3 dias";
     const servico = String((invoice as any).description || "").trim();
 
-    const waMsg = buildWhatsApp(nome, quando, dataStr, link, valor, tipo, servico);
-    const emailHtml = buildEmailHtml(nome, quando, dataStr, link, valor, tipo, servico);
+    let comClausula = false;
+    if (tipo === "vencido_d5" && (invoice as any).contract_id) {
+      const { data: ct } = await admin.from("contracts").select("contract_html").eq("id", (invoice as any).contract_id).maybeSingle();
+      comClausula = temClausulaInadimplencia((ct as any)?.contract_html);
+    }
+    const waMsg = buildWhatsApp(nome, quando, dataStr, link, valor, tipo, servico, comClausula);
+    const emailHtml = buildEmailHtml(nome, quando, dataStr, link, valor, tipo, servico, comClausula);
     const subject = buildSubject(tipo, quando, dataStr);
 
     const finalChannels: Array<"whatsapp" | "email"> = [];
