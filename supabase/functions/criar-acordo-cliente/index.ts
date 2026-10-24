@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildAcordoWhatsApp, buildAcordoEmailHtml } from "../_shared/acordoTextos.ts";
 import { cancelarCobrancaAsaas, registrarTratamento, MOTIVOS, PAID_STATUSES } from "../_shared/crmCobranca.ts";
 
 const corsHeaders = {
@@ -359,7 +360,7 @@ serve(async (req) => {
 
       const linhas = (parcelas || []).map((p: any) =>
         `Parcela ${p.numero_parcela}/${acordo.num_parcelas} — ${brl(Number(p.valor_centavos))} — vence ${fmtDate(p.data_vencimento)}${p.invoice_url ? `\n${p.invoice_url}` : ""}`);
-      const waMsg = `Olá, *${nome.split(" ")[0]}*!
+      let waMsg = `Olá, *${nome.split(" ")[0]}*!
 
 Seu acordo foi registrado com sucesso. ✅
 
@@ -376,7 +377,7 @@ Equipe WebMarcas`;
 
       const linhasHtml = (parcelas || []).map((p: any) =>
         `<li><strong>Parcela ${p.numero_parcela}/${acordo.num_parcelas}</strong> — ${brl(Number(p.valor_centavos))} — vence ${fmtDate(p.data_vencimento)}${p.invoice_url ? ` — <a href="${p.invoice_url}" target="_blank" rel="noopener">acessar boleto</a>` : ""}</li>`).join("");
-      const emailHtml = `
+      let emailHtml = `
 <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;line-height:1.6">
   <h2 style="color:#0a3d62">Acordo registrado — WebMarcas</h2>
   <p>Olá, <strong>${nome.split(" ")[0]}</strong>!</p>
@@ -388,6 +389,21 @@ Equipe WebMarcas`;
   <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
   <p style="font-size:13px;color:#666">Atenciosamente,<br><strong>Equipe WebMarcas</strong><br>🌐 www.webmarcas.net · 📧 ola@webmarcas.net</p>
 </div>`;
+
+      // Textos aprovados (WhatsApp curto com negrito / e-mail integral) quando a fatura original está de fato vencida;
+      // senão mantém o texto manual acima (não afirma atraso fictício).
+      {
+        const { data: orig } = await admin.from("invoices").select("amount, due_date").eq("id", acordo.invoice_original_id).maybeSingle();
+        const hojeBRT = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+        const dias = orig?.due_date ? Math.round((Date.parse(hojeBRT) - Date.parse(orig.due_date)) / 86400000) : 0;
+        const p1: any = (parcelas || [])[0];
+        if (orig && dias >= 1 && p1 && Number(orig.amount) > 0) {
+          const dados = { nome, valor: brl(Math.round(Number(orig.amount) * 100)), dias, n: Number(acordo.num_parcelas),
+            dataPrimeira: fmtDate(p1.data_vencimento), link: p1.invoice_url || "" };
+          waMsg = buildAcordoWhatsApp(dados);
+          emailHtml = buildAcordoEmailHtml(dados);
+        }
+      }
 
       const channels: string[] = [];
       if (phone) channels.push("whatsapp");
