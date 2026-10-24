@@ -13,9 +13,10 @@ const PREVIEW_PORT = 4173;
 
 const preview = spawn('npx', ['vite', 'preview', '--port', String(PREVIEW_PORT), '--strictPort'], { stdio: 'pipe' });
 await new Promise((res, rej) => {
-  const t = setTimeout(() => rej(new Error('preview timeout')), 30000);
-  preview.stdout.on('data', d => { if (String(d).includes('Local:')) { clearTimeout(t); res(); } });
-  preview.stderr.on('data', d => process.stderr.write(d));
+  const t = setTimeout(() => rej(new Error('preview timeout')), 60000);
+  const poll = setInterval(async () => {
+    try { const r = await fetch(`http://127.0.0.1:${PREVIEW_PORT}/`); if (r.ok) { clearInterval(poll); clearTimeout(t); res(); } } catch {}
+  }, 1500);
 });
 const chromePath = process.env.CHROME_PATH || execSync('which google-chrome || which chromium || which chromium-browser').toString().trim().split('\n')[0];
 const browser = await puppeteer.launch({ executablePath: chromePath, timeout: 90000, protocolTimeout: 120000, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
