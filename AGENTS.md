@@ -4,3 +4,4 @@
 - Gate legal-consultancy visibility with the existing `inpi_resources.can_view` permission, so Chat ao Vivo mirrors Recursos INPI access.
 - Annuity campaigns run only server-side in the `annuity` edge function (self-chaining tick + hourly cron backstop), one row per client per exercise in `annuity_items`, so batches survive page closes and never duplicate charges.
 - Use `RegistrationTrustFooter` for registration trust badges and consent links, so registration pages keep consistent responsive alignment.
+- Signature reminders run only server-side in the `signature-followups` edge function (15-min cron), scheduled per link in `signature_followups` by `generate-signature-link`; message texts live in `_shared/signatureFollowups.ts`, so regenerating a link reschedules and never duplicates.

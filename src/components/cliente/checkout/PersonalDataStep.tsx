@@ -15,15 +15,15 @@ import {
 import { trackLead } from "@/lib/metaPixel";
 import { cn } from "@/lib/utils";
 
-export const personalDataSchema = z.object({
-  fullName: z.string().min(3, "Nome deve ter pelo menos 3 caracteres").max(100, "String must contain at most 100 character(s)"),
-  email: z.string().email("E-mail inválido").max(255, "String must contain at most 255 character(s)"),
+const personalDataSchema = z.object({
+  fullName: z.string().min(3, "Nome deve ter pelo menos 3 caracteres").max(100),
+  email: z.string().email("E-mail inválido").max(255),
   phone: z.string().min(14, "Telefone inválido"),
   cpf: z.string().refine((val) => validateCPF(val), "CPF inválido"),
   cep: z.string().regex(/^\d{5}-\d{3}$/, "CEP inválido"),
-  address: z.string().min(5, "Endereço obrigatório").max(200, "String must contain at most 200 character(s)"),
-  neighborhood: z.string().min(2, "Bairro obrigatório").max(100, "String must contain at most 100 character(s)"),
-  city: z.string().min(2, "Cidade obrigatória").max(100, "String must contain at most 100 character(s)"),
+  address: z.string().min(5, "Endereço obrigatório").max(200),
+  neighborhood: z.string().min(2, "Bairro obrigatório").max(100),
+  city: z.string().min(2, "Cidade obrigatória").max(100),
   state: z.string().length(2, "UF obrigatória"),
 });
 
@@ -110,7 +110,7 @@ export function PersonalDataStep({ initialData, onNext, onBack }: PersonalDataSt
     const result = personalDataSchema.safeParse(data);
     if (!result.success) {
       const newErrors: Record<string, string> = {};
-      result.error.issues.forEach((err) => {
+      result.error.errors.forEach((err) => {
         if (err.path[0]) newErrors[err.path[0] as string] = err.message;
       });
       setErrors(newErrors);

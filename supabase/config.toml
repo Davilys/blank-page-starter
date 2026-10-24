@@ -158,3 +158,6 @@ verify_jwt = false
 
 [functions.annuity]
 verify_jwt = false
+
+[functions.signature-followups]
+verify_jwt = false
