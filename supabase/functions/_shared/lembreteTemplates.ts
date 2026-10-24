@@ -107,9 +107,9 @@ export function buildSubject(tipo: TipoLembrete, quando: string, data: string): 
 // ── Acordo automático aos 30 dias. Textos aprovados pelo titular em 24/10:
 // WhatsApp = versão curta (aprovada 12:00:31, negrito nos trechos importantes); E-mail = versão integral
 // (1621 = ditado original; 699 = versão literal aprovada 11:58:59). Sem total e sem juros (10% só no cálculo).
-export type AcordoAutoDados = { nome: string; valor: string; dias: number; n: number; dataPrimeira: string; link: string };
+export type AcordoAutoDados = { nome: string; valor: string; dias: number; n: number; dataPrimeira: string; link: string; atraso?: "ha" | "com_mais_de" };
 
-const atrasoTxt = (d: AcordoAutoDados) => d.n === 5 ? `com mais de ${d.dias} dias` : `há ${d.dias} dias`;
+const atrasoTxt = (d: AcordoAutoDados) => (d.atraso ? d.atraso === "com_mais_de" : d.n === 5) ? `com mais de ${d.dias} dias` : `há ${d.dias} dias`;
 
 export function buildAcordoAutoWhatsApp(d: AcordoAutoDados): string {
   return `Oi ${primeiroNome(d.nome)}! Tudo bem?

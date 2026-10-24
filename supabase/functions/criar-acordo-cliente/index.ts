@@ -414,6 +414,21 @@ Equipe WebMarcas`;
         waMsg = buildAcordoAutoWhatsApp(dados);
         emailHtml = buildAcordoAutoEmailHtml(dados);
         assuntoAcordo = buildAcordoAutoSubject(dados.n);
+      } else {
+        // Acordo MANUAL: mesmos textos aprovados (WhatsApp curto com negrito / e-mail integral), com os dados
+        // reais escolhidos pelo atendente (n de parcelas, datas, link). Só quando a fatura original está de fato
+        // vencida (a frase "em aberto há N dias" não pode ser fictícia); caso contrário mantém o texto manual atual.
+        const { data: orig } = await admin.from("invoices").select("amount, due_date").eq("id", acordo.invoice_original_id).maybeSingle();
+        const p1: any = (parcelas || [])[0];
+        const dias = orig?.due_date ? Math.round((Date.parse(dayBRT()) - Date.parse(orig.due_date)) / 86400000) : 0;
+        if (orig && dias >= 1 && p1 && Number(orig.amount) > 0) {
+          const dados = {
+            nome, valor: brl(Math.round(Number(orig.amount) * 100)), dias, n: Number(acordo.num_parcelas),
+            dataPrimeira: fmtDate(p1.data_vencimento), link: p1.invoice_url || "", atraso: "ha" as const,
+          };
+          waMsg = buildAcordoAutoWhatsApp(dados);
+          emailHtml = buildAcordoAutoEmailHtml(dados);
+        }
       }
 
       const channels: string[] = [];

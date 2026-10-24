@@ -82,3 +82,12 @@ describe("acordo automático D30 (texto literal ditado)", () => {
     expect(w).not.toMatch(/cl[áa]usula|exig[íi]vel/i);
   });
 });
+
+describe("acordo manual reutiliza textos aprovados", () => {
+  it("atraso 'ha' forca 'há N dias' independente de n; sem asteriscos duplicados", () => {
+    const d = { nome: "Ana", valor: "R$ 2.000,00", dias: 12, n: 5, dataPrimeira: "05/11/2026", link: "https://x/1", atraso: "ha" as const };
+    const w = buildAcordoAutoWhatsApp(d);
+    expect(w).toContain("Parcelamos o débito *R$ 2.000,00* em aberto há 12 dias, em até *5x* no boleto!");
+    expect(w).not.toMatch(/\*\*/);
+  });
+});
