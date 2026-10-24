@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
+import { createFetchOrchestrator, type FetchOrchestrator } from '@/lib/fetchOrchestrator';
 import { 
   Search, Plus, RefreshCw, FileSignature, MoreHorizontal, 
   Eye, Trash2, Download, Send, Filter, CheckCircle, XCircle, Loader2, Timer, Edit,
@@ -337,44 +338,89 @@ export default function AdminContratos() {
     }
   };
 
+  // Fetch orchestration (init dedupe, in-flight queue, debounced realtime) lives in a
+  // unit-tested module: src/lib/fetchOrchestrator.ts
+  const mountedRef = useRef(false);
+  const sessionGenRef = useRef(0);
+  const retryTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const scheduleRetry = (fn: () => void, ms: number) => {
+    retryTimersRef.current.push(setTimeout(fn, ms));
+  };
+  const noSessionRetriesRef = useRef(0);
+  const emptyRetriesRef = useRef(0);
+  const orchestratorRef = useRef<FetchOrchestrator | null>(null);
+  if (!orchestratorRef.current) {
+    orchestratorRef.current = createFetchOrchestrator(() => fetchContracts(), {
+      debounceMs: 8000,
+      maxWaitMs: 30000,
+    });
+  }
+  const orchestrator = orchestratorRef.current;
+
+  // Runs the mount sequence once: same calls as the original mount, each exactly once
+  const initOnce = () => {
+    if (!orchestrator.tryInit()) return;
+    orchestrator.requestFetch();   // fetchContracts with in-flight guard
+    fetchPaidInvoices();           // paid metrics appear immediately, as before
+  };
+
   // Wait for auth session before fetching
   useEffect(() => {
     let mounted = true;
+    mountedRef.current = true;
+    orchestrator.activate();
 
     // Always listen for auth state — covers both immediate session and delayed hydration
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        // Invalidate any in-flight response from the previous session
+        sessionGenRef.current += 1;
+        // Allow a full init again after logout (late login / re-login in same mount)
+        orchestrator.resetInit();
+        // Never display the previous session's data after logout
+        setContracts([]);
+        setPaidAsaasIds(new Set());
+        setPaidUserIds(new Set());
+        return;
+      }
       if (session && mounted) {
-        fetchContracts();
+        initOnce();
       }
     });
 
     // Also try immediately in case session is already available
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session && mounted) {
-        fetchContracts();
-        fetchPaidInvoices();
-        // Trigger background Asaas sync once per mount so paid metrics open fresh
+        initOnce();
+        // Trigger background Asaas sync once per mount so paid metrics open fresh.
+        // Deliberately ONLY on the getSession path, exactly as before the perf change:
+        // the onAuthStateChange path must never fire financial sync.
         backgroundSyncAsaas();
       }
     });
 
-    // Realtime subscription — auto-refresh when contracts change
+    // Realtime subscription — auto-refresh when contracts change (debounced)
     const realtimeSub = supabase
       .channel('contracts-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'contracts' }, () => {
-        if (mounted) fetchContracts();
+        if (mounted) orchestrator.scheduleRefetch();
       })
       .subscribe();
 
     return () => {
       mounted = false;
+      mountedRef.current = false;
+      retryTimersRef.current.forEach(clearTimeout);
+      retryTimersRef.current = [];
       subscription.unsubscribe();
       realtimeSub.unsubscribe();
+      orchestrator.dispose();
     };
   }, []);
 
   // Fetch the set of invoices that are actually paid (received/confirmed)
   const fetchPaidInvoices = async () => {
+    const gen = sessionGenRef.current;
     try {
       const PAGE = 1000;
       const aSet = new Set<string>();
@@ -395,8 +441,10 @@ export default function AdminContratos() {
         if (batch.length < PAGE) break;
         from += PAGE;
       }
-      setPaidAsaasIds(aSet);
-      setPaidUserIds(uSet);
+      if (mountedRef.current && gen === sessionGenRef.current) {
+        setPaidAsaasIds(aSet);
+        setPaidUserIds(uSet);
+      }
     } catch (err) {
       console.error('Error fetching paid invoices:', err);
     }
@@ -405,11 +453,12 @@ export default function AdminContratos() {
   const backgroundSyncAsaas = async () => {
     try {
       await supabase.functions.invoke('sync-asaas-invoices');
-      // After background sync, refresh paid set silently
-      fetchPaidInvoices();
     } catch (err) {
       // Silent — background task
       console.warn('Background Asaas sync failed:', err);
+    } finally {
+      // Refresh paid set exactly once, whether sync succeeded or not
+      fetchPaidInvoices();
     }
   };
 
@@ -430,14 +479,16 @@ export default function AdminContratos() {
     }
   };
 
-  const fetchContracts = async (retryCount = 0) => {
+  const fetchContracts = async () => {
+    const gen = sessionGenRef.current;
     setLoading(true);
     try {
       // Ensure session is active before querying
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        if (retryCount < 3) {
-          setTimeout(() => fetchContracts(retryCount + 1), 600);
+        if (noSessionRetriesRef.current < 3) {
+          noSessionRetriesRef.current += 1;
+          scheduleRetry(() => orchestrator.requestFetch(), 600);
         } else {
           setLoading(false);
         }
@@ -489,13 +540,16 @@ export default function AdminContratos() {
       }
 
       // Retry if empty result on first attempt (auth hydration race)
-      if (all.length === 0 && retryCount < 2) {
-        setTimeout(() => fetchContracts(retryCount + 1), 800);
+      if (all.length === 0 && emptyRetriesRef.current < 2) {
+        emptyRetriesRef.current += 1;
+        scheduleRetry(() => orchestrator.requestFetch(), 800);
         setLoading(false);
         return;
       }
+      emptyRetriesRef.current = 0;
 
-      setContracts(all);
+      // Do not set state after unmount or after the session changed mid-flight
+      if (mountedRef.current && gen === sessionGenRef.current) setContracts(all);
     } catch (error) {
       console.error('Error fetching contracts:', error);
       toast.error('Erro ao carregar contratos');
@@ -504,8 +558,8 @@ export default function AdminContratos() {
     }
   };
 
-  // Wrapper without args — safe to pass directly to onClick handlers and callbacks
-  const refreshContracts = () => fetchContracts(0);
+  // Manual refresh goes through the orchestrator: never dropped, queued if a fetch is in flight
+  const refreshContracts = () => orchestrator.requestFetch();
 
   const handleRevertPromotion = async (contract: Contract) => {
     // Only allow reverting contracts that are not signed and not paid
@@ -553,6 +607,11 @@ export default function AdminContratos() {
   };
 
   const handleDelete = async (id: string) => {
+    const target = contracts.find(c => c.id === id);
+    if (target?.signature_status === 'signed') {
+      toast.error('Contratos assinados não podem ser excluídos.');
+      return;
+    }
     if (!confirm('Tem certeza que deseja excluir este contrato?')) return;
     
     try {
@@ -1223,12 +1282,14 @@ export default function AdminContratos() {
                             >
                               Editar
                             </button>
-                            <button 
-                              className="text-destructive hover:underline"
-                              onClick={() => handleDelete(contract.id)}
-                            >
-                              Deletar
-                            </button>
+                            {contract.signature_status !== 'signed' && (
+                              <button 
+                                className="text-destructive hover:underline"
+                                onClick={() => handleDelete(contract.id)}
+                              >
+                                Deletar
+                              </button>
+                            )}
                           </div>
                         </div>
                       </TableCell>
@@ -1391,13 +1452,15 @@ export default function AdminContratos() {
                                 Reverter Expiração (R$ 699)
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem 
-                              onClick={() => handleDelete(contract.id)}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Excluir
-                            </DropdownMenuItem>
+                            {contract.signature_status !== 'signed' && (
+                              <DropdownMenuItem 
+                                onClick={() => handleDelete(contract.id)}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Excluir
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                       </DropdownMenu>
                       </TableCell>

@@ -25,8 +25,11 @@ export default function RecuperarSenha() {
     setIsLoading(true);
 
     try {
+      // www.webmarcas.net serve o app sem redirect HTTP (verificado 23/10): normaliza para o
+      // apex canônico, único domínio presente na allowlist de redirects do Supabase Auth.
+      const canonicalOrigin = window.location.origin.replace(/^https:\/\/www\./, 'https://');
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'https://webmarcas1.lovable.app/cliente/redefinir-senha',
+        redirectTo: `${canonicalOrigin}/cliente/redefinir-senha`,
       });
 
       if (error) {

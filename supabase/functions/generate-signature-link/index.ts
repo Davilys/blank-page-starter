@@ -1,4 +1,3 @@
-import { SIGNATURE_LINK_DAYS, scheduleFollowups } from '../_shared/signatureFollowups.ts';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -68,9 +67,7 @@ serve(async (req) => {
     }
 
     // Use explicitly provided value if given, otherwise use configured value
-    // Link de assinatura vale 3 dias (alinhado aos lembretes 24h/48h/último dia).
-    void configuredDays;
-    const expiresInDays = requestedDays ?? SIGNATURE_LINK_DAYS;
+    const expiresInDays = requestedDays ?? configuredDays;
 
     console.log('Signature link expiration:', { requestedDays, configuredDays, finalDays: expiresInDays });
 
@@ -111,16 +108,6 @@ serve(async (req) => {
           expires_in_days: expiresInDays,
         },
       });
-
-    // (Re)agenda os 3 lembretes automáticos de assinatura
-    try {
-      const times = scheduleFollowups(new Date(), expiresAt);
-      await supabase.from('signature_followups').delete().eq('contract_id', contractId).eq('status', 'pending');
-      await supabase.from('signature_followups').upsert(
-        times.map((t, i) => ({ contract_id: contractId, step: i + 1, scheduled_at: t.toISOString(), status: 'pending', token, sent_at: null, results: null })),
-        { onConflict: 'contract_id,step' },
-      );
-    } catch (e) { console.error('Erro ao agendar lembretes de assinatura:', e); }
 
     // Build public URL
     const signatureUrl = `${baseUrl}/assinar/${token}`;

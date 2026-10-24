@@ -388,7 +388,7 @@ export default function PublicacaoTab() {
   const [createAdminId, setCreateAdminId] = useState('');
 
   // ─── Queries ────
-  const { data: publicacoes = [], isLoading } = useQuery({
+  const { data: publicacoes = [], isLoading, isError: pubsError, refetch: refetchPubs } = useQuery({
     queryKey: ['publicacoes-marcas'],
     queryFn: async () => {
       // Keyset por id (cap PostgREST max_rows=1000 truncaria 2125+ linhas sem erro);
@@ -403,6 +403,10 @@ export default function PublicacaoTab() {
     },
     staleTime: 30000,
   });
+
+  useEffect(() => {
+    if (pubsError) toast.error('Erro ao carregar publicações. Tente novamente.');
+  }, [pubsError]);
 
   const { data: processes = [] } = useQuery({
     queryKey: ['brand-processes-pub'],
@@ -1192,7 +1196,8 @@ export default function PublicacaoTab() {
       const procByNumber = !proc && (pub as any).process_number_rpi ? processNumberMap.get(normalizeProcessNumber((pub as any).process_number_rpi)) : null;
       const resolvedProc = proc || procByNumber;
       const resolvedClient = directClient || (resolvedProc?.user_id ? clientMap.get(resolvedProc.user_id) : null);
-      if (!resolvedClient) return false;
+      // Publicação órfã (sem cliente/processo resolvido) permanece visível com marcação própria,
+      // em vez de sumir da lista silenciosamente.
       if (!matchesResp(pub)) return false;
       const client = resolvedClient;
       if (search) {
@@ -2017,6 +2022,13 @@ export default function PublicacaoTab() {
             <div className="flex items-center justify-center py-16">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
             </div>
+          ) : pubsError ? (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <AlertTriangle className="w-10 h-10 mb-2 text-destructive/70" />
+              <p className="text-sm font-medium text-foreground">Erro ao carregar publicações</p>
+              <p className="text-xs mt-1">Não foi possível buscar os dados agora. Verifique sua conexão e tente novamente.</p>
+              <Button variant="outline" size="sm" className="mt-3" onClick={() => refetchPubs()}>Tentar novamente</Button>
+            </div>
           ) : viewMode === 'prazos' ? (
             <PublicacaoPrazos
               publicacoes={publicacoes as any}
@@ -2126,7 +2138,7 @@ export default function PublicacaoTab() {
                               </div>
                             </TableCell>
                             <TableCell className="text-xs">
-                              {client?.full_name || <span className="text-amber-600 dark:text-amber-400 text-[10px]">Sem cliente</span>}
+                              {client?.full_name || <span className="text-amber-600 dark:text-amber-400 text-[10px]">Sem cliente vinculado</span>}
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline" className={cn('text-[10px]', STATUS_CONFIG[pub.status]?.bg, STATUS_CONFIG[pub.status]?.color)}>
