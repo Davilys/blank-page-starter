@@ -54,8 +54,11 @@ for (const [nome, vp] of Object.entries(VIEWPORTS)) {
     console.log(`${nome} ${rota}: diffPx=${diffPx} (${pct.toFixed(3)}%)`);
   }
 }
-await browser.close(); preview.kill();
+await browser.close();
+try { preview.kill('SIGKILL'); } catch {}
+preview.unref();
 const falhas = resultado.filter(r => r.pct > 2.0);
 console.log('RESUMO:', JSON.stringify(resultado));
 if (falhas.length) { console.error('FALHAS VISUAIS:', JSON.stringify(falhas)); process.exit(1); }
 console.log('VISUAL OK (tolerancia 2% por rota, cobre toast/timestamps dinamicos)');
+process.exit(0);
