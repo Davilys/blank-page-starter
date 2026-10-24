@@ -1,3 +1,4 @@
+import { fetchAllById, comparePrazoCriticoAscNullsLast } from '@/lib/fetchAllById';
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -390,9 +391,15 @@ export default function PublicacaoTab() {
   const { data: publicacoes = [], isLoading } = useQuery({
     queryKey: ['publicacoes-marcas'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('publicacoes_marcas').select('*').order('proximo_prazo_critico', { ascending: true, nullsFirst: false });
-      if (error) throw error;
-      return (data || []) as Publicacao[];
+      // Keyset por id (cap PostgREST max_rows=1000 truncaria 2125+ linhas sem erro);
+      // ordem de exibição reaplicada no cliente — idem à order() original do banco.
+      const all = await fetchAllById<Publicacao>(async (afterId, limit) => {
+        let q = supabase.from('publicacoes_marcas').select('*').order('id', { ascending: true }).limit(limit);
+        if (afterId !== null) q = q.gt('id', afterId);
+        const { data, error } = await q;
+        return { data: (data || null) as Publicacao[] | null, error };
+      });
+      return [...all].sort(comparePrazoCriticoAscNullsLast);
     },
     staleTime: 30000,
   });
@@ -400,9 +407,14 @@ export default function PublicacaoTab() {
   const { data: processes = [] } = useQuery({
     queryKey: ['brand-processes-pub'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('brand_processes').select('id, brand_name, process_number, user_id, deposit_date, ncl_classes, pipeline_stage, business_area');
-      if (error) throw error;
-      return data || [];
+      // Sem .order() + sem range: ordem indefinida E cap 1000 (tabela com 3313 linhas).
+      // Keyset por id torna a carga completa e determinística; consumidores usam Map/filtros (ordem não é contrato).
+      return await fetchAllById<any>(async (afterId, limit) => {
+        let q = supabase.from('brand_processes').select('id, brand_name, process_number, user_id, deposit_date, ncl_classes, pipeline_stage, business_area').order('id', { ascending: true }).limit(limit);
+        if (afterId !== null) q = q.gt('id', afterId);
+        const { data, error } = await q;
+        return { data, error };
+      });
     },
     staleTime: 30000,
   });
