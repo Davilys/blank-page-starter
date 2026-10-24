@@ -159,8 +159,5 @@ verify_jwt = false
 [functions.annuity]
 verify_jwt = false
 
-[functions.regua-cobranca-enfileirar]
-verify_jwt = false
-
-[functions.regua-cobranca-processar]
+[functions.signature-followups]
 verify_jwt = false

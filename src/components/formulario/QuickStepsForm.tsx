@@ -40,17 +40,17 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 
 export interface QuickData { brandName: string; businessArea: string; fullName: string; email: string; phone: string }
 
-export const quickSchema = z.object({
-  brandName: z.string().trim().min(2, "Nome da marca obrigatório").max(100, "String must contain at most 100 character(s)"),
-  businessArea: z.string().trim().min(3, "Ramo de atividade obrigatório").max(200, "String must contain at most 200 character(s)"),
-  fullName: z.string().trim().min(3, "Nome deve ter pelo menos 3 caracteres").max(100, "String must contain at most 100 character(s)"),
-  email: z.string().trim().email("E-mail inválido").max(255, "String must contain at most 255 character(s)"),
-  phone: z.string().min(14, "Celular inválido").max(15, "String must contain at most 15 character(s)"),
+const quickSchema = z.object({
+  brandName: z.string().trim().min(2, "Nome da marca obrigatório").max(100),
+  businessArea: z.string().trim().min(3, "Ramo de atividade obrigatório").max(200),
+  fullName: z.string().trim().min(3, "Nome deve ter pelo menos 3 caracteres").max(100),
+  email: z.string().trim().email("E-mail inválido").max(255),
+  phone: z.string().min(14, "Celular inválido").max(15),
 });
 
-function collect(r: z.ZodSafeParseResult<unknown>) {
+function collect(r: z.SafeParseReturnType<unknown, unknown>) {
   const e: Record<string, string> = {};
-  if (!r.success) r.error.issues.forEach((x) => { if (x.path[0]) e[x.path[0] as string] = x.message; });
+  if (!r.success) r.error.errors.forEach((x) => { if (x.path[0]) e[x.path[0] as string] = x.message; });
   return e;
 }
 
@@ -94,12 +94,12 @@ export function QuickLeadStep({ initial, onNext }: { initial: QuickData; onNext:
   );
 }
 
-export const compSchema = z.object({
+const compSchema = z.object({
   cpf: z.string().refine((v) => validateCPF(v), "CPF inválido"),
   cep: z.string().regex(/^\d{5}-\d{3}$/, "CEP inválido"),
-  address: z.string().min(5, "Endereço obrigatório").max(200, "String must contain at most 200 character(s)"),
-  neighborhood: z.string().min(2, "Bairro obrigatório").max(100, "String must contain at most 100 character(s)"),
-  city: z.string().min(2, "Cidade obrigatória").max(100, "String must contain at most 100 character(s)"),
+  address: z.string().min(5, "Endereço obrigatório").max(200),
+  neighborhood: z.string().min(2, "Bairro obrigatório").max(100),
+  city: z.string().min(2, "Cidade obrigatória").max(100),
   state: z.string().length(2, "UF obrigatória"),
 });
 

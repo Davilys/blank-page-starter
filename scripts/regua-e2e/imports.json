@@ -1,1 +1,0 @@
-{"imports":{"https://deno.land/std@0.190.0/http/server.ts":"./scripts/regua-e2e/std.ts","https://esm.sh/@supabase/supabase-js@2":"./scripts/regua-e2e/fakesb.ts"}}

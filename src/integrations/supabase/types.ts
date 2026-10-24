@@ -1218,6 +1218,56 @@ export type Database = {
           },
         ]
       }
+      cobranca_fila: {
+        Row: {
+          agendado_para: string
+          claimed_at: string | null
+          created_at: string
+          erro: string | null
+          id: string
+          invoice_id: string
+          processado_em: string | null
+          resultado: Json | null
+          status: string
+          tentativas: number
+          tipo: string
+        }
+        Insert: {
+          agendado_para?: string
+          claimed_at?: string | null
+          created_at?: string
+          erro?: string | null
+          id?: string
+          invoice_id: string
+          processado_em?: string | null
+          resultado?: Json | null
+          status?: string
+          tentativas?: number
+          tipo: string
+        }
+        Update: {
+          agendado_para?: string
+          claimed_at?: string | null
+          created_at?: string
+          erro?: string | null
+          id?: string
+          invoice_id?: string
+          processado_em?: string | null
+          resultado?: Json | null
+          status?: string
+          tentativas?: number
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cobranca_fila_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cobranca_historico: {
         Row: {
           canais: string[]
@@ -6832,6 +6882,53 @@ export type Database = {
           },
         ]
       }
+      signature_followups: {
+        Row: {
+          contract_id: string
+          created_at: string
+          id: string
+          results: Json | null
+          scheduled_at: string
+          sent_at: string | null
+          status: string
+          step: number
+          token: string | null
+          updated_at: string
+        }
+        Insert: {
+          contract_id: string
+          created_at?: string
+          id?: string
+          results?: Json | null
+          scheduled_at: string
+          sent_at?: string | null
+          status?: string
+          step: number
+          token?: string | null
+          updated_at?: string
+        }
+        Update: {
+          contract_id?: string
+          created_at?: string
+          id?: string
+          results?: Json | null
+          scheduled_at?: string
+          sent_at?: string | null
+          status?: string
+          step?: number
+          token?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signature_followups_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       system_settings: {
         Row: {
           id: string
@@ -7486,6 +7583,28 @@ export type Database = {
         Args: { p_conversation_id: string }
         Returns: undefined
       }
+      claim_cobranca_fila: {
+        Args: never
+        Returns: {
+          agendado_para: string
+          claimed_at: string | null
+          created_at: string
+          erro: string | null
+          id: string
+          invoice_id: string
+          processado_em: string | null
+          resultado: Json | null
+          status: string
+          tentativas: number
+          tipo: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "cobranca_fila"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       claim_contract_payment: {
         Args: { p_claim_id: string; p_contract_id: string }
         Returns: Json
@@ -7715,6 +7834,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      enfileirar_regua_cobranca: { Args: { p_hoje?: string }; Returns: Json }
       finish_contract_payment: {
         Args: {
           p_claim_id: string
@@ -7806,6 +7926,7 @@ export type Database = {
       }
       recalculate_upsell_weights: { Args: never; Returns: Json }
       recheck_cobranca_reentry: { Args: never; Returns: number }
+      regua_norm: { Args: { t: string }; Returns: string }
       reserve_fernanda_stt: {
         Args: {
           p_company: string

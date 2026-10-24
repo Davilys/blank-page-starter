@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import 'jspdf-autotable';
 
 // ── CRM-compatible export ─────────────────────────────────────────
 export interface CRMExportableClient {
@@ -247,8 +247,8 @@ export function exportToPDF(clients: ExportableClient[], filename: string = 'cli
       : '',
   ]);
   
-  // Add table using autoTable (function-style: registra sem depender de global window.jsPDF)
-  autoTable(doc, {
+  // Add table using autoTable
+  (doc as unknown as { autoTable: Function }).autoTable({
     head: [pdfColumns],
     body: pdfData,
     startY: 42,

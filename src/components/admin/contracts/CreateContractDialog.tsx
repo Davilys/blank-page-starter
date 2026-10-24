@@ -126,7 +126,7 @@ const getProductionBaseUrl = () => {
 };
 
 // Validation schemas matching public form
-export const personalDataSchema = z.object({
+const personalDataSchema = z.object({
   fullName: z.string().min(3, "Nome completo obrigatório"),
   email: z.string().email("Email inválido"),
   phone: z.string().min(14, "Telefone obrigatório"),
@@ -138,7 +138,7 @@ export const personalDataSchema = z.object({
   state: z.string().length(2, "UF obrigatório"),
 });
 
-export const brandDataSchema = z.object({
+const brandDataSchema = z.object({
   brandName: z.string().min(2, "Nome da marca obrigatório"),
   businessArea: z.string().min(3, "Ramo de atividade obrigatório"),
   hasCNPJ: z.boolean(),
@@ -881,9 +881,9 @@ export function CreateContractDialog({ open, onOpenChange, onSuccess, leadId }: 
     // Validate personal data
     const personalResult = personalDataSchema.safeParse(personalData);
     if (!personalResult.success) {
-      personalResult.error.issues.forEach(err => {
+      personalResult.error.errors.forEach(err => {
         if (err.path[0]) {
-          errors[`personal_${String(err.path[0])}`] = err.message;
+          errors[`personal_${err.path[0]}`] = err.message;
         }
       });
     }
@@ -913,9 +913,9 @@ export function CreateContractDialog({ open, onOpenChange, onSuccess, leadId }: 
       // Validate single brand
       const brandResult = brandDataSchema.safeParse(brandData);
       if (!brandResult.success) {
-        brandResult.error.issues.forEach(err => {
+        brandResult.error.errors.forEach(err => {
           if (err.path[0]) {
-            errors[`brand_${String(err.path[0])}`] = err.message;
+            errors[`brand_${err.path[0]}`] = err.message;
           }
         });
       }

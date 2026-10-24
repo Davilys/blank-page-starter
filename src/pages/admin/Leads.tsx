@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -9,7 +9,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
-import { fetchAllKeyset, PAGE_SIZE, type KeysetCursor } from '@/lib/fetchAllPages';
 import {
   Search, Plus, RefreshCw, UserPlus, MoreHorizontal,
   UserCheck, Trash2, Edit, Filter, Upload,
@@ -519,17 +518,6 @@ export default function AdminLeads() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Guarda de janela async: a busca paginada dura mais que a de página única.
-  // fetchSeq invalida respostas de requests antigas (refresh/realtime sobrepostos)
-  // e aliveRef impede setState/toast após desmontar. Sem isso, uma request velha
-  // podia sobrescrever a nova ou tocar estado de componente desmontado.
-  const fetchSeq = useRef(0);
-  const aliveRef = useRef(true);
-  useEffect(() => {
-    aliveRef.current = true;
-    return () => { aliveRef.current = false; };
-  }, []);
-
   const [activeTab, setActiveTab] = useState('lista');
   const [detailLead, setDetailLead] = useState<Lead | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -539,37 +527,13 @@ export default function AdminLeads() {
   useEffect(() => { fetchLeads(); }, []);
 
   const fetchLeads = async () => {
-    const seq = ++fetchSeq.current;
-    const isCurrent = () => aliveRef.current && fetchSeq.current === seq;
     setLoading(true);
     try {
-      // Busca TODAS as páginas via keyset (created_at DESC, id ASC): sem isso o
-      // PostgREST devolve silenciosamente só 1000 leads, e paginação por offset
-      // deriva sob mutação (duplicando/omitindo linhas). O cursor da última linha
-      // âncora cada página; desempate por id torna a ordem determinística.
-      // Filtros/contadores/ordem inalterados.
-      const data = await fetchAllKeyset(
-        (cursor: KeysetCursor | null, limit: number) => {
-          let q = supabase.from('leads').select('*')
-            .order('created_at', { ascending: false }).order('id', { ascending: true })
-            .limit(limit);
-          if (cursor) {
-            // sucessor estrito de (created_at DESC, id ASC):
-            // created_at < c  OU  (created_at = c E id > i)
-            const c = `"${cursor.created_at}"`;
-            const i = `"${cursor.id}"`;
-            q = q.or(`created_at.lt.${c},and(created_at.eq.${c},id.gt.${i})`);
-          }
-          return q;
-        },
-        (lead: any) => ({ created_at: lead.created_at, id: lead.id }),
-        PAGE_SIZE,
-      );
-      // Só troca a lista com o conjunto COMPLETO: erro intermediário nunca
-      // substitui a lista anterior por dados parciais.
-      if (isCurrent()) setLeads((data as any[]) || []);
-    } catch { if (isCurrent()) toast.error('Erro ao carregar leads'); }
-    finally { if (isCurrent()) setLoading(false); }
+      const { data, error } = await supabase.from('leads').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      setLeads((data as any[]) || []);
+    } catch { toast.error('Erro ao carregar leads'); }
+    finally { setLoading(false); }
   };
 
   const handleRefresh = async () => {

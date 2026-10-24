@@ -139,7 +139,7 @@ const EMAIL_TEMPLATES: Record<PublicationType, { subject: string; body: string }
   },
 };
 
-export function replaceTemplateVariables(text: string, client: ClientWithProcess | null): string {
+function replaceTemplateVariables(text: string, client: ClientWithProcess | null): string {
   if (!client) return text;
   const today = format(new Date(), 'dd/MM/yyyy', { locale: ptBR });
   return text
@@ -148,7 +148,7 @@ export function replaceTemplateVariables(text: string, client: ClientWithProcess
     .replace(/\{\{numero_processo\}\}/g, client.process_number || '')
     .replace(/\{\{email_cliente\}\}/g, client.email || '')
     .replace(/\{\{data_hoje\}\}/g, today)
-    .replace(/\{\{link_portal\}\}/g, 'https://webmarcas.net/cliente');
+    .replace(/\{\{link_portal\}\}/g, 'https://webmarcas1.lovable.app/cliente');
 }
 
 export function EmailCompose({ onClose, replyTo, initialTo, initialName, initialBody, accountId, accountEmail, hideClientSearch, initialClientData }: EmailComposeProps) {

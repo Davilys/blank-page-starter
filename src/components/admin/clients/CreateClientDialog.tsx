@@ -19,7 +19,7 @@ import {
 } from "@/lib/validators";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-export const formSchema = z.object({
+const formSchema = z.object({
   fullName: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
   email: z.string().email("E-mail inválido"),
   phone: z.string().min(14, "Telefone inválido"),
@@ -96,7 +96,7 @@ export function CreateClientDialog({ onClientCreated }: CreateClientDialogProps)
     const result = formSchema.safeParse(form);
     if (!result.success) {
       const newErrors: Record<string, string> = {};
-      result.error.issues.forEach((err) => {
+      result.error.errors.forEach((err) => {
         if (err.path[0]) newErrors[err.path[0] as string] = err.message;
       });
       setErrors(newErrors);
