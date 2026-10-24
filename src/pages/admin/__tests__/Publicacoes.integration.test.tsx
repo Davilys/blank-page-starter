@@ -52,10 +52,18 @@ vi.mock('@/integrations/supabase/client', () => {
   } = { tables: {}, writes: [], user: { id: 'u-admin-1', email: 'admin@x.com' } };
 
   const builder = (table: string, op: string, payload?: any) => {
-    const resp = () => state.tables[table] ?? { data: [], error: null };
+    let after: string | null = null; // keyset: fetchAllById pagina por id (gt)
+    const resp = () => {
+      const r = state.tables[table] ?? { data: [], error: null };
+      if (op === 'select' && after !== null && Array.isArray(r.data)) {
+        return { ...r, data: [...r.data].sort((a: any, b: any) => (a.id < b.id ? -1 : 1)).filter((x: any) => x.id > after!) };
+      }
+      return r;
+    };
     const q: any = {
       select: () => q, order: () => q, eq: () => q, neq: () => q, in: () => q,
       or: () => q, limit: () => q, range: () => q, gte: () => q, lte: () => q,
+      gt: (_c: string, v: string) => { after = v; return q; },
       is: () => q, not: () => q, filter: () => q, match: () => q, upsert: () => q,
       ilike: () => q, like: () => q, contains: () => q, overlaps: () => q,
       single: () => Promise.resolve((() => { const r = resp(); return { data: Array.isArray(r.data) ? (r.data[0] ?? null) : r.data, error: r.error }; })()),
