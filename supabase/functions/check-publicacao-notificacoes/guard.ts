@@ -31,6 +31,14 @@ export function diasDesdePublicacao(pub: any, now: Date = new Date()): number | 
 export function textoSustentado(id: number, pub: any, now: Date = new Date()): boolean {
   const d = diasDesdePublicacao(pub, now);
   if (d === null) return false;
+  if (id === 1 || id === 2) {
+    // Prazo de 60 dias precisa estar sustentado pelo ato/prazo cadastrado:
+    // descricao do prazo = cumprimento de exigencia e prazo critico = publicacao + 60 dias.
+    if (!/cumprimento de exig/i.test(String(pub.descricao_prazo || ''))) return false;
+    if (!pub.proximo_prazo_critico) return false;
+    const span = Math.round((new Date(pub.proximo_prazo_critico).getTime() - new Date(pub.data_publicacao_rpi).getTime()) / 86400000);
+    if (span !== 60) return false;
+  }
   if (id === 1) return d >= 0 && d <= 60;
   if (id === 2) return d === 39;
   return false;

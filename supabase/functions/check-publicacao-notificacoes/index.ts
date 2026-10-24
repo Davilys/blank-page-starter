@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
 
   const { data: schedules, error } = await supabase
     .from('publicacao_cobranca_schedule')
-    .select('*, publicacoes_marcas!inner(id, brand_name_rpi, process_id, status, cumprimento_ok, cumprimento_status, data_publicacao_rpi, proximo_prazo_critico)')
+    .select('*, publicacoes_marcas!inner(id, brand_name_rpi, process_id, status, cumprimento_ok, cumprimento_status, descricao_prazo, data_publicacao_rpi, proximo_prazo_critico)')
     .eq('status', 'ativo');
 
   if (error) {

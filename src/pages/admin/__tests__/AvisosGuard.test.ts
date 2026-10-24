@@ -22,9 +22,10 @@ describe('cadastro sustenta texto', () => {
 import { textoSustentado } from '../../../../supabase/functions/check-publicacao-notificacoes/guard';
 describe('texto sustentado', () => {
   const now = new Date('2026-10-26T13:00:00Z');
-  const pubDias = (n: number) => ({ data_publicacao_rpi: new Date(now.getTime() - n * 86400000).toISOString() });
+  const pubDias = (n: number) => { const d = new Date(now.getTime() - n * 86400000); return { data_publicacao_rpi: d.toISOString(), descricao_prazo: 'Cumprimento de exigência', proximo_prazo_critico: new Date(d.getTime() + 60 * 86400000).toISOString() }; };
   it('texto2 so com 39', () => { expect(textoSustentado(2, pubDias(39), now)).toBe(true); expect(textoSustentado(2, pubDias(37), now)).toBe(false); expect(textoSustentado(2, pubDias(40), now)).toBe(false); });
   it('texto1 dentro de 60', () => { expect(textoSustentado(1, pubDias(20), now)).toBe(true); expect(textoSustentado(1, pubDias(61), now)).toBe(false); });
+  it('prazo nao sustenta 60', () => { const b = pubDias(20); expect(textoSustentado(1, { ...b, descricao_prazo: 'Prazo padrão - 60 dias' }, now)).toBe(false); expect(textoSustentado(1, { ...b, proximo_prazo_critico: null }, now)).toBe(false); expect(textoSustentado(1, { ...b, proximo_prazo_critico: new Date(now.getTime() + 10 * 86400000).toISOString() }, now)).toBe(false); expect(textoSustentado(1, { ...b, descricao_prazo: null }, now)).toBe(false); });
   it('sem data nao', () => expect(textoSustentado(1, {}, now)).toBe(false));
   it('texto3 nunca', () => expect(textoSustentado(3, pubDias(50), now)).toBe(false));
 });
