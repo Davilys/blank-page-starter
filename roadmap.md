@@ -1,7 +1,7 @@
 # Roadmap — Recursos INPI (3 modalidades)
 
 ## /registrar e /formulario — celular
-- [ ] Remover o ícone de lupa do card de busca e usar o espaço para mais texto (código pronto; falta conferir na prévia)
+- [x] Remover o ícone de lupa do card de busca (título maior no espaço); frase extra inventada foi retirada a pedido
 - [ ] Traços de etapa: sumir da etapa de busca de viabilidade e aparecer só depois da busca, ao clicar em Registrar (só no celular)
 
 ## Publicações — revisão solicitada

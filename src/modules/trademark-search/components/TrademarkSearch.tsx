@@ -135,7 +135,6 @@ export function TrademarkSearch({ variant, onContinue, continueLabel }: Trademar
                 <div className="text-center space-y-2">
                   <h2 className="text-2xl font-bold leading-tight">Consulte a disponibilidade da sua marca</h2>
                   <p className="text-sm text-muted-foreground">Pesquisa exata e radical na base oficial do INPI.</p>
-                  <p className="text-sm text-muted-foreground">Veja as marcas já registradas antes de seguir com o seu pedido.</p>
                 </div>
                 <div className="space-y-4">
                   <div className="space-y-2">
