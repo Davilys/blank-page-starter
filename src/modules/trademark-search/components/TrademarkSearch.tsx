@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Lock, Zap, Search } from 'lucide-react';
+import { ArrowRight, Lock, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -133,10 +133,7 @@ export function TrademarkSearch({ variant, onContinue, continueLabel }: Trademar
             ) : (
               <form onSubmit={handleSubmit} className="space-y-6" noValidate>
                 <div className="text-center space-y-2">
-                  <div className="mx-auto w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
-                    <Search className="w-6 h-6 text-primary" />
-                  </div>
-                  <h2 className="text-xl font-bold">Consulte a disponibilidade da sua marca</h2>
+                  <h2 className="text-2xl font-bold leading-tight">Consulte a disponibilidade da sua marca</h2>
                   <p className="text-sm text-muted-foreground">Pesquisa exata e radical na base oficial do INPI.</p>
                 </div>
                 <div className="space-y-4">

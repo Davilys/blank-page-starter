@@ -14,6 +14,12 @@ export default defineConfig(({ mode }) => ({
     // Mantidos os demais pisos do default antigo; apenas Safari 14 -> 15.
     target: ["chrome87", "edge88", "es2020", "firefox78", "safari15"],
   },
+  optimizeDeps: {
+    // O otimizador de dependências da prévia herdava pisos antigos (safari14) que o
+    // esbuild 0.28 não rebaixa (destructuring) e que barram top-level await, e isso
+    // derrubava o dev server ao subir. Em prévia local, esnext dispensa o rebaixamento.
+    esbuildOptions: { target: "esnext" },
+  },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
