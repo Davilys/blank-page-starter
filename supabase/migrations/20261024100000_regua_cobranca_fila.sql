@@ -60,7 +60,7 @@ BEGIN
   FROM invoices i
   JOIN (VALUES ('vencido_d1',1),('vencido_d3',3),('vencido_d5',5)) AS t(tipo,d)
     ON i.due_date BETWEEN v_hoje - t.d - v_extra AND v_hoje - t.d
-  WHERE v_lemb
+  WHERE v_lemb AND v_corte IS NOT NULL AND i.due_date >= v_corte  -- só faturas novas (sem estoque antigo)
     AND classificar_situacao_cobranca(i.status, i.due_date, i.sync_status) = 'vencidas'
     AND (v_dun OR lower(coalesce(i.status,'')) <> 'dunning_requested')
     AND NOT EXISTS (SELECT 1 FROM acordos_cliente a WHERE a.invoice_original_id = i.id AND a.status IN ('processando','ativo','falha_pendente'));
