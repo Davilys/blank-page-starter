@@ -16,6 +16,7 @@ const FX = new URL('./fixtures/', import.meta.url).pathname;
 const file = (n: string) => new File([readFileSync(FX + n)], n, { type: 'application/pdf' });
 const results: Record<string, unknown> = { pdfjsVersion };
 
+const NAPI_CANVAS = '@napi-rs/canvas';
 it('versao exata instalada == esperada pela branch', () => {
   expect(process.env.EXPECTED_PDFJS_VERSION, 'CI deve injetar EXPECTED_PDFJS_VERSION').toBeTruthy();
   expect(pdfjsVersion).toBe(process.env.EXPECTED_PDFJS_VERSION);
@@ -88,7 +89,7 @@ it('call site 2 (real): binaryParsers.createPdfParser — 4 fixtures', async () 
 });
 
 it('call site 3 probe: INPILegalChatDialog render SEM param canvas (assinatura exata L104)', async () => {
-  const nc = await import('@napi-rs/canvas'); // ausencia = falha (pinado no CI)
+  const nc = await import(/* @vite-ignore */ NAPI_CANVAS as string) as any; // ausencia = falha (pinado no CI)
   const lib = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const doc = await lib.getDocument({ data: new Uint8Array(readFileSync(FX + 'texto-acentos-3pag.pdf')) }).promise;
   const page = await doc.getPage(1);
@@ -109,7 +110,7 @@ it('call site 3 probe: INPILegalChatDialog render SEM param canvas (assinatura e
 });
 
 it('call site 4 probe: packageBuilder render COM param canvas (assinatura exata L61, cast identico)', async () => {
-  const nc = await import('@napi-rs/canvas');
+  const nc = await import(/* @vite-ignore */ NAPI_CANVAS as string) as any;
   const lib = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const doc = await lib.getDocument({ data: new Uint8Array(readFileSync(FX + 'texto-acentos-3pag.pdf')) }).promise;
   const page = await doc.getPage(2);
