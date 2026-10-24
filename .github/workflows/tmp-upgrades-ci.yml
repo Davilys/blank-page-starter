@@ -38,6 +38,7 @@ jobs:
           [ -z "$FILES" ] && echo "sem suites runtime nesta branch" && exit 0
           npx vitest run $FILES
       - name: render browser-real (Chrome + BlobWorker como o app) base x candidato
+        if: hashFiles('scripts/pdfjs-browser-harness.mjs') != ''
         run: |
           set -e
           npm install --no-save --save-exact --no-audit --no-fund --ignore-scripts puppeteer-core@25.16.0
