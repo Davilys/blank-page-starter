@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { EnrichmentResult } from './types';
 
-const enrichedDataSchema = z.object({
+export const enrichedDataSchema = z.object({
   full_name: z.string().nullable().optional(),
   company_name: z.string().nullable().optional(),
   trade_name: z.string().nullable().optional(),
@@ -20,7 +20,7 @@ const enrichedDataSchema = z.object({
   phones: z.array(z.string()).optional(),
 });
 
-const responseSchema = z.object({
+export const responseSchema = z.object({
   success: z.boolean(),
   status: z.enum([
     'success',
