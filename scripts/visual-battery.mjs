@@ -26,12 +26,20 @@ for (const [nome, vp] of Object.entries(VIEWPORTS)) {
   for (const rota of ROTAS) {
     const shots = {};
     for (const [alvo, base] of [['cand', `http://127.0.0.1:${PREVIEW_PORT}`], ['prod', PROD]]) {
+      const tag = `[${nome} ${rota} ${alvo}]`;
+      console.log(tag, 'newPage');
       const page = await browser.newPage();
       await page.setViewport(vp);
+      console.log(tag, 'goto', base + rota);
+      const t0 = Date.now();
       await page.goto(base + rota, { waitUntil: 'networkidle2', timeout: 45000 }).catch(e => console.error('nav', alvo, rota, e.message));
+      console.log(tag, 'goto done em', Date.now() - t0, 'ms');
       await new Promise(r => setTimeout(r, 2500));
+      console.log(tag, 'screenshot');
       shots[alvo] = await page.screenshot({ fullPage: false });
+      console.log(tag, 'screenshot ok');
       await page.close();
+      console.log(tag, 'page closed');
     }
     const a = PNG.sync.read(Buffer.from(shots.cand)), b = PNG.sync.read(Buffer.from(shots.prod));
     const { width, height } = a;

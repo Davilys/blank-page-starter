@@ -54,6 +54,7 @@ jobs:
       - name: build
         run: npm run build
       - name: bateria visual candidato x producao (5 rotas x desk/mob)
+        timeout-minutes: 25
         run: |
           set -e
           npm install --no-save --save-exact --no-audit --no-fund --ignore-scripts puppeteer-core@25.16.0 pngjs@7.0.0 pixelmatch@7.1.0
