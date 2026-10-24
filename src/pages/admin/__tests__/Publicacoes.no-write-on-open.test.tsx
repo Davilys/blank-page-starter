@@ -1,7 +1,5 @@
 // @vitest-environment happy-dom
-// Invariancia: ABRIR a tela Publicacoes nao grava nada (zero insert/update/upsert/delete).
-// Dados montados para disparar TODAS as rotinas de escrita ao carregar (criar, sync RPI,
-// arquivar por prazo, enriquecer, auto-atribuir responsavel). Backend mock; producao intocada.
+// ABRIR a tela Publicacoes: escritas ao carregar. Backend mock (producao intocada) com paginacao keyset real.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, act, cleanup, screen, waitFor, fireEvent } from '@testing-library/react';
 import React from 'react';
@@ -52,10 +50,18 @@ vi.mock('@/integrations/supabase/client', () => {
   } = { tables: {}, writes: [], user: { id: 'u-admin-1', email: 'admin@x.com' } };
 
   const builder = (table: string, op: string, payload?: any) => {
-    const resp = () => state.tables[table] ?? { data: [], error: null };
+    let after: string | null = null;
+    const resp = () => {
+      const r = state.tables[table] ?? { data: [], error: null };
+      if (op === 'select' && after !== null && Array.isArray(r.data)) {
+        return { ...r, data: [...r.data].sort((a: any, b: any) => (a.id < b.id ? -1 : 1)).filter((x: any) => x.id > after!) };
+      }
+      return r;
+    };
     const q: any = {
       select: () => q, order: () => q, eq: () => q, neq: () => q, in: () => q,
       or: () => q, limit: () => q, range: () => q, gte: () => q, lte: () => q,
+      gt: (_c: string, v: string) => { after = v; return q; },
       is: () => q, not: () => q, filter: () => q, match: () => q, upsert: () => q,
       ilike: () => q, like: () => q, contains: () => q, overlaps: () => q,
       single: () => Promise.resolve((() => { const r = resp(); return { data: Array.isArray(r.data) ? (r.data[0] ?? null) : r.data, error: r.error }; })()),
@@ -93,46 +99,75 @@ import { __state } from '@/integrations/supabase/client';
 const PUB = (id: string, over: any = {}) => ({
   id, process_id: null, client_id: 'c1', admin_id: null,
   status: '003', tipo_publicacao: 'publicacao_rpi',
-  data_deposito: '2026-01-10', data_publicacao_rpi: '2026-01-01',
+  data_deposito: '2026-01-10', data_publicacao_rpi: '2026-10-01',
   prazo_oposicao: null, data_decisao: null, data_certificado: null, data_renovacao: null,
-  proximo_prazo_critico: '2026-02-01', descricao_prazo: null,
+  proximo_prazo_critico: '2027-03-01', descricao_prazo: null,
   oposicao_protocolada: false, oposicao_data: null, comentarios_internos: null,
   documento_rpi_url: null, rpi_number: '2750', rpi_link: null, rpi_entry_id: null,
-  brand_name_rpi: null, process_number_rpi: null, ncl_class: null,
+  brand_name_rpi: `MARCA ${id.toUpperCase()}`, process_number_rpi: `900${id}`, ncl_class: '35',
   cumprimento_ok: false, cumprimento_status: null,
   created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-01T00:00:00Z', ...over,
 });
 const inDays = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+const PROC = (id: string, over: any = {}) => ({ id, user_id: 'c1', pipeline_stage: '003', brand_name: `PROC ${id}`, process_number: `900${id}`, ncl_classes: [35], status: 'em_andamento', deposit_date: '2026-01-10', ...over });
 
-const seed = () => {
-  __state.tables['publicacoes_marcas'] = { data: [
-    PUB('expirada', { process_id: 'p1' }),                                   // auto-arquivar
-    PUB('semcampos', { process_id: 'p2', proximo_prazo_critico: inDays(40) }), // enriquecer + auto-atribuir
-    PUB('semana', { process_id: 'p3', proximo_prazo_critico: inDays(3) }),     // auto-atribuir bucket
-  ], error: null };
-  __state.tables['brand_processes'] = { data: [
-    { id: 'p1', user_id: 'c1', pipeline_stage: '003', brand_name: 'M1', process_number: '111', ncl_classes: [35], status: 'em_andamento' },
-    { id: 'p2', user_id: 'c1', pipeline_stage: '003', brand_name: 'M2', process_number: '222', ncl_classes: [9], status: 'em_andamento' },
-    { id: 'p3', user_id: 'c1', pipeline_stage: '003', brand_name: 'M3', process_number: '333', ncl_classes: [41], status: 'em_andamento' },
-    { id: 'p4', user_id: 'c1', pipeline_stage: 'oposicao', brand_name: 'M4', process_number: '444', ncl_classes: [25], status: 'em_andamento' }, // auto-criar
-  ], error: null };
-  __state.tables['rpi_entries'] = { data: [
-    { id: 'r1', process_number: '111', brand_name: 'M1', rpi_number: '2750', matched_client_id: 'c1', matched_process_id: 'p1', dispatch_type: 'publicacao', rpi_date: '2026-10-01', status: 'matched' },
-  ], error: null };
+const base = () => {
   __state.tables['profiles'] = { data: [{ id: 'c1', full_name: 'Cliente Um', email: 'c1@x.com' }], error: null };
   __state.tables['user_roles'] = { data: [], error: null };
   __state.tables['responsavel_atribuicao'] = { data: [], error: null };
+  __state.tables['rpi_entries'] = { data: [], error: null };
+  __state.tables['brand_processes'] = { data: [], error: null };
+  __state.tables['publicacoes_marcas'] = { data: [], error: null };
+};
+
+// Cada cenario liga UMA rotina de escrita ao carregar.
+const SCENARIOS: Record<string, { seed: () => void; expect: RegExp }> = {
+  autoarquivar: { // pub com prazo vencido => status arquivado
+    seed: () => { __state.tables['publicacoes_marcas'] = { data: [PUB('a1', { process_id: 'p1', proximo_prazo_critico: '2026-02-01' })], error: null };
+                  __state.tables['brand_processes'] = { data: [PROC('p1')], error: null }; },
+    expect: /publicacoes_marcas:update:.*arquivado/,
+  },
+  autocriar: { // processo em etapa juridica sem publicacao => insert
+    seed: () => { __state.tables['brand_processes'] = { data: [PROC('p9', { pipeline_stage: 'oposicao' })], error: null };
+                  __state.tables['publicacoes_marcas'] = { data: [PUB('a1', { process_id: 'p1' })], error: null }; },
+    expect: /publicacoes_marcas:insert:/,
+  },
+  enriquecer: { // pub sem brand/numero/ncl com processo vinculado => update de campos vazios
+    seed: () => { __state.tables['publicacoes_marcas'] = { data: [PUB('a1', { process_id: 'p1', brand_name_rpi: null, process_number_rpi: null, ncl_class: null })], error: null };
+                  __state.tables['brand_processes'] = { data: [PROC('p1')], error: null }; },
+    expect: /publicacoes_marcas:update:.*(brand_name_rpi|ncl_class|process_number_rpi)/,
+  },
+  syncrpi: { // entrada da revista casada com processo sem pub => insert/update vindo do RPI
+    seed: () => { __state.tables['rpi_entries'] = { data: [{ id: 'r1', process_number: '900p5', brand_name: 'M5', rpi_number: '2750', matched_client_id: 'c1', matched_process_id: 'p5', dispatch_type: 'publicacao', rpi_date: '2026-10-01', status: 'matched', matched_publicacao_id: null, publicacao_id: null }], error: null };
+                  __state.tables['brand_processes'] = { data: [PROC('p5')], error: null };
+                  __state.tables['publicacoes_marcas'] = { data: [PUB('a1', { process_id: 'p1', rpi_entry_id: 'zzz' })], error: null }; },
+    expect: /publicacoes_marcas:(insert|update):/,
+  },
+  autoatribuir: { // pub no bucket de 30 dias sem responsavel => upsert responsavel_atribuicao + historico
+    seed: () => { __state.tables['publicacoes_marcas'] = { data: [PUB('a1', { process_id: 'p1', proximo_prazo_critico: inDays(20) })], error: null };
+                  __state.tables['brand_processes'] = { data: [PROC('p1')], error: null }; },
+    expect: /responsavel_(atribuicao|historico):(upsert|insert):/,
+  },
+};
+
+const open = async () => {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 0 } } });
+  render(<QueryClientProvider client={qc}><Publicacoes /></QueryClientProvider>);
+  await waitFor(() => expect(screen.getByTitle('Lista')).toBeTruthy(), { timeout: 5000 });
+  await act(async () => { await new Promise(r => setTimeout(r, 2500)); });
+  // anti-vacuidade: a tela carregou de verdade (sem estado de erro)
+  expect(screen.queryByText('Erro ao carregar publicações')).toBeNull();
+  return __state.writes.map((w: any) => `${w.table}:${w.op}:${JSON.stringify(w.payload)}`);
 };
 
 beforeEach(() => { cleanup(); __state.tables = {}; __state.writes = []; toastError.mockClear(); });
 
-describe('Invariancia: abrir Publicacoes', () => {
-  it('abrir a tela (visao Prazos, padrao) nao dispara NENHUMA escrita', async () => {
-    seed();
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 0 } } });
-    render(<QueryClientProvider client={qc}><Publicacoes /></QueryClientProvider>);
-    await waitFor(() => expect(screen.getByTitle('Lista')).toBeTruthy(), { timeout: 5000 });
-    await act(async () => { await new Promise(r => setTimeout(r, 2500)); });
-    expect(__state.writes).toEqual([]);
-  });
+describe('Invariancia: abrir Publicacoes NAO grava (flag desligada)', () => {
+  for (const [nome, sc] of Object.entries(SCENARIOS)) {
+    it(`cenario ${nome}: zero escritas`, async () => {
+      base(); sc.seed();
+      const w = await open();
+      expect(w).toEqual([]);
+    });
+  }
 });
