@@ -15,9 +15,10 @@ export default defineConfig(({ mode }) => ({
     target: ["chrome87", "edge88", "es2020", "firefox78", "safari15"],
   },
   optimizeDeps: {
-    // O otimizador de dependências da prévia herdava o piso safari14, que o
-    // esbuild 0.28 não consegue rebaixar, e derrubava o dev server ao subir.
-    esbuildOptions: { target: ["chrome87", "edge88", "es2020", "firefox78", "safari15"] },
+    // O otimizador de dependências da prévia herdava pisos antigos (safari14) que o
+    // esbuild 0.28 não rebaixa (destructuring) e que barram top-level await, e isso
+    // derrubava o dev server ao subir. Em prévia local, esnext dispensa o rebaixamento.
+    esbuildOptions: { target: "esnext" },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
