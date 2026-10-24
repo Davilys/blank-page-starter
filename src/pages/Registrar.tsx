@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckoutProgress } from "@/components/cliente/checkout/CheckoutProgress";
+import { StepDashes } from "@/components/formulario/QuickStepsForm";
 import { TrademarkSearch } from "@/modules/trademark-search/components/TrademarkSearch";
 import { useTrademarkSearch, toViabilityResult } from "@/modules/trademark-search/useTrademarkSearch";
 import { PersonalDataStep, type PersonalData } from "@/components/cliente/checkout/PersonalDataStep";
@@ -241,11 +241,13 @@ export default function Registrar() {
       {/* Social Proof Notifications */}
       <SocialProofNotification />
 
-      {/* Public Header (matches landing rebrand) */}
-      <Header />
+      {/* Public Header — desktop only */}
+      <div className="hidden md:block">
+        <Header />
+      </div>
 
       {/* Main content */}
-      <main className="relative z-10 w-full max-w-2xl mx-auto px-4 pt-28 md:pt-36 pb-10">
+      <main className="relative z-10 w-full max-w-2xl mx-auto px-4 pt-4 md:pt-36 pb-10">
         {/* Badge */}
         <div className="flex justify-center mb-5 animate-fade-in">
           <div
@@ -284,17 +286,13 @@ export default function Registrar() {
           </motion.p>
         </div>
 
-        {/* Progress bar */}
-        <div className="rounded-2xl bg-white/95 backdrop-blur-sm p-3 md:p-4 mb-4 shadow-[0_18px_50px_-20px_hsla(226,95%,20%,0.35)] border border-white/40">
-          <CheckoutProgress currentStep={step} />
-        </div>
-
         {/* Form card */}
         <Card
           className="border border-white/60 bg-white"
           style={{ boxShadow: "var(--shadow-card-hero)" }}
         >
           <CardContent className="p-6 md:p-8">
+            <StepDashes total={6} current={step} />
             {step === 1 && (
               <TrademarkSearch
                 variant="checkout"
