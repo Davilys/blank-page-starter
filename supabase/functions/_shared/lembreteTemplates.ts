@@ -6,7 +6,7 @@ export const TIPOS_LEMBRETE: TipoLembrete[] = ["d3", "d0", "vencido_d1", "vencid
 const primeiroNome = (n: string) => (n || "Cliente").split(" ")[0];
 const svc = (s: string) => (s ? ` (${s})` : "");
 
-export function buildWhatsApp(nome: string, quando: string, data: string, link: string, valor: string, tipo: TipoLembrete = "d0", servico = "", comClausula = false): string {
+export function buildWhatsApp(nome: string, quando: string, data: string, link: string, valor: string, tipo: TipoLembrete = "d0", servico = ""): string {
   const first = primeiroNome(nome);
   const linkBlock = link ? `\n🔗 ${link}\n` : "\n(entre em contato para receber o link)\n";
   if (tipo === "vencido_d1") return `Olá, *${first}*! 😊
@@ -33,7 +33,7 @@ Equipe WebMarcas`;
 
 Sua fatura de *${valor}*${svc(servico)} está vencida há 5 dias (vencimento em *${data}*).
 
-${D5_PARAGRAFO(comClausula)}
+${D5_PARAGRAFO()}
 
 Para evitar isso, nosso jurídico pode autorizar um acordo parcelado com vencimento ajustado à sua realidade. Responda esta mensagem ou pague direto pelo link:
 ${linkBlock}
@@ -49,16 +49,9 @@ Qualquer dúvida estamos à disposição 😊
 Equipe WebMarcas`;
 }
 
-// D5: a versão com cláusula só vale para contrato assinado que contém as cláusulas 7.2 e 7.3.
-const D5_PARAGRAFO = (comClausula: boolean) => comClausula
-  ? "Conforme a cláusula 7.2 do seu contrato, o não pagamento autoriza a WebMarcas a rescindir o contrato e cancelar a prestação dos serviços, mediante comunicação por escrito. E, pela cláusula 7.3, o cancelamento não extingue nem perdoa o débito em aberto: ele continua exigível, com multa, juros e correção, além dos serviços já prestados."
-  : "A falta de pagamento pode prejudicar o andamento do seu processo e dos serviços contratados, e o débito em aberto continua exigível.";
-
-/** O contrato assinado do cliente tem as cláusulas 7.2 e 7.3 (só contratos novos). */
-export function temClausulaInadimplencia(contractHtml: string | null | undefined): boolean {
-  const t = (contractHtml || "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ");
-  return t.includes("7.2 O inadimplemento de qualquer valor") && t.includes("7.3 A rescisão ou o cancelamento do contrato por inadimplência não extingue");
-}
+// D5: texto genérico original (aprovado pelo titular às 11:51:00). As versões por cláusula 7.2/7.3
+// NÃO foram aprovadas e não estão no código.
+const D5_PARAGRAFO = () => "A falta de pagamento pode prejudicar o andamento do seu processo e dos serviços contratados.";
 
 export const EMAIL_TITULO: Record<TipoLembrete, string> = {
   d3: "Lembrete de vencimento — WebMarcas",
@@ -68,7 +61,7 @@ export const EMAIL_TITULO: Record<TipoLembrete, string> = {
   vencido_d5: "Importante: sua fatura e seus serviços — WebMarcas",
 };
 
-function emailBody(tipo: TipoLembrete, first: string, valor: string, servico: string, data: string, quando: string, comClausula = false): string {
+function emailBody(tipo: TipoLembrete, first: string, valor: string, servico: string, data: string, quando: string): string {
   const s = svc(servico);
   if (tipo === "vencido_d1") return `<p>Olá, <strong>${first}</strong>!</p>
   <p>Notamos que sua fatura de <strong>${valor}</strong>${s}, com vencimento em <strong>${data}</strong>, ainda consta em aberto.</p>
@@ -79,19 +72,19 @@ function emailBody(tipo: TipoLembrete, first: string, valor: string, servico: st
   <p>Pedimos que regularize o quanto antes para evitar a incidência de juros e multas previstos em contrato:</p>`;
   if (tipo === "vencido_d5") return `<p>Olá, <strong>${first}</strong>.</p>
   <p>Sua fatura de <strong>${valor}</strong>${s} está vencida há 5 dias (vencimento em <strong>${data}</strong>).</p>
-  <p>${D5_PARAGRAFO(comClausula)}</p>
+  <p>${D5_PARAGRAFO()}</p>
   <p>Para evitar isso, nosso jurídico pode autorizar um acordo parcelado com vencimento ajustado à sua realidade. Responda este e-mail ou pague direto pelo link:</p>`;
   return `<p>Olá, <strong>${first}</strong>!</p>
   <p>Passando para lembrar que sua cobrança no valor de <strong>${valor}</strong>${s} vence <strong>${quando}</strong> (${data}).</p>`;
 }
 
-export function buildEmailHtml(nome: string, quando: string, data: string, link: string, valor: string, tipo: TipoLembrete = "d0", servico = "", comClausula = false): string {
+export function buildEmailHtml(nome: string, quando: string, data: string, link: string, valor: string, tipo: TipoLembrete = "d0", servico = ""): string {
   const first = primeiroNome(nome);
   const ehVencido = tipo.startsWith("vencido_");
   return `
 <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;line-height:1.6">
   <h2 style="color:#0a3d62">${EMAIL_TITULO[tipo]}</h2>
-  ${emailBody(tipo, first, valor, servico, data, quando, comClausula)}
+  ${emailBody(tipo, first, valor, servico, data, quando)}
   ${ehVencido ? "" : "<p>Para evitar juros e multas, você pode realizar o pagamento aqui:</p>"}
   ${link ? `<p><a href="${link}" target="_blank" rel="noopener" style="background:#0a3d62;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;display:inline-block">Acessar fatura / boleto</a></p>` : `<p><em>Entre em contato para receber o link de pagamento.</em></p>`}
   <p>Qualquer dúvida estamos à disposição 😊</p>
@@ -111,35 +104,33 @@ export function buildSubject(tipo: TipoLembrete, quando: string, data: string): 
   return m[tipo];
 }
 
-// ── Acordo automático aos 30 dias: texto LITERAL ditado pelo titular (24/10, 11:57), só com os
-// dados do cliente no lugar do exemplo. Sem total e sem juros (os 10% ficam só no cálculo).
-// Exigência R$1.621 (5x): ditado original ("com mais de N dias"). Registro R$699 (3x): versão aprovada
-// pelo titular em 24/10 11:58:59 ("há N dias"). Diferem só na frase do débito.
+// ── Acordo automático aos 30 dias. Textos aprovados pelo titular em 24/10:
+// WhatsApp = versão curta (aprovada 12:00:31, negrito nos trechos importantes); E-mail = versão integral
+// (1621 = ditado original; 699 = versão literal aprovada 11:58:59). Sem total e sem juros (10% só no cálculo).
 export type AcordoAutoDados = { nome: string; valor: string; dias: number; n: number; dataPrimeira: string; link: string };
 
 const atrasoTxt = (d: AcordoAutoDados) => d.n === 5 ? `com mais de ${d.dias} dias` : `há ${d.dias} dias`;
+
 export function buildAcordoAutoWhatsApp(d: AcordoAutoDados): string {
   return `Oi ${primeiroNome(d.nome)}! Tudo bem?
 
 Consegui uma condição especial pra você não perder o seu processo de registro de marca 👇
 
-✅ Parcelamos o débito ${d.valor} em aberto ${atrasoTxt(d)}, em até ${d.n}x no boleto!
-📅 Primeira parcela só dia ${d.dataPrimeira}, segue fatura: ${d.link}
+✅ Parcelamos o débito *${d.valor}* em aberto ${atrasoTxt(d)}, em até *${d.n}x* no boleto!
+📅 Primeira parcela só dia *${d.dataPrimeira}*: ${d.link}
 
-Assim você mantém seu contrato ativo e evita qualquer risco de cancelamento 🚨
-
-Nosso objetivo é garantir que sua marca continue protegida e em andamento no INPI.
+Assim você *mantém seu contrato ativo e evita qualquer risco de cancelamento* 🚨
 
 Só para confirma aqui ja liberei essa condição pra você, combinado... 👍`;
 }
 export function buildAcordoAutoEmailHtml(d: AcordoAutoDados): string {
   return `
 <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;line-height:1.6">
-  <p>Oi <strong>${primeiroNome(d.nome)}</strong>! Tudo bem?</p>
+  <p>Oi ${primeiroNome(d.nome)}! Tudo bem?</p>
   <p>Consegui uma condição especial pra você não perder o seu processo de registro de marca 👇</p>
   <p>✅ Parcelamos o débito <strong>${d.valor}</strong> em aberto ${atrasoTxt(d)}, em até <strong>${d.n}x</strong> no boleto!<br>
   📅 Primeira parcela só dia <strong>${d.dataPrimeira}</strong>${d.link ? `, <a href="${d.link}" target="_blank" rel="noopener">segue fatura</a>` : ""}</p>
-  <p>Assim você mantém seu contrato ativo e evita qualquer risco de cancelamento 🚨</p>
+  <p>Assim você <strong>mantém seu contrato ativo e evita qualquer risco de cancelamento</strong> 🚨</p>
   <p>Nosso objetivo é garantir que sua marca continue protegida e em andamento no INPI.</p>
   <p>Só para confirma aqui ja liberei essa condição pra você, combinado... 👍</p>
 </div>`;

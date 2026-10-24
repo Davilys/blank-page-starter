@@ -51,20 +51,34 @@ describe("textos dos lembretes", () => {
   });
 });
 
-import { buildAcordoAutoWhatsApp, buildAcordoAutoEmailHtml, temClausulaInadimplencia } from "../../../supabase/functions/_shared/lembreteTemplates";
+import { buildAcordoAutoWhatsApp, buildAcordoAutoEmailHtml } from "../../../supabase/functions/_shared/lembreteTemplates";
 describe("acordo automático D30 (texto literal ditado)", () => {
   it("1621 em até 5x e 699 em até 3x, sem total nem juros, sem dados do exemplo", () => {
     const d = { nome: "Maria Souza", valor: "R$ 1.621,00", dias: 31, n: 5, dataPrimeira: "31/10/2026", link: "https://x/1" };
     const w = buildAcordoAutoWhatsApp(d);
     expect(w).toContain("Oi Maria! Tudo bem?");
-    expect(w).toContain("Parcelamos o débito R$ 1.621,00 em aberto com mais de 31 dias, em até 5x no boleto!");
-    expect(w).toContain("Primeira parcela só dia 31/10/2026, segue fatura: https://x/1");
-    expect(buildAcordoAutoWhatsApp({ ...d, valor: "R$ 699,00", n: 3 })).toContain("Parcelamos o débito R$ 699,00 em aberto há 31 dias, em até 3x no boleto!");
+    expect(w).toContain("Parcelamos o débito *R$ 1.621,00* em aberto com mais de 31 dias, em até *5x* no boleto!");
+    expect(w).toContain("Primeira parcela só dia *31/10/2026*: https://x/1");
+    expect(buildAcordoAutoWhatsApp({ ...d, valor: "R$ 699,00", n: 3 })).toContain("Parcelamos o débito *R$ 699,00* em aberto há 31 dias, em até *3x* no boleto!");
     for (const t of [w, buildAcordoAutoEmailHtml(d)]) { expect(/juros|total|768|1\.783|Samuel|73 dias/i.test(t)).toBe(false); }
   });
-  it("detecta cláusula 7.2/7.3 só quando o contrato assinado tem o texto", () => {
-    expect(temClausulaInadimplencia("<p>7.2 O inadimplemento de qualquer valor devido</p><p>7.3 A rescisão ou o cancelamento do contrato por inadimplência não extingue</p>")).toBe(true);
-    expect(temClausulaInadimplencia("<p>Suspensão imediata em caso de inadimplência</p>")).toBe(false);
-    expect(temClausulaInadimplencia(null)).toBe(false);
+  it("WhatsApp curto com negrito nativo exato (sem asteriscos duplicados) e e-mail integral com strong", () => {
+    const d = { nome: "Maria Souza", valor: "R$ 1.621,00", dias: 31, n: 5, dataPrimeira: "31/10/2026", link: "https://x/1" };
+    const w = buildAcordoAutoWhatsApp(d);
+    expect(w).toContain("*R$ 1.621,00*"); expect(w).toContain("*5x*"); expect(w).toContain("*31/10/2026*");
+    expect(w).toContain("*mantém seu contrato ativo e evita qualquer risco de cancelamento*");
+    expect(w).not.toMatch(/\*\*/); expect((w.match(/\*/g) || []).length % 2).toBe(0);
+    expect(w).not.toContain("Nosso objetivo");
+    expect(w).toContain("Só para confirma aqui ja liberei essa condição pra você, combinado... 👍");
+    const e = buildAcordoAutoEmailHtml(d);
+    expect(e).toContain("<strong>R$ 1.621,00</strong>"); expect(e).toContain("<strong>5x</strong>");
+    expect(e).toContain("<strong>mantém seu contrato ativo e evita qualquer risco de cancelamento</strong>");
+    expect(e).toContain("Nosso objetivo é garantir que sua marca continue protegida e em andamento no INPI.");
+    expect(e).not.toContain("*");
+  });
+  it("D5 é o texto genérico original aprovado", () => {
+    const w = buildWhatsApp("Maria", "", "24/10/2026", "https://x", "R$ 699,00", "vencido_d5", "Registro de marca");
+    expect(w).toContain("A falta de pagamento pode prejudicar o andamento do seu processo e dos serviços contratados.");
+    expect(w).not.toMatch(/cl[áa]usula|exig[íi]vel/i);
   });
 });
