@@ -1790,14 +1790,14 @@ export default function PublicacaoTab() {
       {/* ─── AUTO-LINK ORPHAN BANNER ─── */}
       {orphanCount > 0 && (
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-4 p-3 rounded-xl border border-primary/30 bg-primary/5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-primary" />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-2">
+              <Users className="w-4 h-4 shrink-0 text-primary" />
               <p className="text-sm font-medium">
                 <span className="font-bold">{orphanCount}</span> publicação(ões) sem cliente vinculado
               </p>
             </div>
-            <Button size="sm" variant="default" className="text-xs gap-1.5" onClick={handleAutoLinkClients} disabled={isAutoLinking}>
+            <Button size="sm" variant="default" className="text-xs gap-1.5 shrink-0 self-start sm:self-auto" onClick={handleAutoLinkClients} disabled={isAutoLinking}>
               {isAutoLinking ? <><div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" /> Vinculando...</> : <><Zap className="w-3 h-3" /> Auto-vincular</>}
             </Button>
           </div>
