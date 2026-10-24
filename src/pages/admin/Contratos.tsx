@@ -362,7 +362,6 @@ export default function AdminContratos() {
     if (!orchestrator.tryInit()) return;
     orchestrator.requestFetch();   // fetchContracts with in-flight guard
     fetchPaidInvoices();           // paid metrics appear immediately, as before
-    backgroundSyncAsaas();         // background sync refreshes the paid set at the end
   };
 
   // Wait for auth session before fetching
@@ -393,6 +392,10 @@ export default function AdminContratos() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session && mounted) {
         initOnce();
+        // Trigger background Asaas sync once per mount so paid metrics open fresh.
+        // Deliberately ONLY on the getSession path, exactly as before the perf change:
+        // the onAuthStateChange path must never fire financial sync.
+        backgroundSyncAsaas();
       }
     });
 
