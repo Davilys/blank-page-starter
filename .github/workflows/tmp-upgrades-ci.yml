@@ -1,0 +1,59 @@
+name: tmp-upgrades-ci
+on:
+  push:
+    branches: [ci/fix-callback-links, ci/combo-c-z, fix/paginacao-publicacoes]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install -g npm@11
+      - run: npm install --no-audit --no-fund
+      - name: scanner pós-correção (npm audit da árvore do candidato)
+        run: npm audit --json > /tmp/audit-after.json || true; node -e "const a=require('/tmp/audit-after.json');console.log('vulnerabilities:',JSON.stringify(a.metadata.vulnerabilities));for(const[k,v]of Object.entries(a.vulnerabilities||{}))console.log(' ',k,v.severity,'via',(v.via||[]).filter(x=>typeof x==='object').length)"
+      - name: deps de teste+harness (pinadas, UMA unica instalacao --no-save — FORA do lock de producao; instalacoes --no-save separadas se podam mutuamente)
+        run: npm install --no-save --save-exact --no-audit --no-fund --ignore-scripts @testing-library/react@16.3.3 @testing-library/dom@10.4.2 happy-dom@21.0.4 @napi-rs/canvas@0.1.100
+      - name: typecheck projeto inteiro
+        run: npx tsc --noEmit -p tsconfig.app.json && npx tsc --noEmit -p tsconfig.node.json
+      - name: suites Leads + fix PDF (regressão do conjunto)
+        run: npx vitest run src/lib/__tests__/fetchAllPages.test.ts src/lib/__tests__/fetchAllById.test.ts src/pages/admin/__tests__/Leads.integration.test.tsx src/lib/__tests__/pdf-clients-export-fix.test.tsx src/lib/__tests__/callback-links.test.tsx src/lib/__tests__/redefinir-senha.test.tsx
+      - name: suites PDF baseline/autotable (presentes só na branch jsPDF)
+        run: if [ -f src/lib/__tests__/pdf-autotable-baseline.test.tsx ]; then npx vitest run src/lib/__tests__/pdf-baseline.test.tsx src/lib/__tests__/pdf-autotable-baseline.test.tsx; else echo "sem suites PDF nesta branch"; fi
+      - name: suites runtime novas C (asserts reais; versões exatas pinadas)
+        env:
+          EXPECTED_PDFJS_VERSION: "4.10.38"
+          EXPECTED_ZOD_VERSION: "4.6.7"
+        run: |
+          set -e
+          FILES=""
+          for f in src/lib/__tests__/pdfjs-runtime-c.test.ts src/lib/__tests__/zod-runtime-6consumers.test.ts src/lib/__tests__/zod-componentes-falha.test.tsx; do
+            [ -f "$f" ] && FILES="$FILES $f"
+          done
+          [ -z "$FILES" ] && echo "sem suites runtime nesta branch" && exit 0
+          npx vitest run $FILES
+      - name: render browser-real (Chrome + BlobWorker como o app) base x candidato
+        if: hashFiles('scripts/pdfjs-browser-harness.mjs') != ''
+        run: |
+          set -e
+          npm install --no-save --save-exact --no-audit --no-fund --ignore-scripts puppeteer-core@25.16.0
+          mkdir -p /tmp/pdfbase
+          npm install --prefix /tmp/pdfbase --save-exact --no-audit --no-fund --ignore-scripts pdfjs-dist@4.4.168
+          node scripts/pdfjs-browser-harness.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pdfjs-render-${{ github.run_id }}
+          path: /tmp/render-out
+          retention-days: 5
+      - name: build
+        run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.run_id }}
+          path: dist
+          retention-days: 1
