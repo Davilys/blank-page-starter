@@ -52,7 +52,7 @@ BEGIN
   PERFORM pg_advisory_xact_lock(hashtext('regua_cobranca_enfileirar'));
 
   CREATE TEMP TABLE IF NOT EXISTS _regua_cand (invoice_id uuid, tipo text) ON COMMIT DROP;
-  DELETE FROM _regua_cand;
+  DELETE FROM _regua_cand WHERE true;
 
   -- Lembretes D1/D3/D5 de faturas vencidas (fonte: classificador da tela Financeiro > Vencidas).
   INSERT INTO _regua_cand
