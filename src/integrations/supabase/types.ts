@@ -6882,6 +6882,53 @@ export type Database = {
           },
         ]
       }
+      signature_followups: {
+        Row: {
+          contract_id: string
+          created_at: string
+          id: string
+          results: Json | null
+          scheduled_at: string
+          sent_at: string | null
+          status: string
+          step: number
+          token: string | null
+          updated_at: string
+        }
+        Insert: {
+          contract_id: string
+          created_at?: string
+          id?: string
+          results?: Json | null
+          scheduled_at: string
+          sent_at?: string | null
+          status?: string
+          step: number
+          token?: string | null
+          updated_at?: string
+        }
+        Update: {
+          contract_id?: string
+          created_at?: string
+          id?: string
+          results?: Json | null
+          scheduled_at?: string
+          sent_at?: string | null
+          status?: string
+          step?: number
+          token?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signature_followups_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       system_settings: {
         Row: {
           id: string
