@@ -9,9 +9,9 @@ import { z } from "zod";
 import { validateCNPJ, formatCNPJ } from "@/lib/validators";
 import { cn } from "@/lib/utils";
 
-const brandDataSchema = z.object({
-  brandName: z.string().min(2, "Nome da marca obrigatório").max(100),
-  businessArea: z.string().min(3, "Ramo de atividade obrigatório").max(200),
+export const brandDataSchema = z.object({
+  brandName: z.string().min(2, "Nome da marca obrigatório").max(100, "String must contain at most 100 character(s)"),
+  businessArea: z.string().min(3, "Ramo de atividade obrigatório").max(200, "String must contain at most 200 character(s)"),
   hasCNPJ: z.boolean(),
   cnpj: z.string().optional(),
   companyName: z.string().optional(),
@@ -70,7 +70,7 @@ export function BrandDataStep({
     const result = brandDataSchema.safeParse(data);
     if (!result.success) {
       const newErrors: Record<string, string> = {};
-      result.error.errors.forEach((err) => {
+      result.error.issues.forEach((err) => {
         if (err.path[0]) newErrors[err.path[0] as string] = err.message;
       });
       setErrors(newErrors);

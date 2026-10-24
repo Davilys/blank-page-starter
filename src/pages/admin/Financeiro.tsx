@@ -136,6 +136,8 @@ export default function AdminFinanceiro() {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [listError, setListError] = useState<string | null>(null);
+  const [billingError, setBillingError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const navigateTo = useNavigate();
@@ -323,6 +325,7 @@ export default function AdminFinanceiro() {
 
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
+    setListError(null);
     try {
       const { data, error } = await supabase.rpc('admin_invoices_list_filtered', {
         p_search: debouncedSearch || null,
@@ -356,12 +359,15 @@ export default function AdminFinanceiro() {
       toast.error(e?.message || 'Erro ao carregar faturas');
       setInvoices([]);
       setTotalCount(0);
+      // estado de erro distinto do vazio: a tela não pode parecer "sem faturas" quando a consulta falhou
+      setListError(e?.message || 'Erro ao carregar faturas');
     }
     setLoading(false);
   }, [debouncedSearch, filterStatus, dateRange.from, dateRange.to, listOwnerFilter, sortKey, sortDir, page, billingFilters]);
 
   const fetchTotals = useCallback(async () => {
     setBillingLoading(true);
+    setBillingError(false);
     try {
       const { data, error } = await supabase.rpc('admin_billing_situation', {
         p_from: dateRange.from,
@@ -422,7 +428,11 @@ export default function AdminFinanceiro() {
         if (globalAguardando) normalized.categories.aguardando = globalAguardando;
       }
       setBillingData({ ...normalized, total: Number(normalized.total || 0) });
-    } catch (e) { console.warn('totais indisponíveis', e); }
+    } catch (e) {
+      console.warn('totais indisponíveis', e);
+      // nunca mostrar KPIs zerados quando a consulta falhou: erro visível em vez de zero silencioso
+      setBillingError(true);
+    }
     finally { setBillingLoading(false); }
   }, [dateRange.from, dateRange.to, ownerFilter, billingFilters]);
 
@@ -830,6 +840,14 @@ export default function AdminFinanceiro() {
           </div>
         )}
 
+        {billingError ? (
+          <Card className="p-6 flex flex-col items-center justify-center text-center gap-2">
+            <AlertTriangle className="h-8 w-8 text-destructive/70" />
+            <p className="text-sm font-medium text-foreground">Totais indisponíveis</p>
+            <p className="text-xs text-muted-foreground">Não foi possível carregar a situação de cobrança agora. Os valores não estão zerados — houve uma falha na consulta.</p>
+            <Button variant="outline" size="sm" className="mt-1" onClick={() => fetchTotals()}>Tentar novamente</Button>
+          </Card>
+        ) : (
         <BillingSituationSection
           data={billingData}
           loading={billingLoading}
@@ -847,6 +865,7 @@ export default function AdminFinanceiro() {
           onFiltersChange={(value) => { setBillingFilters(value); setPage(1); }}
           onSituationChange={(value) => { setFilterStatus(value); setPage(1); }}
         />
+        )}
 
         {/* ── TABLE ──────────────────────────────── */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
@@ -885,6 +904,13 @@ export default function AdminFinanceiro() {
                     </div>
                   </TableCell>
                 </TableRow>
+              ) : listError ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
+                  <AlertTriangle className="h-8 w-8 text-destructive/70" />
+                  <p className="text-sm font-medium text-foreground">Erro ao carregar faturas</p>
+                  <p className="text-xs text-muted-foreground">Não foi possível buscar as faturas agora. Isso não significa que não há faturas.</p>
+                  <Button variant="outline" size="sm" className="mt-1" onClick={() => fetchInvoices()}>Tentar novamente</Button>
+                </div>
               ) : invoices.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-16">

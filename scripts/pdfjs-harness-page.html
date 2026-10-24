@@ -1,0 +1,34 @@
+<!doctype html><meta charset="utf-8"><title>pdfjs harness</title>
+<script type="module">
+// Render browser-REAL: mesma estrategia do app — worker via Blob URL do fonte do worker.
+const v = new URLSearchParams(location.search).get('v'); // 'cand' | 'base'
+const out = { v, erros: [] };
+try {
+  const lib = await import(`/${v}/node_modules/pdfjs-dist/legacy/build/pdf.mjs`);
+  out.version = lib.version;
+  const workerRaw = await (await fetch(`/${v}/node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs`)).text();
+  lib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([workerRaw], { type: 'text/javascript' }));
+  out.fixtures = {};
+  for (const n of ['texto-acentos-3pag.pdf', 'scan-sem-texto.pdf', 'corrompido.pdf', 'protegido-senha.pdf']) {
+    const r = {};
+    try {
+      const bytes = new Uint8Array(await (await fetch(`/cand/src/lib/__tests__/fixtures/${n}`)).arrayBuffer());
+      const doc = await lib.getDocument({ data: bytes }).promise;
+      r.pages = doc.numPages;
+      const p1 = await doc.getPage(1);
+      const tc = await p1.getTextContent();
+      r.texto = tc.items.map(i => i.str).join('|');
+      const viewport = p1.getViewport({ scale: 1.5 });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await p1.render({ canvasContext: ctx, viewport }).promise; // assinatura exata INPILegalChatDialog:104
+      r.png = canvas.toDataURL('image/png');
+      r.w = canvas.width; r.h = canvas.height;
+    } catch (e) { r.erro = e.name + ': ' + String(e.message).slice(0, 120); }
+    out.fixtures[n] = r;
+  }
+} catch (e) { out.erros.push(e.name + ': ' + String(e.message).slice(0, 200)); }
+window.__done = out;
+</script>
