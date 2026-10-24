@@ -191,7 +191,10 @@ const SocialProofNotification = () => {
         if (newSearch.brand_name && newSearch.business_area) {
           // Add to list and trigger immediate notification
           setRealSearches(prev => [newSearch, ...prev].slice(0, 50));
-          
+
+          // On mobile, don't interrupt the 30s rhythm; it shows in the regular rotation
+          if (window.innerWidth < 768) return;
+
           // Force show new notification immediately
           setIsVisible(false);
           setTimeout(() => {
@@ -317,10 +320,11 @@ const SocialProofNotification = () => {
     setTimeout(() => {
       setIsVisible(false);
       
-      // Show next notification after 2 seconds gap
+      // Gap before next: 30s on mobile, 2s on larger screens
+      const gap = window.innerWidth < 768 ? 30000 : 2000;
       setTimeout(() => {
         showNotification();
-      }, 2000);
+      }, gap);
     }, 3000);
   }, [generateNotification]);
 
