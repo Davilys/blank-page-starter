@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { dentroHorarioComercial, cadastroSustentaTexto } from "./guard.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,6 +30,12 @@ const TEMPLATES = [
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  if (!dentroHorarioComercial()) {
+    return new Response(JSON.stringify({ skipped: 'fora_do_horario_comercial', sent: 0 }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
@@ -36,7 +43,7 @@ Deno.serve(async (req) => {
 
   const { data: schedules, error } = await supabase
     .from('publicacao_cobranca_schedule')
-    .select('*, publicacoes_marcas!inner(id, brand_name_rpi, process_id, status, cumprimento_ok, data_publicacao_rpi, proximo_prazo_critico)')
+    .select('*, publicacoes_marcas!inner(id, brand_name_rpi, process_id, status, cumprimento_ok, cumprimento_status, data_publicacao_rpi, proximo_prazo_critico)')
     .eq('status', 'ativo');
 
   if (error) {
@@ -49,6 +56,7 @@ Deno.serve(async (req) => {
   for (const s of (schedules || []) as any[]) {
     const pub = s.publicacoes_marcas;
     if (!pub || pub.cumprimento_ok || pub.status === 'arquivado' || pub.status === 'certificado') continue;
+    if (!cadastroSustentaTexto(pub, s)) continue;
     const start = new Date(s.data_inicio);
     const days = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
 
@@ -57,6 +65,8 @@ Deno.serve(async (req) => {
     else if (days >= 30 && !s.notif_2_at) tpl = TEMPLATES[1];
     else if (days >= 50 && !s.notif_3_at) tpl = TEMPLATES[2];
     if (!tpl) continue;
+    // Texto 3 afirma debito fixo; sem confirmacao do debito no cadastro, nao envia.
+    if (tpl.id === 3) continue;
 
     // Get client info
     const { data: profile } = await supabase
