@@ -1,3 +1,4 @@
+import { PUBLICACOES_AUTOWRITE_ON_LOAD } from '@/lib/publicacoesAutoWrite';
 import { fetchAllById, comparePrazoCriticoAscNullsLast } from '@/lib/fetchAllById';
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -532,6 +533,7 @@ export default function PublicacaoTab() {
   // ─── Auto-archive expired publications ────
   const autoArchiveRef = useRef(false);
   useEffect(() => {
+    if (!PUBLICACOES_AUTOWRITE_ON_LOAD) return;
     if (autoArchiveRef.current || isLoading || publicacoes.length === 0) return;
 
     const expired = publicacoes.filter(p => {
@@ -589,6 +591,7 @@ export default function PublicacaoTab() {
   }, [rpiEntries.length, processes.length]);
 
   useEffect(() => {
+    if (!PUBLICACOES_AUTOWRITE_ON_LOAD) return;
     if (hasSyncedRef.current) return;
     if (isLoading || rpiEntries.length === 0) return;
 
@@ -805,6 +808,7 @@ export default function PublicacaoTab() {
   // ─── Auto-create publicações for brand_processes in juridical stages without a Kanban card ────
   // (ref declared above at line 514)
   useEffect(() => {
+    if (!PUBLICACOES_AUTOWRITE_ON_LOAD) return;
     if (autoCreateFromProcessesRef.current || isLoading || processes.length === 0) return;
 
     const PIPELINE_TO_PUB: Record<string, PubStatus> = {
