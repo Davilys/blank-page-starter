@@ -17,3 +17,21 @@ export function cadastroSustentaTexto(pub: any, schedule: any): boolean {
   if (cs === 'desistiu' || cs === 'aguardando_pagamento') return false;
   return true;
 }
+
+export function diasDesdePublicacao(pub: any, now: Date = new Date()): number | null {
+  if (!pub?.data_publicacao_rpi) return null;
+  const t = new Date(pub.data_publicacao_rpi).getTime();
+  if (Number.isNaN(t)) return null;
+  return Math.floor((now.getTime() - t) / 86400000);
+}
+
+// Texto 1 afirma prazo de 60 dias a partir da publicacao (so dentro dele).
+// Texto 2 afirma "39 dias desde a publicacao": so quando forem exatamente 39.
+// Texto 3 nunca sai (debito nao confirmado).
+export function textoSustentado(id: number, pub: any, now: Date = new Date()): boolean {
+  const d = diasDesdePublicacao(pub, now);
+  if (d === null) return false;
+  if (id === 1) return d >= 0 && d <= 60;
+  if (id === 2) return d === 39;
+  return false;
+}

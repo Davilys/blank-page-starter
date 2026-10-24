@@ -19,3 +19,12 @@ describe('cadastro sustenta texto', () => {
   it('desistiu', () => expect(cadastroSustentaTexto({ ...ok, cumprimento_status: 'desistiu' }, {})).toBe(false));
   it('aguardando pagamento', () => expect(cadastroSustentaTexto({ ...ok, cumprimento_status: 'aguardando_pagamento' }, {})).toBe(false));
 });
+import { textoSustentado } from '../../../../supabase/functions/check-publicacao-notificacoes/guard';
+describe('texto sustentado', () => {
+  const now = new Date('2026-10-26T13:00:00Z');
+  const pubDias = (n: number) => ({ data_publicacao_rpi: new Date(now.getTime() - n * 86400000).toISOString() });
+  it('texto2 so com 39', () => { expect(textoSustentado(2, pubDias(39), now)).toBe(true); expect(textoSustentado(2, pubDias(37), now)).toBe(false); expect(textoSustentado(2, pubDias(40), now)).toBe(false); });
+  it('texto1 dentro de 60', () => { expect(textoSustentado(1, pubDias(20), now)).toBe(true); expect(textoSustentado(1, pubDias(61), now)).toBe(false); });
+  it('sem data nao', () => expect(textoSustentado(1, {}, now)).toBe(false));
+  it('texto3 nunca', () => expect(textoSustentado(3, pubDias(50), now)).toBe(false));
+});

@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { dentroHorarioComercial, cadastroSustentaTexto } from "./guard.ts";
+import { dentroHorarioComercial, cadastroSustentaTexto, textoSustentado } from "./guard.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -67,6 +67,8 @@ Deno.serve(async (req) => {
     if (!tpl) continue;
     // Texto 3 afirma debito fixo; sem confirmacao do debito no cadastro, nao envia.
     if (tpl.id === 3) continue;
+    // Texto so sai se o fato afirmado (dias/prazo desde a publicacao) vale para este caso.
+    if (!textoSustentado(tpl.id, pub, today)) continue;
 
     // Get client info
     const { data: profile } = await supabase
