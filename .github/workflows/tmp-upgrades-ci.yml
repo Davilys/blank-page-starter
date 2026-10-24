@@ -27,7 +27,7 @@ jobs:
         run: if [ -f src/lib/__tests__/pdf-autotable-baseline.test.tsx ]; then npx vitest run src/lib/__tests__/pdf-baseline.test.tsx src/lib/__tests__/pdf-autotable-baseline.test.tsx; else echo "sem suites PDF nesta branch"; fi
       - name: suites runtime novas C (asserts reais; versões exatas pinadas)
         env:
-          EXPECTED_PDFJS_VERSION: "4.4.168"
+          EXPECTED_PDFJS_VERSION: "4.10.38"
           EXPECTED_ZOD_VERSION: "4.6.7"
         run: |
           set -e
