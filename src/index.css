@@ -1199,3 +1199,8 @@
   from { opacity: 0; transform: translateX(-4px); }
   to   { opacity: 1; transform: translateX(0); }
 }
+
+/* Compat Safari legado: restaura fallbacks -webkit-backdrop-filter omitidos pelo caniuse-lite atual (gate D1; remover quando browserslist data voltar a cobrir).
+   Seletor duplicado preserva especificidade acima da utility gerada e evita merge do minificador; declaracoes replicam exatamente o build 44fa972. */
+.transition.transition{transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,-webkit-backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter,-webkit-backdrop-filter;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}
+@supports ((-webkit-backdrop-filter: var(--tw)) or (backdrop-filter: var(--tw))){.supports-\[backdrop-filter\]\:bg-background\/60{background-color:hsl(var(--background) / .6)}}
