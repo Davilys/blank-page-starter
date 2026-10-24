@@ -1,10 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { reguaAuthorized } from "../_shared/reguaAuth.ts";
 import { cancelarCobrancaAsaas, registrarTratamento, MOTIVOS, PAID_STATUSES } from "../_shared/crmCobranca.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
 };
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -80,18 +81,27 @@ serve(async (req) => {
     if (!ASAAS_API_KEY) return json({ error: "Integração Asaas não configurada" }, 503);
 
     // ── Autenticação + permissão financeira ───────────────────────────────
-    const authHeader = req.headers.get("Authorization") || "";
-    if (!authHeader.startsWith("Bearer ")) return json({ error: "Não autenticado" }, 401);
-    const asUser = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: authHeader } } });
-    const { data: userData } = await asUser.auth.getUser();
-    const user = userData?.user;
-    if (!user) return json({ error: "Sessão inválida" }, 401);
-
-    const { data: allowed } = await admin.rpc("has_financial_permission", { _user_id: user.id });
-    if (allowed !== true) return json({ error: "Sem permissão financeira para esta operação" }, 403);
+    // Chamada da régua automática: segredo do cron (nunca sessão de usuário), só criar/enviar-acordo.
+    const isCron = req.headers.has("x-cron-secret");
+    let user: { id: string | null };
+    if (isCron) {
+      if (!reguaAuthorized(req)) return json({ error: "Não autorizado" }, 401);
+      user = { id: null };
+    } else {
+      const authHeader = req.headers.get("Authorization") || "";
+      if (!authHeader.startsWith("Bearer ")) return json({ error: "Não autenticado" }, 401);
+      const asUser = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: authHeader } } });
+      const { data: userData } = await asUser.auth.getUser();
+      const u = userData?.user;
+      if (!u) return json({ error: "Sessão inválida" }, 401);
+      const { data: allowed } = await admin.rpc("has_financial_permission", { _user_id: u.id });
+      if (allowed !== true) return json({ error: "Sem permissão financeira para esta operação" }, 403);
+      user = { id: u.id };
+    }
 
     const body = await req.json().catch(() => ({}));
     const action: string = body.action || "criar";
+    if (isCron && !["criar", "enviar-acordo"].includes(action)) return json({ error: "Ação não permitida para o cron" }, 403);
     const sessionInfo = {
       ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null,
       user_agent: (req.headers.get("user-agent") || "").slice(0, 200) || null,
@@ -542,7 +552,7 @@ Equipe WebMarcas`;
         preview_divergente: previewTotalCentavos != null && previewTotalCentavos !== totalCentavos,
         asaas_original: resumoAsaas(original),
         sessao: sessionInfo,
-        criado_por: user.id,
+        criado_por: isCron ? "sistema" : user.id,
       },
     }).select().single();
     if (acErr) {

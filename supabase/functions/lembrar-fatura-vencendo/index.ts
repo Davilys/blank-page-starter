@@ -1,10 +1,15 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildWhatsApp, buildEmailHtml, buildSubject, TIPOS_LEMBRETE, type TipoLembrete } from "../_shared/lembreteTemplates.ts";
+import { PAID_STATUSES } from "../_shared/crmCobranca.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const FINANCEIRO_WEBHOOK =
+  "https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/17504/Z6cCNjvBc9uv/";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -32,34 +37,6 @@ function fmtBRL(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function buildWhatsApp(nome: string, quando: string, data: string, link: string, valor: string) {
-  const first = (nome || "Cliente").split(" ")[0];
-  return `Olá, *${first}*!
-
-Passando para lembrar que sua cobrança no valor de *${valor}* vence *${quando}* (${data}).
-
-Para evitar juros e multas, você pode realizar o pagamento aqui:
-${link ? `\n🔗 ${link}\n` : "\n(entre em contato para receber o link)\n"}
-Qualquer dúvida estamos à disposição 😊
-
-Equipe WebMarcas`;
-}
-
-function buildEmailHtml(nome: string, quando: string, data: string, link: string, valor: string) {
-  const first = (nome || "Cliente").split(" ")[0];
-  return `
-<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;line-height:1.6">
-  <h2 style="color:#0a3d62">Lembrete de vencimento — WebMarcas</h2>
-  <p>Olá, <strong>${first}</strong>!</p>
-  <p>Passando para lembrar que sua cobrança no valor de <strong>${valor}</strong> vence <strong>${quando}</strong> (${data}).</p>
-  <p>Para evitar juros e multas, você pode realizar o pagamento aqui:</p>
-  ${link ? `<p><a href="${link}" target="_blank" rel="noopener" style="background:#0a3d62;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;display:inline-block">Acessar fatura / boleto</a></p>` : `<p><em>Entre em contato para receber o link de pagamento.</em></p>`}
-  <p>Qualquer dúvida estamos à disposição 😊</p>
-  <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
-  <p style="font-size:13px;color:#666">Atenciosamente,<br><strong>Equipe WebMarcas</strong><br>🌐 www.webmarcas.net · 📧 ola@webmarcas.net · 📱 (11) 91112-0225</p>
-</div>`;
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -67,7 +44,7 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const invoice_id: string | undefined = body.invoice_id;
     const asaas_payment_id: string | undefined = body.asaas_payment_id;
-    const tipo: "d3" | "d0" = body.tipo === "d3" ? "d3" : "d0";
+    const tipo: TipoLembrete = TIPOS_LEMBRETE.includes(body.tipo) ? body.tipo : "d0";
     const channels: Array<"whatsapp" | "email"> = Array.isArray(body.channels) && body.channels.length
       ? body.channels
       : ["whatsapp", "email"];
@@ -86,14 +63,14 @@ serve(async (req) => {
     if (invoice_id) {
       const { data } = await admin
         .from("invoices")
-        .select("id, user_id, contract_id, amount, due_date, status, invoice_url, description, profiles:user_id(full_name,email,phone)")
+        .select("id, user_id, contract_id, amount, due_date, status, asaas_invoice_id, invoice_url, description, profiles:user_id(full_name,email,phone)")
         .eq("id", invoice_id)
         .maybeSingle();
       invoice = data;
     } else if (asaas_payment_id) {
       const { data } = await admin
         .from("invoices")
-        .select("id, user_id, contract_id, amount, due_date, status, invoice_url, description, profiles:user_id(full_name,email,phone)")
+        .select("id, user_id, contract_id, amount, due_date, status, asaas_invoice_id, invoice_url, description, profiles:user_id(full_name,email,phone)")
         .eq("asaas_invoice_id", asaas_payment_id)
         .maybeSingle();
       invoice = data;
@@ -145,7 +122,32 @@ serve(async (req) => {
     const effInvoiceId: string | null = (invoice as any).id ?? null;
     const effAsaasPaymentId: string | null = (invoice as any)._asaas_payment_id ?? asaas_payment_id ?? null;
 
-    const tipoKey = tipo === "d3" ? "lembrete_d3" : "lembrete_d0";
+    const tipoKey = `lembrete_${tipo}`;
+    const isVencido = tipo.startsWith("vencido_");
+
+    // Re-checagem de pagamento (nunca cobrar quem já pagou): estado local + Asaas.
+    if (!force && isVencido) {
+      const st = String((invoice as any).status || "").toLowerCase();
+      if (PAID_STATUSES.includes(st.toUpperCase()) || ["paid", "refunded", "cancelled", "deleted"].includes(st)) {
+        return new Response(JSON.stringify({ skipped: true, reason: `Fatura com status ${st}` }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const payId = effAsaasPaymentId || (invoice as any).asaas_invoice_id || null;
+      if (payId && ASAAS_API_KEY) {
+        try {
+          const p = await asaasGet(`/payments/${payId}`);
+          const as = String(p?.status || "").toUpperCase();
+          if (p?.deleted || ["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH", "REFUNDED"].includes(as)) {
+            return new Response(JSON.stringify({ skipped: true, reason: `Asaas ${p?.deleted ? "removida" : as}` }), {
+              status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          }
+        } catch (e) {
+          // Sem confirmação do Asaas: não envia cobrança (fail closed).
+          return new Response(JSON.stringify({ error: "Falha ao reconferir pagamento no Asaas; envio abortado" }), {
+            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+      }
+    }
 
     // Idempotência: bloqueia reenvio se já houver do mesmo tipo nas últimas 20h.
     if (!force && effInvoiceId) {
@@ -198,10 +200,11 @@ serve(async (req) => {
     const valor = fmtBRL(Number((invoice as any).amount || 0));
     const link = (invoice as any).invoice_url || "";
     const quando = tipo === "d0" ? "hoje" : "em 3 dias";
+    const servico = String((invoice as any).description || "").trim();
 
-    const waMsg = buildWhatsApp(nome, quando, dataStr, link, valor);
-    const emailHtml = buildEmailHtml(nome, quando, dataStr, link, valor);
-    const subject = `Lembrete: sua fatura vence ${quando} (${dataStr}) — WebMarcas`;
+    const waMsg = buildWhatsApp(nome, quando, dataStr, link, valor, tipo, servico);
+    const emailHtml = buildEmailHtml(nome, quando, dataStr, link, valor, tipo, servico);
+    const subject = buildSubject(tipo, quando, dataStr);
 
     const finalChannels: Array<"whatsapp" | "email"> = [];
     if (channels.includes("whatsapp") && phone) finalChannels.push("whatsapp");
@@ -224,6 +227,7 @@ serve(async (req) => {
           custom_message: waMsg,
           custom_html: emailHtml,
           custom_subject: subject,
+          ...(isVencido ? { whatsapp_webhook_override: FINANCEIRO_WEBHOOK } : {}),
           data: { link, marca: (invoice as any).description || "sua fatura" },
         },
       },
