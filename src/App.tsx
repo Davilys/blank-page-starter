@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, Outlet } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useEffect, lazy, Suspense, Component, ReactNode, ComponentType } from "react";
 import { connectivityRetry, connectivityRetryDelay } from "@/lib/networkResilience";
 
@@ -27,6 +27,12 @@ const lazyWithRetry = <T extends ComponentType<any>>(
       throw err;
     }
   });
+
+// Keep existing ad links, attribution and search continuation working.
+const LegacyConsultationRedirect = () => {
+  const location = useLocation();
+  return <Navigate to={{ pathname: "/consultar", search: location.search, hash: location.hash }} state={location.state} replace />;
+};
 
 class RouteErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -226,8 +232,9 @@ const App = () => (
               {import.meta.env.DEV && (
                 <Route path="/__inpi-package-test" element={<INPIPackageTestHarness />} />
               )}
-              <Route path="/registro" element={<Navigate to="/registrar" replace />} />
-              <Route path="/registrar" element={<Registrar />} />
+              <Route path="/registro" element={<LegacyConsultationRedirect />} />
+              <Route path="/registrar" element={<LegacyConsultationRedirect />} />
+              <Route path="/consultar" element={<Registrar />} />
               <Route path="/formulario" element={<Formulario />} />
               <Route path="/status-pedido" element={<StatusPedido />} />
               <Route path="/obrigado" element={<Obrigado />} />
