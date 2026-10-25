@@ -521,7 +521,7 @@ const ViabilitySearchSection = ({ compact = false }: { compact?: boolean }) => {
       classDescriptions: result?.classDescriptions || [],
     }));
     window.scrollTo({ top: 0, behavior: 'instant' });
-    navigate('/registrar');
+    navigate('/consultar');
   };
 
   const getRegistrarResultConfig = (level: ViabilityResult["level"]) => {

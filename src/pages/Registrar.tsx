@@ -267,13 +267,13 @@ export default function Registrar() {
             transition={{ duration: 0.5 }}
             className="font-display text-3xl sm:text-4xl md:text-5xl font-black leading-[1.05] mb-4 text-center mx-auto max-w-3xl text-white"
           >
-            <span className="block">Apenas 5 minutos.</span>
+            <span className="block">Apenas 1 minuto.</span>
             <span className="block">
               <span className="relative inline-block">
-                Registre
+                Consulte
                 <ScribbleUnderline />
               </span>{" "}
-              sua marca!
+              sua marca grátis!
             </span>
           </motion.h1>
           <motion.p

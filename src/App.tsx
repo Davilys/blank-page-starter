@@ -226,8 +226,9 @@ const App = () => (
               {import.meta.env.DEV && (
                 <Route path="/__inpi-package-test" element={<INPIPackageTestHarness />} />
               )}
-              <Route path="/registro" element={<Navigate to="/registrar" replace />} />
-              <Route path="/registrar" element={<Registrar />} />
+              <Route path="/registro" element={<Navigate to="/consultar" replace />} />
+              <Route path="/registrar" element={<Navigate to="/consultar" replace />} />
+              <Route path="/consultar" element={<Registrar />} />
               <Route path="/formulario" element={<Formulario />} />
               <Route path="/status-pedido" element={<StatusPedido />} />
               <Route path="/obrigado" element={<Obrigado />} />

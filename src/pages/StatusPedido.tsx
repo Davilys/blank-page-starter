@@ -80,10 +80,10 @@ const StatusPedido = () => {
       try {
         setOrderData(JSON.parse(data));
       } catch {
-        navigate("/registrar");
+        navigate("/consultar");
       }
     } else {
-      navigate("/registrar");
+      navigate("/consultar");
     }
   }, [navigate]);
 
@@ -205,7 +205,7 @@ const StatusPedido = () => {
                   className="w-full"
                   onClick={() => {
                     sessionStorage.removeItem('orderData');
-                    navigate('/registrar');
+                    navigate('/consultar');
                   }}
                 >
                   Reiniciar Cadastro
