@@ -12,7 +12,7 @@ const Header = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const isHomePage = location.pathname === '/' || location.pathname === '/registrar';
+  const isHomePage = location.pathname === '/' || location.pathname === '/consultar';
 
   useEffect(() => {
     const handleScroll = () => {
@@ -42,7 +42,7 @@ const Header = () => {
     { label: "Início", href: "#home", isRoute: false },
     { label: "Como funciona", href: "#como-funciona", isRoute: false },
     { label: "Diferenciais", href: "#beneficios", isRoute: false },
-    { label: "Registrar", href: "/registrar", isRoute: true },
+    { label: "Consultar", href: "/consultar", isRoute: true },
     { label: "FAQ", href: "#faq", isRoute: false },
   ];
 
