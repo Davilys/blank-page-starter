@@ -8,8 +8,7 @@ interface Entry { path: string; changefreq?: string; priority?: string; lastmod?
 // Static public routes (admin/cliente excluded — auth-only)
 const staticEntries: Entry[] = [
   { path: "/", changefreq: "weekly", priority: "1.0" },
-  { path: "/registrar", changefreq: "weekly", priority: "0.9" },
-  { path: "/registro", changefreq: "monthly", priority: "0.7" },
+  { path: "/consultar", changefreq: "weekly", priority: "0.9" },
   { path: "/registro-blockchain", changefreq: "monthly", priority: "0.6" },
   { path: "/verificar-contrato", changefreq: "monthly", priority: "0.5" },
   { path: "/status-pedido", changefreq: "monthly", priority: "0.4" },
