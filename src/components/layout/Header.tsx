@@ -42,7 +42,7 @@ const Header = () => {
     { label: "Início", href: "#home", isRoute: false },
     { label: "Como funciona", href: "#como-funciona", isRoute: false },
     { label: "Diferenciais", href: "#beneficios", isRoute: false },
-    { label: "Registrar", href: "/consultar", isRoute: true },
+    { label: "Consultar", href: "/consultar", isRoute: true },
     { label: "FAQ", href: "#faq", isRoute: false },
   ];
 
