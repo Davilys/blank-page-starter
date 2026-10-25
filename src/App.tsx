@@ -226,8 +226,9 @@ const App = () => (
               {import.meta.env.DEV && (
                 <Route path="/__inpi-package-test" element={<INPIPackageTestHarness />} />
               )}
-              <Route path="/registro" element={<Navigate to="/registrar" replace />} />
-              <Route path="/registrar" element={<Registrar />} />
+              <Route path="/registro" element={<Navigate to="/consultar" replace />} />
+              <Route path="/registrar" element={<Navigate to="/consultar" replace />} />
+              <Route path="/consultar" element={<Registrar />} />
               <Route path="/formulario" element={<Formulario />} />
               <Route path="/status-pedido" element={<StatusPedido />} />
               <Route path="/obrigado" element={<Obrigado />} />
@@ -361,7 +362,6 @@ const App = () => (
               <Route path="/como-funciona" element={<SectionRedirect section="como-funciona" />} />
               <Route path="/precos" element={<SectionRedirect section="precos" />} />
               <Route path="/faq" element={<SectionRedirect section="faq" />} />
-              <Route path="/consultar" element={<SectionRedirect section="consultar" />} />
               <Route path="/home" element={<SectionRedirect section="home" />} />
               
               {/* Área do Cliente */}

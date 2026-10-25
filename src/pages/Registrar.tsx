@@ -224,8 +224,8 @@ export default function Registrar() {
       <Helmet>
         <title>Registrar Marca no INPI Online — Protocolo em 48h | WebMarcas</title>
         <meta name="description" content="Registre sua marca no INPI em 48h. Consulta de viabilidade gratuita, contrato digital, pagamento facilitado e acompanhamento completo. A partir de R$699." />
-        <link rel="canonical" href="https://webmarcas.net/registrar" />
-        <meta property="og:url" content="https://webmarcas.net/registrar" />
+        <link rel="canonical" href="https://webmarcas.net/consultar" />
+        <meta property="og:url" content="https://webmarcas.net/consultar" />
         <meta property="og:title" content="Registrar Marca no INPI Online — Protocolo em 48h | WebMarcas" />
         <meta property="og:description" content="Consulta grátis, protocolo em 48h, contrato digital e acompanhamento completo." />
       </Helmet>
@@ -267,13 +267,13 @@ export default function Registrar() {
             transition={{ duration: 0.5 }}
             className="font-display text-3xl sm:text-4xl md:text-5xl font-black leading-[1.05] mb-4 text-center mx-auto max-w-3xl text-white"
           >
-            <span className="block">Apenas 5 minutos.</span>
+            <span className="block">Apenas 1 minuto.</span>
             <span className="block">
               <span className="relative inline-block">
-                Registre
+                Consulte
                 <ScribbleUnderline />
               </span>{" "}
-              sua marca!
+              sua marca grátis!
             </span>
           </motion.h1>
           <motion.p

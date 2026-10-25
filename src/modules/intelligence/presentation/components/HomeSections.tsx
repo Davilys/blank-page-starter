@@ -167,7 +167,7 @@ export const IntelligenceCTA = () => (
           asChild
           className="btn-solid-orange mt-7 h-13 rounded-xl bg-accent px-8 py-6 text-base font-bold text-accent-foreground hover:bg-accent/90"
         >
-          <Link to="/registrar">
+          <Link to="/consultar">
             Registrar minha marca
             <ArrowRight className="ml-2 h-5 w-5" />
           </Link>

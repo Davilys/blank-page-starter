@@ -110,7 +110,7 @@ const HeroSection = () => {
               <TrademarkSearch
                 variant="landing"
                 continueLabel="Continuar o registro"
-                onContinue={() => navigate("/registrar", { state: { continueSearch: true } })}
+                onContinue={() => navigate("/consultar", { state: { continueSearch: true } })}
               />
             </div>
           </div>
