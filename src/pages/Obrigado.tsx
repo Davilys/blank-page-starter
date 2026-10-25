@@ -26,10 +26,10 @@ const Obrigado = () => {
           purchaseTracked.current = true;
         }
       } catch {
-        navigate("/registrar");
+        navigate("/consultar");
       }
     } else {
-      navigate("/registrar");
+      navigate("/consultar");
     }
     
     // Hide confetti after animation
