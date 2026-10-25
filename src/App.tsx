@@ -362,7 +362,6 @@ const App = () => (
               <Route path="/como-funciona" element={<SectionRedirect section="como-funciona" />} />
               <Route path="/precos" element={<SectionRedirect section="precos" />} />
               <Route path="/faq" element={<SectionRedirect section="faq" />} />
-              <Route path="/consultar" element={<SectionRedirect section="consultar" />} />
               <Route path="/home" element={<SectionRedirect section="home" />} />
               
               {/* Área do Cliente */}
