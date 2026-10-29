@@ -42,3 +42,7 @@ body:has(.wm-entry details.menu[open]){overflow:hidden}
 .wm-entry .mobile-panel-footer{padding:29px 21px;background:#081b10;min-height:96px;color:#fcf4e9;flex-shrink:0}.wm-entry .mobile-panel-footer .brand img{filter:grayscale(1) brightness(0) invert(1)}
 }
 .wm-entry .consult-socials{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}.wm-entry .consult-socials a{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border:1px solid #d6d9cf;border-radius:50%;color:#17673c}.wm-entry .consult-socials a:hover{background:#e8efdf}.wm-entry .consult-socials a:focus-visible{outline:2px solid #16884a;outline-offset:3px}
+@media(max-width:700px){.wm-entry .trust{display:flex;justify-content:space-between;align-items:center;gap:6px;margin:0 16px;padding:26px 0;font-size:11px;white-space:nowrap}.wm-entry .trust span:before{margin-right:4px}}
+@media(max-width:350px){.wm-entry .trust{font-size:10px;margin:0 12px;gap:4px}.wm-entry .trust span:before{margin-right:3px}}
+.wm-entry .trust-guarantee .trust-guarantee-short{display:none}.wm-entry .trust-guarantee>span:before{content:none}
+@media(max-width:380px){.wm-entry .trust-guarantee .trust-guarantee-full{display:none}.wm-entry .trust-guarantee .trust-guarantee-short{display:inline}}
