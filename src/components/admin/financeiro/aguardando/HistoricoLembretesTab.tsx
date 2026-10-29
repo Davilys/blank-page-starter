@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { resultadoEnvioLabel } from "@/lib/financeiro/resultadoEnvio";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Trash2, Mail, MessageCircle, History } from "lucide-react";
@@ -20,6 +21,7 @@ type Row = {
   canais: string[] | null;
   tipo: string | null;
   status: string | null;
+  metadata: unknown;
   enviada_em: string | null;
   created_at: string;
 };
@@ -34,7 +36,7 @@ export default function HistoricoLembretesTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("cobranca_historico")
-        .select("id, invoice_id, cliente_nome, cliente_email, cliente_phone, canais, tipo, status, enviada_em, created_at")
+        .select("id, invoice_id, cliente_nome, cliente_email, cliente_phone, canais, tipo, status, metadata, enviada_em, created_at")
         .in("tipo", ["lembrete_d0", "lembrete_d3"])
         .order("enviada_em", { ascending: false })
         .limit(500);
@@ -100,7 +102,7 @@ export default function HistoricoLembretesTab() {
                   </div>
                 </td>
                 <td className="p-2">
-                  <Badge variant={r.status === "enviada" ? "default" : "secondary"}>{r.status}</Badge>
+                  <Badge variant={r.status === "enviada" ? "default" : "secondary"}>{resultadoEnvioLabel(r.metadata) ?? r.status}</Badge>
                 </td>
                 <td className="p-2 text-xs text-muted-foreground">
                   {r.enviada_em ? format(new Date(r.enviada_em), "dd/MM/yyyy HH:mm") : "—"}
