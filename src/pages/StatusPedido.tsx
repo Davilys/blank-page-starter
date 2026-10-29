@@ -1,14 +1,11 @@
+import ConsultationShell from "@/components/consultar/ConsultationShell";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Copy, Check, FileText, Clock, CreditCard, ChevronDown, ChevronUp, QrCode, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import Header from "@/components/layout/Header";
-import Footer from "@/components/layout/Footer";
-import WhatsAppButton from "@/components/layout/WhatsAppButton";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import CreditCardForm from "@/components/payment/CreditCardForm";
-import { CheckoutProgress } from "@/components/cliente/checkout/CheckoutProgress";
 
 interface AsaasData {
   customerId: string;
@@ -181,12 +178,12 @@ const StatusPedido = () => {
   // Validate credit card required data
   const isCreditCard = orderData.paymentMethod === 'cartao6x';
   const hasCreditCardData = isCreditCard && orderData.asaas?.asaasCustomerId && orderData.invoiceId;
-  
+
   // If credit card but missing required data, show error with restart option
   if (isCreditCard && !hasCreditCardData) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
+      <ConsultationShell label="PAGAMENTO DO PEDIDO">
+
         <main className="pt-20 pb-12">
           <div className="container mx-auto px-4">
             <div className="max-w-md mx-auto text-center">
@@ -196,7 +193,7 @@ const StatusPedido = () => {
                 </div>
                 <h2 className="text-xl font-bold mb-2">Dados de Pagamento Incompletos</h2>
                 <p className="text-muted-foreground mb-6">
-                  Houve um problema ao processar seus dados de pagamento. 
+                  Houve um problema ao processar seus dados de pagamento.
                   Por favor, reinicie o processo de cadastro.
                 </p>
                 <Button
@@ -214,14 +211,13 @@ const StatusPedido = () => {
             </div>
           </div>
         </main>
-        <Footer />
-      </div>
+
+      </ConsultationShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <ConsultationShell label="PAGAMENTO DO PEDIDO">
       <main className="pt-20 pb-12">
         <section className="py-12 md:py-20 relative overflow-hidden">
           {/* Background */}
@@ -230,7 +226,7 @@ const StatusPedido = () => {
           <div className="container mx-auto px-4 relative z-10">
             {/* Progress Bar with Icons */}
             <div className="max-w-xl mx-auto mb-8">
-              <CheckoutProgress currentStep={4} />
+
             </div>
 
             {/* Header */}
@@ -248,13 +244,13 @@ const StatusPedido = () => {
             <div className="max-w-md mx-auto">
               <div className="glass-card p-6 mb-6">
                 {/* Value Display */}
-                <div className="flex items-center gap-4 p-4 rounded-xl border-2 border-primary/30 bg-primary/5 mb-6">
+                <div className="wm-order-value flex items-center gap-4 p-4 rounded-xl border-2 border-primary/30 bg-primary/5 mb-6">
                   <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
                     <FileText className="w-6 h-6 text-primary" />
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-primary">
-                      {orderData.paymentMethod === 'cartao6x' 
+                      {orderData.paymentMethod === 'cartao6x'
                         ? `6x de R$ ${(Math.round((orderData.paymentValue / 6) * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                         : orderData.paymentMethod === 'boleto3x'
                         ? `3x de R$ ${(Math.round((orderData.paymentValue / 3) * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
@@ -264,8 +260,8 @@ const StatusPedido = () => {
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <CreditCard className="w-4 h-4" />
                       <span>
-                        {orderData.paymentMethod === 'cartao6x' 
-                          ? '6x sem juros' 
+                        {orderData.paymentMethod === 'cartao6x'
+                          ? '6x sem juros'
                           : orderData.paymentMethod === 'boleto3x'
                           ? '3x no boleto'
                           : 'PIX à vista'
@@ -303,13 +299,13 @@ const StatusPedido = () => {
                       <p className="text-sm text-muted-foreground mb-4">
                         Abra o app do seu banco e aponte a câmera para o QrCode abaixo
                       </p>
-                      
+
                       <div className="flex justify-center mb-6">
                         <div className="w-48 h-48 bg-white p-3 rounded-xl border border-border overflow-hidden">
                           {pixQrCodeImage ? (
-                            <img 
-                              src={`data:image/png;base64,${pixQrCodeImage}`} 
-                              alt="QR Code PIX" 
+                            <img
+                              src={`data:image/png;base64,${pixQrCodeImage}`}
+                              alt="QR Code PIX"
                               className="w-full h-full object-contain"
                             />
                           ) : (
@@ -329,7 +325,7 @@ const StatusPedido = () => {
                       <p className="text-sm text-muted-foreground mb-3">
                         Você pode copiar e colar esse código no app
                       </p>
-                      
+
                       <div className="flex gap-2">
                         <input
                           type="text"
@@ -338,7 +334,7 @@ const StatusPedido = () => {
                           className="input-styled flex-1 text-sm font-mono"
                         />
                       </div>
-                      
+
                       <Button
                         variant="hero"
                         size="lg"
@@ -403,7 +399,7 @@ const StatusPedido = () => {
                     <p className="text-sm text-muted-foreground mb-4">
                       Clique no botão abaixo para acessar o boleto. Serão gerados 3 boletos mensais.
                     </p>
-                    
+
                     <Button
                       variant="hero"
                       size="lg"
@@ -420,9 +416,9 @@ const StatusPedido = () => {
                 {/* Link to invoice if available - for all methods */}
                 {orderData.asaas?.invoiceUrl && orderData.paymentMethod === 'avista' && (
                   <div className="mb-6">
-                    <a 
-                      href={orderData.asaas.invoiceUrl} 
-                      target="_blank" 
+                    <a
+                      href={orderData.asaas.invoiceUrl}
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="text-sm text-primary hover:underline flex items-center justify-center gap-2"
                     >
@@ -445,7 +441,7 @@ const StatusPedido = () => {
                       <ChevronDown className="w-4 h-4" />
                     )}
                   </button>
-                  
+
                   {showInvoiceDetails && (
                     <div className="p-4 bg-secondary/30 rounded-xl text-sm space-y-2">
                       <p><strong>Cliente:</strong> {orderData.personalData.fullName}</p>
@@ -469,7 +465,7 @@ const StatusPedido = () => {
                       <ChevronDown className="w-4 h-4" />
                     )}
                   </button>
-                  
+
                   {showValueDetails && (
                     <div className="p-4 bg-secondary/30 rounded-xl text-sm space-y-2">
                       <div className="flex justify-between">
@@ -526,9 +522,9 @@ const StatusPedido = () => {
           </div>
         </section>
       </main>
-      <Footer />
-      <WhatsAppButton />
-    </div>
+
+
+    </ConsultationShell>
   );
 };
 

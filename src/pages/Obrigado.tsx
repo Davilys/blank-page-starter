@@ -1,11 +1,9 @@
+import ConsultationShell from "@/components/consultar/ConsultationShell";
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle, MessageCircle, FileText, Clock, Shield, PartyPopper } from "lucide-react";
 import { trackPurchase } from "@/lib/metaPixel";
 import { Button } from "@/components/ui/button";
-import Header from "@/components/layout/Header";
-import Footer from "@/components/layout/Footer";
-import WhatsAppButton from "@/components/layout/WhatsAppButton";
 
 const Obrigado = () => {
   const navigate = useNavigate();
@@ -31,7 +29,7 @@ const Obrigado = () => {
     } else {
       navigate("/consultar");
     }
-    
+
     // Hide confetti after animation
     setTimeout(() => setShowConfetti(false), 3000);
   }, [navigate]);
@@ -52,8 +50,8 @@ const Obrigado = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <ConsultationShell label="FINALIZAÇÃO DO PEDIDO">
+
       <main className="pt-20">
         <section className="section-padding relative overflow-hidden">
           {/* Background */}
@@ -85,18 +83,18 @@ const Obrigado = () => {
               <div className="inline-flex items-center justify-center w-28 h-28 rounded-full bg-gradient-to-br from-accent to-emerald-600 mb-6 shadow-lg animate-pulse-glow">
                 <CheckCircle className="w-14 h-14 text-white animate-bounce" style={{ animationDuration: '2s' }} />
               </div>
-              
+
               <span className="badge-premium mb-4 inline-flex bg-accent/10 text-accent border-accent/30">
-                ✅ {registrationData.paymentConfirmed ? "Pagamento Identificado" : "Aguardando Pagamento"}
+                ✓ {registrationData.paymentConfirmed ? "Pagamento Identificado" : "Aguardando Pagamento"}
               </span>
-              
+
               <h1 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4 animate-fade-in-up">
-                🎉 Parabéns! Sua marca está em{" "}
+                 Parabéns! Sua marca está em{" "}
                 <span className="gradient-text-accent">boas mãos.</span>
               </h1>
-              
+
               <p className="text-muted-foreground text-lg max-w-2xl mx-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-                Seu pedido foi recebido com sucesso. Nossa equipe jurídica iniciará imediatamente 
+                Seu pedido foi recebido com sucesso. Nossa equipe jurídica iniciará imediatamente
                 o processo de registro junto ao INPI.
               </p>
             </div>
@@ -114,22 +112,22 @@ const Obrigado = () => {
                     <span className="text-muted-foreground">Cliente</span>
                     <span className="font-medium text-right">{registrationData.personalData?.fullName}</span>
                   </div>
-                  
+
                   <div className="flex items-start justify-between py-3 border-b border-border">
                     <span className="text-muted-foreground">CPF</span>
                     <span className="font-medium">{registrationData.personalData?.cpf}</span>
                   </div>
-                  
+
                   <div className="flex items-start justify-between py-3 border-b border-border">
                     <span className="text-muted-foreground">Marca</span>
                     <span className="font-medium text-primary">{registrationData.brandData?.brandName}</span>
                   </div>
-                  
+
                   <div className="flex items-start justify-between py-3 border-b border-border">
                     <span className="text-muted-foreground">Ramo de Atividade</span>
                     <span className="font-medium text-right">{registrationData.brandData?.businessArea}</span>
                   </div>
-                  
+
                   {registrationData.paymentMethod && (
                     <div className="flex items-start justify-between py-3 border-b border-border">
                       <span className="text-muted-foreground">Forma de Pagamento</span>
@@ -147,7 +145,7 @@ const Obrigado = () => {
                       {(registrationData.paymentValue || 698.97).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </span>
                   </div>
-                  
+
                   <div className="flex items-start justify-between py-3">
                     <span className="text-muted-foreground flex items-center gap-2">
                       <Clock className="w-4 h-4" />
@@ -169,12 +167,12 @@ const Obrigado = () => {
                   <Shield className="w-5 h-5 text-primary" />
                   <h3 className="font-display font-semibold">Próximos Passos</h3>
                 </div>
-                
+
                 <div className="text-left space-y-3 text-muted-foreground mb-6">
-                  <p>✅ Protocolo do pedido será enviado por e-mail</p>
-                  <p>✅ Prazo médio de análise do INPI: 8-12 meses</p>
-                  <p>✅ Acompanhamento completo via portal do cliente</p>
-                  <p>✅ Suporte por WhatsApp durante todo o processo</p>
+                  <p>✓ Protocolo do pedido será enviado por e-mail</p>
+                  <p>✓ Prazo médio de análise do INPI: 8-12 meses</p>
+                  <p>✓ Acompanhamento completo via portal do cliente</p>
+                  <p>✓ Suporte por WhatsApp durante todo o processo</p>
                 </div>
 
                 <Button
@@ -195,9 +193,9 @@ const Obrigado = () => {
           </div>
         </section>
       </main>
-      <Footer />
-      <WhatsAppButton />
-    </div>
+
+
+    </ConsultationShell>
   );
 };
 

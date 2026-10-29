@@ -27,6 +27,7 @@ interface ContractStepProps {
   onSelectedClassesChange?: (classes: number[]) => void;
   onPaymentValueChange?: (value: number) => void;
   plan?: PlanType;
+  submitLabel?: string;
 }
 
 const PLAN_TEMPLATE_NAMES: Record<PlanType, string> = {
@@ -50,6 +51,7 @@ export function ContractStep({
   onSelectedClassesChange,
   onPaymentValueChange,
   plan = 'essencial',
+  submitLabel,
 }: ContractStepProps) {
   const [accepted, setAccepted] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -375,7 +377,7 @@ export function ContractStep({
           ) : (
             <>
               <Sparkles className="w-5 h-5 mr-2" />
-              {isRecurring ? 'Assinar e Iniciar' : 'Finalizar e Pagar'}
+              {submitLabel || (isRecurring ? 'Assinar e Iniciar' : 'Finalizar e Pagar')}
               <Check className="w-5 h-5 ml-2" />
             </>
           )}

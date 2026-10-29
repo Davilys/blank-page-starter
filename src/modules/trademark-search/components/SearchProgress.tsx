@@ -38,7 +38,7 @@ export function SearchProgress({ brandName, phase, elapsedMs }: { brandName: str
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.97 }}
       transition={{ duration: 0.3 }}
-      className="py-4 space-y-7"
+      className="wm-search-progress py-4 space-y-7"
       role="status"
       aria-live="polite"
     >

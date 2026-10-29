@@ -24,7 +24,7 @@ export function SearchError({ error, brandName, onRetry, onReset }: {
     : 'Olá! Tentei consultar uma marca no site e a consulta não foi concluída. Gostaria de solicitar uma análise.';
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5 text-foreground" role="alert">
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="wm-search-error space-y-5 text-foreground" role="alert">
       <div className="flex items-start gap-4 rounded-2xl border border-destructive/30 bg-destructive/5 p-5">
         <div className="p-2.5 rounded-xl bg-background border border-destructive/30 shrink-0">
           <AlertCircle className="w-6 h-6 text-destructive" />

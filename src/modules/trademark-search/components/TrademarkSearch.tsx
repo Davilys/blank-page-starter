@@ -8,12 +8,14 @@ import { useTrademarkSearch } from '../useTrademarkSearch';
 import { validateSearchInput } from '../trademarkSearchService';
 import { ACTIVITY_MAX_LENGTH, BRAND_MAX_LENGTH, type TrademarkSearchJob } from '../types';
 import { SearchProgress } from './SearchProgress';
-import { SearchResult } from './SearchResult';
+import { SearchResult as DefaultSearchResult } from './SearchResult';
+import { ConsultationSearchResult } from './ConsultationSearchResult';
 import { SearchError } from './SearchError';
 
 export interface TrademarkSearchProps {
   /** `landing`: visual da home (pílulas). `checkout`: visual do passo 1 do registro. */
   variant: 'landing' | 'checkout';
+  consultationVisual?: boolean;
   /** Chamado quando o visitante decide continuar após uma consulta concluída. */
   onContinue?: (brandName: string, businessArea: string, job: TrademarkSearchJob) => void;
   continueLabel?: string;
@@ -33,7 +35,8 @@ function useElapsed(startedAt: number | null, active: boolean) {
  * Buscador único de marcas. O mesmo componente (e o mesmo estado, via Provider)
  * é usado na home, em /registrar e na área do cliente.
  */
-export function TrademarkSearch({ variant, onContinue, continueLabel }: TrademarkSearchProps) {
+export function TrademarkSearch({ variant, onContinue, continueLabel, consultationVisual = false }: TrademarkSearchProps) {
+  const SearchResult = consultationVisual ? ConsultationSearchResult : DefaultSearchResult;
   const { state, isBusy, startSearch, retry, reset } = useTrademarkSearch();
   const [brand, setBrand] = useState(state.brandName);
   const [activity, setActivity] = useState(state.businessArea);
