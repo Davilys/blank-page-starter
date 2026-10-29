@@ -266,14 +266,16 @@ async function sendWhatsApp(
     return { success: false, error: `Telefone inválido (${phone}) — corrija o cadastro do cliente` };
   }
 
-  // Financeiro: envio direto pela API oficial do BotConversa (entrega garantida
-  // no WhatsApp). O webhook do fluxo fica como reserva se a API falhar.
+  // Financeiro (webhook 17504 da empresa FINANCEIRO 8572): NÃO usar a API direta
+  // do BotConversa (send_message) — verificado em 28/10/2026 que a API aceita e
+  // registra sucesso, mas as mensagens não são entregues (sem chat ou tick único,
+  // em 5+ clientes), enquanto o caminho webhook→fluxo entrega ✓✓. O envio segue
+  // pelo webhook do fluxo na empresa FINANCEIRO (número financeiro), igual ao
+  // mecanismo do pré-vencimento na empresa ATENDIMENTO.
+  // A função sendViaBotConversaApi permanece disponível para diagnóstico, mas não
+  // é mais usada no fluxo de envio.
   const apiKey = Deno.env.get('BOTCONVERSA_FINANCEIRO_API_KEY') || '';
-  if (webhookOverride && webhookOverride.includes('/catch/17504/') && apiKey) {
-    const direct = await sendViaBotConversaApi(apiKey, `+${finalPhone}`, nome, message);
-    if (direct.success) return direct;
-    console.warn('[whatsapp] API BotConversa falhou, usando webhook:', direct.error);
-  }
+  void apiKey;
 
   const payload = { telefone: finalPhone, nome: nome || 'Cliente', mensagem: message, ...extraData };
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
