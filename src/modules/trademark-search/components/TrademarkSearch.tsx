@@ -19,6 +19,7 @@ export interface TrademarkSearchProps {
   /** Chamado quando o visitante decide continuar após uma consulta concluída. */
   onContinue?: (brandName: string, businessArea: string, job: TrademarkSearchJob) => void;
   continueLabel?: string;
+  formTitle?: string;
 }
 
 function useElapsed(startedAt: number | null, active: boolean) {
@@ -35,7 +36,7 @@ function useElapsed(startedAt: number | null, active: boolean) {
  * Buscador único de marcas. O mesmo componente (e o mesmo estado, via Provider)
  * é usado na home, em /registrar e na área do cliente.
  */
-export function TrademarkSearch({ variant, onContinue, continueLabel, consultationVisual = false }: TrademarkSearchProps) {
+export function TrademarkSearch({ variant, onContinue, continueLabel, consultationVisual = false, formTitle }: TrademarkSearchProps) {
   const SearchResult = consultationVisual ? ConsultationSearchResult : DefaultSearchResult;
   const { state, isBusy, startSearch, retry, retryPdf, pdfRetrying, reset } = useTrademarkSearch();
   const [brand, setBrand] = useState(state.brandName);
@@ -136,7 +137,7 @@ export function TrademarkSearch({ variant, onContinue, continueLabel, consultati
             ) : (
               <form onSubmit={handleSubmit} className="space-y-6" noValidate>
                 <div className="text-center space-y-2">
-                  <h2 className="text-2xl font-bold leading-tight">Consulte a disponibilidade da sua marca</h2>
+                  <h2 className="text-2xl font-bold leading-tight">{formTitle ?? "Consulte a disponibilidade da sua marca"}</h2>
                   <p className="text-sm text-muted-foreground">Pesquisa exata na base oficial do INPI.</p>
                 </div>
                 <div className="space-y-4">
