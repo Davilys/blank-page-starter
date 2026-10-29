@@ -263,8 +263,8 @@ export function ContractStep({
         const totalSuggested = (suggestedClasses || []).length;
         const isCorporativo = plan === 'corporativo';
         return (
-          <div className="rounded-2xl border border-primary/30 bg-primary/5 overflow-hidden">
-            <div className="p-4 border-b border-primary/20 bg-primary/10 flex items-center gap-2">
+          <div className="rounded-2xl border overflow-hidden" style={{background: "#edf5ff", borderColor: "#aac7e8"}}>
+            <div className="p-4 border-b flex items-center gap-2" style={{background: "#d7e8fb", borderColor: "#aac7e8", color: "#0867b4"}}>
               <Scale className="w-4 h-4 text-primary" />
               <p className="text-sm font-semibold text-primary">
                 Orientação Jurídica

@@ -49,6 +49,8 @@ export default function Registrar() {
   const [paymentValue, setPaymentValue] = useState<number>(0);
 
   // NCL classes state
+  const [classesLoading, setClassesLoading] = useState(false);
+  const [classesError, setClassesError] = useState(false);
   const [suggestedClasses, setSuggestedClasses] = useState<number[]>([]);
   const [suggestedClassDescriptions, setSuggestedClassDescriptions] = useState<string[]>([]);
   const [selectedClasses, setSelectedClasses] = useState<number[]>([]);
@@ -98,18 +100,29 @@ export default function Registrar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleViabilityNext = (brandName: string, businessArea: string, result: ViabilityResult) => {
+  const handleViabilityNext = async (brandName: string, businessArea: string, result: ViabilityResult) => {
     setViabilityData({ brandName, businessArea, result });
-    if (Array.isArray(result.classes) && result.classes.length > 0) {
-      setSuggestedClasses(result.classes);
-      setSuggestedClassDescriptions(result.classDescriptions || []);
-      setSelectedClasses(result.primaryClass && result.classes.includes(result.primaryClass) ? [result.primaryClass] : []);
-    } else {
-      setSuggestedClasses([]);
-      setSuggestedClassDescriptions([]);
-      setSelectedClasses([]);
-    }
-    setStep(2);
+    setSuggestedClasses([]); setSuggestedClassDescriptions([]); setSelectedClasses([]);
+    setClassesLoading(true); setClassesError(false); setStep(2);
+    try {
+      const { data, error } = await supabase.functions.invoke('inpi-viability-check', {
+        body: { brandName, businessArea, classesOnly: true },
+      });
+      if (error) throw error;
+      const classes: number[] = Array.isArray(data?.classes) ? data.classes : [];
+      const descriptions: string[] = Array.isArray(data?.classDescriptions) ? data.classDescriptions : [];
+      if (!classes.length || classes.length !== descriptions.length || new Set(classes).size !== classes.length ||
+          classes.some(c => !Number.isInteger(c) || c < 1 || c > 45) || descriptions.some(d => typeof d !== 'string' || !d.trim())) {
+        throw new Error('Resposta de classes incompleta');
+      }
+      const primary = Number.isInteger(data.primaryClass) && classes.includes(data.primaryClass)
+        ? data.primaryClass : classes[descriptions.findIndex(d => /classe principal/i.test(d))];
+      if (!primary) throw new Error('Classe principal não informada');
+      setSuggestedClasses(classes); setSuggestedClassDescriptions(descriptions); setSelectedClasses([primary]);
+    } catch {
+      setClassesError(true);
+      toast.error('Não foi possível carregar as classes sugeridas. Tente novamente antes de continuar.');
+    } finally { setClassesLoading(false); }
   };
 
   const handlePersonalDataNext = (data: PersonalData) => {
@@ -118,6 +131,7 @@ export default function Registrar() {
   };
 
   const handleBrandDataNext = (data: BrandData) => {
+    if (classesLoading || classesError || !suggestedClasses.length) { toast.error("Aguarde as classes sugeridas ou tente carregar novamente."); return; }
     setBrandData(data);
     setStep(4); // Plan selection
   };
@@ -229,6 +243,8 @@ export default function Registrar() {
         <meta property="og:title" content="Registrar Marca no INPI Online — Protocolo em 48h | WebMarcas" />
         <meta property="og:description" content="Consulta grátis, protocolo em 48h, contrato digital e acompanhamento completo." />
       </Helmet><ConsultationShell step={step === 1 ? undefined : step}>
+            {classesLoading && <p role="status" className="text-sm mb-4">Carregando classes sugeridas para sua atividade...</p>}
+            {classesError && <div role="alert" className="mb-4"><p>As classes sugeridas não foram carregadas. Tente novamente para continuar.</p><button type="button" onClick={() => viabilityData && void handleViabilityNext(viabilityData.brandName, viabilityData.businessArea, viabilityData.result)}>Carregar classes novamente</button></div>}
             {step === 1 && (
               <TrademarkSearch consultationVisual
                 variant="checkout"
