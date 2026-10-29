@@ -5,3 +5,5 @@
 @media(prefers-reduced-motion:reduce){.wb-card-image img{transition:none}}
 
 .wb-hero h1>span{white-space:nowrap}.wb-featured .wb-card-image{height:430px}@media(max-width:640px){.wb-hero h1{font-size:clamp(46px,14.6vw,64px);letter-spacing:-3.5px}.wb-featured .wb-card-image{height:auto}}
+
+.wb-page h1,.wb-page h2,.wb-page h3{font-family:Inter,Arial,sans-serif}.wb-page .wb-hero h1 em{font-family:Georgia,serif}
