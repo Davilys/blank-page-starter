@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildWhatsApp, buildEmailHtml, buildSubject, TIPOS_LEMBRETE, type TipoLembrete } from "../_shared/lembreteTemplates.ts";
 import { PAID_STATUSES } from "../_shared/crmCobranca.ts";
+import { deriveResultadoEnvio, HISTORICO_STATUS_COLUMN } from "../_shared/historicoStatus.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,7 +10,7 @@ const corsHeaders = {
 };
 
 const FINANCEIRO_WEBHOOK =
-  "https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/17504/Z6cCNjvBc9uv/";
+  "https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/17504/JxkaXiwGniPL/";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -240,12 +241,15 @@ serve(async (req) => {
       cliente_email: email,
       cliente_phone: phone,
       canais: finalChannels,
-      status: "enviada",
+      // Coluna status preservada ("enviada" = solicitado/tratado): dedupe da aba
+      // Vencidos e o bloqueio de 24h dependem dela. O resultado por canal vai em
+      // metadata.resultado_envio (só observabilidade; nunca reabre reenvio automático).
+      status: HISTORICO_STATUS_COLUMN,
       tipo: tipoKey,
       message_whatsapp: waMsg,
       message_email_html: emailHtml,
       message_email_subject: subject,
-      metadata: { notif: notifResult ?? null, error: notifErr?.message ?? null, origin, due_date: (invoice as any).due_date, asaas_payment_id: effAsaasPaymentId },
+      metadata: { resultado_envio: deriveResultadoEnvio(notifResult, notifErr), notif: notifResult ?? null, error: notifErr?.message ?? null, origin, due_date: (invoice as any).due_date, asaas_payment_id: effAsaasPaymentId },
     });
 
     return new Response(JSON.stringify({
