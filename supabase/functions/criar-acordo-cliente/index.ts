@@ -20,7 +20,7 @@ const ASAAS_BASE = ASAAS_ENV === "sandbox"
   : "https://api.asaas.com/v3";
 
 const FINANCEIRO_WEBHOOK =
-  "https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/17504/Z6cCNjvBc9uv/";
+  "https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/17504/JxkaXiwGniPL/";
 
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
