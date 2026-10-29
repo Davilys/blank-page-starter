@@ -4,5 +4,41 @@
 .wm-entry a{color:inherit;text-decoration:none}.wm-entry a:hover{text-decoration:underline}.wm-entry button{cursor:pointer}.wm-entry .consult form{display:block}.wm-entry .consult form>div:first-child{text-align:left;margin:0 0 30px}.wm-entry .consult form h2{font-size:29px;line-height:1.15;font-weight:400;letter-spacing:-.9px;margin:0 0 12px;color:#1c1f21}.wm-entry .consult form>div:first-child p{font-size:14px;line-height:1.5;color:#626963}.wm-entry .consult form>div:nth-child(2){margin:0;display:grid;gap:22px}.wm-entry .consult form>div:nth-child(2)>div{margin:0}.wm-entry .consult label{font-weight:400;color:#1c1f21}.wm-entry .consult input{width:100%;height:54px;border:1px solid #d5d6cf;border-radius:12px;background:#fffdf9;color:#1c1f21;padding:17px 15px;font-size:13px;box-shadow:none}.wm-entry .consult input:focus-visible{outline:2px solid #16884a;outline-offset:3px}.wm-entry .consult input::placeholder{color:#737a72}.wm-entry .consult button[type=submit]{width:100%;height:60px;border:1px solid #14ae4c;background:#20ce60;color:#1c1f21;border-radius:40px;padding:19px 23px;font-size:16px;font-weight:600;display:flex;justify-content:space-between;margin:28px 0 0}.wm-entry .consult form>p:last-child{font-size:11px;color:#697268;margin:12px 0 24px}.wm-entry .consult form>p:last-child svg{display:none}.wm-entry details>summary{list-style:none;cursor:pointer}.wm-entry details .mobile-links{position:absolute;right:20px;top:68px;z-index:20;padding:18px;border-radius:16px;background:#fffaf4;box-shadow:0 6px 24px #0002;display:grid;gap:15px;font-size:14px}.wm-entry details:not([open]) .mobile-links{display:none}.wm-entry .brand{white-space:nowrap}.wm-entry header{position:relative}.wm-entry .legal a{text-decoration:underline;text-underline-offset:2px}.wm-entry .consult [role=alert]{color:#b42318;font-size:13px;margin:16px 0}.wm-entry .consult .step{margin-top:0}
 @media(max-width:700px){.wm-entry .consult form h2{font-size:26px}.wm-entry .consult form>div:first-child{margin-bottom:23px}.wm-entry .consult form>div:first-child p{font-size:12px}.wm-entry .consult form>div:nth-child(2){gap:19px}.wm-entry .consult input{font-size:12px;height:53px}.wm-entry .consult button[type=submit]{font-size:15px;height:58px;margin-top:25px}.wm-entry .consult form>p:last-child{margin-bottom:19px}}
 
-/* Mobile hero occupies the first screen; form follows naturally on scroll. */
-@media(max-width:700px){.wm-entry:not(.wm-flow) .visual{height:calc(100svh - var(--wm-demo-height,0px) - 120px);min-height:380px;max-height:780px}.wm-entry:not(.wm-flow) .copy{padding:26px 24px}.wm-entry:not(.wm-flow) .consult{padding-top:38px}.wm-entry .brand{letter-spacing:-1.2px}.wm-entry .consult input{min-height:61px;height:auto}.wm-entry .consult button[type=submit]{height:auto;min-height:64px}.wm-flow-screen h1,.wm-flow-screen h2{overflow-wrap:break-word}.wm-flow-screen button,.wm-flow-screen a{white-space:normal}.wm-entry .wm-result-meta{gap:14px}}
+/* Mobile proposal aligned to the supplied photo + search composition. */
+@media(max-width:700px){
+.wm-entry:not(.wm-flow) header{margin:7px 14px 9px;padding:10px 16px;min-height:45px}
+.wm-entry:not(.wm-flow) .brand{font-size:21px}.wm-entry:not(.wm-flow) .brand img{width:27px;height:27px}
+.wm-entry:not(.wm-flow) .hero{margin:0 14px}.wm-entry:not(.wm-flow) .visual{height:auto;aspect-ratio:1.21;min-height:0;max-height:none;border-radius:20px}
+.wm-entry:not(.wm-flow) .visual>img{width:160%;height:132%;max-width:none;left:-15%;top:-24%;object-position:center}
+.wm-entry:not(.wm-flow) .shade{background:linear-gradient(90deg,rgba(7,18,12,.78),rgba(7,18,12,.24) 65%,rgba(7,18,12,.03))}
+.wm-entry:not(.wm-flow) .copy{padding:24px 18px}.wm-entry:not(.wm-flow) .eyebrow{font-size:8px;letter-spacing:1.4px;margin-bottom:20px}
+.wm-entry:not(.wm-flow) .minute{font-size:12px;margin-bottom:12px}.wm-entry:not(.wm-flow) h1{font-size:31px;font-weight:600;line-height:1.02;letter-spacing:-1.2px;max-width:215px;margin-bottom:15px}
+.wm-entry:not(.wm-flow) .intro{font-size:10px;line-height:1.45;max-width:207px}
+.wm-entry:not(.wm-flow) .consult{padding:20px 6px 0}.wm-entry:not(.wm-flow) .step{font-size:9px;margin-bottom:13px}
+.wm-entry:not(.wm-flow) .consult form h2{font-size:26px;line-height:1.08;font-weight:600;letter-spacing:-1px;max-width:335px;margin-bottom:8px}
+.wm-entry:not(.wm-flow) .consult form>div:first-child{margin-bottom:16px}.wm-entry:not(.wm-flow) .consult form>div:first-child p{font-size:12px}
+.wm-entry:not(.wm-flow) .consult form>div:nth-child(2){gap:16px}.wm-entry:not(.wm-flow) .consult label{font-size:12px;margin-bottom:6px}
+.wm-entry:not(.wm-flow) .consult input{height:44px;min-height:44px;font-size:12px;padding:12px 14px}
+.wm-entry:not(.wm-flow) .consult button[type=submit]{min-height:48px;height:48px;margin-top:12px;padding:13px 22px;font-size:15px}
+.wm-entry:not(.wm-flow) .consult form>p:last-child{font-size:10px;margin:10px 0 12px}.wm-entry:not(.wm-flow) .legal{font-size:9px;max-width:320px}
+.wm-entry .brand{letter-spacing:-1.2px}.wm-flow-screen h1,.wm-flow-screen h2{overflow-wrap:break-word}.wm-flow-screen button,.wm-flow-screen a{white-space:normal}.wm-entry .wm-result-meta{gap:14px}
+}
+@media(max-width:700px){
+.wm-entry:not(.wm-flow) header{min-height:45px;height:45px;padding:6px 16px;margin-bottom:9px}
+.wm-entry:not(.wm-flow) .visual>img{width:186%;height:154%;left:-34%;top:-34%}
+.wm-entry:not(.wm-flow) h1{font-family:Arial,Helvetica,sans-serif;font-size:31px;max-width:232px;font-weight:700}
+.wm-entry:not(.wm-flow) .consult form h2{font-family:Arial,Helvetica,sans-serif;font-size:26px;max-width:none;font-weight:700}
+.wm-entry:not(.wm-flow) .eyebrow{margin-bottom:18px}.wm-entry:not(.wm-flow) .intro{max-width:214px}
+}
+@media(max-width:700px){.wm-entry:not(.wm-flow) .visual>img{left:-28%;top:-46%}.wm-entry:not(.wm-flow) .consult form h2{font-size:27px;line-height:1.04}.wm-entry:not(.wm-flow) .consult{padding-top:18px}}
+@media(max-width:700px){
+body:has(.wm-entry details.menu[open]){overflow:hidden}
+.wm-entry details[open] .mobile-links{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;padding:0;gap:0;border-radius:0;background:#fcf4e9;box-shadow:none;overflow-y:auto;overscroll-behavior:contain;min-height:100svh}
+.wm-entry .mobile-panel-head{display:flex;align-items:center;justify-content:space-between;min-height:90px;padding:20px;border-bottom:1px solid #e9e1d5;flex-shrink:0}
+.wm-entry .mobile-panel-head .brand{font-size:25px}.wm-entry .mobile-panel-head .brand img{width:32px;height:32px}
+.wm-entry .mobile-panel-head button{border:1px solid #e5dfd7;border-radius:50%;background:transparent;color:#1c1f21;width:44px;height:44px;font-size:29px;font-weight:300;line-height:1}
+.wm-entry .mobile-panel-items{flex:1}.wm-entry .mobile-panel-items a{display:flex;align-items:center;justify-content:space-between;padding:25px 21px;min-height:76px;font-size:25px;font-weight:400;letter-spacing:-1px;border-bottom:1px solid #e9e1d5;text-decoration:none}
+.wm-entry .mobile-panel-items a span{font-size:26px;color:#21724b;letter-spacing:0;margin-left:18px}
+.wm-entry .mobile-panel-footer{padding:29px 21px;background:#081b10;min-height:96px;color:#fcf4e9;flex-shrink:0}.wm-entry .mobile-panel-footer .brand img{filter:grayscale(1) brightness(0) invert(1)}
+}
+.wm-entry .consult-socials{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}.wm-entry .consult-socials a{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border:1px solid #d6d9cf;border-radius:50%;color:#17673c}.wm-entry .consult-socials a:hover{background:#e8efdf}.wm-entry .consult-socials a:focus-visible{outline:2px solid #16884a;outline-offset:3px}
