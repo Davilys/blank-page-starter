@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { registrarTratamento, MOTIVOS } from "../_shared/crmCobranca.ts";
+import { deriveResultadoEnvio, HISTORICO_STATUS_COLUMN } from "../_shared/historicoStatus.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -40,7 +41,7 @@ async function fetchAsaasPayment(paymentId: string) {
 // Webhook BotConversa DEDICADO às cobranças do Financeiro (Devedores ≤30 / +30 / +60).
 // As demais notificações WhatsApp do CRM continuam usando o webhook padrão em system_settings.botconversa.
 const FINANCEIRO_WEBHOOK =
-  "https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/17504/Z6cCNjvBc9uv/";
+  "https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/17504/JxkaXiwGniPL/";
 
 
 function fmtDate(d: string | null | undefined) {
@@ -250,13 +251,16 @@ serve(async (req) => {
       cliente_email: email,
       cliente_phone: phone,
       canais: finalChannels,
-      status: "enviada",
+      // Coluna status preservada ("enviada" = solicitado/tratado): dedupe da aba
+      // Vencidos e o bloqueio de 24h dependem dela. O resultado por canal vai em
+      // metadata.resultado_envio (só observabilidade; nunca reabre reenvio automático).
+      status: HISTORICO_STATUS_COLUMN,
       situacao: "aguardando",
       proxima_acao_em: proximaAcao,
       message_whatsapp: waMsg,
       message_email_html: emailHtml,
       message_email_subject: subject,
-      metadata: { notif: notifResult ?? null, error: notifErr?.message ?? null, asaas_link: link || null, asaas_unavailable: asaasUnavailable },
+      metadata: { resultado_envio: deriveResultadoEnvio(notifResult, notifErr), notif: notifResult ?? null, error: notifErr?.message ?? null, asaas_link: link || null, asaas_unavailable: asaasUnavailable },
     }).select("id").maybeSingle();
 
     // Registro auditável do tratamento: a dívida sai da fila ativa no momento da
