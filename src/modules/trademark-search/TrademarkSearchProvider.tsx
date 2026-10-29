@@ -33,6 +33,9 @@ interface TrademarkSearchContextValue {
   isBusy: boolean;
   startSearch: (brand: string, activity: string) => Promise<void>;
   retry: () => Promise<void>;
+  /** Regenera só o relatório PDF de uma consulta concluída (quando a geração falhou). */
+  retryPdf: () => Promise<void>;
+  pdfRetrying: boolean;
   reset: () => void;
 }
 
@@ -60,7 +63,15 @@ function saveState(state: TrademarkSearchState) {
       sessionStorage.removeItem(STORAGE_KEY);
       return;
     }
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ v: STORAGE_VERSION, state }));
+    // Regra de retenção ("busca tem que apagar, não guarde"): o laudo NÃO é
+    // gravado nem no sessionStorage. O snapshot guarda o resultado da busca, e
+    // um job que tinha PDF volta com pdf_failed=true — assim, após recarregar a
+    // aba, o site oferece gerar o laudo de novo (nova consulta) em vez de
+    // simplesmente sumir com o botão.
+    const snapshot: TrademarkSearchState = state.job?.pdf_base64
+      ? { ...state, job: { ...state.job, pdf_base64: null, pdf_failed: true } }
+      : state;
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ v: STORAGE_VERSION, state: snapshot }));
   } catch {
     /* armazenamento indisponível — segue só em memória */
   }
@@ -177,7 +188,7 @@ export function TrademarkSearchProvider({ children }: { children: ReactNode }) {
         return;
       }
       inFlight.current = true;
-      const res = await trademarkSearchService.status(jobId);
+      const res = await trademarkSearchService.status(jobId, { brand: s.brandName, activity: s.businessArea });
       inFlight.current = false;
       if (token !== runToken.current) return;
 
@@ -263,6 +274,25 @@ export function TrademarkSearchProvider({ children }: { children: ReactNode }) {
     await runStart(s.brandName, s.businessArea, requestId);
   }, [runStart]);
 
+  const [pdfRetrying, setPdfRetrying] = useState(false);
+
+  // Regeneração do laudo = NOVA consulta à base atual do INPI (a data divulgada
+  // da base não garante conteúdo estático): o job devolvido traz queried_at novo,
+  // resultado possivelmente diferente e o PDF recém-gerado.
+  const retryPdf = useCallback(async () => {
+    const s = stateRef.current;
+    if (!s.jobId || s.phase !== 'completed' || pdfRetrying) return;
+    setPdfRetrying(true);
+    try {
+      const res = await trademarkSearchService.status(s.jobId, { brand: s.brandName, activity: s.businessArea });
+      if (res.ok && res.job.status === 'completed' && res.job.result) {
+        setState((prev) => ({ ...prev, job: res.job, jobId: res.job.job_id }));
+      }
+    } finally {
+      setPdfRetrying(false);
+    }
+  }, [pdfRetrying, setState]);
+
   const reset = useCallback(() => {
     runToken.current += 1;
     clearTimer();
@@ -283,7 +313,7 @@ export function TrademarkSearchProvider({ children }: { children: ReactNode }) {
       else setState((prev) => ({ ...prev, phase: 'error', error: { code: 'network', message: OFFICIAL_ERROR_MESSAGE } }));
     } else if (s.phase === 'completed' && s.jobId) {
       // Link do PDF é assinado e expira: renova consultando o status de novo.
-      trademarkSearchService.status(s.jobId).then((res) => {
+      trademarkSearchService.status(s.jobId, { brand: s.brandName, activity: s.businessArea }).then((res) => {
         if (token !== runToken.current) return;
         if (res.ok === false) {
           // Consulta antiga já expirou na base: mantém o resultado exibido, apenas
@@ -303,7 +333,7 @@ export function TrademarkSearchProvider({ children }: { children: ReactNode }) {
 
   const isBusy = state.phase === 'preparing' || state.phase === 'sending' || state.phase === 'queued' || state.phase === 'running' || state.phase === 'validating';
 
-  const value = useMemo<TrademarkSearchContextValue>(() => ({ state, isBusy, startSearch, retry, reset }), [state, isBusy, startSearch, retry, reset]);
+  const value = useMemo<TrademarkSearchContextValue>(() => ({ state, isBusy, startSearch, retry, retryPdf, pdfRetrying, reset }), [state, isBusy, startSearch, retry, retryPdf, pdfRetrying, reset]);
 
   return <TrademarkSearchContext.Provider value={value}>{children}</TrademarkSearchContext.Provider>;
 }

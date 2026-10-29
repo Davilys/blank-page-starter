@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   CheckCircle2, AlertTriangle, HelpCircle, FileDown, ExternalLink, MessageCircle,
@@ -36,7 +36,7 @@ function conclusionView(job: TrademarkSearchJob, brand: string): ConclusionView 
     return {
       tone: 'success',
       title: 'Nenhum registro encontrado nos termos pesquisados',
-      description: `A busca exata e radical por "${brand}" na base do INPI não retornou processos nos termos consultados. Isso indica um cenário favorável, mas a análise final de colidência e classe é feita pela equipe jurídica antes do protocolo.`,
+      description: `A busca exata por "${brand}" na base pública do INPI não retornou processos com esse nome. Pedidos muito recentes podem não constar na base consultada. A análise final de colidência e classe é feita pela equipe jurídica antes do protocolo.`,
       icon: CheckCircle2,
     };
   }
@@ -73,6 +73,25 @@ function formatSearchMode(mode: string): string {
   return mode.charAt(0).toUpperCase() + mode.slice(1).toLowerCase();
 }
 
+/** Monta URL de objeto local para o laudo recebido em base64 (nada fica no servidor). */
+function buildPdfBlobUrl(pdfBase64: string | null): string | null {
+  if (!pdfBase64) return null;
+  try {
+    const bin = atob(pdfBase64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+  } catch {
+    return null;
+  }
+}
+
+/** Nome de arquivo aprovado: sempre "Laudo de viabilidade - <Marca>.pdf". */
+function laudoFilename(brand: string): string {
+  const safe = brand.replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'marca';
+  return `Laudo de viabilidade - ${safe}.pdf`;
+}
+
 function RecordRow({ r }: { r: TrademarkRecord }) {
   return (
     <li className="grid grid-cols-1 sm:grid-cols-[1.4fr_1fr_1fr] gap-1 sm:gap-3 px-3 py-2.5 text-xs border-b border-border/40 last:border-0">
@@ -96,11 +115,13 @@ function RecordRow({ r }: { r: TrademarkRecord }) {
   );
 }
 
-export function SearchResult({ job, brandName, businessArea, onNewSearch, onContinue, continueLabel = 'Continuar o registro' }: {
+export function SearchResult({ job, brandName, businessArea, onNewSearch, onRetryPdf, pdfRetrying = false, onContinue, continueLabel = 'Continuar o registro' }: {
   job: TrademarkSearchJob;
   brandName: string;
   businessArea: string;
   onNewSearch: () => void;
+  onRetryPdf?: () => void;
+  pdfRetrying?: boolean;
   onContinue?: () => void;
   continueLabel?: string;
 }) {
@@ -114,6 +135,9 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
   const totalRecords = result?.records?.length ?? searches.reduce((acc, s) => acc + s.records.length, 0);
   const queriedAt = formatDate(result?.queried_at ?? null);
   const [queriedDate, queriedTime] = queriedAt?.split(', ') ?? ['—', ''];
+  const pdfBlobUrl = useMemo(() => buildPdfBlobUrl(job.pdf_base64), [job.pdf_base64]);
+  useEffect(() => () => { if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl); }, [pdfBlobUrl]);
+  const hasPdf = !!pdfBlobUrl || !!job.pdf_url;
   const searchType = searches.length > 0
     ? searches.map((search) => formatSearchMode(search.mode)).join(' + ')
     : '—';
@@ -153,6 +177,11 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
             <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">{view.description}</p>
           )}
         </div>
+        {result?.searches?.[0]?.source_timestamp && (
+          <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
+            Fonte: portal público do INPI, base informada como atualizada em {result.searches[0].source_timestamp}. Pedidos mais recentes podem não constar.
+          </p>
+        )}
       </section>
 
       {/* Summary cards */}
@@ -254,6 +283,11 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
                     {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                   </div>
                 </Button>
+                {s.records.length < s.total && (
+                  <p className="border-t border-border bg-muted/30 px-3 py-2 text-[11px] leading-snug text-muted-foreground">
+                    Exibindo os {s.records.length} primeiros de {s.total} registros retornados pela base.
+                  </p>
+                )}
                 {open && s.records.length > 0 && (
                   <ul className="border-t border-border bg-background/60 max-h-72 overflow-y-auto">
                     {s.records.map((r, i) => <RecordRow key={`${r.process}-${i}`} r={r} />)}
@@ -291,21 +325,39 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onCont
             </Button>
           )
         )}
-        {job.pdf_url && (
+        {pdfBlobUrl && (
+          <Button asChild variant="outline" className={cn('min-h-14 whitespace-normal rounded-[14px] px-2 text-center', hasOccurrences && !onContinue && 'col-span-2')}>
+            <a href={pdfBlobUrl} download={laudoFilename(brandName)}>
+              <FileDown className="w-4 h-4 mr-2" />Baixar relatório (PDF)
+            </a>
+          </Button>
+        )}
+        {!pdfBlobUrl && job.pdf_url && (
           <Button asChild variant="outline" className={cn('min-h-14 whitespace-normal rounded-[14px] px-2 text-center', hasOccurrences && !onContinue && 'col-span-2')}>
             <a href={job.pdf_url} target="_blank" rel="noopener noreferrer">
               <FileDown className="w-4 h-4 mr-2" />Baixar relatório (PDF)
             </a>
           </Button>
         )}
+        {!hasPdf && job.pdf_failed && (
+          <div className={cn('col-span-2 flex min-h-14 flex-col items-center justify-center gap-1 rounded-[14px] border border-accent/40 bg-accent/5 px-3 py-2 text-center')}>
+            <p className="text-xs font-semibold text-foreground">O relatório em PDF não está disponível. Sua consulta continua salva acima.</p>
+            <p className="text-[11px] text-muted-foreground">Ao gerar novamente, uma nova consulta é feita na base do INPI e o resultado pode mudar.</p>
+            {onRetryPdf && (
+              <Button type="button" variant="outline" size="sm" disabled={pdfRetrying} onClick={onRetryPdf} className="mt-1 min-h-10 whitespace-normal">
+                <RotateCcw className={cn('w-4 h-4 mr-2', pdfRetrying && 'animate-spin')} />{pdfRetrying ? 'Gerando relatório…' : 'Tentar gerar o relatório novamente'}
+              </Button>
+            )}
+          </div>
+        )}
         {hasOccurrences ? (
           onContinue && (
-            <Button variant="outline" onClick={onContinue} className={cn('min-h-14 whitespace-normal rounded-[14px] px-2 text-center', !job.pdf_url && 'col-span-2')}>
+            <Button variant="outline" onClick={onContinue} className={cn('min-h-14 whitespace-normal rounded-[14px] px-2 text-center', !hasPdf && 'col-span-2')}>
               {continueLabel}<ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           )
         ) : (
-          <Button asChild variant="outline" className={cn('min-h-14 whitespace-normal rounded-[14px] px-2 text-center', !job.pdf_url && 'col-span-2')}>
+          <Button asChild variant="outline" className={cn('min-h-14 whitespace-normal rounded-[14px] px-2 text-center', !hasPdf && 'col-span-2')}>
             <a href={buildWhatsAppUrl(whatsappMessage)} target="_blank" rel="noopener noreferrer">
               <MessageCircle className="w-4 h-4 mr-2" />Falar com a equipe
             </a>

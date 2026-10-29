@@ -9,7 +9,9 @@ import type {
 } from './types';
 import { ACTIVITY_MAX_LENGTH, BRAND_MAX_LENGTH } from './types';
 
-const FUNCTION_NAME = 'webmarcas-inpi-search';
+// Nome da função pode ser trocado por build (prévia isolada usa função própria,
+// sem tocar na compartilhada em produção). Padrão = função atual.
+const FUNCTION_NAME = (import.meta.env.VITE_WM_SEARCH_FUNCTION as string | undefined) || 'webmarcas-inpi-search';
 const SESSION_KEY = 'wm_search_session';
 const CLIENT_TIMEOUT_MS = 30_000;
 
@@ -150,6 +152,12 @@ export function normalizeJob(raw: unknown): TrademarkSearchJob | null {
     delivery: str(j.delivery),
     result,
     pdf_url: safeUrl(j.pdf_url),
+    pdf_base64: (() => {
+      const v = str(j.pdf_base64);
+      // Teto defensivo ~12MB em base64; laudos reais ficam muito abaixo disso.
+      return v && v.length <= 16_000_000 && /^[A-Za-z0-9+/=]+$/.test(v) ? v : null;
+    })(),
+    pdf_failed: j.pdf_failed === true,
   };
 }
 
@@ -229,7 +237,17 @@ export const trademarkSearchService = {
       request_id: requestId,
     });
   },
-  status(jobId: string): Promise<SearchApiResponse> {
-    return callFunction({ action: 'status', job_id: jobId });
+  /**
+   * Consulta o status de um job. Para jobs `site-*` (nova fonte), brand/activity
+   * são obrigatórios: o job_id é um hash dos termos e a função confere o hash
+   * antes de fazer uma NOVA consulta à base atual (resultado pode mudar).
+   */
+  status(jobId: string, terms?: { brand: string; activity: string }): Promise<SearchApiResponse> {
+    const body: Record<string, unknown> = { action: 'status', job_id: jobId };
+    if (terms) {
+      body.brand = normalizeTerm(terms.brand, BRAND_MAX_LENGTH);
+      body.activity = normalizeTerm(terms.activity, ACTIVITY_MAX_LENGTH);
+    }
+    return callFunction(body);
   },
 };

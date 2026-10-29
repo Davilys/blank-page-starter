@@ -15,3 +15,21 @@ describe('activity triage contract',()=>{
  it('renders other segments separately and keeps raw total',()=>{const html=renderToStaticMarkup(<SearchResult job={makeJob(base)} brandName="Santa Isabel" businessArea="Café" onNewSearch={()=>{}}/>);expect(html).toContain('Outros segmentos');expect(html).toContain('Construção de edifícios');expect(html).toContain('Total textual preservado: 1');expect(html).not.toContain('marca disponível');});
  it('old response remains usable without triage',()=>expect(makeJob(undefined).result?.activity_analysis).toBeNull());
 });
+
+describe('portal-port version (candidate integration)',()=>{
+ const nova={...base,version:'wm-activity-filter-2026-09-17+portal-port-2026-10-29+renome-2026-10-20+fifa2027-2026-09-08',limitation:'Triagem preliminar. Alto renome verificado por número de processo contra a lista oficial do INPI de 2026-10-20 (383 processos; fonte https://www.gov.br/inpi/pt-br/servicos/marcas/alto-renome/inpi_marcas_marcas-de-alto-renome-em-vigencia_2026_10_20.pdf). A lista reflete a vigência nessa data; não afirma a vigência atual.'};
+ it('accepts the new version and renders limitation with snapshot date',()=>{
+   const job=makeJob(nova);
+   expect(job.result?.activity_analysis?.version).toBe(nova.version);
+   const html=renderToStaticMarkup(<SearchResult job={job} brandName="Santa Isabel" businessArea="Café" onNewSearch={()=>{}}/>);
+   expect(html).toContain('2026-10-20');
+   expect(html).toContain('lista oficial do INPI');
+ });
+ it('analysis=null is not masked as completed analysis',()=>{
+   const job=makeJob(undefined);
+   const html=renderToStaticMarkup(<SearchResult job={job} brandName="Santa Isabel" businessArea="Café" onNewSearch={()=>{}}/>);
+   expect(html).not.toContain('lista oficial do INPI');
+   expect(html).not.toContain('Outros segmentos');
+   expect(html).toContain('registros semelhantes');
+ });
+});

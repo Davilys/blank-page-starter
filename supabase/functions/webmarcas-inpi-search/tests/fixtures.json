@@ -1,0 +1,620 @@
+{
+ "_comment": "Fixtures autocontidas do harness. barbieRawRecord e barbieSearchRecords sao dados PUBLICOS capturados do portal do INPI (busca exata BARBIE, 2026-10-29). guidanceExpected: saida do orientation.py original da VPS (31 atividades). Sem segredos.",
+ "barbieRawRecord": {
+  "id": {
+   "raw": "162948"
+  },
+  "mark_name": {
+   "raw": "BARBIE"
+  },
+  "process_number": {
+   "raw": "790377179"
+  },
+  "specifications": {
+   "raw": [
+    {
+     "nice_class_code": "28",
+     "nice_class_description": "Jogos e brinquedos; artigos para ginástica e esporte não incluídos em outras classes; decorações para árvores de Natal.",
+     "nice_id": 70,
+     "specification_id": 17572996,
+     "status_class_nice_id": 3,
+     "text": "BONECAS, ROUPAS PARA BONECAS E PARTES E ACESSÓRIOS PARA AS MESMAS ( DESDE QUE INCLUSOS NESTA CLASSE ).;",
+     "translation": null
+    }
+   ]
+  },
+  "status": {
+   "raw": "Registro de marca em vigor"
+  },
+  "vienna_classification": {
+   "raw": []
+  }
+ },
+ "barbieSearchRecords": [
+  {
+   "process": "790377179",
+   "priority": "1979-12-20T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "28",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/790377179"
+  },
+  {
+   "process": "815141653",
+   "priority": "1989-09-20T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/815141653"
+  },
+  {
+   "process": "815141661",
+   "priority": "1989-09-20T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/815141661"
+  },
+  {
+   "process": "815237359",
+   "priority": "1989-11-03T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro Extinto",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/815237359"
+  },
+  {
+   "process": "817311785",
+   "priority": "1993-06-15T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/817311785"
+  },
+  {
+   "process": "817560378",
+   "priority": "1993-10-04T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Pedido Definitivamente Arquivado",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/817560378"
+  },
+  {
+   "process": "817560386",
+   "priority": "1993-10-04T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/817560386"
+  },
+  {
+   "process": "817560394",
+   "priority": "1993-10-04T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Pedido Definitivamente Arquivado",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/817560394"
+  },
+  {
+   "process": "817560408",
+   "priority": "1993-10-04T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Pedido Definitivamente Arquivado",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/817560408"
+  },
+  {
+   "process": "817311750",
+   "priority": "1993-06-15T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/817311750"
+  },
+  {
+   "process": "817311769",
+   "priority": "1993-06-15T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/817311769"
+  },
+  {
+   "process": "817311777",
+   "priority": "1993-06-15T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/817311777"
+  },
+  {
+   "process": "817639861",
+   "priority": "1993-11-30T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/817639861"
+  },
+  {
+   "process": "810821761",
+   "priority": "1982-04-20T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/810821761"
+  },
+  {
+   "process": "810821770",
+   "priority": "1982-04-20T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/810821770"
+  },
+  {
+   "process": "810821788",
+   "priority": "1982-04-20T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/810821788"
+  },
+  {
+   "process": "810821796",
+   "priority": "1982-04-20T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/810821796"
+  },
+  {
+   "process": "810821834",
+   "priority": "1982-04-20T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/810821834"
+  },
+  {
+   "process": "810821842",
+   "priority": "1982-04-20T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/810821842"
+  },
+  {
+   "process": "816899290",
+   "priority": "1992-10-01T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Pedido Definitivamente Arquivado",
+   "holder": "H. STERN COMÉRCIO E INDÚSTRIA S.A.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/816899290"
+  },
+  {
+   "process": "815165862",
+   "priority": "1989-10-06T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/815165862"
+  },
+  {
+   "process": "812250486",
+   "priority": "1985-10-29T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Pedido Definitivamente Arquivado",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/812250486"
+  },
+  {
+   "process": "810821753",
+   "priority": "1982-04-20T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/810821753"
+  },
+  {
+   "process": "818887036",
+   "priority": "1995-10-30T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/818887036"
+  },
+  {
+   "process": "818956313",
+   "priority": "1995-11-29T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/818956313"
+  },
+  {
+   "process": "823226166",
+   "priority": "2000-10-11T11:28:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "12",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/823226166"
+  },
+  {
+   "process": "823226158",
+   "priority": "2000-10-11T11:25:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "10",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/823226158"
+  },
+  {
+   "process": "824743792",
+   "priority": "2002-07-31T17:05:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "11",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/824743792"
+  },
+  {
+   "process": "824743911",
+   "priority": "2002-07-31T17:10:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "24",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/824743911"
+  },
+  {
+   "process": "824879325",
+   "priority": "2002-07-31T17:04:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "05",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/824879325"
+  },
+  {
+   "process": "825195888",
+   "priority": "2003-01-10T16:24:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "27",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/825195888"
+  },
+  {
+   "process": "824743822",
+   "priority": "2002-07-31T17:06:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "22",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/824743822"
+  },
+  {
+   "process": "824743830",
+   "priority": "2002-07-31T17:07:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "26",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/824743830"
+  },
+  {
+   "process": "824743849",
+   "priority": "2002-07-31T17:07:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "28",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/824743849"
+  },
+  {
+   "process": "824743857",
+   "priority": "2002-07-31T17:08:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "32",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/824743857"
+  },
+  {
+   "process": "824743920",
+   "priority": "2002-07-31T17:11:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "27",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/824743920"
+  },
+  {
+   "process": "824743938",
+   "priority": "2002-07-31T17:11:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "30",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/824743938"
+  },
+  {
+   "process": "824743946",
+   "priority": "2002-07-31T17:11:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "35",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/824743946"
+  },
+  {
+   "process": "824743806",
+   "priority": "2002-07-31T17:05:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "12",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/824743806"
+  },
+  {
+   "process": "824743814",
+   "priority": "2002-07-31T17:06:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "20",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/824743814"
+  },
+  {
+   "process": "824743890",
+   "priority": "2002-07-31T17:10:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "09",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/824743890"
+  },
+  {
+   "process": "824743903",
+   "priority": "2002-07-31T17:10:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "18",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/824743903"
+  },
+  {
+   "process": "825519721",
+   "priority": "2003-05-26T16:18:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "09",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/825519721"
+  },
+  {
+   "process": "825519748",
+   "priority": "2003-05-26T16:18:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "12",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/825519748"
+  },
+  {
+   "process": "825195896",
+   "priority": "2003-01-10T16:25:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "30",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/825195896"
+  },
+  {
+   "process": "120000022",
+   "priority": "1900-01-01T00:00:00.000Z",
+   "brand": "BARBIE",
+   "status": "Não Publicado",
+   "holder": null,
+   "nice": null,
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/120000022"
+  },
+  {
+   "process": "911639152",
+   "priority": "2016-09-16T14:56:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "Mattel, Inc.",
+   "nice": "08",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/911639152"
+  },
+  {
+   "process": "911639080",
+   "priority": "2016-09-16T14:53:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "Mattel, Inc.",
+   "nice": "04",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/911639080"
+  },
+  {
+   "process": "911639136",
+   "priority": "2016-09-16T14:55:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "Mattel, Inc.",
+   "nice": "06",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/911639136"
+  },
+  {
+   "process": "925284343",
+   "priority": "2021-12-21T18:33:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "43",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/925284343"
+  },
+  {
+   "process": "925284386",
+   "priority": "2021-12-21T18:35:00.000Z",
+   "brand": "BARBIE",
+   "status": "Registro de marca em vigor",
+   "holder": "MATTEL, INC.",
+   "nice": "44",
+   "source_url": "https://servicos.busca.inpi.gov.br/marcas/925284386"
+  }
+ ],
+ "guidanceExpected": {
+  "restaurante": [
+   43,
+   "preliminary"
+  ],
+  "igreja": [
+   45,
+   "preliminary"
+  ],
+  "energia solar": [
+   null,
+   "needs_confirmation"
+  ],
+  "instalação e manutenção de sistemas de energia solar fotovoltaica": [
+   null,
+   "needs_confirmation"
+  ],
+  "conserto e reparo de veículos": [
+   37,
+   "preliminary"
+  ],
+  "oficina mecânica de automóveis": [
+   37,
+   "preliminary"
+  ],
+  "loja de roupas de produtos de terceiros, sem marca própria": [
+   35,
+   "preliminary"
+  ],
+  "fabrico velas com marca própria": [
+   4,
+   "preliminary"
+  ],
+  "velas": [
+   null,
+   "needs_confirmation"
+  ],
+  "velas de massagem": [
+   null,
+   "needs_confirmation"
+  ],
+  "agência de publicidade": [
+   35,
+   "preliminary"
+  ],
+  "advocacia": [
+   45,
+   "preliminary"
+  ],
+  "veterinário": [
+   44,
+   "preliminary"
+  ],
+  "salão de beleza": [
+   44,
+   "preliminary"
+  ],
+  "escola de cursos": [
+   41,
+   "preliminary"
+  ],
+  "banda musical e shows": [
+   41,
+   "preliminary"
+  ],
+  "saas": [
+   42,
+   "preliminary"
+  ],
+  "transportadora de fretes": [
+   39,
+   "preliminary"
+  ],
+  "construtora de obras": [
+   37,
+   "preliminary"
+  ],
+  "arquitetura": [
+   42,
+   "preliminary"
+  ],
+  "serviços financeiros e crédito": [
+   36,
+   "preliminary"
+  ],
+  "imobiliária": [
+   36,
+   "preliminary"
+  ],
+  "agência de viagens": [
+   39,
+   "preliminary"
+  ],
+  "produtos de limpeza": [
+   null,
+   "needs_confirmation"
+  ],
+  "não sei ainda": [
+   null,
+   "needs_confirmation"
+  ],
+  "loja de cosméticos": [
+   35,
+   "preliminary"
+  ],
+  "vendo roupas": [
+   25,
+   "preliminary"
+  ],
+  "comércio de alimentos": [
+   null,
+   "conditional"
+  ],
+  "consultoria empresarial e advocacia": [
+   null,
+   "needs_confirmation"
+  ],
+  "hotel e pousada": [
+   43,
+   "preliminary"
+  ],
+  "petshop com rações": [
+   35,
+   "preliminary"
+  ]
+ }
+}

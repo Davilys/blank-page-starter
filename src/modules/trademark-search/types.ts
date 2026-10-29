@@ -1,7 +1,9 @@
 import type { ActivityAnalysis } from '../../../supabase/functions/_shared/activityAnalysis';
 /**
  * Tipos do buscador único de marcas (API WebMarcas/INPI).
- * Nenhum campo aqui contém segredo — tudo pode ser persistido em sessionStorage.
+ * Nenhum campo aqui contém segredo. Ainda assim, pela regra de retenção das
+ * buscas, `pdf_base64` NUNCA é persistido (nem em sessionStorage): o laudo só
+ * existe em memória até o cliente baixar o arquivo.
  */
 
 export type UpstreamJobStatus = 'queued' | 'running' | 'completed' | 'inconclusive' | 'failed';
@@ -50,6 +52,10 @@ export interface TrademarkSearchJob {
   delivery: string | null;
   result: TrademarkSearchResultData | null;
   pdf_url: string | null;
+  /** Laudo em base64 (fluxo atual: nada fica guardado no servidor). */
+  pdf_base64: string | null;
+  /** true quando a geração do laudo falhou e vale tentar de novo. */
+  pdf_failed: boolean;
 }
 
 export type SearchErrorCode =

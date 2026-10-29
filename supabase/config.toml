@@ -135,6 +135,9 @@ verify_jwt = true
 [functions.webmarcas-inpi-search]
 verify_jwt = false
 
+[functions.webmarcas-inpi-search-preview]
+verify_jwt = false
+
 [functions.criar-acordo-cliente]
 verify_jwt = false
 

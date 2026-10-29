@@ -6,14 +6,14 @@ import type { SearchPhase } from '../types';
 /**
  * Etapas exibidas correspondem a ações reais do fluxo:
  *  preparing -> validação local | sending -> chamada à função segura | queued -> aguardando na base do INPI
- *  running   -> busca exata e radical em execução | validating -> normalização do retorno
+ *  running   -> busca exata em execução | validating -> normalização do retorno
  *  completed -> relatório recebido (PDF quando disponível) e consulta concluída
  */
 const STEPS: { key: string; label: string; detail: string; icon: typeof Send; reachedAt: SearchPhase[] }[] = [
   { key: 'preparing', label: 'Preparando consulta', detail: 'Validando os termos informados', icon: Loader2, reachedAt: ['preparing', 'sending', 'queued', 'running', 'validating', 'completed'] },
   { key: 'sending', label: 'Enviando consulta segura', detail: 'Conexão criptografada com o servidor WebMarcas', icon: Send, reachedAt: ['sending', 'queued', 'running', 'validating', 'completed'] },
   { key: 'queued', label: 'Consultando a base do INPI', detail: 'Consulta registrada e aguardando processamento', icon: Database, reachedAt: ['queued', 'running', 'validating', 'completed'] },
-  { key: 'running', label: 'Processando busca exata e radical', detail: 'Pesquisa textual em andamento na base oficial', icon: ScanSearch, reachedAt: ['running', 'validating', 'completed'] },
+  { key: 'running', label: 'Processando busca exata', detail: 'Pesquisa textual em andamento na base oficial', icon: ScanSearch, reachedAt: ['running', 'validating', 'completed'] },
   { key: 'validating', label: 'Validando resultados', detail: 'Conferindo os dados retornados', icon: ShieldCheck, reachedAt: ['validating', 'completed'] },
   { key: 'report', label: 'Gerando relatório', detail: 'Relatório da consulta', icon: FileText, reachedAt: ['completed'] },
   { key: 'done', label: 'Consulta concluída', detail: '', icon: Flag, reachedAt: ['completed'] },

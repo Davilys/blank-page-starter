@@ -13,7 +13,11 @@ export function normalizeActivityAnalysis(raw: unknown, processIds: string[]): A
   if (!raw || typeof raw !== 'object') return null;
   const a = raw as Record<string, unknown>;
   const text = (v: unknown, max: number) => typeof v === 'string' && v.trim() && v.length <= max ? v.trim() : null;
-  if (a.version !== 'wm-activity-filter-2026-09-17' || !Array.isArray(a.items) || !Array.isArray(a.focus_classes)) return null;
+  // Versões aceitas: original da VPS e o port do portal novo (ver
+  // webmarcas-inpi-search/activityFilterPort.ts; string declarada, sem curinga).
+  const ACCEPTED_VERSIONS = ['wm-activity-filter-2026-09-17', 'wm-activity-filter-2026-09-17+portal-port-2026-10-29+renome-2026-10-20+fifa2027-2026-09-08'];
+  const version = typeof a.version === 'string' ? a.version : '';
+  if (!ACCEPTED_VERSIONS.includes(version) || !Array.isArray(a.items) || !Array.isArray(a.focus_classes)) return null;
   const ids = new Set(processIds);
   if (ids.size !== processIds.length || a.items.length !== ids.size) return null;
   const seen = new Set<string>();
@@ -34,5 +38,5 @@ export function normalizeActivityAnalysis(raw: unknown, processIds: string[]): A
   for (const group of ['related','pending','other'] as const) if ((a.counts as Record<string,unknown>)[group] !== counts[group]) return null;
   const activity=text(a.activity,160), message=text(a.message,1000), limitation=text(a.limitation,2000);
   if (!activity || !message || !limitation || a.focus_classes.some(c=>!Number.isInteger(c)||c<1||c>45)) return null;
-  return {version:a.version,activity,focus_classes:a.focus_classes,counts,items,message,limitation};
+  return {version,activity,focus_classes:a.focus_classes,counts,items,message,limitation};
 }

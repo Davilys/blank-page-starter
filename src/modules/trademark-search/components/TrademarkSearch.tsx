@@ -8,12 +8,14 @@ import { useTrademarkSearch } from '../useTrademarkSearch';
 import { validateSearchInput } from '../trademarkSearchService';
 import { ACTIVITY_MAX_LENGTH, BRAND_MAX_LENGTH, type TrademarkSearchJob } from '../types';
 import { SearchProgress } from './SearchProgress';
-import { SearchResult } from './SearchResult';
+import { SearchResult as DefaultSearchResult } from './SearchResult';
+import { ConsultationSearchResult } from './ConsultationSearchResult';
 import { SearchError } from './SearchError';
 
 export interface TrademarkSearchProps {
   /** `landing`: visual da home (pílulas). `checkout`: visual do passo 1 do registro. */
   variant: 'landing' | 'checkout';
+  consultationVisual?: boolean;
   /** Chamado quando o visitante decide continuar após uma consulta concluída. */
   onContinue?: (brandName: string, businessArea: string, job: TrademarkSearchJob) => void;
   continueLabel?: string;
@@ -33,8 +35,9 @@ function useElapsed(startedAt: number | null, active: boolean) {
  * Buscador único de marcas. O mesmo componente (e o mesmo estado, via Provider)
  * é usado na home, em /registrar e na área do cliente.
  */
-export function TrademarkSearch({ variant, onContinue, continueLabel }: TrademarkSearchProps) {
-  const { state, isBusy, startSearch, retry, reset } = useTrademarkSearch();
+export function TrademarkSearch({ variant, onContinue, continueLabel, consultationVisual = false }: TrademarkSearchProps) {
+  const SearchResult = consultationVisual ? ConsultationSearchResult : DefaultSearchResult;
+  const { state, isBusy, startSearch, retry, retryPdf, pdfRetrying, reset } = useTrademarkSearch();
   const [brand, setBrand] = useState(state.brandName);
   const [activity, setActivity] = useState(state.businessArea);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -134,7 +137,7 @@ export function TrademarkSearch({ variant, onContinue, continueLabel }: Trademar
               <form onSubmit={handleSubmit} className="space-y-6" noValidate>
                 <div className="text-center space-y-2">
                   <h2 className="text-2xl font-bold leading-tight">Consulte a disponibilidade da sua marca</h2>
-                  <p className="text-sm text-muted-foreground">Pesquisa exata e radical na base oficial do INPI.</p>
+                  <p className="text-sm text-muted-foreground">Pesquisa exata na base oficial do INPI.</p>
                 </div>
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -169,6 +172,8 @@ export function TrademarkSearch({ variant, onContinue, continueLabel }: Trademar
             brandName={state.brandName}
             businessArea={state.businessArea}
             onNewSearch={handleReset}
+            onRetryPdf={() => void retryPdf()}
+            pdfRetrying={pdfRetrying}
             onContinue={onContinue ? () => onContinue(state.brandName, state.businessArea, state.job!) : undefined}
             continueLabel={continueLabel}
           />
