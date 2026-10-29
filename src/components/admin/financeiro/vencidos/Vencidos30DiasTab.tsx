@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
+import { resultadoEnvioLabel } from "@/lib/financeiro/resultadoEnvio";
 import { MessageCircle, Mail, Loader2, RefreshCw, Search, CheckCircle2, Calendar, Trash2, Link2, Ban } from "lucide-react";
 import { toast } from "sonner";
 import { startOfDay, startOfWeek, startOfMonth, subDays } from "date-fns";
@@ -171,7 +172,7 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
 
       const { data: hist } = await supabase
         .from("cobranca_historico")
-        .select("id, invoice_id, user_id, enviada_em, canais, status, cliente_nome, proxima_acao_em, situacao, pago_em, pago_manual")
+        .select("id, invoice_id, user_id, enviada_em, canais, status, cliente_nome, proxima_acao_em, situacao, pago_em, pago_manual, metadata")
         .order("enviada_em", { ascending: false })
         .limit(1000);
       setHistory((hist as any) || []);
@@ -488,7 +489,7 @@ export default function Vencidos30DiasTab({ view = "lista" }: Vencidos30DiasTabP
                       h.status === "confirmada_paga" ? "text-emerald-500 border-emerald-500/40" :
                       h.status === "reentrada_fila" ? "text-amber-500 border-amber-500/40" :
                       "text-blue-500 border-blue-500/40"
-                    }>{h.status}</Badge>
+                    }>{resultadoEnvioLabel((h as any).metadata) ?? h.status}</Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-0.5">
