@@ -35,6 +35,7 @@ export interface ViabilityResult {
   description: string;
   laudo?: string;
   classes?: number[];
+  primaryClass?: number | null;
   classDescriptions?: string[];
   searchDate?: string;
   error?: string;

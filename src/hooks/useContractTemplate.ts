@@ -504,6 +504,7 @@ export function replaceContractVariables(
     classDescriptions?: string[];
     plan?: PlanType;
     promotionalValue?: number;
+    paymentTotal?: number;
   }
 ): string {
   const { personalData, brandData, paymentMethod } = data;
@@ -532,7 +533,7 @@ export function replaceContractVariables(
   const getPaymentDetails = () => {
     // For recurring plans, the payment details are already in the template
     if (data.plan === 'premium') {
-      return `• Assinatura mensal recorrente: R$ 398,00/mês — cobrada automaticamente via cartão de crédito.`;
+      return `• Assinatura mensal recorrente: R$ ${(data.paymentTotal ?? 398).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês — cobrada automaticamente via cartão de crédito.`;
     }
     if (data.plan === 'corporativo') {
       return `• Assinatura mensal recorrente: R$ 1.621,00/mês — cobrada automaticamente via boleto ou cartão de crédito.`;
@@ -551,16 +552,16 @@ export function replaceContractVariables(
     
     switch (paymentMethod) {
       case 'avista': {
-        const total = 699 * quantity;
+        const total = data.paymentTotal ?? 699 * quantity;
         const valorIntegral = 1228 * quantity;
         const economia = valorIntegral - total;
         const totalSuffix = quantity > 1 
           ? ` Valor total de ${quantity} ${classCount > 0 ? 'classes' : 'marcas'}: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`
           : '';
-        return `• Pagamento à vista via PIX: R$ ${quantity === 1 ? '699,00' : total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} - com 43% de desconto (economia de R$ ${economia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}).${totalSuffix}`;
+        return `• Pagamento à vista via PIX: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} - com 43% de desconto (economia de R$ ${economia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}).${totalSuffix}`;
       }
       case 'cartao6x': {
-        const total = 1194 * quantity;
+        const total = data.paymentTotal ?? 1194 * quantity;
         const installment = total / 6;
         const totalSuffix = quantity > 1 
           ? ` Valor total de ${quantity} ${classCount > 0 ? 'classes' : 'marcas'}: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`
@@ -568,7 +569,7 @@ export function replaceContractVariables(
         return `• Pagamento parcelado no Cartão de Crédito: 6x de R$ ${installment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = Total: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} - sem juros.${totalSuffix}`;
       }
       case 'boleto3x': {
-        const total = 1197 * quantity;
+        const total = data.paymentTotal ?? 1197 * quantity;
         const installment = total / 3;
         const totalSuffix = quantity > 1 
           ? ` Valor total de ${quantity} ${classCount > 0 ? 'classes' : 'marcas'}: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`
@@ -610,6 +611,12 @@ export function replaceContractVariables(
     .replace(/\{\{forma_pagamento_detalhada\}\}/g, getPaymentDetails())
     .replace(/\{\{data_extenso\}\}/g, currentDate)
     .replace(/\{\{data\}\}/g, new Date().toLocaleDateString('pt-BR'));
+
+  // Update only the variable amount in the premium payment clause, not other clauses.
+  if (data.plan === 'premium' && data.paymentTotal !== undefined) {
+    const value = data.paymentTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    result = result.replace(/(5\.1[^\n]*assinatura mensal recorrente no valor de )R\$\s*[\d.,]+(?:\s*\([^)]*\))?/i, `$1R$ ${value}`);
+  }
 
   // When promotional value is set, replace hardcoded amounts in the corporate template
   if (paymentMethod === 'recorrente_promocional' && data.promotionalValue) {

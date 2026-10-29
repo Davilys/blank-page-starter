@@ -99,9 +99,10 @@ export function ContractStep({
       paymentMethod,
       selectedClasses,
       classDescriptions,
+      paymentTotal: paymentValue,
       plan,
     });
-  }, [template, personalData, brandData, paymentMethod, selectedClasses, classDescriptions, plan]);
+  }, [template, personalData, brandData, paymentMethod, paymentValue, selectedClasses, classDescriptions, plan]);
 
   // Extract contract title from the template content for the renderer
   const getContractTitle = useCallback(() => {
@@ -256,9 +257,7 @@ export function ContractStep({
 
       {/* Upsell: suggested classes not in initial selection — all plans */}
       {(() => {
-        const extraClasses = (suggestedClasses || []).filter(
-          cls => !initialSelectedRef.current.includes(cls)
-        );
+        const extraClasses = suggestedClasses || [];
         if (extraClasses.length === 0) return null;
         const unitPrice = getUnitPrice();
         const totalSuggested = (suggestedClasses || []).length;
@@ -293,7 +292,6 @@ export function ContractStep({
                   return (
                     <label
                       key={cls}
-                      onClick={() => handleToggleClass(cls)}
                       className={cn(
                         "w-full flex items-start gap-3 p-3 rounded-xl border transition-all duration-200 cursor-pointer",
                         isChecked
@@ -304,7 +302,7 @@ export function ContractStep({
                       <input
                         type="checkbox"
                         checked={isChecked}
-                        readOnly
+                        onChange={() => handleToggleClass(cls)}
                         className="mt-0.5 shrink-0 h-4 w-4 rounded border-border text-primary cursor-pointer"
                       />
                       <span className={cn(

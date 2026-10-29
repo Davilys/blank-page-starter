@@ -92,8 +92,7 @@ export default function Registrar() {
     // Veio da home clicando em "Continuar o registro": a consulta já concluída fica no Provider.
     const s = searchState;
     if ((location.state as { continueSearch?: boolean } | null)?.continueSearch && s.phase === 'completed' && s.job) {
-      setViabilityData({ brandName: s.brandName, businessArea: s.businessArea, result: toViabilityResult(s.job) });
-      setStep(2);
+      handleViabilityNext(s.brandName, s.businessArea, toViabilityResult(s.job));
       navigate(location.pathname, { replace: true, state: null });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -104,6 +103,11 @@ export default function Registrar() {
     if (Array.isArray(result.classes) && result.classes.length > 0) {
       setSuggestedClasses(result.classes);
       setSuggestedClassDescriptions(result.classDescriptions || []);
+      setSelectedClasses(result.primaryClass && result.classes.includes(result.primaryClass) ? [result.primaryClass] : []);
+    } else {
+      setSuggestedClasses([]);
+      setSuggestedClassDescriptions([]);
+      setSelectedClasses([]);
     }
     setStep(2);
   };
@@ -178,6 +182,8 @@ export default function Registrar() {
           },
           paymentMethod,
           paymentValue,
+          contractHtml,
+          selectedClasses,
           acceptedAt: new Date().toISOString(),
           leadId: data.leadId,
           contractId: data.contractId,

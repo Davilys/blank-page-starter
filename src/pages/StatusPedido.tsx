@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Copy, Check, FileText, Clock, CreditCard, ChevronDown, ChevronUp, QrCode, Loader2 } from "lucide-react";
+import { Copy, Check, FileText, Clock, CreditCard, ChevronDown, ChevronUp, QrCode, Loader2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import Header from "@/components/layout/Header";
-import Footer from "@/components/layout/Footer";
-import WhatsAppButton from "@/components/layout/WhatsAppButton";
+import ConsultationShell from "@/components/consultar/ConsultationShell";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import CreditCardForm from "@/components/payment/CreditCardForm";
-import { CheckoutProgress } from "@/components/cliente/checkout/CheckoutProgress";
+
+import { downloadContractHtmlPDF } from "@/hooks/useUnifiedContractDownload";
 
 interface AsaasData {
   customerId: string;
@@ -64,6 +63,14 @@ const StatusPedido = () => {
   const [showInvoiceDetails, setShowInvoiceDetails] = useState(false);
   const [showValueDetails, setShowValueDetails] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
+  const [isDownloadingContract, setIsDownloadingContract] = useState(false);
+  const downloadAcceptedContract = async () => {
+    if (!orderData?.contractHtml) return;
+    setIsDownloadingContract(true);
+    try { await downloadContractHtmlPDF(orderData.contractHtml, orderData.brandData.brandName); }
+    catch { toast({ title: "Erro ao baixar contrato", description: "Tente novamente.", variant: "destructive" }); }
+    finally { setIsDownloadingContract(false); }
+  };
 
   // Get PIX code from Asaas data
   const pixCode = orderData?.asaas?.pixQrCode?.payload || "";
@@ -185,8 +192,7 @@ const StatusPedido = () => {
   // If credit card but missing required data, show error with restart option
   if (isCreditCard && !hasCreditCardData) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
+      <ConsultationShell label="FINALIZAÇÃO">
         <main className="pt-20 pb-12">
           <div className="container mx-auto px-4">
             <div className="max-w-md mx-auto text-center">
@@ -214,24 +220,18 @@ const StatusPedido = () => {
             </div>
           </div>
         </main>
-        <Footer />
-      </div>
+      </ConsultationShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <ConsultationShell label="FINALIZAÇÃO">
       <main className="pt-20 pb-12">
         <section className="py-12 md:py-20 relative overflow-hidden">
           {/* Background */}
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl" />
 
           <div className="container mx-auto px-4 relative z-10">
-            {/* Progress Bar with Icons */}
-            <div className="max-w-xl mx-auto mb-8">
-              <CheckoutProgress currentStep={4} />
-            </div>
 
             {/* Header */}
             <div className="text-center max-w-2xl mx-auto mb-8">
@@ -290,6 +290,10 @@ const StatusPedido = () => {
                     <span className="font-mono font-medium">{orderData.contractNumber}</span>
                   </div>
                 )}
+
+              {orderData.contractHtml && <Button variant="outline" className="w-full mb-4" onClick={downloadAcceptedContract} disabled={isDownloadingContract}>
+                {isDownloadingContract ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}Baixar contrato PDF
+              </Button>}
 
               {/* Payment Method Specific Content */}
                 {orderData.paymentMethod === 'avista' && (
@@ -526,9 +530,7 @@ const StatusPedido = () => {
           </div>
         </section>
       </main>
-      <Footer />
-      <WhatsAppButton />
-    </div>
+    </ConsultationShell>
   );
 };
 
