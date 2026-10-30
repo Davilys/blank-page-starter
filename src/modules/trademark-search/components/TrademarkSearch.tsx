@@ -88,7 +88,7 @@ export function TrademarkSearch({ variant, onContinue, continueLabel, consultati
                     Consulta Gratuita
                   </span>
                 </div>
-                <h2 className="font-display text-[1.9rem] sm:text-[2.15rem] leading-[1.05] font-bold text-center max-md:text-left text-[hsl(222_47%_11%)] mb-8 max-md:mb-2">
+                <h2 className="wm-home-consult-title font-display text-[1.9rem] sm:text-[2.15rem] leading-[1.05] font-bold text-center max-md:text-left text-[hsl(222_47%_11%)] mb-8 max-md:mb-2">
                   Consulte sua{' '}
                   <span className="text-[hsl(222_92%_54%)]">marca</span> grátis!
                 </h2>
