@@ -529,3 +529,34 @@ html body .brand-public .hero4-photo-mobile { display: none !important; }
   /* v8.12: benefícios acima da zona dos flutuantes (WhatsApp ~64px + toast), foto absorve a folga */
   html body .brand-public .hero4-cardwrap div:has(> .hero4-pill-light) { margin-top: 10px !important; margin-bottom: 84px !important; }
 }
+
+/* v8.13: efeito folhas empilhadas atras do card da consulta — APROVADO pelo usuario 01:45 ("Sim top publique") */
+@media (max-width: 767px) {
+  html body .brand-public .hero4-cardwrap > .rounded-\[2rem\] { position: relative !important; }
+  html body .brand-public .hero4-cardwrap > .rounded-\[2rem\]::before,
+  html body .brand-public .hero4-cardwrap > .rounded-\[2rem\]::after {
+    content: ""; position: absolute; inset: 0; border-radius: 1.5rem;
+    background: #fffdf8; z-index: -1;
+    box-shadow: 0 14px 34px rgba(7,19,15,.30);
+  }
+  html body .brand-public .hero4-cardwrap > .rounded-\[2rem\]::before { transform: rotate(-2.2deg) translate(-7px,-5px); opacity: .9; }
+  html body .brand-public .hero4-cardwrap > .rounded-\[2rem\]::after { transform: rotate(1.6deg) translate(7px,-9px); opacity: .75; }
+}
+
+/* v8.14 — pedidos audio 01:46: rosto/foto mais claros, folhas com mais respiro, publicar ja */
+@media (max-width: 767px) {
+  /* menos preto sobre a foto/rosto: scrim concentrado a esquerda (texto), face praticamente limpa a direita */
+  html body .brand-public .hero4-overlay {
+    background: linear-gradient(90deg, rgba(7,19,15,.78) 0%, rgba(7,19,15,.50) 38%, rgba(7,19,15,.12) 64%, rgba(7,19,15,.02) 100%) !important;
+  }
+  html body .brand-public .hero4-photo { filter: brightness(1.08) !important; }
+  /* contraste dos textos sobre foto mais clara */
+  html body .brand-public .hero4-content h1,
+  html body .brand-public .hero4-content p,
+  html body .brand-public .hero4-content .flex.flex-wrap.items-center { text-shadow: 0 2px 16px rgba(7,19,15,.55) !important; }
+  /* folhas empilhadas com mais respiro/separacao do card */
+  html body .brand-public .hero4-cardwrap > .rounded-\[2rem\]::before { transform: rotate(-3deg) translate(-12px,-8px) !important; opacity: .92 !important; }
+  html body .brand-public .hero4-cardwrap > .rounded-\[2rem\]::after { transform: rotate(2.3deg) translate(12px,-14px) !important; opacity: .8 !important; }
+  /* respiro entre card e beneficios */
+  html body .brand-public .hero4-cardwrap div:has(> .hero4-pill-light) { margin-top: 14px !important; }
+}
