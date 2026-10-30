@@ -580,3 +580,163 @@ html body .brand-public .hero4-photo-mobile { display: none !important; }
 @media (max-width: 400px) {
   html body .brand-public .hero4-cardwrap h2 { max-width: 250px !important; }
 }
+/* ===== BLOCO PREPARADO (NAO PUBLICADO NO SERVIDOR AINDA) — FAQ/PRECOS/COMO-FUNCIONA estilo RegistreAi ===== */
+/* ===== FIX v5.1 — correcao offset de ancora (header fixo cobre titulos) ===== */
+html body .brand-public section[id] { scroll-margin-top: 88px !important; }
+@media (max-width: 767.98px) {
+  html body .brand-public section[id] { scroll-margin-top: 72px !important; }
+}
+
+/* ===== FIX v5.2 — FAQ no estilo RegistreAi (linhas leves + plus) ===== */
+html body .brand-public #faq .badge-premium {
+  background: transparent !important; border: none !important; padding: 0 !important;
+  color: #04884a !important; font-size: 11px !important; font-weight: 800 !important;
+  letter-spacing: .28em !important; text-transform: uppercase !important;
+}
+html body .brand-public #faq h2 { color: #16211a !important; font-weight: 800 !important; font-family: 'Inter', 'Public Sans', sans-serif !important; letter-spacing: -0.022em !important; }
+html body .brand-public #faq h2 .gradient-text {
+  background: none !important; -webkit-background-clip: initial !important;
+  background-clip: initial !important; color: #16211a !important; -webkit-text-fill-color: #16211a !important;
+}
+html body .brand-public #faq .space-y-4 > * + * { margin-top: 0 !important; }
+html body .brand-public #faq .glass-card {
+  background: transparent !important; border: none !important; box-shadow: none !important;
+  backdrop-filter: none !important; border-radius: 0 !important;
+  border-bottom: 1px solid #dde3d3 !important; padding-left: 0 !important; padding-right: 0 !important;
+}
+html body .brand-public #faq button[data-state] {
+  padding-top: 24px !important; padding-bottom: 24px !important;
+  font-size: 16.5px !important; font-weight: 500 !important; color: #1c261e !important;
+  font-family: 'Inter', 'Public Sans', sans-serif !important; font-weight: 600 !important; letter-spacing: -0.011em !important;
+}
+html body .brand-public #faq button[data-state]:hover { text-decoration: none !important; color: #04884a !important; }
+html body .brand-public #faq button[data-state] > svg { display: none !important; }
+html body .brand-public #faq button[data-state]::after {
+  content: "+" !important; color: #04884a !important; font-size: 26px !important;
+  font-weight: 400 !important; line-height: 1 !important; flex-shrink: 0 !important;
+  font-family: 'Inter', 'Public Sans', sans-serif !important; font-weight: 300 !important;
+}
+html body .brand-public #faq button[data-state="open"]::after { content: "–" !important; }
+html body .brand-public #faq div[data-state] > div {
+  color: #5d6859 !important; font-size: 15px !important; line-height: 1.65 !important; padding-bottom: 26px !important;
+}
+
+/* ===== FIX v5.3 — PRECOS no estilo RegistreAi (cards menta/branco, botao verde) ===== */
+html body .brand-public #precos { background: #faf4e8 !important; }
+html body .brand-public #precos .badge-premium {
+  background: transparent !important; border: none !important; padding: 0 !important;
+  color: #04884a !important; font-size: 11px !important; font-weight: 800 !important;
+  letter-spacing: .28em !important; text-transform: uppercase !important;
+}
+html body .brand-public #precos h2 { color: #16211a !important; font-weight: 800 !important; font-family: 'Inter', 'Public Sans', sans-serif !important; letter-spacing: -0.022em !important; }
+html body .brand-public #precos h2 .gradient-text,
+html body .brand-public #precos .text-display .gradient-text {
+  background: none !important; -webkit-background-clip: initial !important;
+  background-clip: initial !important; color: #16211a !important; -webkit-text-fill-color: #16211a !important;
+}
+html body .brand-public #precos .grid > .rounded-3xl {
+  border-radius: 1.5rem !important; border: 1px solid #d9e1cf !important;
+  box-shadow: 0 18px 40px -30px rgba(7,19,15,.25) !important;
+  background: #fffdf7 !important; overflow: hidden !important;
+}
+html body .brand-public #precos .grid > .rounded-3xl:nth-child(2) {
+  background: #dcf5e6 !important; border: 1px solid #bfe8cf !important;
+}
+html body .brand-public #precos .grid > .rounded-3xl:nth-child(3) { background: #fffdf7 !important; }
+html body .brand-public #precos .grid > .rounded-3xl .from-card { background: transparent !important; }
+/* selos dos cards */
+html body .brand-public #precos .grid > .rounded-3xl .absolute.top-0.right-0 > div {
+  background: #0b3d2e !important; color: #e9f8ef !important; box-shadow: none !important;
+  border-radius: 0 0 0 1rem !important;
+}
+/* preco: texto escuro liso, alinhado a esquerda */
+html body .brand-public #precos .bg-clip-text {
+  background: none !important; -webkit-background-clip: initial !important;
+  background-clip: initial !important; color: #101a12 !important; -webkit-text-fill-color: #101a12 !important;
+}
+html body .brand-public #precos .grid > .rounded-3xl .text-center.mb-6 { text-align: left !important; }
+html body .brand-public #precos .grid > .rounded-3xl .text-center.mb-6 .justify-center { justify-content: flex-start !important; }
+html body .brand-public #precos .line-through { color: #8a947f !important; }
+html body .brand-public #precos .bg-primary\/10.text-primary { background: rgba(4,136,74,.10) !important; color: #04884a !important; }
+/* caixas de pagamento neutras */
+html body .brand-public #precos .from-blue-500,
+html body .brand-public #precos .from-orange-500 {
+  background: #f1f5ec !important; border: 1px solid #dfe6d4 !important; box-shadow: none !important;
+}
+html body .brand-public #precos .from-blue-500 span,
+html body .brand-public #precos .from-orange-500 span { color: #1c261e !important; }
+html body .brand-public #precos .from-blue-500 svg,
+html body .brand-public #precos .from-orange-500 svg { color: #04884a !important; }
+/* faixa de inclusos do Premium */
+html body .brand-public #precos .bg-primary\/5.border {
+  background: rgba(4,136,74,.08) !important; border: 1px solid rgba(4,136,74,.20) !important;
+}
+/* lista de features: check verde liso */
+html body .brand-public #precos ul li > .bg-accent\/20 { background: transparent !important; width: 18px !important; height: 18px !important; }
+html body .brand-public #precos ul li > .bg-accent\/20 svg { color: #04884a !important; width: 15px !important; height: 15px !important; }
+html body .brand-public #precos ul li span { color: #2c362b !important; }
+/* botoes verde RegistreAi */
+html body .brand-public #precos .grid > .rounded-3xl button {
+  background: #1fd05f !important; background-image: none !important; color: #062d1b !important;
+  border-radius: 999px !important; box-shadow: none !important; ring: none !important;
+  border: none !important; font-weight: 700 !important;
+}
+html body .brand-public #precos .grid > .rounded-3xl button:hover { background: #19b854 !important; box-shadow: none !important; }
+/* aviso de urgencia neutro */
+html body .brand-public #precos .bg-destructive\/10 {
+  background: rgba(249,115,22,.08) !important; border: 1px solid rgba(249,115,22,.22) !important;
+}
+html body .brand-public #precos .bg-destructive\/10 .text-destructive { color: #c2410c !important; }
+
+/* ===== FIX v5.4 — COMO FUNCIONA no estilo RegistreAi (verde liso, cards escuros borda fina) ===== */
+html body .brand-public #como-funciona > .container {
+  background: #0b3d2e !important;
+  box-shadow: none !important;
+}
+html body .brand-public #como-funciona .text-center .inline-flex {
+  background: transparent !important; border: none !important; padding: 0 !important;
+  color: #8fe3b4 !important; font-size: 11px !important; font-weight: 800 !important;
+  letter-spacing: .28em !important; text-transform: uppercase !important;
+}
+html body .brand-public #como-funciona h2 {
+  color: #f4f9f2 !important; font-weight: 700 !important; letter-spacing: -0.02em !important;
+}
+html body .brand-public #como-funciona h2 span { color: #7ee2ae !important; }
+html body .brand-public #como-funciona .text-center p.text-muted-foreground,
+html body .brand-public #como-funciona .text-center .text-muted-foreground {
+  color: rgba(233,246,236,.62) !important;
+}
+/* cards de passo: escuros translúcidos, borda fina verde-clara */
+html body .brand-public #como-funciona .relative.max-w-4xl.mx-auto > div > .flex-1,
+html body .brand-public #como-funciona .flex-1.rounded-2xl {
+  background: rgba(255,255,255,.04) !important;
+  border: 1px solid rgba(163,230,190,.28) !important;
+  box-shadow: none !important; border-radius: 1.25rem !important;
+}
+html body .brand-public #como-funciona .flex-1 h3 { color: #f4f9f2 !important; font-weight: 700 !important; }
+html body .brand-public #como-funciona .flex-1 p,
+html body .brand-public #como-funciona .flex-1 .text-muted-foreground,
+html body .brand-public #como-funciona .bg-white .text-muted-foreground {
+  color: rgba(233,246,236,.66) !important;
+}
+/* chip PASSO xx */
+html body .brand-public #como-funciona .flex-1 span[class*="rounded-full"] {
+  background: rgba(126,226,174,.12) !important; color: #8fe3b4 !important;
+  font-weight: 700 !important; letter-spacing: .22em !important;
+}
+/* bolhas de icone: contorno fino, sem gradiente */
+html body .brand-public #como-funciona div[class*="shadow-[0_14px_28px"] {
+  background: rgba(126,226,174,.10) !important;
+  border: 1px solid rgba(163,230,190,.35) !important;
+  box-shadow: none !important;
+}
+html body .brand-public #como-funciona div[class*="shadow-[0_14px_28px"] svg { color: #8fe3b4 !important; }
+html body .brand-public #como-funciona div[class*="absolute"][class*="w-\[2px\]"] {
+  background: rgba(163,230,190,.22) !important;
+}
+
+/* ===== FIX v5.5 — FAQ: neutralizar container branco herdado do rebrand anterior ===== */
+html body .brand-public #faq .max-w-3xl > div {
+  background: transparent !important; border: none !important;
+  border-radius: 0 !important; box-shadow: none !important;
+}
