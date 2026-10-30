@@ -9,3 +9,32 @@
 
 @media(max-width:640px){.wm-entry.wm-flow.wm-formulario header{margin:12px 15px 0;padding:10px 16px}.wm-entry.wm-flow.wm-formulario .wm-form-main{padding-top:18px}.wm-entry.wm-flow.wm-formulario .wm-form-intro{margin-bottom:18px}.wm-entry.wm-flow.wm-formulario .wm-form-intro h1{font-size:32px;line-height:1.04;margin:12px 0;letter-spacing:-1.2px}.wm-entry.wm-flow.wm-formulario .wm-form-intro p{font-size:13px;line-height:1.45;margin:0}.wm-entry.wm-flow.wm-formulario .wm-kicker{font-size:8px}.wm-entry.wm-flow.wm-formulario form.space-y-5>div{margin-top:12px}.wm-entry.wm-flow.wm-formulario input:not([type=checkbox]):not([type=radio]){min-height:44px!important;height:44px!important}.wm-entry.wm-flow.wm-formulario form>button[type=submit]{margin-top:18px!important;min-height:46px!important;height:46px}.wm-entry.wm-flow.wm-formulario form label{font-size:12px!important}.wm-entry.wm-flow.wm-formulario form .space-y-1\.5>*+*{margin-top:4px}}
 @media(max-width:640px){.wm-entry.wm-flow.wm-formulario form.space-y-5{display:flex;flex-direction:column;gap:10px}.wm-entry.wm-flow.wm-formulario form.space-y-5>*{margin-top:0!important}.wm-entry.wm-flow.wm-formulario form>button[type=submit]{margin-top:6px!important}.wm-entry.wm-flow.wm-formulario form.space-y-5>div:first-child{display:none}.wm-entry.wm-flow.wm-formulario .wm-form-intro{margin-bottom:18px}}
+
+/* Exact mobile reference supplied 2026-10-29, entry only. */
+.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) header{margin:8px 19px 12px;padding:10px 17px;max-width:640px;height:42px}
+.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) .wm-form-main{max-width:660px;padding:0 13px 56px}
+.wm-entry.wm-flow.wm-formulario .wm-reference-hero{margin:0 0 16px;line-height:0}
+.wm-reference-hero img{width:100%;height:auto;display:block;border-radius:20px}
+.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) .wm-flow-screen{padding:0 13px!important}
+.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) form.space-y-5{display:flex;flex-direction:column;gap:12px}
+.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) form.space-y-5>*{margin:0!important}
+.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) form.space-y-5>div:first-child{display:none}
+.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) form label{font-size:12px!important;line-height:18px}
+.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) form input{height:38px!important;min-height:38px!important;font-size:12px!important;border-radius:9px!important;background:#fffdfb;padding:0 12px}
+.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) form .space-y-1\.5>*+*{margin-top:5px}
+.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) form>button[type=submit]{height:47px;min-height:47px!important;font-size:14px;margin-top:0!important}
+@media(min-width:641px){.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) header{margin:14px auto 20px;height:58px}.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) form input{height:48px!important;min-height:48px!important;font-size:16px!important}.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) form label{font-size:14px!important}.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) form.space-y-5{gap:18px}}
+.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) .wm-flow-screen form input:not([type=checkbox]):not([type=radio]){height:38px!important;min-height:38px!important;font-size:12px!important}
+.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) .wm-flow-screen form>button[type=submit]{justify-content:center!important;text-align:center;background:#06cb66}
+.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) header .brand{font-size:21px!important}.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) header .brand img{width:25px;height:25px}
+
+.wm-reference-hero{position:relative;aspect-ratio:745/549;background:#183028;overflow:hidden;border-radius:20px}
+.wm-reference-hero .wm-reference-copy{position:absolute;inset:0;padding:16% 4% 0;display:flex;flex-direction:column;align-items:flex-start;line-height:normal;background:linear-gradient(90deg,#07130fe0 0%,#07130f55 65%,transparent 100%)}
+.wm-entry.wm-flow.wm-formulario .wm-reference-hero h1{font:700 clamp(24px,6.3vw,42px)/1.04 Arial,sans-serif;letter-spacing:-1.3px;color:white;margin:0 0 18px}
+.wm-reference-copy h1 span{color:#05d165}.wm-reference-rule{height:3px;width:32px;background:#08cf68;margin:0 0 15px}
+.wm-entry.wm-flow.wm-formulario .wm-reference-copy p{color:#f2f3f0;font:400 clamp(12px,2.65vw,18px)/1.45 Arial,sans-serif;margin:0;max-width:90%}
+
+.wm-reference-hero img.wm-reference-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:65% 50%}.wm-reference-hero .wm-reference-copy{padding-top:16%}.wm-reference-hero .wm-reference-copy h1{max-width:100%}
+@media(min-width:701px){.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) header{max-width:1160px;width:calc(100% - 48px);height:68px;padding:14px 24px}.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) header .brand{flex-shrink:0;margin-right:24px}.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) .wm-flow-screen form input:not([type=checkbox]):not([type=radio]){height:48px!important;min-height:48px!important;font-size:16px!important}}
+@media(max-width:700px){.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) header.consult-entry-header{gap:8px;margin-left:13px;margin-right:13px;padding:10px 13px;height:auto;min-height:48px}.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) header.consult-entry-header>.brand{font-size:19px!important;gap:7px;flex-shrink:0}.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) header.consult-entry-header .entry-whatsapp{font-size:9px;padding:7px 9px;gap:5px;white-space:nowrap}.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) header.consult-entry-header .entry-whatsapp svg{width:15px;height:15px}.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) header.consult-entry-header .menu{font-size:21px}}
+@media(max-width:350px){.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) header.consult-entry-header{padding:9px;gap:5px}.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) header.consult-entry-header>.brand{font-size:16px!important;gap:4px}.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) header.consult-entry-header>.brand img{width:21px;height:21px}.wm-entry.wm-flow.wm-formulario:has(.wm-reference-hero) header.consult-entry-header .entry-whatsapp{padding:6px;font-size:8px;gap:3px}}
