@@ -19,7 +19,10 @@ import type { PlanType } from "@/hooks/useContractTemplate";
 import ScribbleUnderline from "@/components/decorative/ScribbleUnderline";
 import WhatsAppButton from "@/components/layout/WhatsAppButton";
 import Footer from "@/components/layout/Footer";
-import RegistrationTrustFooter from "@/components/layout/RegistrationTrustFooter";
+import { ConsultationHeader } from "@/components/consultar/ConsultationEntry";
+import { ConsultationFooter } from "@/components/consultar/ConsultationFooter";
+import "@/components/consultar/ConsultationFlow.css";
+import "@/components/formulario/FormularioClean.css";
 
 // Dynamic text options for typing effect
 const dynamicTexts = [
@@ -247,7 +250,7 @@ export default function Formulario() {
   };
 
   return (
-    <div className="brand-public min-h-screen relative overflow-hidden bg-[hsl(220_33%_98%)]">
+    <div className="wm-entry wm-flow wm-formulario">
       <Helmet>
         <title>Proposta de Registro de Marca no INPI | WebMarcas</title>
         <meta name="description" content="Registre sua marca no INPI em 48h. Consulta de viabilidade gratuita, contrato digital, pagamento facilitado e acompanhamento completo. A partir de R$699." />
@@ -256,66 +259,10 @@ export default function Formulario() {
         <meta property="og:title" content="Proposta de Registro de Marca no INPI | WebMarcas" />
         <meta property="og:description" content="Consulta grátis, protocolo em 48h, contrato digital e acompanhamento completo." />
       </Helmet>
-      {/* Blue hero band (top) */}
-      <div
-        aria-hidden
-        className="absolute inset-x-0 top-0 h-[420px] md:h-[520px] hero-blue-bg"
-        style={{ background: "var(--gradient-hero-blue)" }}
-      />
-      <div aria-hidden className="absolute top-24 -left-20 w-96 h-96 rounded-full bg-white/5 blur-3xl" />
-      <div aria-hidden className="absolute top-40 right-0 w-80 h-80 rounded-full bg-[hsl(20_100%_55%)]/10 blur-3xl" />
-
-      {/* Social Proof Notifications */}
-      <SocialProofNotification />
-
-
-      {/* Main content */}
-      <main className="relative z-10 w-full max-w-2xl mx-auto px-4 pt-10 md:pt-14 pb-10">
-        {/* Badge */}
-        <div className="flex justify-center mb-5 animate-fade-in">
-          <div
-            className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[11px] font-extrabold tracking-[0.18em] uppercase text-white shadow-[0_10px_20px_-6px_hsla(20,100%,50%,0.55)]"
-            style={{ background: "linear-gradient(180deg, hsl(20 100% 55%), hsl(14 100% 50%))" }}
-          >
-            <Award className="w-3.5 h-3.5" />
-            <span>Proposta de Registro de Marcas · INPI</span>
-          </div>
-        </div>
-
-        {/* Title */}
-        <div className="text-center mb-8">
-          <motion.h1
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="font-display text-3xl sm:text-4xl md:text-5xl font-black leading-[1.05] mb-4 text-center mx-auto max-w-3xl text-white"
-          >
-            <span className="block">Em apenas 1 minuto,</span>
-            <span className="block">
-              <span className="relative inline-block">
-                receba
-                <ScribbleUnderline />
-              </span>{" "}
-              sua proposta de registro de marca!
-            </span>
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.15 }}
-            className="text-base md:text-lg text-white/85 max-w-xl mx-auto"
-          >
-            Preencha seus dados para gerar sua proposta. Após sua aprovação, iniciamos imediatamente o processo de registro da sua marca junto ao INPI.
-          </motion.p>
-        </div>
-
-        {/* Form card */}
-        <Card
-          className="border border-white/60 bg-white"
-          style={{ boxShadow: "var(--shadow-card-hero)" }}
-        >
-          <CardContent className="p-6 md:p-8">
-            <StepDashes total={5} current={step} />
+      <ConsultationHeader />
+      <main className="wm-form-main">
+        {step === 1 ? <div className="wm-form-intro"><div className="wm-kicker">WEBMARCAS · REGISTRO DE MARCAS</div><h1>Sua marca.<br/><em>Seu próximo passo.</em></h1><p>Comece com os dados abaixo. Depois, complete o cadastro, escolha seu plano e revise o contrato.</p></div> : <StepDashes total={5} current={step} />}
+        <section className="wm-flow-screen">
             {step === 1 && (
               <QuickLeadStep initial={quick} onNext={handleQuickNext} />
             )}
@@ -377,17 +324,13 @@ export default function Formulario() {
                 onSelectedClassesChange={setSelectedClasses}
                 onPaymentValueChange={setPaymentValue}
                 plan={plan}
+                submitLabel="Assinar contrato"
+                cleanClassList
               />
             )}
-          </CardContent>
-        </Card>
-
-        <RegistrationTrustFooter />
+        </section>
       </main>
-
-      {/* WhatsApp Floating Button */}
-      <WhatsAppButton />
-      <Footer />
+      <ConsultationFooter />
     </div>
   );
-}
+                }
