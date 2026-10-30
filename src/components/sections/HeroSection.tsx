@@ -9,6 +9,7 @@ import consultant1 from "@/assets/consultants/consultant-1.jpg";
 import consultant2 from "@/assets/consultants/consultant-2.jpg";
 import consultant3 from "@/assets/consultants/consultant-3.jpg";
 import heroPhoto from "@/assets/hero-mulher-r.jpg";
+import heroPhotoMobile from "@/assets/hero-ruiva-r.jpg";
 
 const HeroSection = () => {
   const { t } = useLanguage();
@@ -30,7 +31,8 @@ const HeroSection = () => {
 
         {/* Photo panel */}
         <div className={cn("hero4-panel", showingResult && "max-md:hidden")}>
-          <img src={heroPhoto} alt="" className="hero4-photo" />
+          <img src={heroPhoto} alt="" className="hero4-photo hero4-photo-desktop" />
+          <img src={heroPhotoMobile} alt="" className="hero4-photo hero4-photo-mobile" />
           <div className="hero4-overlay" />
           <div className={cn("hero4-content text-center lg:text-left", showingResult && "max-md:hidden")}>
             {/* Badge */}
