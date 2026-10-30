@@ -29,7 +29,7 @@ const PROFILES: ProfileRow[] = [
   ['\\b(servicos financeiros|credito|seguros|corretora de seguros|banco|financeira)\\b',36,'Serviços financeiros, monetários ou de seguros informados',42,'Plataforma tecnológica oferecida como serviço',41,'Educação financeira oferecida a terceiros'],
   ['\\b(imobiliaria|corretagem imobiliaria|administracao de imoveis)\\b',36,'Serviços imobiliários informados',37,'Construção ou manutenção de imóveis',42,'Projetos de arquitetura oferecidos a terceiros'],
   ['\\b(agencia de publicidade|marketing|publicidade|contabilidade|consultoria empresarial)\\b',35,'Serviços comerciais, publicitários ou de gestão informados',41,'Cursos e formação oferecidos a terceiros',42,'Serviços tecnológicos próprios oferecidos a terceiros'],
-  ['\\b(advocacia|servicos juridicos|registro de marcas|marcas e patentes)\\b',45,'Serviços jurídicos e de propriedade intelectual informados',41,'Cursos e formação oferecidos a terceiros',42,'Plataforma tecnológica própria oferecida como serviço'],
+  ['\\b(advocacia|advogad\\w*|juridic\\w*|servicos juridicos|registro de marcas|marcas e patentes)\\b',45,'Serviços jurídicos e de propriedade intelectual informados',41,'Cursos e formação oferecidos a terceiros',42,'Plataforma tecnológica própria oferecida como serviço'],
   ['\\b(agencia de viagens|operadora de turismo)\\b',39,'Organização de viagens e serviços de transporte',43,'Reservas de hospedagem temporária',41,'Visitas guiadas culturais ou atividades recreativas'],
 ];
 type ProductRow = [string, number, string, number, string];

@@ -28,7 +28,7 @@
  */
 import { normalizeActivityAnalysis } from '../_shared/activityAnalysis.ts';
 import { triage } from './activityFilterPort.ts';
-import { primaryClassFor } from './orientationPort.ts';
+import { guidance, primaryClassFor } from './orientationPort.ts';
 import { z } from 'npm:zod@3.25.76';
 import { buildLaudoPdf } from './laudoPdf.ts';
 
@@ -383,6 +383,7 @@ async function attachLaudoPdf(job: ReturnType<typeof buildCompletedJob>): Promis
       total: result.searches[0]?.total ?? result.records.length,
       records: result.records,
       activityAnalysis: result.activity_analysis ?? null,
+      guidance: guidance(result.activity),
     });
     job.pdf_base64 = bytesToBase64(pdf);
     job.pdf_failed = false;
