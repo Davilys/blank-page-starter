@@ -511,7 +511,7 @@ html body .brand-public .hero4-photo-mobile { display: none !important; }
   html body .brand-public .hero4-content .flex.flex-wrap.items-center p.text-xs { font-size: 11px !important; margin-top: 3px !important; }
   html body .brand-public .hero4-badge { padding: 7px 14px !important; font-size: 11px !important; }
   /* v8.4: selo 48h reduzido 50% no mobile (pedido audio 01:17:33) */
-  html body .brand-public .hero4-cardwrap > .absolute { transform: scale(0.35) !important; transform-origin: top right !important; }
+  html body .brand-public .hero4-cardwrap > .absolute { transform: scale(0.35) !important; transform-origin: top right !important; top: -25px !important; right: 3px !important; }
   /* Toast de prova social: sai do topo (não cobre o selo) */
   html body .brand-public div.fixed.z-40.top-20 {
     top: auto !important; bottom: 14px !important; left: 10px !important;
