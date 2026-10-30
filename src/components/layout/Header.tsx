@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import webmarcasLogoMark from "@/assets/webmarcas-logo-mark.webp";
 import { Menu, X, Phone, User, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,13 @@ const Header = () => {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+      return () => { document.body.style.overflow = ""; };
+    }
+  }, [isMobileMenuOpen]);
 
   const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, anchor: string) => {
     // Route links (start with "/") should navigate normally, not scroll.
@@ -163,38 +171,44 @@ const Header = () => {
         </div>
       </div>
 
-      {/* Mobile Menu */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden bg-white/98 backdrop-blur-xl border-b border-border animate-fade-in shadow-xl">
-          <nav className="container mx-auto px-3 py-3 flex flex-col gap-1">
-            {navItems.map((item) => (
-                <a
-                  key={item.label}
-                  href={item.isRoute ? item.href : (isHomePage ? item.href : `/${item.href}`)}
-                  onClick={(e) => { handleAnchorClick(e, item.href); setIsMobileMenuOpen(false); }}
-                  className="px-4 py-3 text-[hsl(222_40%_25%)] hover:text-[hsl(222_92%_54%)] transition-colors rounded-xl hover:bg-[hsl(220_33%_96%)] touch-target font-medium"
-                >
-                  {item.label}
-                </a>
-            ))}
-            <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-border">
+      {/* Mobile Menu — padrao full-screen (pedido 02:42) */}
+      {isMobileMenuOpen && createPortal(
+        <div className="wm-mobile-menu md:hidden" role="dialog" aria-label="Menu">
+          <div className="wmm-top">
+            <a href="/" className="wmm-brand" onClick={() => setIsMobileMenuOpen(false)}>
+              <img src={webmarcasLogoMark} alt="WebMarcas" className="wmm-logo" width={40} height={40} />
+              <span className="wmm-word">WebMarcas.</span>
+            </a>
+            <button className="wmm-close" onClick={() => setIsMobileMenuOpen(false)} aria-label="Fechar menu">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <nav className="wmm-nav">
+            {[
+              { label: "Início", href: "#home", isRoute: false },
+              { label: "Como funciona", href: "#como-funciona", isRoute: false },
+              { label: "Diferenciais", href: "#beneficios", isRoute: false },
+              { label: "FAQ", href: "#faq", isRoute: false },
+              { label: "Blog", href: "/blog", isRoute: true },
+              { label: "Área do Cliente", href: "/cliente/login", isRoute: true },
+            ].map((item) => (
               <a
-                href={isHomePage ? "#consultar" : "/#consultar"}
-                onClick={(e) => { handleAnchorClick(e, "#consultar"); setIsMobileMenuOpen(false); }}
-                className="btn-solid-orange touch-target"
+                key={item.label}
+                href={item.isRoute ? item.href : (isHomePage ? item.href : `/${item.href}`)}
+                onClick={(e) => { handleAnchorClick(e, item.href); setIsMobileMenuOpen(false); }}
+                className="wmm-item"
               >
-                Consultar minha marca <ArrowRight className="w-4 h-4" />
+                <span>{item.label}</span>
+                <ArrowRight className="wmm-arrow" />
               </a>
-              <Link
-                to="/cliente/login"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="btn-outline-blue touch-target"
-              >
-                <User className="w-4 h-4" /> Área do cliente
-              </Link>
-            </div>
+            ))}
           </nav>
-        </div>
+          <div className="wmm-foot">
+            <img src={webmarcasLogoMark} alt="" className="wmm-logo-w" width={30} height={30} />
+            <span>WebMarcas</span>
+          </div>
+        </div>,
+        document.body
       )}
     </header>
   );

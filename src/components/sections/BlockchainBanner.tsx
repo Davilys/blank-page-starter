@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Blocks, ArrowRight, Shield } from "lucide-react";
+import { FileCheck, ArrowRight, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const BlockchainBanner = () => {
@@ -18,7 +18,7 @@ const BlockchainBanner = () => {
           <div className="relative z-10 flex flex-col md:flex-row items-center gap-6 md:gap-10">
             <div className="flex-shrink-0">
               <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-primary/15 flex items-center justify-center">
-                <Blocks className="w-8 h-8 md:w-10 md:h-10 text-primary" />
+                <FileCheck className="w-8 h-8 md:w-10 md:h-10 text-primary" />
               </div>
             </div>
 

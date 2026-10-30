@@ -777,3 +777,78 @@ html body .brand-public #faq .max-w-3xl > div {
   html body .brand-public a.fixed.bottom-6.right-6[href*="api.whatsapp.com"] { display: none !important; }
   html body .brand-public .hero4-cardwrap div:has(> .hero4-pill-light) { margin-bottom: 88px !important; }
 }
+
+/* v9.5 — pedido usuario 02:35 ("botao perdido/desconforme"): banner Blockchain, botao Saiba Mais sem contraste (verde sobre verde, fundo transparente). Texto e destino preservados. */
+html body .brand-public main > section:nth-of-type(8) a button {
+  background: #062d1b !important;
+  background-image: none !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 999px !important;
+  height: auto !important;
+  padding: 14px 30px !important;
+  font-weight: 700 !important;
+  box-shadow: 0 12px 26px -10px rgba(6,45,27,.6) !important;
+}
+html body .brand-public main > section:nth-of-type(8) a button svg { color: #ffffff !important; stroke: #ffffff !important; }
+@media (max-width: 767px) {
+  html body .brand-public main > section:nth-of-type(8) .rounded-2xl { padding: 28px 22px !important; }
+  html body .brand-public main > section:nth-of-type(8) .relative.z-10 > div:last-child { width: 100% !important; }
+  html body .brand-public main > section:nth-of-type(8) .relative.z-10 > div:last-child a { display: block !important; width: 100% !important; }
+  html body .brand-public main > section:nth-of-type(8) a button { width: 100% !important; justify-content: center !important; }
+}
+
+/* v9.6 — pedido audio 02:38 ("rola ele um pouco mais para baixo para deixar descolado do botao"): faixa de beneficios desce +16px no mobile, usando o vazio abaixo; card/foto aprovados intactos */
+@media (max-width: 767px) {
+  html body .brand-public .hero4-cardwrap div:has(> .hero4-pill-light) { margin-top: 26px !important; }
+  html body .brand-public .hero4 { min-height: calc(100svh + 100px) !important; }
+}
+
+/* v9.7 — pedidos 02:41/02:42: logo do header SEMPRE preta (parada ou rolando) + menu mobile full-screen padrao */
+html body .brand-public > header a img.h-10,
+html body .brand-public > header a img.md\:h-12 { filter: brightness(0) !important; }
+
+/* Menu mobile full-screen (overlay em portal, fora do .brand-public) */
+.wm-mobile-menu {
+  position: fixed !important; inset: 0 !important; height: 100dvh !important;
+  z-index: 9999 !important; background: #faf4e8 !important;
+  display: flex !important; flex-direction: column !important;
+  font-family: 'Inter', system-ui, sans-serif !important;
+}
+.wm-mobile-menu .wmm-top {
+  display: flex !important; align-items: center !important; justify-content: space-between !important;
+  padding: 22px 24px 18px !important;
+}
+.wm-mobile-menu .wmm-brand { display: flex !important; align-items: center !important; gap: 10px !important; text-decoration: none !important; }
+.wm-mobile-menu .wmm-logo { height: 34px !important; width: auto !important; filter: brightness(0) !important; }
+.wm-mobile-menu .wmm-word { color: #07130f !important; font-size: 23px !important; font-weight: 800 !important; letter-spacing: -0.03em !important; }
+.wm-mobile-menu .wmm-close {
+  width: 44px !important; height: 44px !important; border-radius: 999px !important;
+  border: 1.5px solid rgba(7,19,15,.28) !important; background: transparent !important;
+  color: #07130f !important; display: flex !important; align-items: center !important; justify-content: center !important;
+}
+.wm-mobile-menu .wmm-nav { display: flex !important; flex-direction: column !important; border-top: 1px solid rgba(7,19,15,.14) !important; margin-top: 6px !important; }
+.wm-mobile-menu .wmm-item {
+  display: flex !important; align-items: center !important; justify-content: space-between !important;
+  padding: 24px 26px !important; border-bottom: 1px solid rgba(7,19,15,.14) !important;
+  color: #07130f !important; font-size: 24px !important; font-weight: 500 !important; letter-spacing: -0.02em !important;
+  text-decoration: none !important;
+}
+.wm-mobile-menu .wmm-arrow { width: 26px !important; height: 26px !important; color: #04884a !important; stroke: #04884a !important; }
+.wm-mobile-menu .wmm-foot {
+  margin-top: auto !important; background: #07130f !important;
+  display: flex !important; align-items: center !important; gap: 10px !important;
+  padding: 30px 26px calc(30px + env(safe-area-inset-bottom, 0px)) !important;
+  color: #ffffff !important; font-size: 21px !important; font-weight: 700 !important; letter-spacing: -0.02em !important;
+}
+.wm-mobile-menu .wmm-logo-w { height: 26px !important; width: auto !important; filter: brightness(0) invert(1) !important; }
+
+/* v9.8 — pedido 02:46/02:47 ("sobreposicao toda desalinhada", "Nao todo torto" + referencia): folhas empilhadas RETAS e paralelas, offsets regulares cima/direita, sem rotacao; vale para formulario e resultado */
+@media (max-width: 767px) {
+  html body .brand-public .hero4-cardwrap > .rounded-\[2rem\]::before,
+  html body .brand-public .hero4-cardwrap > .rounded-\[2rem\]::after {
+    border-radius: 2rem !important;
+  }
+  html body .brand-public .hero4-cardwrap > .rounded-\[2rem\]::before { transform: translate(6px,-6px) !important; opacity: .92 !important; }
+  html body .brand-public .hero4-cardwrap > .rounded-\[2rem\]::after { transform: translate(12px,-12px) !important; opacity: .8 !important; }
+}
