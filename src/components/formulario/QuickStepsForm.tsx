@@ -194,8 +194,7 @@ export function ComplementStep({
   return (
     <form onSubmit={submit} className="space-y-5" noValidate>
       <div className="text-center space-y-2">
-        <h2 className="text-xl font-bold">Dados pessoais e da marca</h2>
-        <p className="text-sm text-muted-foreground">Marca <strong className="text-foreground">{b.brandName}</strong> · {p.fullName}</p>
+        <p className="wm-cadastro-context">{b.brandName} · {p.fullName}</p><h2>Complete seu cadastro.</h2><p>Seus dados seguem com você nas próximas etapas.</p>
       </div>
       <Field label="CPF" error={errors.cpf}>
         <Input value={p.cpf} onChange={(e) => setP({ ...p, cpf: formatCPF(e.target.value) })} placeholder="000.000.000-00" maxLength={14} className={ic("cpf")} />
@@ -262,4 +261,4 @@ export function ComplementStep({
       </div>
     </form>
   );
-  }
+}
