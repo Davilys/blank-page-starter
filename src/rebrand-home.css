@@ -185,9 +185,9 @@ html body .brand-public .bg-\[hsl\(220_33\%_96\%\)\] { background-color: #f2ecdc
 html body .brand-public .hover\:text-\[hsl\(222_92\%_54\%\)\]:hover { color: #0a8f4d !important; }
 
 /* Selo 48h (SVG inline) */
-html body .brand-public svg [fill="#005fe6"] { fill: #04884a !important; }
-html body .brand-public svg [stroke="#005fe6"] { stroke: #04884a !important; stroke-opacity: .55 !important; }
-html body .brand-public svg [fill="#ed8534"] { fill: #04884a !important; }
+html body .brand-public svg [fill="#005fe6"] { fill: #000000 !important; }
+html body .brand-public svg [stroke="#005fe6"] { stroke: #000000 !important; stroke-opacity: .8 !important; }
+html body .brand-public svg [fill="#ed8534"] { fill: #000000 !important; }
 
 /* Formulario do hero */
 html body .brand-public .form-pill-input { background: #fffdf7 !important; border: 1px solid #d8dccf !important; color: #232923 !important; }
@@ -405,8 +405,8 @@ html body .brand-public .badge-consulta {
 html body .brand-public .badge-consulta svg { color: #f97316 !important; fill: none !important; }
 
 /* FIX v4.2 — mockup fiel: selo verde, marca verde, rabisco laranja, faixa 4 beneficios */
-html body .brand-public .hero4-cardwrap svg [fill="#005fe6"] { fill: #06cb66 !important; }
-html body .brand-public .hero4-cardwrap svg [stroke="#005fe6"] { stroke: #06cb66 !important; }
+html body .brand-public .hero4-cardwrap svg [fill="#005fe6"] { fill: #000000 !important; }
+html body .brand-public .hero4-cardwrap svg [stroke="#005fe6"] { stroke: #000000 !important; }
 html body .brand-public .hero4-cardwrap svg [fill="#005FE6"] { fill: #06cb66 !important; }
 html body .brand-public .hero4-cardwrap .text-\[hsl\(222_92\%_54\%\)\] { color: #06cb66 !important; }
 html body .brand-public .hero4-hl { display: inline-block !important; position: relative !important; padding-bottom: 0.16em !important; }
@@ -511,7 +511,7 @@ html body .brand-public .hero4-photo-mobile { display: none !important; }
   html body .brand-public .hero4-content .flex.flex-wrap.items-center p.text-xs { font-size: 11px !important; margin-top: 3px !important; }
   html body .brand-public .hero4-badge { display: none !important; }
   /* v8.15: selo 48h no DOBRO do tamanho atual + posicao canto sup. direito (pedido 01:58) */
-  html body .brand-public .hero4-cardwrap .rounded-\[2rem\] > .absolute { transform: scale(0.70) !important; transform-origin: top right !important; top: -20px !important; right: 2px !important; }
+  html body .brand-public .hero4-cardwrap .rounded-\[2rem\] > .absolute { transform: scale(0.63) !important; transform-origin: top right !important; top: -20px !important; right: 2px !important; }
   /* Toast de prova social: sai do topo (não cobre o selo) */
   html body .brand-public div.fixed.z-40.top-20 {
     top: auto !important; bottom: 14px !important; left: 10px !important;
@@ -739,4 +739,41 @@ html body .brand-public #como-funciona div[class*="absolute"][class*="w-\[2px\]"
 html body .brand-public #faq .max-w-3xl > div {
   background: transparent !important; border: none !important;
   border-radius: 0 !important; box-shadow: none !important;
+}
+
+/* v9.1 — mobile: widget WhatsApp flutuante compacto p/ nao cobrir FAQ/precos/passos + respiro de scroll nas secoes (review Main 02:19) */
+@media (max-width: 767px) {
+  html body .brand-public a.fixed.bottom-6.right-6[href*="api.whatsapp.com"] {
+    bottom: 12px !important; right: 12px !important; padding: 4px 8px 4px 4px !important; gap: 6px !important;
+  }
+  html body .brand-public a.fixed.bottom-6.right-6[href*="api.whatsapp.com"] img { width: 34px !important; height: 34px !important; }
+  html body .brand-public a.fixed.bottom-6.right-6[href*="api.whatsapp.com"] svg { width: 18px !important; height: 18px !important; }
+  html body .brand-public #faq, html body .brand-public #precos, html body .brand-public #como-funciona { padding-bottom: 96px !important; }
+}
+
+/* v9.2 — widget ainda menor: so a foto em circulo 42px no canto (icone WhatsApp some no mobile; acesso preservado via link inteiro) */
+@media (max-width: 767px) {
+  html body .brand-public a.fixed.bottom-6.right-6[href*="api.whatsapp.com"] { bottom: 10px !important; right: 10px !important; padding: 3px !important; gap: 0 !important; }
+  html body .brand-public a.fixed.bottom-6.right-6[href*="api.whatsapp.com"] img { display: none !important; }
+  html body .brand-public a.fixed.bottom-6.right-6[href*="api.whatsapp.com"] svg { width: 24px !important; height: 24px !important; margin: 6px !important; }
+}
+
+/* v9.3 — pedido audio 02:23: descer quadro de consulta, foto maior, consumir vazio inferior.
+   Limite fisico: toast (740-800 esq) + widget (dir) travam a faixa final; pills ficam acima deles.
+   Widget: compacto com foto+glyph, MESMA posicao (canto inferior direito) — "segura o botao". */
+@media (max-width: 767px) {
+  html body .brand-public .hero4-cardwrap { margin-top: -55px !important; }
+  html body .brand-public .hero4-cardwrap div:has(> .hero4-pill-light) { margin-bottom: 132px !important; }
+  html body .brand-public a.fixed.bottom-6.right-6[href*="api.whatsapp.com"] { bottom: 10px !important; right: 10px !important; padding: 3px 7px 3px 3px !important; gap: 5px !important; }
+  html body .brand-public a.fixed.bottom-6.right-6[href*="api.whatsapp.com"] img { display: block !important; width: 32px !important; height: 32px !important; }
+  html body .brand-public a.fixed.bottom-6.right-6[href*="api.whatsapp.com"] svg { display: block !important; width: 15px !important; height: 15px !important; margin: 0 !important; }
+}
+
+/* v9.4 — pedido usuario 02:28 (print com circulos verdes): REMOVER toast de registros e botao flutuante WhatsApp no mobile
+   ("nao precisa botao do whats pois ja tem la em cima"), e descer AINDA MAIS o quadro de consulta.
+   Desktop mantem toast e widget. Sem mudanca de copy. */
+@media (max-width: 767px) {
+  html body .brand-public div.fixed.z-40.top-20 { display: none !important; }
+  html body .brand-public a.fixed.bottom-6.right-6[href*="api.whatsapp.com"] { display: none !important; }
+  html body .brand-public .hero4-cardwrap div:has(> .hero4-pill-light) { margin-bottom: 88px !important; }
 }
