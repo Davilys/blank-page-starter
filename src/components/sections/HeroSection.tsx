@@ -1,16 +1,14 @@
 import { Shield, FileSignature, UserCheck, CalendarCheck, Star, Zap } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { TrademarkSearch } from "@/modules/trademark-search/components/TrademarkSearch";
 import { useTrademarkSearch } from "@/modules/trademark-search/useTrademarkSearch";
 import { cn } from "@/lib/utils";
-import ScribbleUnderline from "@/components/decorative/ScribbleUnderline";
-import WaveDivider from "@/components/decorative/WaveDivider";
 import Seal48h from "@/components/decorative/Seal48h";
 import consultant1 from "@/assets/consultants/consultant-1.jpg";
 import consultant2 from "@/assets/consultants/consultant-2.jpg";
 import consultant3 from "@/assets/consultants/consultant-3.jpg";
+import heroPhoto from "@/assets/hero-mulher-r.jpg";
 
 const HeroSection = () => {
   const { t } = useLanguage();
@@ -26,17 +24,18 @@ const HeroSection = () => {
   ];
 
   return (
-    <section id="home" className={cn("relative hero-blue-bg overflow-x-clip overflow-y-visible", showingResult && "search-result-active max-md:text-foreground")}>
+    <section id="home" className={cn("relative hero4 overflow-x-clip overflow-y-visible", showingResult && "search-result-active max-md:text-foreground")}>
 
-      <div className={cn("container mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16 relative z-10 max-w-7xl", showingResult && "max-md:px-3 max-md:pb-10 max-md:pt-20")}>
-        {/* Two-column hero */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+      <div className={cn("container mx-auto px-4 sm:px-6 lg:px-8 pt-24 md:pt-32 relative z-10 max-w-7xl", showingResult && "max-md:px-3 max-md:pb-10 max-md:pt-20")}>
 
-          {/* Left — Text */}
-          <div className={cn("text-center lg:text-left order-1 lg:order-none", showingResult && "max-md:hidden")}>
-            {/* Orange badge */}
-            <div className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[hsl(20_100%_55%)] to-[hsl(14_100%_48%)] px-5 py-2.5 text-white shadow-[0_10px_24px_-8px_hsla(20,100%,45%,0.55)] mb-6 mx-auto lg:mx-0">
-              <Zap className="w-4 h-4 fill-white" />
+        {/* Photo panel */}
+        <div className={cn("hero4-panel", showingResult && "max-md:hidden")}>
+          <img src={heroPhoto} alt="" className="hero4-photo" />
+          <div className="hero4-overlay" />
+          <div className={cn("hero4-content text-center lg:text-left", showingResult && "max-md:hidden")}>
+            {/* Badge */}
+            <div className="hero4-badge inline-flex items-center gap-2 rounded-full px-5 py-2.5 mb-6 mx-auto lg:mx-0">
+              <Zap className="w-4 h-4 fill-[#06cb66] text-[#06cb66]" />
               <span className="text-[11px] md:text-xs font-black uppercase tracking-[0.18em]">
                 Registro de marcas · INPI
               </span>
@@ -46,11 +45,7 @@ const HeroSection = () => {
             <h1 className="font-display text-[2.75rem] sm:text-[3.25rem] xl:text-[4.25rem] font-black leading-[1.05] tracking-tight mb-6 text-white">
               {t("hero.title")}
               <br />
-              faça o <span className="relative inline-block">
-                registro
-                <ScribbleUnderline />
-              </span>{" "}
-              agora!
+              <span className="hero4-hl">faça o registro agora!</span>
             </h1>
 
             {/* Subtitle */}
@@ -88,9 +83,9 @@ const HeroSection = () => {
               {trustPills.map((p, i) => (
                 <span
                   key={i}
-                  className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur border border-white/25 px-4 py-2 text-white text-xs md:text-sm font-semibold"
+                  className="hero4-pill inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs md:text-sm font-semibold"
                 >
-                  <span className="w-5 h-5 rounded-full bg-[hsl(20_100%_55%)] flex items-center justify-center">
+                  <span className="hero4-pill-icon w-5 h-5 rounded-full flex items-center justify-center">
                     <p.icon className="w-3 h-3 text-white" strokeWidth={2.5} />
                   </span>
                   {p.label}
@@ -98,31 +93,31 @@ const HeroSection = () => {
               ))}
             </div>
           </div>
+        </div>
 
-          {/* Right — Viability Search */}
-          <div className={cn("relative w-full max-w-md mx-auto lg:max-w-none order-2 lg:order-none", showingResult && "max-md:max-w-none")}>
-            {/* 48h floating seal */}
-            {!showingResult && <Seal48h
-              size={144}
-              className="absolute -top-20 -right-4 sm:-top-24 sm:-right-6 md:-top-28 md:-right-10 z-20 scale-[0.8] lg:scale-100 origin-top-right"
-            />}
-            <div className={cn("relative rounded-[2rem] bg-card p-6 md:p-8 shadow-[0_28px_70px_-16px_hsl(var(--foreground)/0.4)]", showingResult && "max-md:rounded-none max-md:bg-transparent max-md:p-0 max-md:shadow-none")}>
-              <TrademarkSearch
-                variant="landing"
-                continueLabel="Continuar o registro"
-                onContinue={() => navigate("/consultar", { state: { continueSearch: true } })}
-              />
-            </div>
+        {/* Overlapping viability search card */}
+        <div className={cn("hero4-cardwrap relative w-full max-w-3xl mx-auto", showingResult && "max-md:max-w-none")}>
+          {/* 48h floating seal */}
+          {!showingResult && <Seal48h
+            size={144}
+            className="absolute -top-16 -right-4 sm:-top-16 sm:-right-4 md:-top-16 md:-right-8 z-20 scale-[0.7] lg:scale-[0.85] origin-top-right"
+          />}
+          <div className={cn("relative rounded-[2rem] bg-card p-6 md:p-8 shadow-[0_28px_70px_-16px_hsl(var(--foreground)/0.4)]", showingResult && "max-md:rounded-none max-md:bg-transparent max-md:p-0 max-md:shadow-none")}>
+            <TrademarkSearch
+              variant="landing"
+              continueLabel="Continuar o registro"
+              onContinue={() => navigate("/consultar", { state: { continueSearch: true } })}
+            />
           </div>
 
           {/* Trust pills — mobile only, below viability search */}
-          <div className={cn("flex lg:hidden flex-wrap gap-2.5 justify-center order-3", showingResult && "max-md:hidden")}>
+          <div className={cn("flex lg:hidden flex-wrap gap-2.5 justify-center mt-8", showingResult && "max-md:hidden")}>
             {trustPills.map((p, i) => (
               <span
                 key={i}
-                className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur border border-white/25 px-4 py-2 text-white text-xs font-semibold"
+                className="hero4-pill hero4-pill-light inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold"
               >
-                <span className="w-5 h-5 rounded-full bg-[hsl(20_100%_55%)] flex items-center justify-center">
+                <span className="hero4-pill-icon w-5 h-5 rounded-full flex items-center justify-center">
                   <p.icon className="w-3 h-3 text-white" strokeWidth={2.5} />
                 </span>
                 {p.label}
@@ -132,7 +127,6 @@ const HeroSection = () => {
         </div>
 
       </div>
-      {!showingResult && <WaveDivider className="absolute bottom-0 left-0 right-0 z-10" fill="hsl(var(--background))" />}
     </section>
   );
 };

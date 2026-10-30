@@ -1,0 +1,432 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+/* ============================================================
+   WebMarcas home — NOVA IDENTIDADE (preview local, nao publicar)
+   Referencia aprovada: /consultar e /formulario (hero/cadastro)
+   ============================================================ */
+
+html body .brand-public {
+  --background: 39 56% 95% !important;            /* #faf4e8 */
+  --foreground: 115 8% 15% !important;            /* #232923 */
+  --card: 45 100% 98% !important;                 /* #fffdf7 */
+  --card-foreground: 115 8% 15% !important;
+  --popover: 45 100% 98% !important;
+  --popover-foreground: 115 8% 15% !important;
+  --muted: 45 24% 90% !important;
+  --muted-foreground: 105 9% 43% !important;      /* #6a7664 */
+  --primary: 146 92% 38% !important;
+  --primary-foreground: 140 33% 9% !important;
+  --accent: 142 68% 44% !important;
+  --accent-foreground: 140 33% 9% !important;
+  --secondary: 70 20% 90% !important;
+  --secondary-foreground: 115 8% 15% !important;
+  --border: 84 16% 84% !important;                /* #d8dccf */
+  --input: 84 16% 84% !important;
+  --ring: 146 60% 36% !important;
+  --success: 142 55% 36% !important;
+  --brand-orange: 146 92% 41% !important;
+  --brand-orange-glow: 146 92% 50% !important;
+  --hero-blue: 146 92% 41% !important;
+  --hero-blue-deep: 150 60% 24% !important;
+  --gradient-primary: linear-gradient(135deg, #0bd36c 0%, #04884a 100%) !important;
+  --gradient-hero-blue: linear-gradient(180deg, #0bd36c 0%, #04884a 100%) !important;
+  --gradient-accent-orange: linear-gradient(135deg, #0bd36c 0%, #04884a 100%) !important;
+  --gradient-accent: linear-gradient(135deg, #0bd36c 0%, #04884a 100%) !important;
+  --gradient-hero: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(6,203,102,.14), transparent) !important;
+  --gradient-card: linear-gradient(180deg, #fffdf7 0%, #faf4e8 100%) !important;
+  --glass-bg: rgba(255,253,247,.92) !important;
+  --glass-border: #d8dccf !important;
+  --shadow-glow: 0 0 60px rgba(6,203,102,.15) !important;
+  --shadow-card: 0 4px 24px rgba(16,41,30,.08) !important;
+  --shadow-button: 0 8px 20px rgba(4,136,74,.35) !important;
+}
+
+/* Tipografia identidade (Arial como /consultar e /formulario) */
+html body .brand-public h1,
+html body .brand-public h2,
+html body .brand-public h3,
+html body .brand-public .font-display {
+  font-family: Arial, 'Public Sans', Helvetica, sans-serif !important;
+  letter-spacing: -0.03em !important;
+}
+
+/* Ritmo de fundos creme */
+html body .brand-public { background: #faf4e8 !important; }
+html body .brand-public main > section:not(#home) { background-color: #faf4e8 !important; }
+html body .brand-public main > section:not(#home):nth-of-type(even) { background-color: #f6efdf !important; }
+html body .brand-public section.bg-card { background: #fffdf7 !important; }
+html body .brand-public .bg-hero-gradient { background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(6,203,102,.08), transparent 70%) !important; }
+html body .brand-public .from-\[\#f6f8fc\] { --tw-gradient-from: #f6efdf var(--tw-gradient-from-position) !important; --tw-gradient-to: rgba(246,239,223,0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+
+/* Hero: painel verde-escuro arredondado */
+html body .brand-public .hero-blue-bg {
+  background: radial-gradient(900px 420px at 88% -8%, rgba(6,203,102,.22), transparent 62%), radial-gradient(700px 500px at -10% 110%, rgba(6,203,102,.10), transparent 60%), linear-gradient(158deg, #07130f 0%, #10291e 52%, #183028 100%) !important;
+  color: #fff !important;
+}
+html body .brand-public section#home {
+  margin: 10px 12px 0 !important;
+  border-radius: 26px !important;
+  box-shadow: 0 30px 60px -30px rgba(7,19,15,.45) !important;
+}
+@media (min-width: 768px) {
+  html body .brand-public section#home { margin: 14px 24px 0 !important; border-radius: 34px !important; }
+}
+
+/* Header: pilula flutuante creme */
+html body .brand-public > header {
+  top: 10px !important; left: 12px !important; right: 12px !important;
+  max-width: 1180px !important; margin: 0 auto !important;
+  border-radius: 999px !important;
+  background: rgba(255,253,247,.94) !important;
+  border: 1px solid #e6e1cd !important;
+  box-shadow: 0 14px 34px -18px rgba(16,41,30,.35) !important;
+  backdrop-filter: blur(14px) !important;
+}
+@media (min-width: 768px) {
+  html body .brand-public > header { top: 14px !important; left: 24px !important; right: 24px !important; }
+}
+html body .brand-public > header img.brightness-0.invert { filter: none !important; }
+html body .brand-public > header .text-white { color: #232923 !important; }
+html body .brand-public > header .text-white\/70 { color: #6a7664 !important; }
+html body .brand-public > header .text-white\/85 { color: #55604f !important; }
+html body .brand-public > header .text-white\/90 { color: #2f382e !important; }
+html body .brand-public > header .bg-white\/15,
+html body .brand-public > header .bg-white\/10 { background: rgba(6,203,102,.12) !important; }
+html body .brand-public > header .hover\:bg-white\/10:hover,
+html body .brand-public > header .hover\:bg-white\/20:hover { background: rgba(6,203,102,.10) !important; }
+html body .brand-public > header .border-white { border-color: #232923 !important; }
+html body .brand-public > header .hover\:text-white:hover { color: #04884a !important; }
+html body .brand-public > header .hover\:bg-primary\/5:hover { background: rgba(6,203,102,.08) !important; }
+html body .brand-public > header a[style*="linear-gradient"],
+html body .brand-public > header button[style*="linear-gradient"] {
+  background: linear-gradient(180deg, #0bd36c, #05a352) !important;
+  color: #062d1b !important;
+  box-shadow: 0 10px 20px -6px rgba(5,163,82,.5) !important;
+}
+html body .brand-public > header .bg-white\/98 { background: rgba(255,253,247,.98) !important; }
+
+/* Badges e pilulas */
+html body .brand-public .badge-consulta { background: rgba(6,203,102,.12) !important; color: #0a6b38 !important; }
+html body .brand-public .badge-premium { background: rgba(6,203,102,.10) !important; border: 1px solid rgba(6,203,102,.38) !important; color: #0a6b38 !important; }
+html body .brand-public .hero-blue-bg .badge-premium { background: rgba(6,203,102,.14) !important; border-color: rgba(6,203,102,.45) !important; color: #a9f4c9 !important; }
+html body .brand-public .hero-pill-badge::before { background: #0bd36c !important; box-shadow: 0 0 8px rgba(11,211,108,.8) !important; }
+html body .brand-public .bg-gradient-to-r.from-\[hsl\(20_100\%_55\%\)\] {
+  background: rgba(7,25,17,.55) !important;
+  border: 1px solid rgba(11,211,108,.5) !important;
+  color: #8df2ba !important;
+  box-shadow: none !important;
+}
+html body .brand-public .bg-gradient-to-r.from-\[hsl\(20_100\%_55\%\)\] svg { color: #0bd36c !important; fill: #0bd36c !important; }
+
+/* Botoes */
+html body .brand-public .btn-cta-solid { background: linear-gradient(180deg, #0bd36c, #05a352) !important; color: #062d1b !important; box-shadow: 0 12px 24px -8px rgba(5,163,82,.55) !important; }
+html body .brand-public .btn-cta-solid:hover { box-shadow: 0 16px 28px -8px rgba(5,163,82,.65) !important; }
+html body .brand-public .btn-solid-orange,
+html body .brand-public .btn-orange { background: linear-gradient(180deg, #0bd36c, #05a352) !important; color: #062d1b !important; border-radius: 9999px !important; box-shadow: 0 10px 22px -8px rgba(5,163,82,.55) !important; }
+html body .brand-public .btn-solid-orange:hover,
+html body .brand-public .btn-orange:hover { box-shadow: 0 12px 26px -8px rgba(5,163,82,.65) !important; }
+html body .brand-public .btn-outline-blue { border: 2px solid #127a44 !important; color: #127a44 !important; border-radius: 9999px !important; }
+html body .brand-public .btn-outline-blue:hover { background: rgba(6,203,102,.08) !important; }
+
+/* Cartoes */
+html body .brand-public .feature-card,
+html body .brand-public .glass-card { background: #fffdf7 !important; border: 1px solid #e0dcc8 !important; box-shadow: 0 10px 26px -14px rgba(16,41,30,.18) !important; border-radius: 1.25rem !important; }
+html body .brand-public .feature-card:hover { border-color: rgba(6,203,102,.45) !important; box-shadow: 0 20px 40px -16px rgba(5,163,82,.28) !important; }
+html body .brand-public .feature-card .bg-primary\/10 { background: rgba(6,203,102,.12) !important; }
+html body .brand-public .focus-glow:focus-within { box-shadow: 0 0 0 3px rgba(6,203,102,.22) !important; }
+
+/* Textos em gradiente */
+html body .brand-public .gradient-text,
+html body .brand-public #precos .gradient-text.text-transparent,
+html body .brand-public #precos .bg-clip-text.gradient-text { background-image: linear-gradient(135deg, #0a8f4d 0%, #06cb66 100%) !important; }
+html body .brand-public .gradient-text-accent,
+html body .brand-public #precos .gradient-text-accent.text-transparent,
+html body .brand-public #precos .bg-clip-text.gradient-text-accent { background-image: linear-gradient(135deg, #0a8f4d 0%, #04884a 100%) !important; }
+html body .brand-public .text-gradient { background: none !important; color: #1f7a45 !important; -webkit-text-fill-color: #1f7a45 !important; }
+html body .brand-public .hover-underline::after { background: #0bd36c !important; }
+
+/* Precos */
+html body .brand-public #precos .bg-accent\/20 { background: rgba(6,203,102,.14) !important; }
+html body .brand-public #precos .text-accent { color: #0a6b38 !important; }
+html body .brand-public #precos .bg-clip-text.text-transparent { background-image: linear-gradient(180deg, #0a8f4d, #046b39) !important; -webkit-background-clip: text !important; background-clip: text !important; color: transparent !important; }
+html body .brand-public #precos .bg-muted\/50 { background: #fffdf7 !important; border-color: #e0dcc8 !important; border-radius: 1rem !important; }
+html body .brand-public #precos .text-primary { color: #0a8f4d !important; }
+html body .brand-public #precos .bg-primary\/10 { background: rgba(6,203,102,.12) !important; }
+html body .brand-public #precos .bg-primary\/5 { background: rgba(6,203,102,.07) !important; }
+html body .brand-public #precos .border-primary\/20 { border-color: rgba(6,203,102,.25) !important; }
+html body .brand-public #precos .border-primary\/30 { border-color: rgba(6,203,102,.4) !important; }
+html body .brand-public #precos .from-blue-500,
+html body .brand-public .from-blue-500 { --tw-gradient-from: #0bd36c var(--tw-gradient-from-position) !important; --tw-gradient-to: rgba(11,211,108,0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+html body .brand-public #precos .to-indigo-600,
+html body .brand-public .to-indigo-600 { --tw-gradient-to: #04884a var(--tw-gradient-to-position) !important; }
+html body .brand-public #precos .from-orange-500,
+html body .brand-public .from-orange-500 { --tw-gradient-from: #1f7a45 var(--tw-gradient-from-position) !important; --tw-gradient-to: rgba(31,122,69,0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+html body .brand-public #precos .to-amber-600,
+html body .brand-public .to-amber-600 { --tw-gradient-to: #14532d var(--tw-gradient-to-position) !important; }
+html body .brand-public .border-blue-400\/50 { border-color: rgba(11,211,108,.5) !important; }
+html body .brand-public .border-orange-400\/50 { border-color: rgba(20,83,45,.45) !important; }
+html body .brand-public .shadow-blue-500\/20 { --tw-shadow-color: rgba(6,203,102,.25) !important; }
+html body .brand-public .shadow-orange-500\/20 { --tw-shadow-color: rgba(20,83,45,.25) !important; }
+html body .brand-public .to-blue-500 { --tw-gradient-to: #04884a var(--tw-gradient-to-position) !important; }
+html body .brand-public .via-blue-500 { --tw-gradient-to: rgba(11,211,108,0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), #0bd36c var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
+html body .brand-public .text-blue-500 { color: #0a8f4d !important; }
+html body .brand-public .bg-gradient-to-r.from-primary { background-image: linear-gradient(90deg, #0bd36c, #04884a) !important; }
+
+/* Utilitarios arbitrarios remapeados */
+html body .brand-public .bg-\[hsl\(20_100\%_55\%\)\] { background-color: #0bd36c !important; }
+html body .brand-public .bg-\[hsl\(20_100\%_55\%_\/_0\.25\)\] { background-color: rgba(6,203,102,.22) !important; }
+html body .brand-public .text-\[hsl\(20_100\%_65\%\)\] { color: #8df2ba !important; }
+html body .brand-public .text-\[hsl\(222_92\%_54\%\)\] { color: #0a8f4d !important; }
+html body .brand-public .text-\[hsl\(226_95\%_28\%\)\] { color: #0a3a22 !important; }
+html body .brand-public .text-\[hsl\(222_47\%_11\%\)\] { color: #232923 !important; }
+html body .brand-public .text-\[hsl\(222_40\%_25\%\)\] { color: #2c362b !important; }
+html body .brand-public .text-\[hsl\(215_16\%_47\%\)\] { color: #6a7664 !important; }
+html body .brand-public .bg-\[hsl\(220_33\%_98\%\)\] { background-color: #fffdf7 !important; }
+html body .brand-public .bg-\[hsl\(220_33\%_96\%\)\] { background-color: #f2ecdc !important; }
+html body .brand-public .hover\:text-\[hsl\(222_92\%_54\%\)\]:hover { color: #0a8f4d !important; }
+
+/* Selo 48h (SVG inline) */
+html body .brand-public svg [fill="#005fe6"] { fill: #127a44 !important; }
+html body .brand-public svg [stroke="#005fe6"] { stroke: #127a44 !important; }
+html body .brand-public svg [fill="#ed8534"] { fill: #0bd36c !important; }
+
+/* Formulario do hero */
+html body .brand-public .form-pill-input { background: #fffdf7 !important; border: 1px solid #d8dccf !important; color: #232923 !important; }
+html body .brand-public .form-pill-input::placeholder { color: #9aa294 !important; }
+html body .brand-public .form-pill-input:focus { background: #fff !important; border-color: #0a8f4d !important; box-shadow: 0 0 0 4px rgba(6,203,102,.14) !important; }
+html body .brand-public .form-label-caps { color: #2c362b !important; }
+
+/* HowItWorks: azuis em style inline (serializados como rgb) */
+html body .brand-public span[style*="rgb(5, 50, 199)"] { color: #0a8f4d !important; background-color: rgba(6,203,102,.12) !important; }
+html body .brand-public h2 span[style*="rgb(5, 50, 199)"] { background-color: transparent !important; }
+html body .brand-public div[style*="rgb(30, 95, 246)"] { background: linear-gradient(180deg, #0bd36c, #04884a) !important; box-shadow: 0 14px 28px -10px rgba(4,136,74,.5) !important; }
+html body .brand-public span[style*="rgba(30, 95, 246, 0.5)"] { background-image: linear-gradient(to bottom, rgba(6,203,102,.55) 0 6px, transparent 6px 12px) !important; background-size: 2px 12px !important; }
+html body .brand-public [style*="rgb(10, 14, 41)"] { color: #232923 !important; }
+html body .brand-public [style*="rgb(228, 232, 240)"] { border-color: #e0dcc8 !important; }
+
+/* Social proof */
+html body .brand-public .social-proof-pill { background: #fffdf7 !important; border: 1px solid #e0dcc8 !important; border-left: 4px solid #0a8f4d !important; box-shadow: 0 18px 40px -18px rgba(16,41,30,.35) !important; }
+html body .brand-public .social-proof-pill .sp-icon { background: linear-gradient(135deg, #0bd36c, #04884a) !important; box-shadow: 0 6px 14px -6px rgba(5,163,82,.6) !important; }
+html body .brand-public .social-proof-pill .sp-title { color: #232923 !important; }
+html body .brand-public .social-proof-pill .sp-meta { color: #0a6b38 !important; }
+
+/* Footer verde-escuro */
+html body .brand-public .footer-branded { background: linear-gradient(180deg, #10291e 0%, #07130f 100%) !important; color: hsl(0 0% 95%) !important; border-top: 1px solid rgba(6,203,102,.25) !important; }
+html body .brand-public .footer-branded a { color: hsl(0 0% 85%) !important; }
+html body .brand-public .footer-branded a:hover { color: #4be38e !important; }
+
+/* Radio cards */
+html body .brand-public .radio-card:hover { border-color: rgba(6,203,102,.45) !important; }
+html body .brand-public .radio-card.selected { border-color: #0a8f4d !important; }
+
+/* ============================================================
+
+/* ============================================================
+   RECOMPOSICAO v4 - linguagem Very/RegistreAi
+   Referencia: mockup enviado pelo usuario (23:24) + sites ao vivo
+   app.webmarcas.net (Very) e registreai.com.br
+   ============================================================ */
+
+/* Fonte Inter (mesma da Very) */
+html body .brand-public,
+html body .brand-public .font-body { font-family: 'Inter', Arial, Helvetica, sans-serif !important; }
+html body .brand-public h1,
+html body .brand-public h2,
+html body .brand-public h3,
+html body .brand-public h4,
+html body .brand-public .font-display { font-family: 'Inter', Arial, Helvetica, sans-serif !important; letter-spacing: -0.035em !important; }
+
+/* Header: logo preto + wordmark escuro (como no mockup) */
+html body .brand-public > header img.brightness-0.invert { filter: brightness(0) !important; }
+html body .brand-public > header .text-primary { color: #232923 !important; }
+
+/* ---------- HERO v4: painel fotografico + card sobreposto ---------- */
+html body .brand-public .hero4 { background: #faf4e8 !important; }
+html body .brand-public .hero4-panel {
+  position: relative !important;
+  border-radius: 2rem !important;
+  overflow: hidden !important;
+  min-height: 620px !important;
+  display: flex !important;
+  align-items: center !important;
+  box-shadow: 0 34px 64px -30px rgba(7,19,15,.45) !important;
+  background: #07130f !important;
+}
+html body .brand-public .hero4-photo {
+  position: absolute !important; inset: 0 !important;
+  width: 100% !important; height: 100% !important;
+  object-fit: cover !important; object-position: 70% center !important;
+}
+html body .brand-public .hero4-overlay {
+  position: absolute !important; inset: 0 !important;
+  background: linear-gradient(90deg, rgba(7,19,15,.95) 0%, rgba(7,19,15,.88) 30%, rgba(7,19,15,.48) 58%, rgba(7,19,15,.10) 82%) !important;
+}
+html body .brand-public .hero4-content {
+  position: relative !important; z-index: 2 !important;
+  padding: 72px 60px !important;
+  max-width: 660px !important;
+}
+html body .brand-public .hero4-badge {
+  background: rgba(7,19,15,.55) !important;
+  border: 1px solid rgba(6,203,102,.45) !important;
+  color: #d9f5e4 !important;
+  backdrop-filter: blur(6px) !important;
+  box-shadow: none !important;
+}
+html body .brand-public .hero4-hl {
+  background: linear-gradient(120deg, #2ee57f 0%, #06cb66 100%) !important;
+  -webkit-background-clip: text !important; background-clip: text !important;
+  color: transparent !important;
+}
+html body .brand-public .hero4-pill {
+  background: rgba(255,255,255,.12) !important;
+  border: 1px solid rgba(255,255,255,.28) !important;
+  color: #fff !important;
+  backdrop-filter: blur(6px) !important;
+}
+html body .brand-public .hero4-pill-icon { background: #06cb66 !important; }
+html body .brand-public .hero4-pill-light {
+  background: #fffdf7 !important;
+  border-color: rgba(11,61,46,.16) !important;
+  color: #10291e !important;
+  backdrop-filter: none !important;
+}
+html body .brand-public .hero4-cardwrap { margin-top: -96px !important; z-index: 20 !important; }
+html body .brand-public .hero4.search-result-active .hero4-cardwrap { margin-top: 24px !important; }
+html body .brand-public .hero4-cardwrap > .rounded-\[2rem\] {
+  border: 1px solid rgba(11,61,46,.10) !important;
+  box-shadow: 0 30px 60px -22px rgba(7,19,15,.30) !important;
+}
+@media (max-width: 1023px) {
+  html body .brand-public .hero4-panel { min-height: 0 !important; }
+  html body .brand-public .hero4-overlay {
+    background: linear-gradient(180deg, rgba(7,19,15,.86) 0%, rgba(7,19,15,.70) 100%) !important;
+  }
+  html body .brand-public .hero4-content { padding: 48px 26px 56px !important; max-width: 100% !important; }
+  html body .brand-public .hero4-cardwrap { margin-top: -60px !important; }
+}
+
+/* ---------- STATS: faixa clara em cards (ritmo do mockup) ---------- */
+html body .brand-public main > section:nth-of-type(3) .grid.grid-cols-2.lg\:grid-cols-4 > div {
+  background: #fffdf7 !important;
+  border: 1px solid rgba(11,61,46,.10) !important;
+  border-radius: 1.25rem !important;
+  padding: 22px 22px !important;
+  box-shadow: 0 10px 26px -18px rgba(7,19,15,.25) !important;
+  text-align: left !important;
+}
+html body .brand-public main > section:nth-of-type(3) .grid.grid-cols-2.lg\:grid-cols-4 > div .mx-auto { margin-left: 0 !important; }
+
+/* ---------- COMO FUNCIONA: painel verde-escuro + cards numerados ---------- */
+html body .brand-public #como-funciona { background: transparent !important; }
+html body .brand-public #como-funciona > .container {
+  background: linear-gradient(165deg, #0e3a28 0%, #07130f 100%) !important;
+  border-radius: 2rem !important;
+  padding: 56px 44px 60px !important;
+  box-shadow: 0 34px 64px -30px rgba(7,19,15,.45) !important;
+}
+html body .brand-public #como-funciona h2 { color: #f7f1e3 !important; }
+html body .brand-public #como-funciona .text-muted-foreground { color: rgba(247,241,227,.75) !important; }
+html body .brand-public #como-funciona .text-center .inline-flex {
+  background: rgba(6,203,102,.14) !important;
+  border-color: rgba(6,203,102,.40) !important;
+  color: #a9f4c9 !important;
+}
+html body .brand-public #como-funciona div[class*="shadow-[0_14px_28px"] {
+  background: linear-gradient(135deg, #0bd36c 0%, #04884a 100%) !important;
+  box-shadow: 0 14px 28px -10px rgba(6,203,102,.5) !important;
+}
+html body .brand-public #como-funciona div[class*="absolute"][class*="w-\[2px\]"] { background: rgba(6,203,102,.30) !important; }
+@media (min-width: 900px) {
+  html body .brand-public #como-funciona .relative.max-w-4xl.mx-auto {
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 14px !important;
+    max-width: 100% !important;
+    padding-left: 0 !important;
+  }
+  html body .brand-public #como-funciona .relative.max-w-4xl.mx-auto > div {
+    flex-direction: column !important;
+    gap: 14px !important;
+    padding-bottom: 0 !important;
+  }
+  html body .brand-public #como-funciona .relative.max-w-4xl.mx-auto > div > div[class*="absolute"] { display: none !important; }
+  html body .brand-public #como-funciona .relative.max-w-4xl.mx-auto > div > .flex-1 {
+    padding: 20px 18px !important;
+    height: 100% !important;
+  }
+}
+
+/* ---------- PLANOS: cards claros, Premium elevado ---------- */
+@media (min-width: 768px) {
+  html body .brand-public #precos .grid.md\:grid-cols-3 > div:nth-child(2) {
+    transform: scale(1.03) !important; z-index: 2 !important;
+    border: 2px solid #0bd36c !important;
+    box-shadow: 0 30px 60px -24px rgba(6,203,102,.35) !important;
+  }
+}
+
+/* ---------- BLOCKCHAIN: banner verde-vivo ---------- */
+html body .brand-public main > section:nth-of-type(8) .rounded-2xl {
+  background: linear-gradient(135deg, #12d872 0%, #06cb66 100%) !important;
+  border: none !important;
+  border-radius: 2rem !important;
+}
+html body .brand-public main > section:nth-of-type(8) h3,
+html body .brand-public main > section:nth-of-type(8) p { color: #07130f !important; }
+html body .brand-public main > section:nth-of-type(8) .text-primary { color: #062d1b !important; }
+
+/* ---------- FAQ: linhas claras arredondadas ---------- */
+html body .brand-public #faq .max-w-3xl > div,
+html body .brand-public #faq [data-radix-accordion-item] {
+  background: #fffdf7 !important;
+  border: 1px solid rgba(11,61,46,.10) !important;
+  border-radius: 1rem !important;
+}
+
+/* ---------- CTA final: painel escuro arredondado ---------- */
+html body .brand-public main > section:nth-of-type(12) > div[class*="rounded"],
+html body .brand-public main > section:nth-of-type(12) .relative.z-10 {
+  border-radius: 2rem !important;
+}
+
+/* FIX v4.1 */
+html body .brand-public .hero4-content { padding-bottom: 150px !important; }
+@media (max-width: 1023px) {
+  html body .brand-public .hero4-content { padding-bottom: 96px !important; }
+}
+html body .brand-public #como-funciona .bg-white .text-muted-foreground,
+html body .brand-public #como-funciona .flex-1 .text-muted-foreground { color: #4f5b48 !important; }
+html body .brand-public .hero4-panel .bg-\[hsl\(20_100\%_55\%\)\] { background-color: #f97316 !important; }
+html body .brand-public .badge-consulta {
+  background: rgba(249,115,22,.10) !important;
+  border: 1px solid rgba(249,115,22,.35) !important;
+  color: #c2410c !important;
+}
+html body .brand-public .badge-consulta svg { color: #f97316 !important; fill: none !important; }
+
+/* FIX v4.2 — mockup fiel: selo verde, marca verde, rabisco laranja, faixa 4 beneficios */
+html body .brand-public .hero4-cardwrap svg [fill="#005fe6"] { fill: #06cb66 !important; }
+html body .brand-public .hero4-cardwrap svg [stroke="#005fe6"] { stroke: #06cb66 !important; }
+html body .brand-public .hero4-cardwrap svg [fill="#005FE6"] { fill: #06cb66 !important; }
+html body .brand-public .hero4-cardwrap .text-\[hsl\(222_92\%_54\%\)\] { color: #06cb66 !important; }
+html body .brand-public .hero4-hl { display: inline-block !important; position: relative !important; padding-bottom: 0.16em !important; }
+html body .brand-public .hero4-hl::after {
+  content: "" !important; position: absolute !important; left: 0 !important; right: 0 !important; bottom: 0 !important; height: 0.13em !important;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='10' viewBox='0 0 120 10'%3E%3Cpath d='M2 6 Q 20 2 40 6 T 78 6 T 118 5' stroke='%23f97316' stroke-width='3.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat 0 100% / 100% 100% !important;
+}
+html body .brand-public .hero4-cardwrap div:has(> .hero4-pill-light) {
+  display: grid !important; grid-template-columns: repeat(4, 1fr) !important;
+  gap: 10px !important; justify-items: stretch !important;
+}
+html body .brand-public .hero4-pill-light {
+  background: transparent !important; border: none !important; box-shadow: none !important;
+  padding: 0 !important; gap: 6px !important; align-items: flex-start !important;
+  font-size: 10px !important; line-height: 1.25 !important; font-weight: 700 !important;
+  color: #2a3c33 !important;
+}
+html body .brand-public .hero4-pill-light .hero4-pill-icon {
+  background: transparent !important; width: 18px !important; height: 18px !important; flex: none !important;
+}
+html body .brand-public .hero4-pill-light .hero4-pill-icon svg {
+  color: #04884a !important; width: 16px !important; height: 16px !important;
+}

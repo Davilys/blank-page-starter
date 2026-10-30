@@ -16,6 +16,7 @@ import FAQSection from "@/components/sections/FAQSection";
 import CTASection from "@/components/sections/CTASection";
 import BlogPreviewSection from "@/components/sections/BlogPreviewSection";
 import { useTrademarkSearch } from "@/modules/trademark-search/useTrademarkSearch";
+import "@/rebrand-home.css";
 
 const Index = () => {
   const { state: searchState } = useTrademarkSearch();
