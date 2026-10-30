@@ -23,6 +23,7 @@ import { ConsultationHeader } from "@/components/consultar/ConsultationEntry";
 import { ConsultationFooter } from "@/components/consultar/ConsultationFooter";
 import "@/components/consultar/ConsultationFlow.css";
 import "@/components/formulario/FormularioClean.css";
+import proposalHero from "@/assets/formulario-proposta-original.webp";
 
 // Dynamic text options for typing effect
 const dynamicTexts = [
@@ -259,9 +260,9 @@ export default function Formulario() {
         <meta property="og:title" content="Proposta de Registro de Marca no INPI | WebMarcas" />
         <meta property="og:description" content="Consulta grátis, protocolo em 48h, contrato digital e acompanhamento completo." />
       </Helmet>
-      <ConsultationHeader />
+      <ConsultationHeader entry />
       <main className="wm-form-main">
-        {step === 1 ? <div className="wm-form-intro"><div className="wm-kicker">WEBMARCAS · REGISTRO DE MARCAS</div><h1>Sua marca.<br/><em>Seu próximo passo.</em></h1><p>Comece com os dados abaixo. Depois, complete o cadastro, escolha seu plano e revise o contrato.</p></div> : <StepDashes total={5} current={step} />}
+        {step === 1 ? <section className="wm-reference-hero"><img className="wm-reference-photo" src={proposalHero} alt="" fetchPriority="high"/><div className="wm-reference-copy"><h1>Apenas 1 minuto,<br/>receba proposta do<br/><span>registro de marca!</span></h1><div className="wm-reference-rule"/><p>Preencha seus dados para gerar sua<br className="wm-reference-break"/> proposta. Após sua aprovação,<br className="wm-reference-break"/> iniciamos imediatamente o registro !</p></div></section> : <StepDashes total={5} current={step} />}
         <section className="wm-flow-screen">
             {step === 1 && (
               <QuickLeadStep initial={quick} onNext={handleQuickNext} />
@@ -333,4 +334,4 @@ export default function Formulario() {
       <ConsultationFooter />
     </div>
   );
-                }
+}
