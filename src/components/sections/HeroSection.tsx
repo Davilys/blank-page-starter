@@ -47,7 +47,7 @@ const HeroSection = () => {
             <h1 className="font-display text-[2.75rem] sm:text-[3.25rem] xl:text-[4.25rem] font-black leading-[1.05] tracking-tight mb-6 text-white">
               {t("hero.title")}
               <br />
-              <span className="hero4-hl">faça o registro agora!</span>
+              <span className="hero4-hl">Registre sua Marca!</span>
             </h1>
 
             {/* Subtitle */}
@@ -99,12 +99,12 @@ const HeroSection = () => {
 
         {/* Overlapping viability search card */}
         <div className={cn("hero4-cardwrap relative w-full max-w-3xl mx-auto", showingResult && "max-md:max-w-none")}>
-          {/* 48h floating seal */}
-          {!showingResult && <Seal48h
-            size={144}
-            className="absolute -top-16 -right-4 sm:-top-16 sm:-right-4 md:-top-16 md:-right-8 z-20 scale-[0.7] lg:scale-[0.85] origin-top-right"
-          />}
           <div className={cn("relative rounded-[2rem] bg-card p-6 md:p-8 shadow-[0_28px_70px_-16px_hsl(var(--foreground)/0.4)]", showingResult && "max-md:rounded-none max-md:bg-transparent max-md:p-0 max-md:shadow-none")}>
+            {/* 48h floating seal */}
+            {!showingResult && <Seal48h
+              size={144}
+              className="absolute -top-16 -right-4 sm:-top-16 sm:-right-4 md:-top-16 md:-right-8 z-20 scale-[0.7] lg:scale-[0.85] origin-top-right"
+            />}
             <TrademarkSearch
               variant="landing"
               continueLabel="Continuar o registro"

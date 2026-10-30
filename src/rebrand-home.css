@@ -465,7 +465,7 @@ html body .brand-public .hero4-photo-mobile { display: none !important; }
     background: linear-gradient(90deg, rgba(7,19,15,.94) 0%, rgba(7,19,15,.78) 40%, rgba(7,19,15,.22) 66%, rgba(7,19,15,.05) 100%) !important;
   }
   html body .brand-public .hero4-content {
-    padding: 50px 22px 130px !important; max-width: 100% !important; text-align: left !important;
+    padding: 54px 22px 14px !important; max-width: 100% !important; text-align: left !important;
   }
   html body .brand-public .hero4-content .hero4-badge {
     margin-left: 0 !important; margin-bottom: 12px !important;
@@ -509,12 +509,22 @@ html body .brand-public .hero4-photo-mobile { display: none !important; }
   html body .brand-public .hero4-content .flex.flex-wrap.items-center svg { width: 13px !important; height: 13px !important; }
   html body .brand-public .hero4-content .flex.flex-wrap.items-center .text-lg { font-size: 16px !important; }
   html body .brand-public .hero4-content .flex.flex-wrap.items-center p.text-xs { font-size: 11px !important; margin-top: 3px !important; }
-  html body .brand-public .hero4-badge { padding: 7px 14px !important; font-size: 11px !important; }
+  html body .brand-public .hero4-badge { display: none !important; }
   /* v8.4: selo 48h reduzido 50% no mobile (pedido audio 01:17:33) */
-  html body .brand-public .hero4-cardwrap > .absolute { transform: scale(0.35) !important; transform-origin: top right !important; top: -25px !important; right: 3px !important; }
+  html body .brand-public .hero4-cardwrap .rounded-\[2rem\] > .absolute { transform: scale(0.35) !important; transform-origin: top right !important; top: -25px !important; right: 3px !important; }
   /* Toast de prova social: sai do topo (não cobre o selo) */
   html body .brand-public div.fixed.z-40.top-20 {
     top: auto !important; bottom: 14px !important; left: 10px !important;
     max-width: 232px !important;
   }
+}
+
+/* v8.7: abertura preenche exatamente a tela útil do celular (Very-style), card e benefícios mais para baixo */
+@media (max-width: 767px) {
+  html body .brand-public .hero4 { display: flex !important; flex-direction: column !important; min-height: 100svh !important; }
+  html body .brand-public .hero4 > .container { flex: 1 0 auto !important; display: flex !important; flex-direction: column !important; }
+  html body .brand-public .hero4-panel { flex: 1 1 auto !important; }
+  html body .brand-public .hero4-cardwrap { flex: 0 0 auto !important; }
+  html body .brand-public .hero4-cardwrap > .rounded-\[2rem\] { padding: 18px 20px !important; }
+  html body .brand-public .hero4-cardwrap div:has(> .hero4-pill-light) { margin-top: 10px !important; margin-bottom: 14px !important; }
 }

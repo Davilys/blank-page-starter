@@ -89,12 +89,12 @@ export function TrademarkSearch({ variant, onContinue, continueLabel, consultati
                   </span>
                 </div>
                 <h2 className="font-display text-[1.9rem] sm:text-[2.15rem] leading-[1.05] font-bold text-center max-md:text-left text-[hsl(222_47%_11%)] mb-8 max-md:mb-2">
-                  Consulte a viabilidade da sua{' '}
-                  <span className="text-[hsl(222_92%_54%)]">marca</span>
+                  Consulte sua{' '}
+                  <span className="text-[hsl(222_92%_54%)]">marca</span> grátis!
                 </h2>
                 <p className="flex md:hidden items-center gap-1.5 text-xs text-[hsl(215_16%_47%)] mb-6">
                   <Zap className="w-3.5 h-3.5" strokeWidth={2.5} />
-                  Consulta gratuita
+                  Pesquisa exata na base oficial do INPI.
                 </p>
                 <form onSubmit={handleSubmit} className="space-y-5" noValidate>
                   <div>

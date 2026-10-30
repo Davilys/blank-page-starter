@@ -22,8 +22,8 @@ const translations: Record<Language, Record<string, string>> = {
     
     // Hero
     "hero.badge": "Líder em Registro de Marcas no Brasil",
-    "hero.title": "Proteja sua marca,",
-    "hero.phrase1": "faça o registro agora!",
+    "hero.title": "Apenas 5 minutos,",
+    "hero.phrase1": "Registre sua Marca!",
     "hero.phrase2": "seja exclusivo agora!",
     "hero.phrase3": "torne única sua marca!",
     "hero.subtitle": "Dono da marca e quem registra primeiro!",
