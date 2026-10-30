@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -21,6 +22,25 @@ import "@/rebrand-home.css";
 const Index = () => {
   const { state: searchState } = useTrademarkSearch();
   const showingSearchResult = searchState.phase === 'completed' && Boolean(searchState.job);
+
+  // v9.9c — auditoria rolagens: saltos de âncora realinham após o conteúdo assíncrono assentar
+  useEffect(() => {
+    const onClick = (e) => {
+      const a = e.target.closest('a[href^="#"]');
+      if (!a) return;
+      const id = a.getAttribute('href');
+      if (id.length < 2) return;
+      const target = document.querySelector(id);
+      if (!target) return;
+      e.preventDefault();
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      [800, 1800, 3200].forEach((ms) => setTimeout(() => {
+        target.scrollIntoView({ behavior: 'auto', block: 'start' });
+      }, ms));
+    };
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
+  }, []);
 
   return (
     <div className="brand-public min-h-screen bg-background">

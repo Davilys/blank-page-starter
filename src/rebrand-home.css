@@ -486,6 +486,8 @@ html body .brand-public .hero4-photo-mobile { display: none !important; }
   }
   html body .brand-public .hero4-content .flex.flex-wrap.items-center .text-left p { margin-top: 4px !important; }
   html body .brand-public .hero4-cardwrap { margin-top: -100px !important; padding: 0 14px !important; }
+  /* v9.9e: no resultado, afastar do header fixo (alvo: topo do card a 76px) */
+  html body .brand-public .hero4.search-result-active .hero4-cardwrap { margin-top: 44px !important; }
   html body .brand-public .hero4-cardwrap > .rounded-\[2rem\] { border-radius: 1.5rem !important; }
   html body .brand-public .form-label-caps {
     text-transform: none !important; font-size: 14.5px !important;
@@ -851,4 +853,13 @@ html body .brand-public > header a img.md\:h-12 { filter: brightness(0) !importa
   }
   html body .brand-public .hero4-cardwrap > .rounded-\[2rem\]::before { transform: translate(6px,-6px) !important; opacity: .92 !important; }
   html body .brand-public .hero4-cardwrap > .rounded-\[2rem\]::after { transform: translate(12px,-12px) !important; opacity: .8 !important; }
+}
+
+/* v9.9b — auditoria rolagens 03:14: CTA "#consultar" cai em DIV (id duplicado) sem scroll-margin e o header cobre o topo; ampliar offset para qualquer elemento com id */
+@media (max-width: 767.98px) {
+  html body .brand-public [id] { scroll-margin-top: 72px !important; }
+}
+html body .brand-public main [id] { scroll-margin-top: 88px; }
+@media (max-width: 767.98px) {
+  html body .brand-public main [id] { scroll-margin-top: 72px !important; }
 }

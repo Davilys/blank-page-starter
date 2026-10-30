@@ -1,4 +1,5 @@
 import { Shield, FileSignature, UserCheck, CalendarCheck, Star, Zap } from "lucide-react";
+import { useEffect } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useNavigate } from "react-router-dom";
 import { TrademarkSearch } from "@/modules/trademark-search/components/TrademarkSearch";
@@ -17,6 +18,21 @@ const HeroSection = () => {
   const { state } = useTrademarkSearch();
   const showingResult = state.phase === 'completed' && Boolean(state.job);
 
+  // v9.9 — pedido 03:07: ao concluir a consulta, alinhar o INÍCIO do resultado logo abaixo do header fixo (mobile)
+  useEffect(() => {
+    if (!showingResult || window.innerWidth >= 768) return;
+    const align = (smooth) => {
+      const wrap = document.querySelector('.hero4-cardwrap');
+      const el = wrap ? [...wrap.children].find((c) => String(c.className).includes('rounded-[2rem]')) : null;
+      if (!el) return;
+      const y = el.getBoundingClientRect().top + window.scrollY - 76;
+      window.scrollTo({ top: Math.max(0, y), behavior: smooth ? 'smooth' : 'auto' });
+    };
+    const raf = requestAnimationFrame(() => align(true));
+    const timers = [700, 1500, 2600, 4000].map((ms) => setTimeout(() => align(false), ms));
+    return () => { cancelAnimationFrame(raf); timers.forEach(clearTimeout); };
+  }, [showingResult]);
+
   const trustPills = [
     { icon: Shield, label: "Protocolo em 48h" },
     { icon: FileSignature, label: "Contrato digital" },
@@ -27,7 +43,7 @@ const HeroSection = () => {
   return (
     <section id="home" className={cn("relative hero4 overflow-x-clip overflow-y-visible", showingResult && "search-result-active max-md:text-foreground")}>
 
-      <div className={cn("container mx-auto px-4 sm:px-6 lg:px-8 pt-24 md:pt-32 relative z-10 max-w-7xl", showingResult && "max-md:px-3 max-md:pb-10 max-md:pt-20")}>
+      <div className={cn("container mx-auto px-4 sm:px-6 lg:px-8 pt-24 md:pt-32 relative z-10 max-w-7xl", showingResult && "max-md:px-3 max-md:pb-10 max-md:pt-[104px]")}>
 
         {/* Photo panel */}
         <div className={cn("hero4-panel", showingResult && "max-md:hidden")}>
