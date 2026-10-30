@@ -898,3 +898,6 @@ html body .brand-public .hero4-cardwrap h2.wm-home-consult-title span {
   html body .brand-public .hero4-cardwrap .rounded-\[2rem\] > .absolute { top: 8px !important; }
   html body .brand-public .hero4-cardwrap > .rounded-\[2rem\] { padding-top: 112px !important; }
 }
+@media (max-width: 360px) {
+  html body .brand-public .hero4 { min-height: calc(100svh + 200px) !important; }
+}
