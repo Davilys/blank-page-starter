@@ -185,9 +185,9 @@ html body .brand-public .bg-\[hsl\(220_33\%_96\%\)\] { background-color: #f2ecdc
 html body .brand-public .hover\:text-\[hsl\(222_92\%_54\%\)\]:hover { color: #0a8f4d !important; }
 
 /* Selo 48h (SVG inline) */
-html body .brand-public svg [fill="#005fe6"] { fill: #127a44 !important; }
-html body .brand-public svg [stroke="#005fe6"] { stroke: #127a44 !important; }
-html body .brand-public svg [fill="#ed8534"] { fill: #0bd36c !important; }
+html body .brand-public svg [fill="#005fe6"] { fill: #04884a !important; }
+html body .brand-public svg [stroke="#005fe6"] { stroke: #04884a !important; stroke-opacity: .55 !important; }
+html body .brand-public svg [fill="#ed8534"] { fill: #04884a !important; }
 
 /* Formulario do hero */
 html body .brand-public .form-pill-input { background: #fffdf7 !important; border: 1px solid #d8dccf !important; color: #232923 !important; }
@@ -510,8 +510,8 @@ html body .brand-public .hero4-photo-mobile { display: none !important; }
   html body .brand-public .hero4-content .flex.flex-wrap.items-center .text-lg { font-size: 16px !important; }
   html body .brand-public .hero4-content .flex.flex-wrap.items-center p.text-xs { font-size: 11px !important; margin-top: 3px !important; }
   html body .brand-public .hero4-badge { display: none !important; }
-  /* v8.4: selo 48h reduzido 50% no mobile (pedido audio 01:17:33) */
-  html body .brand-public .hero4-cardwrap .rounded-\[2rem\] > .absolute { transform: scale(0.35) !important; transform-origin: top right !important; top: -25px !important; right: 3px !important; }
+  /* v8.15: selo 48h no DOBRO do tamanho atual + posicao canto sup. direito (pedido 01:58) */
+  html body .brand-public .hero4-cardwrap .rounded-\[2rem\] > .absolute { transform: scale(0.70) !important; transform-origin: top right !important; top: -20px !important; right: 2px !important; }
   /* Toast de prova social: sai do topo (não cobre o selo) */
   html body .brand-public div.fixed.z-40.top-20 {
     top: auto !important; bottom: 14px !important; left: 10px !important;
@@ -559,4 +559,24 @@ html body .brand-public .hero4-photo-mobile { display: none !important; }
   html body .brand-public .hero4-cardwrap > .rounded-\[2rem\]::after { transform: rotate(2.3deg) translate(12px,-14px) !important; opacity: .8 !important; }
   /* respiro entre card e beneficios */
   html body .brand-public .hero4-cardwrap div:has(> .hero4-pill-light) { margin-top: 14px !important; }
+}
+
+/* v8.15 — correcao regressao iPhone real (print 01:54): hero ganha folga da barra translucida do Safari,
+   conteudo compactado p/ caber na tela util SEM cobrir prova social; faixa de segmentos fora do 1o quadro.
+   + selo 48h no dobro do tamanho e verde mais forte (pedido 01:58). Desktop intacto. */
+@media (max-width: 767px) {
+  html body .brand-public .hero4 { min-height: calc(100svh + 84px) !important; }
+  html body .brand-public .hero4-content { padding: 30px 22px 10px !important; }
+  html body .brand-public .hero4-content h1 { font-size: clamp(24px, 6.2vw, 30px) !important; margin-bottom: 10px !important; }
+  html body .brand-public .hero4-content > p { font-size: 15px !important; margin-bottom: 12px !important; }
+  html body .brand-public .hero4-cardwrap { margin-top: -40px !important; }
+  html body .brand-public .hero4-cardwrap > .rounded-\[2rem\] { padding: 12px 16px !important; }
+  html body .brand-public .hero4-cardwrap form > * + * { margin-top: 10px !important; }
+  html body .brand-public .hero4-cardwrap h2 { margin-bottom: 4px !important; }
+  html body .brand-public .hero4-cardwrap div:has(> .hero4-pill-light) { margin-top: 8px !important; margin-bottom: 168px !important; }
+}
+
+/* v8.15b — telas estreitas (<=400px): titulo do card quebra antes da zona do selo dobrado (sem mexer em copy) */
+@media (max-width: 400px) {
+  html body .brand-public .hero4-cardwrap h2 { max-width: 250px !important; }
 }
