@@ -282,7 +282,7 @@ export default function ChatSuporte() {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!isMounted) return;
-      if (!session) { navigate('/cliente/login'); return; }
+      if (!session) { navigate('/login'); return; }
 
       setUser(session.user);
 

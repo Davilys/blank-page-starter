@@ -80,7 +80,7 @@ const CAMPAIGN_TEMPLATES: Record<string, { subject: string; body: string }> = {
 Sua Área do Cliente está disponível para acompanhamento completo do seu processo de registro da marca {{marca}}.
 
 Acesse:
-https://www.webmarcas.net/cliente/login
+https://www.webmarcas.net/login
 
 Login: seu e-mail cadastrado
 Senha provisória: 123Mudar@

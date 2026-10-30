@@ -86,7 +86,7 @@ export default function RecuperarSenha() {
                 Enviar para outro e-mail
               </Button>
               
-              <Link to="/cliente/login" className="w-full">
+              <Link to="/login" className="w-full">
                 <Button variant="ghost" className="w-full">
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Voltar ao login
@@ -144,7 +144,7 @@ export default function RecuperarSenha() {
 
           <div className="mt-6 text-center">
             <Link 
-              to="/cliente/login" 
+              to="/login" 
               className="text-sm text-muted-foreground hover:text-primary inline-flex items-center gap-1"
             >
               <ArrowLeft className="h-4 w-4" />

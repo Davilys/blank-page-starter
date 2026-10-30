@@ -203,7 +203,7 @@ export function MobileBottomNav() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast.success('Logout realizado');
-    navigate('/cliente/login');
+    navigate('/admin');
   };
 
   return (

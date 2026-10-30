@@ -239,7 +239,7 @@ export default function AdminLogin() {
           </form>
 
           <div className="mt-8 flex items-center justify-between gap-4 border-t border-border pt-6 text-sm">
-            <Link to="/cliente/login" className="inline-flex items-center gap-2 font-medium text-muted-foreground transition-colors hover:text-foreground">
+            <Link to="/login" className="inline-flex items-center gap-2 font-medium text-muted-foreground transition-colors hover:text-foreground">
               <ArrowLeft className="h-4 w-4" />
               Área do cliente
             </Link>

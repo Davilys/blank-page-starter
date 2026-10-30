@@ -18,7 +18,7 @@ export default function Processos() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!session) {
-          navigate('/cliente/login');
+          navigate('/login');
         } else {
           setUser(session.user);
         }
@@ -27,7 +27,7 @@ export default function Processos() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
-        navigate('/cliente/login');
+        navigate('/login');
       } else {
         setUser(session.user);
       }

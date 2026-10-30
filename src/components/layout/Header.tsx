@@ -147,7 +147,7 @@ const Header = () => {
               }`}
               asChild
             >
-              <Link to="/cliente/login">
+              <Link to="/login">
                 <User className="w-3.5 h-3.5" /> Área do cliente
               </Link>
             </Button>
@@ -192,7 +192,7 @@ const Header = () => {
               { label: "Valores", href: "#precos", isRoute: false },
               { label: "Blog", href: "/blog", isRoute: true },
               { label: "Consultar marca", href: "/consultar", isRoute: true },
-              { label: "Área do Cliente", href: "/cliente/login", isRoute: true },
+              { label: "Área do Cliente", href: "/login", isRoute: true },
             ].map((item) => (
               <a
                 key={item.label}

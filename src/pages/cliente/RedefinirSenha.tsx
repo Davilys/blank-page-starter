@@ -112,7 +112,7 @@ export default function RedefinirSenha() {
       toast.success('Senha redefinida com sucesso!');
       
       setTimeout(() => {
-        navigate('/cliente/login');
+        navigate('/login');
       }, 3000);
     } catch (error) {
       toast.error('Erro ao processar solicitação');
@@ -156,7 +156,7 @@ export default function RedefinirSenha() {
             <Link to="/cliente/recuperar-senha" className="block">
               <Button className="w-full">Solicitar Novo Link</Button>
             </Link>
-            <Link to="/cliente/login" className="block">
+            <Link to="/login" className="block">
               <Button variant="outline" className="w-full">Voltar ao Login</Button>
             </Link>
           </CardContent>
@@ -184,7 +184,7 @@ export default function RedefinirSenha() {
             <p className="text-sm text-muted-foreground mb-4">
               Você será redirecionado para o login em instantes...
             </p>
-            <Link to="/cliente/login">
+            <Link to="/login">
               <Button className="w-full">Ir para o Login</Button>
             </Link>
           </CardContent>

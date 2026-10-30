@@ -103,7 +103,7 @@ export default function Suporte() {
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { navigate('/cliente/login'); return; }
+      if (!session) { navigate('/login'); return; }
       setUser(session.user);
       fetchUserProfile(session.user.id);
       fetchMessages(session.user.id);
@@ -111,7 +111,7 @@ export default function Suporte() {
     };
     init();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, sess) => {
-      if (!sess) navigate('/cliente/login');
+      if (!sess) navigate('/login');
     });
     return () => subscription.unsubscribe();
   }, [navigate]);

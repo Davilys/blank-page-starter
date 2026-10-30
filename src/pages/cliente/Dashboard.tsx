@@ -816,11 +816,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      if (!session) navigate('/cliente/login');
+      if (!session) navigate('/login');
       else { setUser(session.user); setLoading(false); }
     });
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) navigate('/cliente/login');
+      if (!session) navigate('/login');
       else { setUser(session.user); setLoading(false); }
     });
     return () => subscription.unsubscribe();

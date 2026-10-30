@@ -308,7 +308,7 @@ function AdminSidebar() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast.success('Logout realizado com sucesso');
-    navigate('/cliente/login');
+    navigate('/admin');
   };
 
   return (
@@ -407,6 +407,10 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
   const [authError, setAuthError] = useState<string | null>(null);
 
   const checkAdmin = useCallback(async () => {
+    // /admin index is the public admin login page: skip the auth guard there.
+    if (window.location.pathname === '/admin' || window.location.pathname === '/admin/') {
+      return;
+    }
     setAuthError(null);
     try {
       // Fast path: if sessionStorage already has verified admin for current session, skip network
@@ -433,7 +437,7 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
         sessionStorage.removeItem('admin_verified');
         sessionStorage.removeItem('admin_user_id');
         setIsAdmin(null);
-        navigate('/cliente/login');
+        navigate('/admin');
         return;
       }
 
@@ -496,7 +500,7 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
         setAuthError('Falha de conexão com o servidor. Tente novamente.');
       } else {
         toast.error('Erro ao verificar permissões.');
-        navigate('/cliente/login');
+        navigate('/login');
       }
     }
   }, [navigate]);
@@ -527,6 +531,11 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
       }
     }
   }, [isAdmin, loadingPermissions, permissions, location.pathname, canAccessPath, navigate, getFirstPermittedRoute]);
+
+  // /admin index renders the public admin login without admin chrome or guard.
+  if (location.pathname === '/admin' || location.pathname === '/admin/') {
+    return <>{children}</>;
+  }
 
   if (authError) {
     return (

@@ -167,7 +167,7 @@ export default function Login() {
 
       <section className="relative flex min-h-screen w-full items-center justify-center px-5 py-10 sm:px-10 lg:w-[46%] lg:px-12 xl:px-20">
       <Link
-        to="/admin/login"
+        to="/admin"
         title="Área do administrador"
         aria-label="Área do administrador"
         className="absolute right-4 top-4 inline-flex h-11 w-11 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm transition-all hover:border-primary/40 hover:text-primary hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:right-6 sm:top-6"

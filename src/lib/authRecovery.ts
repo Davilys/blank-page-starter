@@ -44,7 +44,7 @@ function clearAuthCache() {
 
 function isOnLoginRoute(): boolean {
   const p = window.location.pathname;
-  return p.startsWith('/cliente/login') || p.startsWith('/admin/login');
+  return p === '/login' || p === '/login/' || p.startsWith('/cliente/login') || p === '/admin' || p === '/admin/' || p.startsWith('/admin/login');
 }
 
 function isProtectedRoute(): boolean {
@@ -72,8 +72,8 @@ export async function forceAuthRecovery(reason?: string) {
     }
     if (!isOnLoginRoute() && isProtectedRoute()) {
       const target = window.location.pathname.startsWith('/admin')
-        ? '/cliente/login?reason=session_expired'
-        : '/cliente/login?reason=session_expired';
+        ? '/admin?reason=session_expired'
+        : '/login?reason=session_expired';
       window.location.replace(target);
     }
   } finally {
@@ -96,7 +96,7 @@ export function installAuthRecovery() {
     if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
       clearAuthCache();
       if (isProtectedRoute() && !isOnLoginRoute()) {
-        window.location.replace('/cliente/login?reason=session_expired');
+        window.location.replace('/login?reason=session_expired');
       }
     }
   });

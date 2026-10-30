@@ -512,11 +512,11 @@ export default function Documentos() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      if (!session) navigate('/cliente/login');
+      if (!session) navigate('/login');
       else { setUser(session.user); fetchDocs(session.user.id); }
     });
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) navigate('/cliente/login');
+      if (!session) navigate('/login');
       else { setUser(session.user); fetchDocs(session.user.id); }
     });
     return () => subscription.unsubscribe();

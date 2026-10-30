@@ -117,7 +117,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session?.user) {
-        navigate('/cliente/login');
+        navigate('/login');
         setAuthChecked(true);
         return;
       }
@@ -146,7 +146,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           // No roles at all — account was deleted, sign out
           await supabase.auth.signOut();
           toast.error('Sua conta não está mais ativa.');
-          navigate('/cliente/login');
+          navigate('/login');
         }
         setAuthChecked(true);
         return;
@@ -162,7 +162,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast.success('Logout realizado com sucesso');
-    navigate('/cliente/login');
+    navigate('/login');
   };
 
   const NavContent = () => (

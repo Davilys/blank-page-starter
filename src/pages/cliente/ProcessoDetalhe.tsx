@@ -202,7 +202,7 @@ export default function ProcessoDetalhe() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!session) {
-          navigate('/cliente/login');
+          navigate('/login');
         } else {
           setUser(session.user);
         }
@@ -211,7 +211,7 @@ export default function ProcessoDetalhe() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
-        navigate('/cliente/login');
+        navigate('/login');
       } else {
         setUser(session.user);
       }

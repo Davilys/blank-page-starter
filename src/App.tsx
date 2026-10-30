@@ -365,7 +365,8 @@ const App = () => (
               <Route path="/home" element={<SectionRedirect section="home" />} />
               
               {/* Área do Cliente */}
-              <Route path="/cliente/login" element={<ClienteLogin />} />
+              <Route path="/login" element={<ClienteLogin />} />
+              <Route path="/cliente/login" element={<Navigate to="/login" replace />} />
               <Route path="/cliente/dashboard" element={<ClienteDashboard />} />
               <Route path="/cliente/processos" element={<ClienteProcessos />} />
               <Route path="/cliente/processos/:id" element={<ClienteProcessoDetalhe />} />
@@ -380,8 +381,9 @@ const App = () => (
               <Route path="/cliente/redefinir-senha" element={<ClienteRedefinirSenha />} />
               <Route path="/cliente/analise-inteligente" element={<ClienteAnaliseInteligente />} />
               {/* Painel Administrativo */}
-              <Route path="/admin/login" element={<AdminLogin />} />
+              <Route path="/admin/login" element={<Navigate to="/admin" replace />} />
               <Route path="/admin" element={<AdminRouteWrapper />}>
+                <Route index element={<AdminLogin />} />
                 <Route path="dashboard" element={<AdminDashboard />} />
                 <Route path="leads" element={<AdminLeads />} />
                 <Route path="clientes" element={<AdminClientes />} />

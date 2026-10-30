@@ -288,11 +288,11 @@ export default function Configuracoes() {
   // ── Auth ──
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      if (!session) navigate('/cliente/login');
+      if (!session) navigate('/login');
       else { setUser(session.user); fetchProfile(session.user.id); }
     });
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) navigate('/cliente/login');
+      if (!session) navigate('/login');
       else { setUser(session.user); fetchProfile(session.user.id); }
     });
     return () => subscription.unsubscribe();
