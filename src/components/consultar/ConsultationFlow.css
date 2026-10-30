@@ -14,3 +14,23 @@
 
 /* Minimal post-consultation progress, no stage names or numbers. */
 .wm-progress-lines{display:flex;gap:8px;margin:0 0 30px;width:100%}.wm-progress-lines>span{display:block;flex:1;height:4px;border-radius:8px;background:#dedfd5}.wm-progress-lines>span.is-filled{background:#22c55e}
+/* Approved compact personal-address layout in the consultation journey. */
+.wm-entry.wm-flow:not(.wm-formulario) form:has(input[placeholder="Bairro"]){padding:24px;border:1px solid #d9ddce;border-radius:22px;background:#fffdf7}
+.wm-entry.wm-flow:not(.wm-formulario) form:has(input[placeholder="Bairro"])>div.space-y-4:nth-of-type(3){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.wm-entry.wm-flow:not(.wm-formulario) form:has(input[placeholder="Bairro"])>div.space-y-4:nth-of-type(3)>div{margin:0}
+.wm-entry.wm-flow:not(.wm-formulario) form:has(input[placeholder="Bairro"])>div.space-y-4:nth-of-type(3)>div:nth-child(-n+2){grid-column:1/-1}
+.wm-entry.wm-flow:not(.wm-formulario) form:has(input[placeholder="Bairro"])>div.space-y-4:nth-of-type(3)>div.grid{display:contents}
+.wm-entry.wm-flow:not(.wm-formulario) form:has(input[placeholder="Bairro"])>div.space-y-4:nth-of-type(3)>div.grid>.sm\:col-span-3{grid-column:1/-1}
+.wm-entry.wm-flow:not(.wm-formulario) form:has(input[placeholder="Bairro"])>div.space-y-4:nth-of-type(3)>div.grid>*{min-width:0;margin:0}
+@media(max-width:640px){.wm-entry.wm-flow:not(.wm-formulario) form:has(input[placeholder="Bairro"]){padding:18px 14px}.wm-entry.wm-flow:not(.wm-formulario) form:has(input[placeholder="Bairro"]) input{font-size:16px!important;min-width:0;width:100%}}
+/* Compact class cards, keeping every word and existing selection/price logic. */
+.wm-entry.wm-flow .wm-flow-screen div[style*="rgb(237, 245, 255)"]{background:#eff3e4!important;border-color:#d1dfc5!important}
+.wm-entry.wm-flow .wm-flow-screen div[style*="rgb(215, 232, 251)"]{background:#e5efda!important;border-color:#d1dfc5!important;color:#276e46!important;padding:12px 16px}
+.wm-entry.wm-flow .wm-flow-screen div[style*="rgb(237, 245, 255)"]>.p-4{padding:14px}
+.wm-entry.wm-flow .wm-flow-screen div[style*="rgb(237, 245, 255)"] label{display:grid!important;grid-template-columns:18px 28px minmax(0,1fr);gap:8px!important;padding:12px!important;align-items:start;border-radius:13px!important}
+.wm-entry.wm-flow .wm-flow-screen div[style*="rgb(237, 245, 255)"] label>input{grid-column:1;grid-row:1;margin-top:5px}
+.wm-entry.wm-flow .wm-flow-screen div[style*="rgb(237, 245, 255)"] label>span{width:28px;height:28px;font-size:12px}
+.wm-entry.wm-flow .wm-flow-screen div[style*="rgb(237, 245, 255)"] label>div{grid-column:3;min-width:0}
+.wm-entry.wm-flow .wm-flow-screen div[style*="rgb(237, 245, 255)"] label>div p{font-size:12px;line-height:1.5;overflow-wrap:break-word}
+.wm-entry.wm-flow .wm-flow-screen div[style*="rgb(237, 245, 255)"] label>span:last-child{grid-column:3;width:auto;height:auto;white-space:nowrap;margin-top:2px;font-size:12px}
+.wm-entry.wm-flow .wm-flow-screen .wm-contract-classes .wm-class{padding:14px!important;gap:7px!important}.wm-entry.wm-flow .wm-flow-screen .wm-contract-classes .wm-class-body{gap:7px}.wm-entry.wm-flow .wm-flow-screen .wm-contract-classes .wm-class-body>span{font-size:12px;line-height:1.5}.wm-entry.wm-flow .wm-flow-screen .wm-contract-classes .wm-class-body small{font-size:11px}
