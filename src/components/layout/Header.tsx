@@ -188,9 +188,10 @@ const Header = () => {
               { label: "Início", href: "#home", isRoute: false },
               { label: "Como funciona", href: "#como-funciona", isRoute: false },
               { label: "Diferenciais", href: "#beneficios", isRoute: false },
-              { label: "Consultar marca", href: "/consultar", isRoute: true },
               { label: "FAQ", href: "#faq", isRoute: false },
+              { label: "Valores", href: "#precos", isRoute: false },
               { label: "Blog", href: "/blog", isRoute: true },
+              { label: "Consultar marca", href: "/consultar", isRoute: true },
               { label: "Área do Cliente", href: "/cliente/login", isRoute: true },
             ].map((item) => (
               <a
