@@ -28,6 +28,7 @@ interface ContractStepProps {
   onPaymentValueChange?: (value: number) => void;
   plan?: PlanType;
   submitLabel?: string;
+  cleanClassList?: boolean;
 }
 
 const PLAN_TEMPLATE_NAMES: Record<PlanType, string> = {
@@ -52,6 +53,7 @@ export function ContractStep({
   onPaymentValueChange,
   plan = 'essencial',
   submitLabel,
+  cleanClassList = false,
 }: ContractStepProps) {
   const [accepted, setAccepted] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -255,8 +257,20 @@ export function ContractStep({
         </div>
       </div>
 
+      {cleanClassList && (suggestedClasses || []).length > 0 && <section className="wm-contract-classes" aria-label="Classes da marca">
+        <h2>Classes da sua marca.</h2>
+        <p>A principal já vem marcada. Adicione outras classes se desejar.</p>
+        <div className="wm-class-list">{(suggestedClasses || []).map((cls,idx) => {
+          const checked=(selectedClasses || []).includes(cls);
+          return <label key={cls} className={checked ? "wm-class is-selected" : "wm-class"}>
+            <input type="checkbox" checked={checked} onChange={() => handleToggleClass(cls)} aria-label={`Classe ${cls}${idx === 0 ? ' principal' : ' adicional'}`} />
+            <span className="wm-class-body"><strong>Classe {cls}</strong><span>{suggestedClassDescriptions?.[idx] || `Classe ${cls}`}</span><small>{idx === 0 ? 'Classe principal' : 'Adicional · clique para incluir'}</small></span>
+            <span className="wm-class-price">{plan === 'corporativo' ? 'Incluso' : `${idx > 0 ? '+ ' : ''}${formatCurrency(getUnitPrice())}${plan === 'premium' ? '/mês' : ''}`}</span>
+          </label>;
+        })}</div>
+      </section>}
       {/* Upsell: suggested classes not in initial selection — all plans */}
-      {(() => {
+      {!cleanClassList && (() => {
         const extraClasses = suggestedClasses || [];
         if (extraClasses.length === 0) return null;
         const unitPrice = getUnitPrice();
