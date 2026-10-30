@@ -73,19 +73,19 @@ export function QuickLeadStep({ initial, onNext }: { initial: QuickData; onNext:
         <p className="text-sm text-muted-foreground">Complete suas informações para prosseguir para receber a proposta</p>
       </div>
       <Field label="Nome da Marca" error={errors.brandName}>
-        <Input value={d.brandName} onChange={(e) => setD({ ...d, brandName: e.target.value })} placeholder="Como sua marca se chama?" maxLength={100} className={ic("brandName")} />
+        <Input value={d.brandName} onChange={(e) => setD({ ...d, brandName: e.target.value })} placeholder="Ex: WebMarcas, TechFlow, BioVida..." maxLength={100} className={ic("brandName")} />
       </Field>
       <Field label="Ramo de Atividade" error={errors.businessArea}>
         <Input value={d.businessArea} onChange={(e) => setD({ ...d, businessArea: e.target.value })} placeholder="Ex: Serviços Jurídicos, Alimentação, Tecnologia..." maxLength={200} className={ic("businessArea")} />
       </Field>
       <Field label="Nome Completo" error={errors.fullName}>
-        <Input value={d.fullName} onChange={(e) => setD({ ...d, fullName: e.target.value })} placeholder="Seu nome completo" maxLength={100} className={ic("fullName")} />
+        <Input value={d.fullName} onChange={(e) => setD({ ...d, fullName: e.target.value })} placeholder="Ex: Davilys Cunha" maxLength={100} className={ic("fullName")} />
       </Field>
       <Field label="E-mail" error={errors.email}>
-        <Input type="email" value={d.email} onChange={(e) => setD({ ...d, email: e.target.value })} placeholder="seu@email.com" maxLength={255} className={ic("email")} />
+        <Input type="email" value={d.email} onChange={(e) => setD({ ...d, email: e.target.value })} placeholder="Ex: seu@email.com" maxLength={255} className={ic("email")} />
       </Field>
       <Field label="Celular" error={errors.phone}>
-        <Input value={d.phone} onChange={(e) => setD({ ...d, phone: formatPhone(e.target.value) })} placeholder="(00) 00000-0000" maxLength={15} inputMode="tel" className={ic("phone")} />
+        <Input value={d.phone} onChange={(e) => setD({ ...d, phone: formatPhone(e.target.value) })} placeholder="Ex: (11) 91234-5678" maxLength={15} inputMode="tel" className={ic("phone")} />
       </Field>
       <Button type="submit" className="w-full h-12 rounded-xl font-bold text-base">
         Continuar <ArrowRight className="w-4 h-4 ml-2" />
@@ -262,4 +262,4 @@ export function ComplementStep({
       </div>
     </form>
   );
-}
+  }
