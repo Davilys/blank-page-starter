@@ -430,3 +430,56 @@ html body .brand-public .hero4-pill-light .hero4-pill-icon {
 html body .brand-public .hero4-pill-light .hero4-pill-icon svg {
   color: #04884a !important; width: 16px !important; height: 16px !important;
 }
+
+/* ---------- FIX v5: HERO MOBILE conforme referencia 2026-10-30 ----------
+   Barra reta, hero full-bleed, texto a esquerda, foto a direita,
+   headline 2 linhas, prova social em 1 linha, card mais sobreposto.
+   Apenas <=767.98px: tablet/desktop preservados. */
+@media (max-width: 767.98px) {
+  html body .brand-public > header {
+    top: 0 !important; left: 0 !important; right: 0 !important;
+    border-radius: 0 !important; box-shadow: none !important;
+    border: none !important; border-bottom: 1px solid #e6e1cd !important;
+  }
+  html body .brand-public section#home {
+    margin: 0 !important; border-radius: 0 !important; box-shadow: none !important;
+  }
+  html body .brand-public section#home > .container {
+    padding-top: 64px !important; padding-left: 0 !important; padding-right: 0 !important;
+  }
+  html body .brand-public .hero4-panel {
+    border-radius: 0 !important; min-height: 560px !important;
+    align-items: flex-start !important; box-shadow: none !important;
+  }
+  html body .brand-public .hero4-photo {
+    left: auto !important; right: 0 !important; width: 62% !important;
+    object-position: left center !important;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 34%) !important;
+    mask-image: linear-gradient(90deg, transparent 0%, #000 34%) !important;
+  }
+  html body .brand-public .hero4-overlay {
+    background: linear-gradient(90deg, rgba(7,19,15,.94) 0%, rgba(7,19,15,.80) 42%, rgba(7,19,15,.28) 68%, rgba(7,19,15,.06) 100%) !important;
+  }
+  html body .brand-public .hero4-content {
+    padding: 26px 22px 118px !important; max-width: 100% !important; text-align: left !important;
+  }
+  html body .brand-public .hero4-content .hero4-badge { margin-left: 0 !important; margin-bottom: 18px !important; }
+  html body .brand-public .hero4-content h1 {
+    font-size: clamp(23px, 5.9vw, 30px) !important; line-height: 1.12 !important; margin-bottom: 16px !important;
+  }
+  html body .brand-public .hero4-content > p {
+    margin-left: 0 !important; margin-right: 0 !important;
+    font-size: 15px !important; line-height: 1.55 !important; margin-bottom: 22px !important;
+    max-width: 340px !important;
+  }
+  html body .brand-public .hero4-content .flex.flex-wrap.items-center {
+    justify-content: flex-start !important; flex-wrap: nowrap !important; gap: 12px !important; margin-bottom: 0 !important;
+  }
+  html body .brand-public .hero4-content .flex.flex-wrap.items-center .text-left p { margin-top: 4px !important; }
+  html body .brand-public .hero4-cardwrap { margin-top: -84px !important; padding: 0 14px !important; }
+  html body .brand-public .hero4-cardwrap > .rounded-\[2rem\] { border-radius: 1.5rem !important; }
+  html body .brand-public .form-label-caps {
+    text-transform: none !important; font-size: 14.5px !important;
+    font-weight: 600 !important; letter-spacing: 0 !important;
+  }
+}
