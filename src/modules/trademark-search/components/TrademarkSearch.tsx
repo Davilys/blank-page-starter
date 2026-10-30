@@ -82,16 +82,20 @@ export function TrademarkSearch({ variant, onContinue, continueLabel, consultati
           <motion.div key="form" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3 }}>
             {variant === 'landing' ? (
               <>
-                <div className="flex justify-center mb-4">
+                <div className="hidden md:flex justify-center mb-4">
                   <span className="badge-consulta">
                     <Zap className="w-3.5 h-3.5" strokeWidth={2.5} />
                     Consulta Gratuita
                   </span>
                 </div>
-                <h2 className="font-display text-[1.9rem] sm:text-[2.15rem] leading-[1.05] font-bold text-center text-[hsl(222_47%_11%)] mb-8">
+                <h2 className="font-display text-[1.9rem] sm:text-[2.15rem] leading-[1.05] font-bold text-center max-md:text-left text-[hsl(222_47%_11%)] mb-8 max-md:mb-2">
                   Consulte a viabilidade da sua{' '}
                   <span className="text-[hsl(222_92%_54%)]">marca</span>
                 </h2>
+                <p className="flex md:hidden items-center gap-1.5 text-xs text-[hsl(215_16%_47%)] mb-6">
+                  <Zap className="w-3.5 h-3.5" strokeWidth={2.5} />
+                  Consulta gratuita
+                </p>
                 <form onSubmit={handleSubmit} className="space-y-5" noValidate>
                   <div>
                     <label htmlFor={`${idPrefix}Brand`} className="form-label-caps">Nome da Marca</label>

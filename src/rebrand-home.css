@@ -498,6 +498,20 @@ html body .brand-public .hero4-photo-mobile { display: none !important; }
   html body .brand-public .hero4-cardwrap form > * + * { margin-top: 10px !important; }
   html body .brand-public .hero4-cardwrap .form-pill-input { height: 44px !important; }
   html body .brand-public .hero4-cardwrap .btn-cta-solid { height: 48px !important; margin-top: 4px !important; }
+  /* v8.3: alinhamento/escala card + social (review 01:14, sem mexer em copy) */
+  html body .brand-public .hero4-cardwrap h2 { text-align: left !important; font-size: 23px !important; }
+  html body .brand-public .hero4-cardwrap .form-pill-input { border-radius: 12px !important; background: #fff !important; }
+  html body .brand-public .hero4-cardwrap .btn-cta-solid { border-radius: 14px !important; }
+  html body .brand-public .hero4-cardwrap .form-label-caps { margin-bottom: 6px !important; }
+  html body .brand-public .hero4-cardwrap form > * + * { margin-top: 8px !important; }
+  html body .brand-public .hero4-content .flex.flex-wrap.items-center img.w-11,
+  html body .brand-public .hero4-content .flex.flex-wrap.items-center div.w-11 { width: 36px !important; height: 36px !important; font-size: 12px !important; }
+  html body .brand-public .hero4-content .flex.flex-wrap.items-center svg { width: 13px !important; height: 13px !important; }
+  html body .brand-public .hero4-content .flex.flex-wrap.items-center .text-lg { font-size: 16px !important; }
+  html body .brand-public .hero4-content .flex.flex-wrap.items-center p.text-xs { font-size: 11px !important; margin-top: 3px !important; }
+  html body .brand-public .hero4-badge { padding: 7px 14px !important; font-size: 11px !important; }
+  /* v8.4: selo 48h reduzido 50% no mobile (pedido audio 01:17:33) */
+  html body .brand-public .hero4-cardwrap > .absolute { transform: scale(0.35) !important; transform-origin: top right !important; }
   /* Toast de prova social: sai do topo (não cobre o selo) */
   html body .brand-public div.fixed.z-40.top-20 {
     top: auto !important; bottom: 14px !important; left: 10px !important;
