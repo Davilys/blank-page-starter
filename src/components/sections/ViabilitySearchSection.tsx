@@ -739,7 +739,7 @@ const ViabilitySearchSection = ({ compact = false }: { compact?: boolean }) => {
                   <Lock className="w-3.5 h-3.5 text-emerald-600" />
                   <span className="font-semibold text-[hsl(222_47%_11%)]">100% Seguro</span>
                   <span className="opacity-40">·</span>
-                  <a href="/politica-privacidade" className="underline hover:text-[hsl(222_92%_54%)]">Política de privacidade</a>
+                  <a href="/privacidade" className="underline hover:text-[hsl(222_92%_54%)]">Política de privacidade</a>
                 </div>
               </form>
             </motion.div>

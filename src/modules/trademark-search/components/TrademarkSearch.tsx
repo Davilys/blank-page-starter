@@ -134,7 +134,7 @@ export function TrademarkSearch({ variant, onContinue, continueLabel, consultati
                       100% Seguro
                     </span>
                     <span aria-hidden="true" className="opacity-40">·</span>
-                    <a href="/politica-privacidade" className="underline underline-offset-2 hover:text-primary">Política de privacidade</a>
+                    <a href="/privacidade" className="underline underline-offset-2 hover:text-primary">Política de privacidade</a>
                   </div>
                 </form>
               </>
