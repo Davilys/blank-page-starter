@@ -890,6 +890,6 @@ html body .brand-public .hero4-cardwrap h2.wm-home-consult-title span {
 /* Lift the 48h seal clear of the consultation heading without changing typography. */
 @media (max-width: 767px) {
   html body .brand-public .hero4-cardwrap .rounded-\[2rem\] > .absolute {
-    top: -104px !important;
+    top: -84px !important;
   }
 }
