@@ -526,5 +526,6 @@ html body .brand-public .hero4-photo-mobile { display: none !important; }
   html body .brand-public .hero4-panel { flex: 1 1 auto !important; }
   html body .brand-public .hero4-cardwrap { flex: 0 0 auto !important; }
   html body .brand-public .hero4-cardwrap > .rounded-\[2rem\] { padding: 18px 20px !important; }
-  html body .brand-public .hero4-cardwrap div:has(> .hero4-pill-light) { margin-top: 10px !important; margin-bottom: 14px !important; }
+  /* v8.12: benefícios acima da zona dos flutuantes (WhatsApp ~64px + toast), foto absorve a folga */
+  html body .brand-public .hero4-cardwrap div:has(> .hero4-pill-light) { margin-top: 10px !important; margin-bottom: 84px !important; }
 }
