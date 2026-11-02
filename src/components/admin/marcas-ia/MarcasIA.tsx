@@ -331,17 +331,25 @@ ${manual.tipografia.uso ?? ''}`);
     { id: 'entrega', label: 'Entrega' },
   ] as const), []);
 
+  const etapaAtual = etapas.findIndex((e) => e.id === stage) + 1;
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-background">
-      <div className="flex items-center gap-3 border-b px-5 py-3">
-        <BrainCircuit className="h-6 w-6 text-primary" />
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-lg font-semibold">Marcas IA — BrandBot</h2>
-          <p className="truncate text-xs text-muted-foreground">Criação de nome e logotipo com a sua aprovação em cada etapa.</p>
+    <div className="flex h-full flex-col overflow-hidden bg-slate-50 dark:bg-background">
+      <div className="bg-gradient-to-r from-[#0B3D91] via-[#1553C7] to-[#1D4ED8] px-5 py-4 text-white shadow-md">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/30">
+            <BrainCircuit className="h-6 w-6 text-white" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h2 className="truncate text-lg font-bold tracking-tight">Marcas IA — BrandBot</h2>
+              <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">Etapa {etapaAtual} de 4</span>
+            </div>
+            <p className="truncate text-xs text-blue-100">Criação de nome e logotipo com a sua aprovação em cada etapa.</p>
+          </div>
         </div>
-        <div className="hidden items-center gap-1 md:flex">
+        <div className="mt-3 flex items-center gap-1.5 overflow-x-auto">
           {etapas.map((e, i) => (
-            <span key={e.id} className={cn('rounded-full px-2.5 py-1 text-xs', stage === e.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>
+            <span key={e.id} className={cn('whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition', stage === e.id ? 'bg-white text-[#0B3D91] shadow' : 'bg-white/15 text-blue-100')}>
               {i + 1}. {e.label}
             </span>
           ))}
@@ -360,15 +368,22 @@ ${manual.tipografia.uso ?? ''}`);
           <motion.div key="briefing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex min-h-0 flex-1 flex-col">
             <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
               {msgs.map((m, i) => (
-                <div key={i} className={cn('max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed', m.role === 'assistant' ? 'bg-muted' : 'ml-auto bg-primary text-primary-foreground')}>
-                  {m.content}
+                <div key={i} className={cn('flex items-end gap-2', m.role === 'user' && 'justify-end')}>
+                  {m.role === 'assistant' && (
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#0B3D91] to-[#1D4ED8]">
+                      <BrainCircuit className="h-4 w-4 text-white" />
+                    </div>
+                  )}
+                  <div className={cn('max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm', m.role === 'assistant' ? 'rounded-bl-sm bg-white dark:bg-muted' : 'rounded-br-sm bg-[#1D4ED8] text-white')}>
+                    {m.content}
+                  </div>
                 </div>
               ))}
               {busy && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> BrandBot pensando...</div>}
             </div>
             {diagnostico && !diagAprovado && (
-              <div className="border-t bg-muted/40 px-5 py-3">
-                <p className="mb-2 text-sm font-medium">Diagnóstico pronto. Ao aprovar, gero os 10 nomes.</p>
+              <div className="mx-5 mb-3 rounded-xl border-2 border-dashed border-[#1D4ED8]/50 bg-blue-50/60 px-4 py-3 dark:bg-blue-950/20">
+                <p className="mb-2 text-sm font-semibold text-[#0B3D91] dark:text-blue-300">Diagnóstico pronto. Ao aprovar, gero os 10 nomes.</p>
                 <Button onClick={() => { setDiagAprovado(true); void gerarNomes(); }} disabled={busy}>
                   <CheckCircle2 className="mr-2 h-4 w-4" /> Aprovar diagnóstico e gerar 10 nomes
                 </Button>
@@ -403,10 +418,15 @@ ${manual.tipografia.uso ?? ''}`);
               {nomes.map((n) => {
                 const ck = checks[n.nome] ?? { kind: 'idle' as const };
                 return (
-                  <div key={n.nome} className={cn('rounded-xl border p-4', nomeEscolhido?.nome === n.nome && 'border-primary ring-1 ring-primary')}>
+                  <div key={n.nome} className={cn('rounded-xl border bg-white p-4 shadow-sm transition hover:shadow dark:bg-card', nomeEscolhido?.nome === n.nome ? 'border-[#1D4ED8] ring-2 ring-[#1D4ED8]/40' : 'border-slate-200 dark:border-border')}>
                     <div className="mb-1 flex items-center justify-between gap-2">
-                      <h3 className="text-base font-semibold">{n.nome}</h3>
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{n.tom}</span>
+                      <button type="button" onClick={() => setNomeEscolhido(n)} className="flex items-center gap-2 text-left">
+                        <span className={cn('flex h-5 w-5 items-center justify-center rounded-full border-2', nomeEscolhido?.nome === n.nome ? 'border-[#1D4ED8] bg-[#1D4ED8]' : 'border-slate-300')}>
+                          {nomeEscolhido?.nome === n.nome && <CheckCircle2 className="h-3.5 w-3.5 text-white" />}
+                        </span>
+                        <h3 className="text-base font-bold tracking-tight">{n.nome}</h3>
+                      </button>
+                      <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-[#0B3D91] dark:bg-blue-950 dark:text-blue-300">{n.tom}</span>
                     </div>
                     <p className="mb-3 text-sm text-muted-foreground">{n.justificativa}</p>
                     <div className="flex flex-wrap items-center gap-2">
@@ -419,11 +439,16 @@ ${manual.tipografia.uso ?? ''}`);
                       </Button>
                     </div>
                     {ck.kind === 'ok' && (
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        {ck.exatas > 0
-                          ? `Nome exato aparece entre os resultados retornados; ${ck.total} ocorrência(s) relacionada(s) na base (${ck.fonte}). Isso NÃO garante indeferimento nem aprovação — a análise oficial é do INPI.`
-                          : `Nenhum nome exato entre os resultados retornados; ${ck.total} ocorrência(s) relacionada(s) na base (${ck.fonte}). Isso NÃO garante disponibilidade — a análise oficial é do INPI.`}
-                      </p>
+                      <div className="mt-2 space-y-1">
+                        <span className={cn('inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold', ck.exatas > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800')}>
+                          {ck.exatas > 0 ? 'Nome exato encontrado na base' : 'Sem nome exato na base'}
+                        </span>
+                        <p className="text-xs text-muted-foreground">
+                          {ck.exatas > 0
+                            ? `${ck.total} ocorrência(s) relacionada(s) retornadas (${ck.fonte}). Isso NÃO garante indeferimento nem aprovação — a análise oficial é do INPI.`
+                            : `${ck.total} ocorrência(s) relacionada(s) retornadas (${ck.fonte}). Isso NÃO garante disponibilidade — a análise oficial é do INPI.`}
+                        </p>
+                      </div>
                     )}
                     {ck.kind === 'erro' && <p className="mt-2 text-xs text-destructive">{ck.message}</p>}
                   </div>
