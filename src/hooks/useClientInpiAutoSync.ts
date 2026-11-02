@@ -14,8 +14,8 @@ const MAX_PER_LOGIN = 10;
  *
  * - Roda no máximo 1 vez por aba/sessão (sessionStorage).
  * - Sequencial e limitada (MAX_PER_LOGIN por login) para não pressionar o INPI.
- * - Falhas são silenciosas: a tela preserva a informação anterior e o botão
- *   manual continua disponível.
+ * - Falhas NÃO são silenciosas: marcam sessionStorage (wm_inpi_syncfail_<n>)
+ *   e a tela do processo mostra aviso com a última consulta preservada.
  */
 export function useClientInpiAutoSync(userId?: string | null) {
   useEffect(() => {

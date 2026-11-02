@@ -25,8 +25,17 @@ export function useClientInpiLookups(userId?: string) {
       }
       setByNumber(map);
     })();
+    // Atualização em segundo plano (login/botão) reflete na lista/Kanban sem reload.
+    const onSynced = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ process_number?: string; lookup?: ProcessLookup }>).detail;
+      if (detail?.process_number && detail.lookup) {
+        setByNumber((m) => ({ ...m, [detail.process_number as string]: detail.lookup as ProcessLookup }));
+      }
+    };
+    window.addEventListener('wm-inpi-synced', onSynced);
     return () => {
       cancelled = true;
+      window.removeEventListener('wm-inpi-synced', onSynced);
     };
   }, [userId]);
 
