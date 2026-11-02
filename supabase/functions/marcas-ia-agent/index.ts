@@ -10,8 +10,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Identificador INEQUÍVOCO de build, ecoado no 503 disabled para readback do
+// código live SEM pagamento. Atualizar a cada alteração da função.
+const BUILD_VERSION = 'mia-20261102-testuid.1';
 const CAP_TOTAL_CENTS = 1000; // US$10,00 TOTAL — grant do usuário 02/11 (WhatsApp 👍 15:33:52). NÃO recorrente: o ledger
-// (marcas_ia_spend_ledger) é único e persistente; migration usa CREATE IF NOT EXISTS e o RPC só incrementa — redeploy NÃO reseta.
+// (public.marcas_ia_spend_log) é único e persistente; migration usa CREATE IF NOT EXISTS e o RPC só incrementa — redeploy NÃO reseta.
 const CAP_SESSION_CENTS = 200; // US$2,00 ADVISORY por session_id: o id vem do cliente e é forjável; o guard real é o cap TOTAL.
 const TEXT_MODEL = 'gpt-5-mini';
 
@@ -85,7 +88,7 @@ Deno.serve(async (req) => {
     // Janela obrigatória até GO de operação contínua (auditoria executor 16:04).
     const testUntil = Date.parse(Deno.env.get('MARCAS_IA_TEST_UNTIL') ?? '');
     if (Deno.env.get('MARCAS_IA_ENABLED') !== 'true' || !Number.isFinite(testUntil) || Date.now() > testUntil) {
-      return json({ ok: false, error: { code: 'disabled', message: 'O BrandBot está em configuração. Avisaremos quando estiver ativo.' } }, 503);
+      return json({ ok: false, error: { code: 'disabled', message: 'O BrandBot está em configuração. Avisaremos quando estiver ativo.' }, build: BUILD_VERSION }, 503);
     }
 
     const authHeader = req.headers.get('Authorization');
@@ -99,6 +102,13 @@ Deno.serve(async (req) => {
 
     const { data: isAdmin, error: roleError } = await userClient.rpc('has_role', { _user_id: userData.user.id, _role: 'admin' });
     if (roleError || !isAdmin) return json({ ok: false, error: { code: 'forbidden', message: 'Acesso restrito à equipe WebMarcas.' } }, 403);
+
+    // Janela de teste é de UM usuário: sem MARCAS_IA_TEST_UID (ou uid divergente)
+    // NENHUMA chamada passa, mesmo de outro admin. Fail-closed.
+    const testUid = Deno.env.get('MARCAS_IA_TEST_UID') ?? '';
+    if (!testUid || userData.user.id !== testUid) {
+      return json({ ok: false, error: { code: 'forbidden', message: 'Acesso restrito à equipe WebMarcas.' } }, 403);
+    }
 
     const body = await req.json().catch(() => null);
     const action = body?.action as string | undefined;
