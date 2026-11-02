@@ -170,3 +170,6 @@ verify_jwt = false
 
 [functions.client-process-lookup]
 verify_jwt = true
+
+[functions.marcas-ia-agent]
+verify_jwt = true

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import jsPDF from 'jspdf';
+import 'svg2pdf.js';
 import { runConsultorIaSearch } from '@/lib/api/consultorIaSearch';
 import { cn } from '@/lib/utils';
 
@@ -216,6 +217,35 @@ ${manual.tipografia.uso ?? ''}`);
     doc.save(`manual-${nomeEscolhido.nome}.pdf`);
   }
 
+  function rasterizarLogo(tipo: 'png' | 'jpeg') {
+    if (svgEscolhido === null || !nomeEscolhido) return;
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 2048; canvas.height = 2048;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      if (tipo === 'jpeg') { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 2048, 2048); }
+      ctx.drawImage(img, 0, 0, 2048, 2048);
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL(tipo === 'png' ? 'image/png' : 'image/jpeg', 0.95);
+      a.download = `${nomeEscolhido.nome}.${tipo === 'png' ? 'png' : 'jpg'}`;
+      a.click();
+    };
+    img.src = svgToDataUrl(svgs[svgEscolhido]);
+  }
+
+  async function baixarPdfVetorialLogo() {
+    if (svgEscolhido === null || !nomeEscolhido) return;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: [480, 480] });
+    const el = document.createElement('div');
+    el.innerHTML = svgs[svgEscolhido];
+    const svgEl = el.querySelector('svg');
+    if (!svgEl) return;
+    await (doc as unknown as { svg: (el: SVGSVGElement, o: { x: number; y: number; width: number; height: number }) => Promise<unknown> }).svg(svgEl as SVGSVGElement, { x: 0, y: 0, width: 480, height: 480 });
+    doc.save(`${nomeEscolhido.nome}-vetorial.pdf`);
+  }
+
   function baixarSvg() {
     if (svgEscolhido === null) return;
     const blob = new Blob([svgs[svgEscolhido]], { type: 'image/svg+xml' });
@@ -372,17 +402,20 @@ ${manual.tipografia.uso ?? ''}`);
                 <img src={svgToDataUrl(svgs[svgEscolhido])} alt="Logotipo aprovado" className="h-40 w-40 rounded-xl border" />
                 <div className="space-y-2">
                   <div className="flex flex-wrap gap-2">
-                    <Button onClick={baixarSvg}><Download className="mr-2 h-4 w-4" /> Baixar SVG vetorial</Button>
+                    <Button onClick={baixarSvg}><Download className="mr-2 h-4 w-4" /> SVG vetorial</Button>
+                    <Button variant="secondary" onClick={() => void baixarPdfVetorialLogo()}><Download className="mr-2 h-4 w-4" /> PDF vetorial</Button>
+                    <Button variant="secondary" onClick={() => rasterizarLogo('png')}><Download className="mr-2 h-4 w-4" /> PNG transparente</Button>
+                    <Button variant="secondary" onClick={() => rasterizarLogo('jpeg')}><Download className="mr-2 h-4 w-4" /> JPEG</Button>
                     <Button variant="secondary" onClick={baixarManualPdf} disabled={!manual}>
                       {manualBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                       Manual de identidade (PDF)
                     </Button>
                   </div>
                   <p className="max-w-md text-sm text-muted-foreground">
-                    O SVG é vetor de verdade: abre e edita no Illustrator, CorelDRAW e Inkscape.
-                    EPS e PDF vetorial do logotipo e os exports PNG transparente/JPEG estão em montagem
-                    no servidor (conversão que preserva o vetor, sem renomear extensão) — sem Pantone exato,
-                    conforme combinado.
+                    SVG e PDF são vetor de verdade: abrem e editam no Illustrator, CorelDRAW e Inkscape.
+                    O PNG sai com fundo transparente e o JPEG com fundo branco. O EPS (formato de
+                    intercâmbio que Corel e Illustrator abrem) está em montagem no servidor — sem Pantone
+                    exato, conforme combinado.
                   </p>
                 </div>
               </div>
