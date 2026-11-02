@@ -84,6 +84,7 @@ Deno.serve(async (req) => {
     const { data: spend, error: spendError } = await adminClient.rpc('marcas_ia_spend', {
       p_amount_cents: reserveCents,
       p_session_id: sessionId,
+      p_action: action,
       p_cap_total_cents: CAP_TOTAL_CENTS,
       p_cap_session_cents: CAP_SESSION_CENTS,
     });
@@ -95,7 +96,14 @@ Deno.serve(async (req) => {
     if (!OPENAI_API_KEY) return json({ ok: false, error: { code: 'config', message: 'Agente em configuração.' } }, 503);
 
     if (action === 'chat') {
-      const messages = Array.isArray(body?.messages) ? body.messages.slice(-20) : [];
+      // Teto de input REAL: últimas 12 mensagens, cada uma com no máx. 1500
+      // caracteres (~400 tokens). 12x400 + prompt ~600 = ~5.4k tokens < 8000
+      // assumidos na reserva. Sem este cap a reserva não é upper-bound.
+      const messages = (Array.isArray(body?.messages) ? body.messages.slice(-12) : [])
+        .map((m: { role?: unknown; content?: unknown }) => ({
+          role: m?.role === 'user' ? 'user' : 'assistant',
+          content: String(m?.content ?? '').slice(0, 1500),
+        }));
       const completion = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },

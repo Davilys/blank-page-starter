@@ -25,9 +25,12 @@ CREATE TABLE IF NOT EXISTS public.marcas_ia_spend_log (
 -- Retorna ok=false quando o limite (total ou sessão) seria excedido — nenhum
 -- centavo é debitado nesse caso. Concorrência: o UPDATE ... WHERE serialized
 -- pelo row lock garante que dois chamadores simultâneos não ultrapassem o cap.
+DROP FUNCTION IF EXISTS public.marcas_ia_spend(integer, text, integer, integer);
+
 CREATE OR REPLACE FUNCTION public.marcas_ia_spend(
   p_amount_cents integer,
   p_session_id text,
+  p_action text,
   p_cap_total_cents integer,
   p_cap_session_cents integer
 )
@@ -72,16 +75,16 @@ BEGIN
   END IF;
 
   INSERT INTO public.marcas_ia_spend_log (session_id, action, reserved_cents)
-  VALUES (p_session_id, coalesce(current_setting('request.jwt.claims', true), ''), p_amount_cents);
+  VALUES (p_session_id, left(coalesce(p_action, ''), 32), p_amount_cents);
 
   RETURN jsonb_build_object('ok', true, 'spent_cents', v_new_total, 'cap_total_cents', p_cap_total_cents);
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.marcas_ia_spend(integer, text, integer, integer) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.marcas_ia_spend(integer, text, integer, integer) FROM anon;
-REVOKE ALL ON FUNCTION public.marcas_ia_spend(integer, text, integer, integer) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.marcas_ia_spend(integer, text, integer, integer) TO service_role;
+REVOKE ALL ON FUNCTION public.marcas_ia_spend(integer, text, text, integer, integer) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.marcas_ia_spend(integer, text, text, integer, integer) FROM anon;
+REVOKE ALL ON FUNCTION public.marcas_ia_spend(integer, text, text, integer, integer) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.marcas_ia_spend(integer, text, text, integer, integer) TO service_role;
 
 REVOKE ALL ON TABLE public.marcas_ia_budget FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.marcas_ia_spend_log FROM PUBLIC, anon, authenticated;
