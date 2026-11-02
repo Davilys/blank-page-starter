@@ -528,6 +528,13 @@ ${manual.tipografia.uso ?? ''}`);
 
         {stage === 'entrega' && (
           <motion.div key="entrega" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+            <div className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-3 text-white shadow">
+              <CheckCircle2 className="h-6 w-6 shrink-0" />
+              <div>
+                <p className="text-sm font-bold">Marca criada com sucesso!</p>
+                <p className="text-xs text-emerald-100">Baixe o pacote completo ou cada arquivo separadamente.</p>
+              </div>
+            </div>
             <h3 className="text-lg font-semibold">Entrega da marca {nomeEscolhido?.nome}</h3>
             {svgEscolhido !== null && (
               <div className="flex flex-wrap items-start gap-4">
@@ -564,13 +571,16 @@ ${manual.tipografia.uso ?? ''}`);
                 {manual.tom_de_voz && manual.tom_de_voz.length > 0 && <div><h4 className="text-sm font-semibold">Tom de voz</h4><p className="text-sm text-muted-foreground">{manual.tom_de_voz.join(' • ')}</p></div>}
                 {manual.tipografia && <div><h4 className="text-sm font-semibold">Tipografia</h4><p className="text-sm text-muted-foreground">Primária: {manual.tipografia.primaria ?? '-'} | Secundária: {manual.tipografia.secundaria ?? '-'} — {manual.tipografia.uso ?? ''}</p></div>}
                 {manual.paleta && manual.paleta.length > 0 && (
-                  <div>
-                    <h4 className="mb-1 text-sm font-semibold">Paleta</h4>
-                    <div className="flex flex-wrap gap-2">
+                  <div className="rounded-2xl bg-gradient-to-br from-[#0B3D91] to-[#122A5C] p-4 text-white">
+                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-widest text-blue-200">Paleta de cores</h4>
+                    <div className="flex flex-wrap gap-3">
                       {manual.paleta.map((c) => (
-                        <div key={c.hex} className="flex items-center gap-2 rounded-lg border px-2 py-1">
-                          <span className="h-5 w-5 rounded" style={{ backgroundColor: c.hex }} />
-                          <span className="text-xs">{c.nome} {c.hex} • RGB {c.rgb} • CMYK {c.cmyk}</span>
+                        <div key={c.hex} className="text-center">
+                          <div className="h-12 w-12 rounded-xl border border-white/30 shadow" style={{ backgroundColor: c.hex }} />
+                          <p className="mt-1 text-[11px] font-semibold">{c.nome}</p>
+                          <p className="text-[10px] text-blue-200">{c.hex}</p>
+                          <p className="text-[10px] text-blue-200">RGB {c.rgb}</p>
+                          <p className="text-[10px] text-blue-200">CMYK {c.cmyk}</p>
                         </div>
                       ))}
                     </div>
