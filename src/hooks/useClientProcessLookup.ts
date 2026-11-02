@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { isNineDigits, type ProcessLookup } from '@/hooks/useProcessLookup';
 
@@ -34,6 +34,25 @@ export function useClientProcessLookup() {
     (processNumber: string): ClientLookupState => states[processNumber] ?? EMPTY,
     [states],
   );
+
+  // A sincronização automática de fundo (login) avisa aqui quando grava uma
+  // consulta nova: telas já abertas refletem o resultado sem refresh manual.
+  useEffect(() => {
+    const onSynced = (ev: Event) => {
+      const detail = (ev as CustomEvent).detail as
+        | { process_number?: string; lookup?: ProcessLookup }
+        | undefined;
+      if (!detail?.process_number || !detail.lookup) return;
+      const key = detail.process_number;
+      hydrated.current.add(key);
+      setStates((s) => ({
+        ...s,
+        [key]: { loading: false, lookup: detail.lookup ?? null, fromCache: false, error: null },
+      }));
+    };
+    window.addEventListener('wm-inpi-synced', onSynced);
+    return () => window.removeEventListener('wm-inpi-synced', onSynced);
+  }, []);
 
   /** Carrega a última consulta gravada no cache oficial, sem chamar o INPI. */
   const hydrate = useCallback(async (processNumber: string) => {
@@ -109,6 +128,9 @@ export function useClientProcessLookup() {
       const result = await promise;
       inFlight.current.delete(key);
       hydrated.current.add(key);
+      if (result.lookup && !result.error && typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem(`wm_inpi_syncfail_${key}`);
+      }
       setStates((s) => {
         const prev = s[key];
         // Falha sem dados novos: preserva a última informação conhecida.

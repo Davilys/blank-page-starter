@@ -140,3 +140,12 @@ export function getDisplayedPhase(opts: {
     syncedAt: null,
   };
 }
+
+export const LOOKUP_FRESH_MS = 24 * 60 * 60 * 1000;
+
+/** Consulta oficial conta como fresca por 24 h (mesmo TTL do cache do motor). */
+export function isLookupFresh(queriedAt: string | null | undefined): boolean {
+  if (!queriedAt) return false;
+  const t = Date.parse(queriedAt);
+  return !Number.isNaN(t) && Date.now() - t < LOOKUP_FRESH_MS;
+}

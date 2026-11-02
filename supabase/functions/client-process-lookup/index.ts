@@ -104,6 +104,10 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   const now = Date.now();
+  // Em QUALQUER erro depois deste ponto, devolve a última consulta boa junto:
+  // falha preserva o estado anterior também na resposta, não só na tela.
+  const preserved =
+    cached && cached.lookup_status === 'completed' ? { from_cache: true, lookup: cached } : {};
   if (cached) {
     const queriedAt = cached.queried_at ? Date.parse(cached.queried_at as string) : 0;
     if (!force && cached.lookup_status === 'completed' && queriedAt && now - queriedAt < CACHE_TTL_MS) {
@@ -137,11 +141,11 @@ Deno.serve(async (req) => {
   const baseUrl = baseUrlRaw.trim().replace(/\/+$/, '').replace(/\/v1(\/.*)?$/i, '');
   if (!baseUrl || !apiKey || !/^https:\/\//i.test(baseUrl)) {
     console.error('[client-process-lookup] secrets WEBMARCAS_API_BASE_URL/WEBMARCAS_API_KEY ausentes');
-    return fail('not_configured', 'Integração de consulta ainda não configurada.', 503);
+    return json({ ok: false, ...preserved, error: { code: 'not_configured', message: 'Integração de consulta ainda não configurada.' } }, 503);
   }
 
   if (inFlight >= MAX_CONCURRENT_UPSTREAM) {
-    return fail('rate_limited', 'Muitas consultas em andamento. Tente novamente em instantes.', 429);
+    return json({ ok: false, ...preserved, error: { code: 'rate_limited', message: 'Muitas consultas em andamento. Tente novamente em instantes.' } }, 429);
   }
 
   // ── consulta upstream ──
@@ -190,6 +194,7 @@ Deno.serve(async (req) => {
     return json(
       {
         ok: false,
+        ...preserved,
         error: {
           code: aborted ? 'upstream_timeout' : 'upstream_unavailable',
           message:
@@ -210,6 +215,7 @@ Deno.serve(async (req) => {
     return json(
       {
         ok: false,
+        ...preserved,
         error: {
           code: 'integration_auth',
           message: 'A integração de consulta ao INPI recusou a autenticação. Verifique a configuração da chave.',
@@ -232,6 +238,7 @@ Deno.serve(async (req) => {
     return json(
       {
         ok: false,
+        ...preserved,
         error: {
           code: 'not_found',
           message: 'Processo não localizado nesta consulta. Confira o número e tente novamente.',
@@ -258,6 +265,7 @@ Deno.serve(async (req) => {
     return json(
       {
         ok: false,
+        ...preserved,
         error: {
           code,
           message:
@@ -303,6 +311,7 @@ Deno.serve(async (req) => {
     return json(
       {
         ok: false,
+        ...preserved,
         error: {
           code: 'cache_write_failed',
           message:

@@ -66,11 +66,23 @@ export function useClientInpiAutoSync(userId?: string | null) {
           if (fresh.has(n)) continue;
           done++;
           try {
-            await supabase.functions.invoke('client-process-lookup', {
+            const { data, error } = await supabase.functions.invoke('client-process-lookup', {
               body: { process_number: n, force: false },
             });
+            const res = data as { ok?: boolean; lookup?: unknown } | null;
+            if (error || res?.ok === false) {
+              // Falha NÃO é silenciosa para a UI: a tela do processo mostra aviso
+              // com a data da última consulta preservada.
+              sessionStorage.setItem(`wm_inpi_syncfail_${n}`, new Date().toISOString());
+            } else if (res?.lookup) {
+              sessionStorage.removeItem(`wm_inpi_syncfail_${n}`);
+              // Telas abertas (detalhe do processo) refletem a consulta nova sem refresh.
+              window.dispatchEvent(
+                new CustomEvent('wm-inpi-synced', { detail: { process_number: n, lookup: res.lookup } }),
+              );
+            }
           } catch {
-            /* falha preserva o estado anterior; o botão manual segue disponível */
+            sessionStorage.setItem(`wm_inpi_syncfail_${n}`, new Date().toISOString());
           }
         }
       } catch {

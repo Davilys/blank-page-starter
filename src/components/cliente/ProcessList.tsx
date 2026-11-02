@@ -112,7 +112,7 @@ export function ProcessList({ userId, limit }: ProcessListProps) {
                       {process.process_number || 'Aguardando protocolo'}
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
                     {inpiPhase && inpiPhase.label !== status.label && (
                       <Badge variant="outline" className="text-emerald-600 border-emerald-500/40">
                         INPI: {inpiPhase.label}

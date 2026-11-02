@@ -35,7 +35,7 @@ import { generateDocumentPrintHTML, getLogoBase64ForPDF } from '@/components/con
 import { toast } from 'sonner';
 import { useClientProcessLookup } from '@/hooks/useClientProcessLookup';
 import { InpiStatusCard } from '@/components/cliente/InpiStatusCard';
-import { getDisplayedPhase } from '@/lib/inpiStatus';
+import { getDisplayedPhase, isLookupFresh } from '@/lib/inpiStatus';
 import { getJuridicoStageLabel } from '@/hooks/useJuridicoStages';
 import { isNineDigits } from '@/hooks/useProcessLookup';
 
@@ -542,9 +542,16 @@ export default function ProcessoDetalhe() {
                   <span className="font-medium">{phase.label}</span>
                 </div>
                 {phase.source === 'inpi' && phase.syncedAt && (
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
-                    ✓ Sincronizado com o INPI em {formatSafeDate(phase.syncedAt, "dd/MM/yyyy 'às' HH:mm")}
-                  </p>
+                  isLookupFresh(phase.syncedAt) ? (
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                      ✓ Situação oficial consultada em {formatSafeDate(phase.syncedAt, "dd/MM/yyyy 'às' HH:mm")}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                      Consulta de {formatSafeDate(phase.syncedAt, "dd/MM/yyyy 'às' HH:mm")} — pode estar
+                      desatualizada. Toque em "Sincronizar com INPI" abaixo para atualizar.
+                    </p>
+                  )
                 )}
               </div>
               {process.deposit_date && (
@@ -673,7 +680,8 @@ export default function ProcessoDetalhe() {
                   </CardTitle>
                   <CardDescription>
                     Despachos publicados nas edições da Revista oficial do INPI — histórico do
-                    processo, não é a situação atual. Avisos de prazo abaixo continuam valendo.
+                    processo, não é a situação atual. Os avisos de prazo abaixo vêm desses
+                    registros e aguardam confirmação; nada foi alterado ou descartado.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">

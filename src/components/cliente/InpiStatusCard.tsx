@@ -4,6 +4,7 @@ import { AlertTriangle, ExternalLink, Globe, Loader2, RefreshCw } from 'lucide-r
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { useClientProcessLookup } from '@/hooks/useClientProcessLookup';
+import { isLookupFresh } from '@/lib/inpiStatus';
 
 function formatWhen(iso: string | null): string {
   if (!iso) return '';
@@ -26,6 +27,10 @@ export function InpiStatusCard({ processNumber, controller }: Props) {
   const state = controller.get(processNumber);
   const lookup = state.lookup;
   const when = formatWhen(lookup?.queried_at ?? null);
+  const autoSyncFailed =
+    typeof sessionStorage !== 'undefined' &&
+    !!sessionStorage.getItem(`wm_inpi_syncfail_${processNumber}`) &&
+    !isLookupFresh(lookup?.queried_at ?? null);
 
   return (
     <div className="rounded-xl border border-primary/25 bg-gradient-to-b from-primary/5 to-transparent p-4 sm:p-5">
@@ -91,6 +96,27 @@ export function InpiStatusCard({ processNumber, controller }: Props) {
               Tentar novamente
             </Button>
           )}
+        </div>
+      )}
+
+      {lookup && !isLookupFresh(lookup.queried_at) && (
+        <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+          <p className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            {autoSyncFailed
+              ? `A atualização automática não completou agora. Exibindo a consulta de ${formatWhen(lookup.queried_at)}. Toque em "Sincronizar com INPI" para tentar de novo.`
+              : `Consulta de ${formatWhen(lookup.queried_at)} — pode estar desatualizada. Toque em "Sincronizar com INPI" para buscar a situação de agora.`}
+          </p>
+        </div>
+      )}
+
+      {!state.loading && !lookup && autoSyncFailed && !state.error && (
+        <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+          <p className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            A atualização automática não completou agora e ainda não há consulta anterior deste
+            processo. Toque em "Sincronizar com INPI" para tentar de novo.
+          </p>
         </div>
       )}
 
