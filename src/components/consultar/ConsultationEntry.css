@@ -85,3 +85,4 @@ body:has(.consult-entry-header details.menu[open]){overflow:hidden}
 @media(max-width:700px){.wm-entry:not(.wm-flow) .copy{position:absolute;inset:0;z-index:1}}
 @media(max-width:350px){.wm-entry:not(.wm-flow) .visual{aspect-ratio:1.08}.wm-entry:not(.wm-flow) .hero-highlights{font-size:8px;bottom:12px}}
 @media(min-width:351px) and (max-width:700px){.wm-entry:not(.wm-flow) .hero-highlights{font-size:9px}}
+@media(max-width:700px){.wm-entry .consult input,.wm-entry .consult select{font-size:16px}}
