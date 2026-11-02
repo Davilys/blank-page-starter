@@ -10,8 +10,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const CAP_TOTAL_CENTS = 1000; // US$10,00 — grant pedido ao usuário 02/11 15:22
-const CAP_SESSION_CENTS = 200; // US$2,00 por sessão
+const CAP_TOTAL_CENTS = 1000; // US$10,00 TOTAL — grant do usuário 02/11 (WhatsApp 👍 15:33:52). NÃO recorrente: o ledger
+// (marcas_ia_spend_ledger) é único e persistente; migration usa CREATE IF NOT EXISTS e o RPC só incrementa — redeploy NÃO reseta.
+const CAP_SESSION_CENTS = 200; // US$2,00 ADVISORY por session_id: o id vem do cliente e é forjável; o guard real é o cap TOTAL.
 const TEXT_MODEL = 'gpt-5-mini';
 
 // Preços oficiais verificados 02/11 (developers.openai.com/api/docs/pricing + guia image-generation)
@@ -42,7 +43,7 @@ function capBytes(s: string, maxBytes: number): string {
 }
 const ATTEMPTS = 2; // chamada + 1 retry, ambos dentro da reserva
 function reserveCentsFor(inputBytes: number, nMessages: number, outCapTokens: number): number {
-  const inCeiling = inputBytes + 16 * nMessages + 256; // tokens <= bytes (BPE byte-level) + framing + overhead
+  const inCeiling = inputBytes + 32 * nMessages + 1024; // tokens <= bytes (BPE byte-level) + framing 32/msg + overhead 1024 (auditoria executor 16:04)
   const usd = ATTEMPTS * (inCeiling * PRICE_TEXT_IN_PER_MTOK + outCapTokens * PRICE_TEXT_OUT_PER_MTOK) / 1_000_000;
   return Math.max(1, Math.ceil(usd * 100));
 }
@@ -79,7 +80,11 @@ Deno.serve(async (req) => {
     new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   try {
-    if (Deno.env.get('MARCAS_IA_ENABLED') !== 'true') {
+    // Ativação exige flag E janela de teste finita: expirada (ou ausente), a
+    // função volta sozinha para OFF — evita deriva de preço/estado indefinida.
+    // Janela obrigatória até GO de operação contínua (auditoria executor 16:04).
+    const testUntil = Date.parse(Deno.env.get('MARCAS_IA_TEST_UNTIL') ?? '');
+    if (Deno.env.get('MARCAS_IA_ENABLED') !== 'true' || !Number.isFinite(testUntil) || Date.now() > testUntil) {
       return json({ ok: false, error: { code: 'disabled', message: 'O BrandBot está em configuração. Avisaremos quando estiver ativo.' } }, 503);
     }
 
@@ -138,6 +143,7 @@ Deno.serve(async (req) => {
         headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: TEXT_MODEL,
+          service_tier: 'default', // trava na tier padrão: sem priority/flex mais cara
           max_completion_tokens: 1200,
           messages: [{ role: 'system', content: BRANDBOT_PROMPT }, ...messages],
         }),
@@ -159,6 +165,7 @@ Deno.serve(async (req) => {
         headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: TEXT_MODEL,
+          service_tier: 'default', // trava na tier padrão: sem priority/flex mais cara
           max_completion_tokens: 3000,
           response_format: { type: 'json_object' },
           messages: [
@@ -189,6 +196,7 @@ Deno.serve(async (req) => {
         headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: TEXT_MODEL,
+          service_tier: 'default', // trava na tier padrão: sem priority/flex mais cara
           max_completion_tokens: 16000,
           response_format: { type: 'json_object' },
           messages: [
@@ -224,6 +232,7 @@ Deno.serve(async (req) => {
         headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: TEXT_MODEL,
+          service_tier: 'default', // trava na tier padrão: sem priority/flex mais cara
           max_completion_tokens: 6000,
           response_format: { type: 'json_object' },
           messages: [
