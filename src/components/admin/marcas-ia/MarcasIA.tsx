@@ -40,7 +40,16 @@ function svgToDataUrl(svg: string): string {
 
 async function callAgent(body: Record<string, unknown>): Promise<{ ok: boolean; [k: string]: unknown }> {
   const { data, error } = await supabase.functions.invoke('marcas-ia-agent', { body });
-  if (error) return { ok: false, error: { code: 'invoke', message: 'Não consegui falar com o BrandBot agora.' } };
+  if (error) {
+    // supabase-js trata non-2xx como erro genérico: o corpo JSON da edge
+    // (disabled/budget/config) está em error.context — ler antes de assumir falha.
+    try {
+      const ctx = (error as { context?: Response }).context;
+      const payload = ctx ? await ctx.json() : null;
+      if (payload?.error?.code) return { ok: false, error: payload.error };
+    } catch { /* corpo ilegível: cai no genérico */ }
+    return { ok: false, error: { code: 'invoke', message: 'Não consegui falar com o BrandBot agora.' } };
+  }
   return data as { ok: boolean };
 }
 
@@ -308,6 +317,8 @@ ${manual.tipografia.uso ?? ''}`);
             )}
             <div className="flex gap-2 border-t px-5 py-3">
               <Textarea
+                disabled={!!agenteOff}
+                placeholder={agenteOff ? 'BrandBot em ativação — aguarde a liberação.' : undefined}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendChat(); } }}
@@ -315,7 +326,7 @@ ${manual.tipografia.uso ?? ''}`);
                 className="min-h-[44px] flex-1 resize-none"
                 rows={1}
               />
-              <Button onClick={() => void sendChat()} disabled={busy || !input.trim()}>
+              <Button onClick={() => void sendChat()} disabled={busy || !!agenteOff || !input.trim()}>
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
