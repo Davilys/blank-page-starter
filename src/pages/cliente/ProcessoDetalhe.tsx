@@ -500,7 +500,12 @@ export default function ProcessoDetalhe() {
               {process.process_number ? `Processo: ${process.process_number}` : 'Processo em andamento'}
             </p>
           </div>
-          <Badge variant={status.variant}>{status.label}</Badge>
+          <div className="flex flex-col items-end gap-1">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Acompanhamento WebMarcas
+            </span>
+            <Badge variant={status.variant}>{status.label}</Badge>
+          </div>
         </div>
 
         {/* Process Info Card */}

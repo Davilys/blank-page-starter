@@ -35,7 +35,7 @@ const DEFAULT_STAGES: KanbanStage[] = [
 export function ClientProcessKanban({ userId }: ClientProcessKanbanProps) {
   const [processes, setProcesses] = useState<BrandProcess[]>([]);
   const [loading, setLoading] = useState(true);
-  const inpiLookups = useClientInpiLookups(userId);
+  const { byNumber: inpiLookups, loaded: inpiLoaded } = useClientInpiLookups(userId);
   const [stages, setStages] = useState<KanbanStage[]>(DEFAULT_STAGES);
   const [configOpen, setConfigOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -170,11 +170,19 @@ export function ClientProcessKanban({ userId }: ClientProcessKanbanProps) {
                                 {process.process_number || 'Aguardando protocolo'}
                               </p>
                               {(() => {
-                                const ph = process.process_number
-                                  ? derivePhaseFromInpi(inpiLookups[process.process_number]?.current_status)
+                                const lk = process.process_number
+                                  ? inpiLookups[process.process_number]
+                                  : undefined;
+                                const ph = lk?.lookup_status === 'completed'
+                                  ? derivePhaseFromInpi(lk.current_status)
                                   : null;
-                                return ph ? (
-                                  <p className="text-[11px] text-emerald-600 truncate">INPI: {ph.label}</p>
+                                if (ph) {
+                                  return (
+                                    <p className="text-[11px] text-emerald-600 truncate">INPI: {ph.label}</p>
+                                  );
+                                }
+                                return inpiLoaded && process.process_number ? (
+                                  <p className="text-[11px] text-slate-500 truncate">INPI: pendente de consulta</p>
                                 ) : null;
                               })()}
                             </div>

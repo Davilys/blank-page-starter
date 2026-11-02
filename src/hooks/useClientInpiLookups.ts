@@ -9,6 +9,7 @@ import type { ProcessLookup } from '@/hooks/useProcessLookup';
  */
 export function useClientInpiLookups(userId?: string) {
   const [byNumber, setByNumber] = useState<Record<string, ProcessLookup>>({});
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -24,6 +25,7 @@ export function useClientInpiLookups(userId?: string) {
         if (row?.process_number) map[row.process_number] = row;
       }
       setByNumber(map);
+      setLoaded(true);
     })();
     // Atualização em segundo plano (login/botão) reflete na lista/Kanban sem reload.
     const onSynced = (ev: Event) => {
@@ -39,5 +41,6 @@ export function useClientInpiLookups(userId?: string) {
     };
   }, [userId]);
 
-  return byNumber;
+  // loaded evita mostrar "pendente de consulta" antes da primeira resposta da RPC.
+  return { byNumber, loaded };
 }

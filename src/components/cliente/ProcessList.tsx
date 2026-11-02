@@ -33,7 +33,7 @@ const statusConfig: Record<string, { label: string; variant: 'default' | 'second
 
 export function ProcessList({ userId, limit }: ProcessListProps) {
   const [processes, setProcesses] = useState<BrandProcess[]>([]);
-  const inpiLookups = useClientInpiLookups(userId);
+  const { byNumber: inpiLookups, loaded: inpiLoaded } = useClientInpiLookups(userId);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -97,9 +97,11 @@ export function ProcessList({ userId, limit }: ProcessListProps) {
           <div className="space-y-3 stagger-children">
             {processes.map((process, index) => {
               const status = statusConfig[process.status] || statusConfig.em_andamento;
-              const inpiPhase = process.process_number
-                ? derivePhaseFromInpi(inpiLookups[process.process_number]?.current_status)
+              const lookupRow = process.process_number ? inpiLookups[process.process_number] : undefined;
+              const inpiPhase = lookupRow?.lookup_status === 'completed'
+                ? derivePhaseFromInpi(lookupRow.current_status)
                 : null;
+              const inpiPending = inpiLoaded && !!process.process_number && !inpiPhase;
               return (
                 <Link
                   key={process.id}
@@ -118,8 +120,13 @@ export function ProcessList({ userId, limit }: ProcessListProps) {
                         INPI: {inpiPhase.label}
                       </Badge>
                     )}
+                    {inpiPending && (
+                      <Badge variant="outline" className="text-slate-500 border-slate-300">
+                        INPI: pendente de consulta
+                      </Badge>
+                    )}
                     <Badge variant={status.variant} className="transition-transform group-hover:scale-105">
-                      {status.label}
+                      WebMarcas: {status.label}
                     </Badge>
                     <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
                   </div>
