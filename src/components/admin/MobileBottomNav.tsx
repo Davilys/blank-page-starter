@@ -3,6 +3,7 @@ import { useState, useRef, useCallback } from 'react';
 import {
   LayoutDashboard,
   MessageCircle,
+  Sparkles,
   Users,
   FileSignature,
   Mail,
@@ -88,7 +89,7 @@ const primaryNavItems: NavItem[] = [
 ];
 
 const moreItems: MoreItem[] = [
-  { icon: MessageCircle, label: 'Chat', href: '/admin/chat-ao-vivo', color: 'text-teal-500', permissionKey: 'live_chat' },
+  { icon: Sparkles, label: 'Central Inteligente', href: '/admin/chat-ao-vivo', color: 'text-teal-500', permissionKey: 'live_chat' },
   { icon: FileStack, label: 'Modelos', href: '/admin/modelos-contrato', color: 'text-pink-500', permissionKey: 'contract_templates' },
 
   { icon: FolderOpen, label: 'Documentos', href: '/admin/documentos', color: 'text-amber-500', permissionKey: 'documents' },

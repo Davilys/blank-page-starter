@@ -12,7 +12,7 @@ export const CRM_SECTIONS = [
   { key: 'documents', label: 'Documentos', description: 'Arquivos e anexos' },
   { key: 'financial', label: 'Financeiro', description: 'Pagamentos e faturas' },
   { key: 'emails', label: 'Emails', description: 'Comunicação e templates' },
-  { key: 'live_chat', label: 'Chat ao Vivo', description: 'Atendimento em tempo real' },
+  { key: 'live_chat', label: 'Central Inteligente', description: 'Atendimento inteligente e busca de viabilidade' },
   { key: 'notifications', label: 'Notificações', description: 'Alertas e avisos' },
   { key: 'inpi_magazine', label: 'Revista INPI', description: 'Publicações oficiais' },
   { key: 'inpi_resources', label: 'Recursos INPI', description: 'Recursos e petições' },

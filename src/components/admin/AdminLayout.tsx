@@ -23,6 +23,7 @@ import {
   FileSignature,
   FileStack,
   MessageCircle,
+  Sparkles,
   Mail,
   ChevronRight,
   Trophy,
@@ -143,9 +144,9 @@ const menuItems: MenuItem[] = [
     permissionKey: 'emails'
   },
   { 
-    icon: MessageCircle, 
-    label: 'Chat ao Vivo', 
-    subtitle: 'Atendimento em tempo real',
+    icon: Sparkles, 
+    label: 'Central Inteligente', 
+    subtitle: 'Atendimento inteligente e viabilidade',
     href: '/admin/chat-ao-vivo',
     iconColor: 'text-teal-500',
     iconBg: 'bg-teal-100 dark:bg-teal-900/30',
