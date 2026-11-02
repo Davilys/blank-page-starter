@@ -379,7 +379,7 @@ ${manual.tipografia.uso ?? ''}`);
                   onClick={() => setSvgEscolhido(i)}
                   className={cn('overflow-hidden rounded-xl border transition', svgEscolhido === i ? 'border-primary ring-2 ring-primary' : 'hover:border-primary/50')}
                 >
-                  <img src={svgToDataUrl(svg)} alt={`Conceito ${i + 1}`} className="aspect-square w-full object-cover" />
+                  <img src={svgToDataUrl(svg)} alt={`Conceito ${i + 1}`} className="aspect-square w-full bg-white object-contain" />
                   <span className="block py-2 text-sm">Conceito {i + 1}</span>
                 </button>
               ))}

@@ -100,6 +100,7 @@
     "globals": "^15.15.0",
     "happy-dom": "^21.0.4",
     "lovable-tagger": "^1.1.13",
+    "playwright": "^1.64.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.23.1",
