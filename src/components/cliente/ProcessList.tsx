@@ -104,15 +104,15 @@ export function ProcessList({ userId, limit }: ProcessListProps) {
                 <Link
                   key={process.id}
                   to={`/cliente/processos/${process.id}`}
-                  className="flex items-center justify-between p-4 rounded-xl border hover:bg-muted/50 hover:border-primary/30 hover:shadow-sm transition-all duration-200 group"
+                  className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl border hover:bg-muted/50 hover:border-primary/30 hover:shadow-sm transition-all duration-200 group"
                 >
-                  <div className="space-y-1">
-                    <p className="font-medium group-hover:text-primary transition-colors">{process.brand_name}</p>
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <p className="font-medium truncate group-hover:text-primary transition-colors">{process.brand_name}</p>
                     <p className="text-sm text-muted-foreground">
                       {process.process_number || 'Aguardando protocolo'}
                     </p>
                   </div>
-                  <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
+                  <div className="flex flex-wrap items-center justify-end gap-2 ml-auto">
                     {inpiPhase && inpiPhase.label !== status.label && (
                       <Badge variant="outline" className="text-emerald-600 border-emerald-500/40">
                         INPI: {inpiPhase.label}
