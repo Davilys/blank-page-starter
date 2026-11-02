@@ -446,6 +446,43 @@ function ProductionAssinarDocumento() {
 
       toast.success('Documento assinado com sucesso!');
       setSigned(true);
+
+      // Meta Pixel: Lead somente em contrato assinado com sucesso (nao procuracao/distrato),
+      // uma vez por contrato, sem bloquear o fluxo de assinatura.
+      const leadDocType = (contract.document_type || '').toLowerCase();
+      if (leadDocType !== 'procuracao' && leadDocType !== 'distrato_multa' && leadDocType !== 'distrato_sem_multa') {
+        const leadGuardKey = `metaLeadTracked:${contract.id}`;
+        const markLeadGuard = () => {
+          try { window.localStorage.setItem(leadGuardKey, '1'); } catch { /* storage indisponivel: evento ja disparado */ }
+        };
+        const wasLeadTracked = (() => {
+          try { return !!window.localStorage.getItem(leadGuardKey); } catch { return false; }
+        })();
+        if (!wasLeadTracked) {
+          if (typeof window.fbq === 'function') {
+            trackLead();
+            markLeadGuard();
+          } else {
+            // Pixel ainda nao carregou: aguarda ate ~5s sem impedir a assinatura.
+            // Se nao aparecer (ex.: bloqueador), o evento nao e enviado e a guarda nao e marcada.
+            let leadPollAttempts = 0;
+            const leadPoll = window.setInterval(() => {
+              leadPollAttempts += 1;
+              if (typeof window.fbq === 'function') {
+                window.clearInterval(leadPoll);
+                let alreadyTracked = false;
+                try { alreadyTracked = !!window.localStorage.getItem(leadGuardKey); } catch { /* ignora */ }
+                if (!alreadyTracked) {
+                  trackLead();
+                  markLeadGuard();
+                }
+              } else if (leadPollAttempts >= 10) {
+                window.clearInterval(leadPoll);
+              }
+            }, 500);
+          }
+        }
+      }
       
       // Refresh contract data and use returned value to avoid stale closure
       const refreshedContract = await fetchContract();

@@ -1,4 +1,4 @@
-import { Shield, FileSignature, UserCheck, CalendarCheck, Star, Zap } from "lucide-react";
+import { Star, Zap } from "lucide-react";
 import { useEffect } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useNavigate } from "react-router-dom";
@@ -32,13 +32,6 @@ const HeroSection = () => {
     const timers = [700, 1500, 2600, 4000].map((ms) => setTimeout(() => align(false), ms));
     return () => { cancelAnimationFrame(raf); timers.forEach(clearTimeout); };
   }, [showingResult]);
-
-  const trustPills = [
-    { icon: Shield, label: "Protocolo em 48h" },
-    { icon: FileSignature, label: "Contrato digital" },
-    { icon: UserCheck, label: "Especialista dedicado" },
-    { icon: CalendarCheck, label: "10 anos de vigência" },
-  ];
 
   return (
     <section id="home" className={cn("relative hero4 overflow-x-clip overflow-y-visible", showingResult && "search-result-active max-md:text-foreground")}>
@@ -96,20 +89,6 @@ const HeroSection = () => {
               </div>
             </div>
 
-            {/* Trust pills — desktop only (mobile version below search) */}
-            <div className="hidden lg:flex flex-wrap gap-2.5 justify-center lg:justify-start">
-              {trustPills.map((p, i) => (
-                <span
-                  key={i}
-                  className="hero4-pill inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs md:text-sm font-semibold"
-                >
-                  <span className="hero4-pill-icon w-5 h-5 rounded-full flex items-center justify-center">
-                    <p.icon className="w-3 h-3 text-white" strokeWidth={2.5} />
-                  </span>
-                  {p.label}
-                </span>
-              ))}
-            </div>
           </div>
         </div>
 
@@ -123,24 +102,10 @@ const HeroSection = () => {
             />}
             <TrademarkSearch
               variant="landing"
+              collectContact
               continueLabel="Continuar o registro"
               onContinue={() => navigate("/consultar", { state: { continueSearch: true } })}
             />
-          </div>
-
-          {/* Trust pills — mobile only, below viability search */}
-          <div className={cn("flex lg:hidden flex-wrap gap-2.5 justify-center mt-8", showingResult && "max-md:hidden")}>
-            {trustPills.map((p, i) => (
-              <span
-                key={i}
-                className="hero4-pill hero4-pill-light inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold"
-              >
-                <span className="hero4-pill-icon w-5 h-5 rounded-full flex items-center justify-center">
-                  <p.icon className="w-3 h-3 text-white" strokeWidth={2.5} />
-                </span>
-                {p.label}
-              </span>
-            ))}
           </div>
         </div>
 

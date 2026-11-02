@@ -248,6 +248,7 @@ export default function Registrar() {
             {step === 1 && (
               <TrademarkSearch consultationVisual
                 variant="checkout"
+                collectContact
                 continueLabel="Continuar o registro"
                 onContinue={(brand, area, job) => handleViabilityNext(brand, area, toViabilityResult(job))}
               />
@@ -264,7 +265,7 @@ export default function Registrar() {
             {step === 2 && personalData === null && (
               <PersonalDataStep
                 initialData={{
-                  fullName: '', email: '', phone: '', cpf: '',
+                  fullName: searchState.fullName || '', email: searchState.email || '', phone: searchState.phone || '', cpf: '',
                   cep: '', address: '', addressNumber: '', city: '', state: '', neighborhood: '',
                 }}
                 onNext={handlePersonalDataNext}
@@ -277,7 +278,7 @@ export default function Registrar() {
                 initialData={{
                   brandName: viabilityData?.brandName || '',
                   businessArea: viabilityData?.businessArea || '',
-                  hasCNPJ: false, cnpj: '', companyName: '',
+                  hasCNPJ: personalData?.hasCNPJ ?? false, cnpj: personalData?.cnpj ?? '', companyName: personalData?.companyName ?? '',
                 }}
                 onNext={handleBrandDataNext}
                 onBack={() => setStep(2)}

@@ -96,11 +96,38 @@ export interface TrademarkSearchState {
   requestId: string | null;
   brandName: string;
   businessArea: string;
+  /** Estágio atual da marca, capturado na entrada de /consultar (pedido do cliente, 31/10). */
+  brandStage: string;
+  /** Contato capturado na segunda tela da entrada de /consultar (desenho aprovado do cliente, 31/10). */
+  fullName: string;
+  phone: string;
+  email: string;
   jobId: string | null;
   startedAt: number | null;
   completedAt: number | null;
   job: TrademarkSearchJob | null;
   error: SearchApiError | null;
+}
+
+/**
+ * Opções do campo "Estágio atual da marca" (dropdown, escopo: entrada de /consultar).
+ * Texto exato confirmado pelo cliente via print em 31/10/2026.
+ */
+export const BRAND_STAGES = [
+  'Pré-lançamento (ainda não estou no mercado)',
+  'Iniciante (menos de 6 meses)',
+  'Crescimento (6 meses a 2 anos)',
+  'Consolidada (mais de 2 anos)',
+] as const;
+export type BrandStage = (typeof BRAND_STAGES)[number];
+export const BRAND_STAGE_PLACEHOLDER = 'Selecione o estágio atual da marca';
+
+/** Dados extras capturados junto da consulta (escopo: entrada de /consultar). */
+export interface SearchContact {
+  brandStage?: string;
+  fullName?: string;
+  phone?: string;
+  email?: string;
 }
 
 export const OFFICIAL_ERROR_MESSAGE =

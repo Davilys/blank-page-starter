@@ -365,15 +365,12 @@ html body .brand-public #como-funciona div[class*="absolute"][class*="w-\[2px\]"
   }
 }
 
-/* ---------- BLOCKCHAIN: banner verde-vivo ---------- */
-html body .brand-public main > section:nth-of-type(8) .rounded-2xl {
-  background: linear-gradient(135deg, #12d872 0%, #06cb66 100%) !important;
+/* ---------- BLOCKCHAIN: banner 3D verde-escuro (pedido user 03:19) ---------- */
+html body .brand-public .blockchain-banner-3d {
+  background: linear-gradient(180deg, #0b3d2e 0%, #07130f 78%) !important;
   border: none !important;
   border-radius: 2rem !important;
 }
-html body .brand-public main > section:nth-of-type(8) h3,
-html body .brand-public main > section:nth-of-type(8) p { color: #07130f !important; }
-html body .brand-public main > section:nth-of-type(8) .text-primary { color: #062d1b !important; }
 
 /* ---------- FAQ: linhas claras arredondadas ---------- */
 html body .brand-public #faq .max-w-3xl > div,
@@ -450,6 +447,7 @@ html body .brand-public .hero4-photo-mobile { display: none !important; }
   html body .brand-public > header button[aria-label="Menu"] svg { width: 22px !important; height: 22px !important; }
   /* Hero: full-bleed colado no topo (header pill flutua sobre) */
   html body .brand-public section#home { margin: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
+  html body .brand-public section#home { padding-top: 0 !important; }
   html body .brand-public section#home > .container { padding-top: 0 !important; padding-left: 0 !important; padding-right: 0 !important; }
   html body .brand-public .hero4-panel { border-radius: 0 !important; min-height: 0 !important; box-shadow: none !important; }
   /* Foto mobile: ruiva com R (janela direita, crop centrado nela) */
@@ -901,3 +899,7 @@ html body .brand-public .hero4-cardwrap h2.wm-home-consult-title span {
 @media (max-width: 360px) {
   html body .brand-public .hero4 { min-height: calc(100svh + 200px) !important; }
 }
+
+/* v9.10: overscroll do iPhone na home — o vao elástico acima/abaixo da página usa o
+   escuro do hero/footer (#07130f), nao o bege do corpo (pedido 03:14) */
+html:has(.brand-home) { background: #07130f !important; }

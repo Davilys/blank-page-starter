@@ -42,3 +42,9 @@ REVOKE ALL ON FUNCTION public.get_client_process_lookup(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.get_client_process_lookups() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_client_process_lookup(text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_client_process_lookups() TO authenticated;
+
+-- Supabase concede EXECUTE em funções novas para anon/authenticated/service_role
+-- via default privileges. Endurecer para a postura pretendida: somente o dono,
+-- service_role e usuários autenticados executam.
+REVOKE EXECUTE ON FUNCTION public.get_client_process_lookup(text) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.get_client_process_lookups() FROM anon;

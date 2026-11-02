@@ -276,7 +276,7 @@ const RegistrationFormSection = () => {
   const getInitialBrandData = (): BrandData => ({
     brandName: viabilityData?.brandName || "",
     businessArea: viabilityData?.businessArea || "",
-    hasCNPJ: false, cnpj: "", companyName: "",
+    hasCNPJ: personalData?.hasCNPJ ?? false, cnpj: personalData?.cnpj ?? "", companyName: personalData?.companyName ?? "",
   });
 
   const classCount = selectedClasses.length > 0 ? selectedClasses.length : 1;

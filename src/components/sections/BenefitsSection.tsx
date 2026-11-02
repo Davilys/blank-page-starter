@@ -1,5 +1,6 @@
 import { Clock, Headphones, FileSignature, Wallet, ChevronRight, CheckCircle2, QrCode } from "lucide-react";
 import ScribbleUnderline from "@/components/decorative/ScribbleUnderline";
+import webmarcasLogoMark from "@/assets/webmarcas-logo-mark.webp";
 import Seal48h from "@/components/decorative/Seal48h";
 
 const benefits = [
@@ -66,7 +67,7 @@ const BenefitsSection = () => {
               {/* header */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-black">W</div>
+                  <img src={webmarcasLogoMark} alt="WebMarcas" className="h-8 w-8 rounded-md object-contain" style={{ filter: "brightness(0)" }} />
                   <div className="leading-tight">
                     <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">WebMarcas · INPI</p>
                     <p className="text-[10px] text-muted-foreground">Processo Nº 925.678.432</p>

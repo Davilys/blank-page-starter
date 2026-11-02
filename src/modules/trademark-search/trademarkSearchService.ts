@@ -2,6 +2,7 @@ import { normalizeActivityAnalysis } from '../../../supabase/functions/_shared/a
 import type {
   SearchApiError,
   SearchApiResponse,
+  SearchContact,
   TrademarkSearchJob,
   TrademarkRecord,
   TrademarkSearchMode,
@@ -46,6 +47,31 @@ export function validateSearchInput(brand: string, activity: string): SearchApiE
   }
   if (a.length > ACTIVITY_MAX_LENGTH) {
     return { code: 'invalid_input', message: `O ramo de atividade deve ter no máximo ${ACTIVITY_MAX_LENGTH} caracteres.` };
+  }
+  return null;
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/** Segunda tela de /consultar: nome (mín. 3) + WhatsApp BR com DDD (10/11 dígitos) + e-mail. */
+export function validateLeadInput(fullName: string, phone: string, email: string): SearchApiError | null {
+  if ((fullName || '').replace(/\s+/g, ' ').trim().length < 3) {
+    return { code: 'invalid_input', message: 'Informe seu nome.' };
+  }
+  const digits = (phone || '').replace(/\D/g, '');
+  if (digits.length < 10 || digits.length > 11) {
+    return { code: 'invalid_input', message: 'Informe um WhatsApp válido com DDD.' };
+  }
+  if (!EMAIL_RE.test((email || '').trim())) {
+    return { code: 'invalid_input', message: 'Informe um e-mail válido.' };
+  }
+  return null;
+}
+
+/** Estágio atual da marca: deve ser uma das opções do dropdown. */
+export function validateContactInput(brandStage: string, stages: readonly string[]): SearchApiError | null {
+  if (!stages.includes(brandStage)) {
+    return { code: 'invalid_input', message: 'Selecione o estágio atual da marca.' };
   }
   return null;
 }
@@ -229,13 +255,18 @@ async function callFunction(body: Record<string, unknown>): Promise<SearchApiRes
 }
 
 export const trademarkSearchService = {
-  start(brand: string, activity: string, requestId: string): Promise<SearchApiResponse> {
-    return callFunction({
+  start(brand: string, activity: string, requestId: string, contact?: SearchContact): Promise<SearchApiResponse> {
+    const body: Record<string, unknown> = {
       action: 'start',
       brand: normalizeTerm(brand, BRAND_MAX_LENGTH),
       activity: normalizeTerm(activity, ACTIVITY_MAX_LENGTH),
       request_id: requestId,
-    });
+    };
+    if (contact?.brandStage) body.brand_stage = contact.brandStage;
+    if (contact?.fullName) body.full_name = contact.fullName;
+    if (contact?.phone) body.phone = contact.phone;
+    if (contact?.email) body.email = contact.email;
+    return callFunction(body);
   },
   /**
    * Consulta o status de um job. Para jobs `site-*` (nova fonte), brand/activity

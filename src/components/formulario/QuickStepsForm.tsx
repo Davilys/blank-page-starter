@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { validateCPF, validateCNPJ, fetchAddressByCEP, formatCPF, formatCEP, formatPhone, formatCNPJ } from "@/lib/validators";
-import { trackLead } from "@/lib/metaPixel";
 import type { PersonalData } from "@/components/cliente/checkout/PersonalDataStep";
 import type { BrandData } from "@/components/cliente/checkout/BrandDataStep";
 
@@ -62,7 +61,6 @@ export function QuickLeadStep({ initial, onNext }: { initial: QuickData; onNext:
     const r = quickSchema.safeParse(d);
     if (!r.success) return setErrors(collect(r));
     setErrors({});
-    trackLead();
     onNext({ ...d, brandName: d.brandName.trim(), businessArea: d.businessArea.trim(), fullName: d.fullName.trim(), email: d.email.trim() });
   };
   const ic = (k: string) => cn("h-12 text-base", errors[k] && "border-destructive");

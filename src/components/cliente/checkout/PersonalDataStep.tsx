@@ -1,18 +1,19 @@
 import { useState, useCallback } from "react";
-import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Loader2, User, Mail, Phone, CreditCard, MapPin, Home, Building } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowLeft, ArrowRight, Loader2, User, Mail, Phone, CreditCard, MapPin, Home, Building, Hash, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { z } from "zod";
 import {
   validateCPF,
+  validateCNPJ,
   fetchAddressByCEP,
   formatCPF,
+  formatCNPJ,
   formatCEP,
   formatPhone,
 } from "@/lib/validators";
-import { trackLead } from "@/lib/metaPixel";
 import { cn } from "@/lib/utils";
 
 export const personalDataSchema = z.object({
@@ -25,6 +26,18 @@ export const personalDataSchema = z.object({
   neighborhood: z.string().min(2, "Bairro obrigatório").max(100, "String must contain at most 100 character(s)"),
   city: z.string().min(2, "Cidade obrigatória").max(100, "String must contain at most 100 character(s)"),
   state: z.string().length(2, "UF obrigatória"),
+  hasCNPJ: z.boolean().optional(),
+  cnpj: z.string().optional(),
+  companyName: z.string().optional(),
+}).refine((data) => {
+  if (data.hasCNPJ) {
+    if (!data.cnpj || !validateCNPJ(data.cnpj)) return false;
+    if (!data.companyName || data.companyName.length < 3) return false;
+  }
+  return true;
+}, {
+  message: "CNPJ ou Razão Social inválidos",
+  path: ["cnpj"],
 });
 
 export interface PersonalData {
@@ -38,12 +51,16 @@ export interface PersonalData {
   neighborhood: string;
   city: string;
   state: string;
+  hasCNPJ?: boolean;
+  cnpj?: string;
+  companyName?: string;
 }
 
 interface PersonalDataStepProps {
   initialData: PersonalData;
   onNext: (data: PersonalData) => void;
   onBack: () => void;
+  showCnpjOption?: boolean;
 }
 
 interface FieldProps {
@@ -76,10 +93,21 @@ function Field({ label, error, icon: Icon, children, required }: FieldProps) {
   );
 }
 
-export function PersonalDataStep({ initialData, onNext, onBack }: PersonalDataStepProps) {
-  const [data, setData] = useState<PersonalData>(initialData);
+export function PersonalDataStep({ initialData, onNext, onBack, showCnpjOption = true }: PersonalDataStepProps) {
+  const [data, setData] = useState<PersonalData>({
+    ...initialData,
+    hasCNPJ: initialData.hasCNPJ ?? false,
+    cnpj: initialData.cnpj ?? '',
+    companyName: initialData.companyName ?? '',
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoadingCEP, setIsLoadingCEP] = useState(false);
+  const contactPrefilled = Boolean(
+    initialData.fullName && initialData.fullName.trim().length >= 3 &&
+    initialData.email && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(initialData.email.trim()) &&
+    initialData.phone && initialData.phone.replace(/\D/g, '').length >= 10
+  );
+  const [showContact, setShowContact] = useState(!contactPrefilled);
 
   const handleCEPChange = useCallback(async (cep: string) => {
     const formattedCEP = formatCEP(cep);
@@ -116,7 +144,6 @@ export function PersonalDataStep({ initialData, onNext, onBack }: PersonalDataSt
       setErrors(newErrors);
       return;
     }
-    trackLead();
     onNext(data);
   };
 
@@ -140,6 +167,21 @@ export function PersonalDataStep({ initialData, onNext, onBack }: PersonalDataSt
         </div>
 
         {/* Section: Contato */}
+        {!showContact && (
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+            <p className="text-xs text-muted-foreground leading-snug">
+              Nome, e-mail e telefone já informados.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowContact(true)}
+              className="text-xs font-medium text-primary hover:underline shrink-0"
+            >
+              Alterar
+            </button>
+          </div>
+        )}
+        {showContact && (
         <div className="space-y-4">
           <div className="flex items-center gap-2 mb-1">
             <div className="h-px flex-1 bg-border" />
@@ -187,6 +229,7 @@ export function PersonalDataStep({ initialData, onNext, onBack }: PersonalDataSt
             </Field>
           </div>
         </div>
+        )}
 
         {/* Section: Endereço */}
         <div className="space-y-4">

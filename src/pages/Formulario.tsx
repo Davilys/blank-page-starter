@@ -16,6 +16,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import SocialProofNotification from "@/components/SocialProofNotification";
 import type { ViabilityResult } from "@/lib/api/viability";
 import type { PlanType } from "@/hooks/useContractTemplate";
+import { formatPhone } from "@/lib/validators";
 import ScribbleUnderline from "@/components/decorative/ScribbleUnderline";
 import WhatsAppButton from "@/components/layout/WhatsAppButton";
 import Footer from "@/components/layout/Footer";
@@ -120,6 +121,39 @@ export default function Formulario() {
   };
 
   const [quick, setQuick] = useState<QuickData>({ brandName: '', businessArea: '', fullName: '', email: '', phone: '' });
+
+  // Prefill via capability token (?ref=) enviado no e-mail do laudo: busca na edge
+  // os dados que o próprio cliente digitou na consulta e pré-preenche a etapa 1.
+  // Best-effort: falha/expiração apenas deixa o formulário vazio, como hoje.
+  const [prefillReady, setPrefillReady] = useState(() => {
+    const ref = new URLSearchParams(window.location.search).get('ref');
+    return !(ref && /^[0-9a-f]{64}$/.test(ref));
+  });
+  useEffect(() => {
+    if (prefillReady) return;
+    const ref = new URLSearchParams(window.location.search).get('ref') ?? '';
+    (async () => {
+      try {
+        const base = import.meta.env.VITE_SUPABASE_URL as string;
+        const res = await fetch(`${base}/functions/v1/webmarcas-inpi-search/form-prefill?token=${ref}`);
+        if (res.ok) {
+          const d = await res.json();
+          setQuick((prev) => ({
+            ...prev,
+            brandName: typeof d.brand_name === 'string' && d.brand_name ? d.brand_name : prev.brandName,
+            businessArea: typeof d.business_area === 'string' && d.business_area ? d.business_area : prev.businessArea,
+            fullName: typeof d.full_name === 'string' && d.full_name ? d.full_name : prev.fullName,
+            email: typeof d.email === 'string' && d.email ? d.email : prev.email,
+            phone: typeof d.phone === 'string' && d.phone ? formatPhone(d.phone) : prev.phone,
+          }));
+        }
+      } catch { /* prefill é best-effort */ }
+      // Remove o token da URL (não fica em histórico/compartilhamento acidental).
+      window.history.replaceState(null, '', window.location.pathname);
+      setPrefillReady(true);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const emptyPersonal = (q: QuickData): PersonalData => ({ fullName: q.fullName, email: q.email, phone: q.phone, cpf: '', cep: '', address: '', addressNumber: '', city: '', state: '', neighborhood: '' });
   const [classesLoading, setClassesLoading] = useState(false);
   const [classesArea, setClassesArea] = useState('');
@@ -264,7 +298,7 @@ export default function Formulario() {
       <main className="wm-form-main">
         {step === 1 ? <section className="wm-reference-hero"><img className="wm-reference-photo" src={proposalHero} alt="" fetchPriority="high"/><div className="wm-reference-copy"><h1>Apenas 1 minuto,<br/>receba proposta do<br/><span>registro de marca!</span></h1><div className="wm-reference-rule"/><p>Preencha seus dados para gerar sua<br className="wm-reference-break"/> proposta. Após sua aprovação,<br className="wm-reference-break"/> iniciamos imediatamente o registro !</p></div></section> : <StepDashes total={5} current={step} />}
         <section className="wm-flow-screen">
-            {step === 1 && (
+            {step === 1 && prefillReady && (
               <QuickLeadStep initial={quick} onNext={handleQuickNext} />
             )}
 

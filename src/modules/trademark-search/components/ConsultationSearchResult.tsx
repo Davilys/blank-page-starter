@@ -158,8 +158,8 @@ export function ConsultationSearchResult({ job, brandName, businessArea, onNewSe
           </div>
           <div className="min-w-0 flex-1">
             <div className="wm-result-title-line flex min-w-0 flex-wrap items-center justify-center gap-x-2 gap-y-0.5">
-              <h2 id="search-result-title" className="text-sm font-black leading-tight sm:text-base text-center">
-                {view.tone === 'success' ? 'Nenhuma ocorrência relevante encontrada' : view.title}
+              <h2 id="search-result-title" className={cn('text-sm font-black leading-tight sm:text-base text-center', view.tone === 'success' && 'wm-title-zero')}>
+                {view.tone === 'success' ? 'Parabéns ! Nenhum resultado encontrado.' : view.title}
               </h2>
               <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider', tone.badge)}>
                 Base oficial INPI
@@ -170,8 +170,8 @@ export function ConsultationSearchResult({ job, brandName, businessArea, onNewSe
         <div className="wm-result-description mt-2.5 space-y-1 text-center">
           {view.tone === 'success' ? (
             <>
-              <p className="text-xs font-semibold leading-snug">Não identificamos ocorrência potencialmente conflitante nesta triagem preliminar.</p>
-              <p className="text-[11px] leading-snug text-muted-foreground">A análise técnica da WebMarcas realizará a conferência antes do protocolo. A consulta não garante registro.</p>
+              <p className="text-xs font-semibold leading-snug">Após iniciar a contratação, nossa equipe jurídica entrará em contato ainda hoje para uma reunião.</p>
+              <p className="text-[11px] leading-snug text-muted-foreground">Após a aprovação, protocolaremos seu pedido junto ao INPI em até 48 horas, com envio do comprovante oficial.</p>
             </>
           ) : (
             <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">{view.description}</p>

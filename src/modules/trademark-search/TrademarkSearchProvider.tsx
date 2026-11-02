@@ -1,5 +1,4 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { trademarkSearchService, validateSearchInput, normalizeTerm } from './trademarkSearchService';
 import {
   ACTIVITY_MAX_LENGTH,
@@ -9,6 +8,7 @@ import {
   POLL_INTERVAL_MS,
   POLL_MAX_DURATION_MS,
   type SearchApiError,
+  type SearchContact,
   type TrademarkSearchJob,
   type TrademarkSearchState,
 } from './types';
@@ -21,6 +21,10 @@ const INITIAL_STATE: TrademarkSearchState = {
   requestId: null,
   brandName: '',
   businessArea: '',
+  brandStage: '',
+  fullName: '',
+  phone: '',
+  email: '',
   jobId: null,
   startedAt: null,
   completedAt: null,
@@ -31,7 +35,7 @@ const INITIAL_STATE: TrademarkSearchState = {
 interface TrademarkSearchContextValue {
   state: TrademarkSearchState;
   isBusy: boolean;
-  startSearch: (brand: string, activity: string) => Promise<void>;
+  startSearch: (brand: string, activity: string, contact?: SearchContact) => Promise<void>;
   retry: () => Promise<void>;
   /** Regenera só o relatório PDF de uma consulta concluída (quando a geração falhou). */
   retryPdf: () => Promise<void>;
@@ -81,28 +85,6 @@ function isFinalJob(job: TrademarkSearchJob): boolean {
   return job.status === 'completed' || job.status === 'inconclusive' || job.status === 'failed';
 }
 
-function summarizeStatus(job: TrademarkSearchJob | null, error: SearchApiError | null): string {
-  if (job?.status === 'completed' && job.result) {
-    if (job.result.conclusion === 'requires_legal_review') return 'requires_legal_review';
-    if (job.result.conclusion === 'no_matches_in_searched_terms') return 'no_matches';
-    return String(job.result.conclusion).slice(0, 60);
-  }
-  if (job?.status === 'inconclusive') return 'inconclusive';
-  if (error) return `error:${error.code}`;
-  return 'inconclusive';
-}
-
-/**
- * Registro na tabela existente `viability_searches` (prova social do site).
- * Estrutura e permissões atuais preservadas: grava só marca, ramo e status resumido.
- * Falhas (ex.: visitante anônimo sem permissão de insert) são ignoradas silenciosamente.
- */
-function logSearch(brand: string, activity: string, summary: string) {
-  supabase
-    .from('viability_searches')
-    .insert({ brand_name: brand, business_area: activity, result_level: summary })
-    .then(() => undefined, () => undefined);
-}
 
 // ─── Provider ────────────────────────────────────────────────────────────────
 
@@ -129,10 +111,8 @@ export function TrademarkSearchProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const finishWithError = useCallback((error: SearchApiError, logIt = true) => {
+  const finishWithError = useCallback((error: SearchApiError) => {
     clearTimer();
-    const s = stateRef.current;
-    if (logIt && s.brandName) logSearch(s.brandName, s.businessArea, summarizeStatus(null, error));
     setState((prev) => ({ ...prev, phase: 'error', error, completedAt: Date.now() }));
   }, [clearTimer, setState]);
 
@@ -151,8 +131,6 @@ export function TrademarkSearchProvider({ children }: { children: ReactNode }) {
       }
       // "Validando resultados" é real: a normalização acabou de rodar no cliente.
       setState((prev) => ({ ...prev, phase: 'validating', job, jobId: job.job_id }));
-      const s = stateRef.current;
-      logSearch(s.brandName, s.businessArea, summarizeStatus(job, null));
       pollTimer.current = setTimeout(() => {
         if (token !== runToken.current) return;
         setState((prev) => ({ ...prev, phase: 'completed', completedAt: Date.now() }));
@@ -213,7 +191,7 @@ export function TrademarkSearchProvider({ children }: { children: ReactNode }) {
     }, POLL_INTERVAL_MS);
   };
 
-  const runStart = useCallback(async (brand: string, activity: string, requestId: string) => {
+  const runStart = useCallback(async (brand: string, activity: string, requestId: string, contact?: SearchContact) => {
     const token = ++runToken.current;
     clearTimer();
     inFlight.current = false;
@@ -224,6 +202,10 @@ export function TrademarkSearchProvider({ children }: { children: ReactNode }) {
       requestId,
       brandName: brand,
       businessArea: activity,
+      brandStage: contact?.brandStage ?? '',
+      fullName: contact?.fullName ?? '',
+      phone: contact?.phone ?? '',
+      email: contact?.email ?? '',
       startedAt: Date.now(),
     }));
 
@@ -232,7 +214,7 @@ export function TrademarkSearchProvider({ children }: { children: ReactNode }) {
     if (token !== runToken.current) return;
     setState((prev) => ({ ...prev, phase: 'sending' }));
 
-    const res = await trademarkSearchService.start(brand, activity, requestId);
+    const res = await trademarkSearchService.start(brand, activity, requestId, contact);
     if (token !== runToken.current) return;
 
     if (res.ok === false) {
@@ -249,7 +231,7 @@ export function TrademarkSearchProvider({ children }: { children: ReactNode }) {
     if (!isFinalJob(res.job)) schedulePoll(res.job.job_id, token);
   }, [applyJob, clearTimer, finishWithError, schedulePoll, setState]);
 
-  const startSearch = useCallback(async (brandInput: string, activityInput: string) => {
+  const startSearch = useCallback(async (brandInput: string, activityInput: string, contact?: SearchContact) => {
     const brand = normalizeTerm(brandInput, BRAND_MAX_LENGTH);
     const activity = normalizeTerm(activityInput, ACTIVITY_MAX_LENGTH);
     const invalid = validateSearchInput(brand, activity);
@@ -262,7 +244,7 @@ export function TrademarkSearchProvider({ children }: { children: ReactNode }) {
     // Duplo clique / mesma consulta em andamento: não cria novo job.
     if (busy && s.brandName.toLowerCase() === brand.toLowerCase() && s.businessArea.toLowerCase() === activity.toLowerCase()) return;
 
-    await runStart(brand, activity, crypto.randomUUID());
+    await runStart(brand, activity, crypto.randomUUID(), contact);
   }, [runStart, setState]);
 
   const retry = useCallback(async () => {
@@ -271,7 +253,7 @@ export function TrademarkSearchProvider({ children }: { children: ReactNode }) {
     // Sem job criado (falha de rede ao iniciar): reaproveita o request_id -> chave idempotente estável.
     // Job já finalizado como inconclusivo/erro: nova tentativa legítima -> novo request_id.
     const requestId = !s.jobId && s.requestId ? s.requestId : crypto.randomUUID();
-    await runStart(s.brandName, s.businessArea, requestId);
+    await runStart(s.brandName, s.businessArea, requestId, { brandStage: s.brandStage, fullName: s.fullName, phone: s.phone, email: s.email });
   }, [runStart]);
 
   const [pdfRetrying, setPdfRetrying] = useState(false);

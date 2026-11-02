@@ -43,7 +43,7 @@ const Index = () => {
   }, []);
 
   return (
-    <div className="brand-public min-h-screen bg-background">
+    <div className="brand-public brand-home min-h-screen bg-background">
       <Helmet>
         <title>WebMarcas — Registro de Marca no INPI em 48h | A partir de R$699</title>
         <meta name="description" content="Registre sua marca no INPI 100% online. Protocolo em 48h, contrato digital, acompanhamento completo e garantia. A partir de R$699." />

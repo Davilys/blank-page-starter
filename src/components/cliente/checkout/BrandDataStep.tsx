@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, Building2, Briefcase, Hash, FileText, Sparkles, Layers, Info } from "lucide-react";
+import { motion } from "framer-motion";
+import { ArrowLeft, ArrowRight, Building2, Briefcase, Sparkles, Layers, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import { z } from "zod";
-import { validateCNPJ, formatCNPJ } from "@/lib/validators";
+import { validateCNPJ } from "@/lib/validators";
 import { cn } from "@/lib/utils";
 
 export const brandDataSchema = z.object({
@@ -157,68 +157,6 @@ export function BrandDataStep({
             {errors.businessArea && (
               <p className="text-destructive text-xs">{errors.businessArea}</p>
             )}
-          </div>
-
-          {/* CNPJ Toggle */}
-          <div className="rounded-xl border border-border bg-muted/20 p-4">
-            <div className="flex items-center gap-3">
-              <input
-                id="hasCNPJ"
-                type="checkbox"
-                checked={data.hasCNPJ}
-                onChange={(e) => setData({ ...data, hasCNPJ: e.target.checked })}
-                className="h-4 w-4 shrink-0 rounded border-border text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              />
-              <Label htmlFor="hasCNPJ" className="text-sm cursor-pointer leading-relaxed">
-                <span className="font-semibold">Tenho CNPJ</span>
-                <span className="text-muted-foreground"> — quero vincular à marca (opcional)</span>
-              </Label>
-            </div>
-
-            <AnimatePresence>
-              {data.hasCNPJ && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="overflow-hidden"
-                >
-                  <div className="space-y-4 mt-4 pt-4 border-t border-border/50">
-                    <div className="space-y-1.5">
-                      <Label className="text-sm font-medium flex items-center gap-1.5">
-                        <Hash className="w-3.5 h-3.5 text-muted-foreground" />
-                        CNPJ <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        value={data.cnpj}
-                        onChange={(e) => setData({ ...data, cnpj: formatCNPJ(e.target.value) })}
-                        placeholder="00.000.000/0000-00"
-                        maxLength={18}
-                        className={cn(inputClass, errors.cnpj && "border-destructive")}
-                      />
-                      {errors.cnpj && <p className="text-destructive text-xs">{errors.cnpj}</p>}
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label className="text-sm font-medium flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5 text-muted-foreground" />
-                        Razão Social <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        value={data.companyName}
-                        onChange={(e) => setData({ ...data, companyName: e.target.value })}
-                        placeholder="Nome da empresa"
-                        className={cn(inputClass, errors.companyName && "border-destructive")}
-                      />
-                      {errors.companyName && (
-                        <p className="text-destructive text-xs">{errors.companyName}</p>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
 
           {/* NCL Classes Selection - embedded */}

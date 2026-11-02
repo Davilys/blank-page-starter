@@ -101,6 +101,7 @@ export default function RegistrarMarca() {
 
   const handlePersonalDataNext = (data: PersonalData) => {
     setPersonalData(data);
+    setBrandData(prev => ({ ...prev, hasCNPJ: data.hasCNPJ ?? false, cnpj: data.cnpj ?? '', companyName: data.companyName ?? '' }));
     setStep(3);
   };
 

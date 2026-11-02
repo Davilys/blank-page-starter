@@ -24,13 +24,19 @@
  *
  * - CORS restrito a origens exatas + subdomínios Lovable validados. Nunca "*" nem reflexo de origem.
  * - Limite de abuso: 10 novas buscas / 15 min por IP e por sessão anônima.
- * - Não envia nenhum dado pessoal do visitante para a API.
+ * - Não envia nenhum dado pessoal do visitante para a API do INPI.
+ * - Dados da entrada de /consultar (estágio atual da marca + contato da segunda
+ *   tela: nome, WhatsApp, e-mail) são gravados na tabela própria
+ *   viability_searches via service role (RLS não permite insert anônimo);
+ *   nunca vão para fontes externas nem disparam automação.
  */
 import { normalizeActivityAnalysis } from '../_shared/activityAnalysis.ts';
 import { triage } from './activityFilterPort.ts';
 import { guidance, primaryClassFor } from './orientationPort.ts';
 import { z } from 'npm:zod@3.25.76';
+import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { buildLaudoPdf } from './laudoPdf.ts';
+import { dispatchLaudoDelivery, sha256Hex } from './laudoDelivery.ts';
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
 
@@ -99,11 +105,24 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 const normalizeTerm = (v: string, max: number) => v.replace(/\s+/g, ' ').trim().slice(0, max);
 
+// Opções exatas do campo "Estágio atual da marca" confirmadas pelo cliente (print 31/10/2026).
+const BRAND_STAGES = [
+  'Pré-lançamento (ainda não estou no mercado)',
+  'Iniciante (menos de 6 meses)',
+  'Crescimento (6 meses a 2 anos)',
+  'Consolidada (mais de 2 anos)',
+] as const;
+
 const StartSchema = z.object({
   action: z.literal('start'),
   brand: z.string().transform((v) => normalizeTerm(v, 121)).pipe(z.string().min(2).max(120)),
   activity: z.string().transform((v) => normalizeTerm(v, 161)).pipe(z.string().min(1).max(160)),
   request_id: z.string().regex(UUID_RE),
+  // Estágio e contato opcionais (entrada de /consultar). Ausência não bloqueia a consulta.
+  brand_stage: z.enum(BRAND_STAGES).optional(),
+  full_name: z.string().transform((v) => normalizeTerm(v, 101)).pipe(z.string().max(100)).optional(),
+  phone: z.string().max(25).optional(),
+  email: z.string().max(160).transform((v) => v.trim().toLowerCase()).pipe(z.string().email()).optional(),
 });
 
 const StatusSchema = z.object({
@@ -532,6 +551,120 @@ function mapUpstreamFailure(u: { kind: string; status?: number }, cors: Record<s
   }
 }
 
+// ─── Registro da consulta (tabela própria; service role porque a RLS barra anon) ─
+
+let dbClient: SupabaseClient | null = null;
+function getDb(): SupabaseClient | null {
+  if (dbClient) return dbClient;
+  const url = Deno.env.get('SUPABASE_URL') ?? '';
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (!url || !key) return null;
+  dbClient = createClient(url, key, { auth: { persistSession: false } });
+  return dbClient;
+}
+
+function summarizeConclusion(job: { status: string; result: { conclusion?: unknown } | null }): string {
+  if (job.status === 'completed' && job.result) {
+    if (job.result.conclusion === 'requires_legal_review') return 'requires_legal_review';
+    if (job.result.conclusion === 'no_matches_in_searched_terms') return 'no_matches';
+    return String(job.result.conclusion).slice(0, 60);
+  }
+  return 'inconclusive';
+}
+
+/** Grava a consulta com o contato opcional e devolve o id da linha (para a entrega do laudo). Falha NUNCA derruba a consulta. */
+async function logViabilitySearch(body: { brand: string; activity: string; brand_stage?: string; full_name?: string; phone?: string; email?: string }, job: { status: string; result: { conclusion?: unknown } | null }): Promise<string | number | null> {
+  try {
+    const db = getDb();
+    if (!db) return null;
+    const digits = (body.phone ?? '').replace(/\D/g, '');
+    const fullName = (body.full_name ?? '').trim();
+    const ins = await db.from('viability_searches').insert({
+      brand_name: body.brand,
+      business_area: body.activity,
+      result_level: summarizeConclusion(job),
+      brand_stage: body.brand_stage ?? null,
+      full_name: fullName.length >= 3 ? fullName.slice(0, 100) : null,
+      phone: digits.length >= 10 && digits.length <= 11 ? body.phone!.slice(0, 25) : null,
+      email: body.email ?? null,
+    }).select('id').single();
+    return ins.data?.id != null ? (ins.data.id as string | number) : null;
+  } catch (e) {
+    console.error('[webmarcas-inpi-search] falha ao registrar consulta (ignorada):', e);
+    return null;
+  }
+}
+
+// ─── Rota capability do laudo: PDF privado servido por token temporário ─────
+// GET .../webmarcas-inpi-search/laudo/<token64hex>/<arquivo>.pdf
+// O token (128 bits) nunca é logado; só o hash SHA-256 fica gravado na linha da
+// consulta, com expiração. Sem listagem, sem bucket público, sem query string —
+// formato exigido pelo envio de arquivo do BotConversa.
+
+const LAUDO_BUCKET = 'laudos';
+
+async function serveLaudoPdf(token: string): Promise<Response> {
+  try {
+    const db = getDb();
+    if (!db) return new Response('not found', { status: 404 });
+    const hash = await sha256Hex(token);
+    const { data } = await db.from('viability_searches')
+      .select('laudo_path, laudo_token_expires_at')
+      .eq('laudo_token_hash', hash)
+      .gt('laudo_token_expires_at', new Date().toISOString())
+      .limit(1)
+      .maybeSingle();
+    if (!data?.laudo_path) return new Response('not found', { status: 404 });
+    const dl = await db.storage.from(LAUDO_BUCKET).download(data.laudo_path);
+    if (dl.error || !dl.data) return new Response('not found', { status: 404 });
+    const bytes = new Uint8Array(await dl.data.arrayBuffer());
+    return new Response(bytes, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': 'inline; filename="laudo.pdf"',
+        'Cache-Control': 'no-store',
+      },
+    });
+  } catch {
+    return new Response('not found', { status: 404 });
+  }
+}
+
+// ─── Prefill do /formulario: dados que o próprio cliente digitou na consulta ─
+// GET .../webmarcas-inpi-search/form-prefill?token=<64hex>
+// Mesmo padrão capability do laudo: token de 128 bits imprevisível, só o hash
+// SHA-256 gravado na linha, expiração (72h), no-store, 404 genérico (sem oracle
+// de existência), escopo mínimo (apenas os campos que o formulário pede).
+// Não abre RLS nem endpoint enumerável: sem o token não há como listar/adivinhar.
+
+async function serveFormPrefill(token: string, cors: Record<string, string>): Promise<Response> {
+  const out = (obj: Record<string, unknown>, status = 200) =>
+    new Response(JSON.stringify(obj), { status, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+  try {
+    if (!/^[0-9a-f]{64}$/.test(token)) return out({ error: 'not_found' }, 404);
+    const db = getDb();
+    if (!db) return out({ error: 'not_found' }, 404);
+    const hash = await sha256Hex(token);
+    const { data } = await db.from('viability_searches')
+      .select('full_name, email, phone, brand_name, business_area')
+      .eq('prefill_token_hash', hash)
+      .gt('prefill_token_expires_at', new Date().toISOString())
+      .limit(1)
+      .maybeSingle();
+    if (!data) return out({ error: 'not_found' }, 404);
+    return out({
+      full_name: data.full_name ?? null,
+      email: data.email ?? null,
+      phone: data.phone ?? null,
+      brand_name: data.brand_name ?? null,
+      business_area: data.business_area ?? null,
+    });
+  } catch {
+    return out({ error: 'not_found' }, 404);
+  }
+}
+
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -540,6 +673,11 @@ Deno.serve(async (req) => {
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: cors });
+  }
+  // Rota capability do laudo (GET público com token imprevisível e expiração).
+  const laudoMatch = /\/laudo\/([0-9a-f]{64})\/[^/]+\.pdf$/.exec(new URL(req.url).pathname);
+  if (req.method === 'GET' && laudoMatch) {
+    return serveLaudoPdf(laudoMatch[1]);
   }
   if (req.method !== 'POST') {
     return fail('invalid_input', 'Método não permitido.', 405, cors);
@@ -621,6 +759,12 @@ Deno.serve(async (req) => {
 
   const job = buildCompletedJob(await siteJobId(body.brand, body.activity), body.brand, body.activity, u.data, u.incomplete);
   await attachLaudoPdf(job);
+  const searchRowId = await logViabilitySearch(body, job);
+  await dispatchLaudoDelivery(
+    { full_name: body.full_name, phone: body.phone, email: body.email, brand: body.brand },
+    job,
+    searchRowId,
+  );
   console.log(`[webmarcas-inpi-search] consulta exata concluída: ${job.job_id.slice(0, 24)}… (${job.result.searches[0].total} registros, laudo ${job.pdf_base64 ? 'gerado' : 'falhou'})`);
   return jsonResponse({ ok: true, job }, 200, cors);
 });
