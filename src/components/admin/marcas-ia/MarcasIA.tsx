@@ -71,6 +71,7 @@ export default function MarcasIA() {
   const [nomeEscolhido, setNomeEscolhido] = useState<Nome | null>(null);
   const [svgs, setSvgs] = useState<string[]>([]);
   const [svgEscolhido, setSvgEscolhido] = useState<number | null>(null);
+  const [conceitos, setConceitos] = useState<string[]>([]);
   const [manual, setManual] = useState<{ proposito?: string; tom_de_voz?: string[]; valores?: string[]; paleta?: { nome: string; hex: string; rgb: string; cmyk: string }[]; tipografia?: { primaria?: string; secundaria?: string; uso?: string } } | null>(null);
   const [manualBusy, setManualBusy] = useState(false);
   const [agenteOff, setAgenteOff] = useState<string | null>(null);
@@ -157,11 +158,13 @@ export default function MarcasIA() {
     try {
       if (MOCK) {
         setSvgs(MOCK_SVGS);
+        setConceitos(['monograma', 'símbolo abstrato', 'wordmark', 'emblema', 'minimalista']);
         setStage('logos');
       } else {
         const res = await callAgent({ action: 'logos', session_id: sessionId, nome: nomeEscolhido.nome, diagnostico });
         if (!res.ok) { handleAgentError(res); return; }
         setSvgs((res.svgs as string[]) ?? []);
+        setConceitos((res.conceitos as string[]) ?? []);
         setStage('logos');
       }
     } finally {
@@ -467,20 +470,54 @@ ${manual.tipografia.uso ?? ''}`);
 
         {stage === 'logos' && (
           <motion.div key="logos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex min-h-0 flex-1 flex-col">
-            <div className="grid flex-1 grid-cols-2 gap-4 overflow-y-auto px-5 py-4 md:grid-cols-3">
-              {svgs.map((svg, i) => (
-                <button
-                  key={i}
-                  onClick={() => setSvgEscolhido(i)}
-                  className={cn('overflow-hidden rounded-xl border transition', svgEscolhido === i ? 'border-primary ring-2 ring-primary' : 'hover:border-primary/50')}
-                >
-                  <img src={svgToDataUrl(svg)} alt={`Conceito ${i + 1}`} className="aspect-square w-full bg-white object-contain" />
-                  <span className="block py-2 text-sm">Conceito {i + 1}</span>
-                </button>
-              ))}
+            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+              {svgEscolhido !== null && (
+                <div className="rounded-2xl bg-gradient-to-br from-[#0B3D91] to-[#122A5C] p-4 text-white shadow-lg">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-blue-200">Conceito em análise</p>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <img src={svgToDataUrl(svgs[svgEscolhido])} alt="Conceito selecionado" className="h-24 w-24 rounded-xl bg-white object-contain p-1" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-lg font-bold">{nomeEscolhido?.nome}</p>
+                      <p className="text-sm text-blue-200">Conceito {svgEscolhido + 1}{conceitos[svgEscolhido] ? ` — ${conceitos[svgEscolhido]}` : ''}</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="text-center">
+                        <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-white shadow"><img src={svgToDataUrl(svgs[svgEscolhido])} alt="Mock perfil" className="h-12 w-12 object-contain" /></div>
+                        <span className="mt-1 block text-[10px] uppercase text-blue-200">Perfil</span>
+                      </div>
+                      <div className="text-center">
+                        <div className="flex h-16 w-28 items-center justify-center rounded-lg bg-white px-2 shadow"><img src={svgToDataUrl(svgs[svgEscolhido])} alt="Mock fachada" className="h-10 object-contain" /></div>
+                        <span className="mt-1 block text-[10px] uppercase text-blue-200">Fachada</span>
+                      </div>
+                      <div className="text-center">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-md bg-white shadow"><img src={svgToDataUrl(svgs[svgEscolhido])} alt="Mock embalagem" className="h-12 w-12 object-contain" /></div>
+                        <span className="mt-1 block text-[10px] uppercase text-blue-200">Embalagem</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                {svgs.map((svg, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setSvgEscolhido(i)}
+                    className={cn('overflow-hidden rounded-xl border bg-white shadow-sm transition hover:shadow-md dark:bg-card', svgEscolhido === i ? 'border-[#1D4ED8] ring-2 ring-[#1D4ED8]/40' : 'border-slate-200 dark:border-border')}
+                  >
+                    <img src={svgToDataUrl(svg)} alt={`Conceito ${i + 1}`} className="aspect-square w-full bg-white object-contain" />
+                    <span className="block py-2 text-sm font-medium">Conceito {i + 1}{conceitos[i] ? <span className="block text-xs font-normal text-muted-foreground">{conceitos[i]}</span> : null}</span>
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="flex items-center justify-between border-t px-5 py-3">
-              <Button variant="ghost" onClick={() => setStage('nomes')}><ArrowLeft className="mr-2 h-4 w-4" /> Voltar aos nomes</Button>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" onClick={() => setStage('nomes')}><ArrowLeft className="mr-2 h-4 w-4" /> Voltar aos nomes</Button>
+                <Button variant="outline" onClick={() => void gerarLogos()} disabled={busy}>
+                  {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                  Gerar novas variações
+                </Button>
+              </div>
               <Button onClick={() => void montarEntrega()} disabled={svgEscolhido === null}>
                 {manualBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Aprovar conceito {svgEscolhido !== null ? svgEscolhido + 1 : ''} e montar entrega
