@@ -487,7 +487,7 @@ Como posso ajudar você hoje?`,
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl h-[88vh] flex flex-col p-0 gap-0 border-0 shadow-2xl overflow-hidden rounded-2xl bg-transparent">
+      <DialogContent hideClose className="max-w-3xl h-[88vh] flex flex-col p-0 gap-0 border-0 shadow-2xl overflow-hidden rounded-2xl bg-transparent">
         {/* Glassmorphism shell */}
         <div className="relative flex flex-col h-full bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 rounded-2xl overflow-hidden border border-white/10">
           <ParticleField />
