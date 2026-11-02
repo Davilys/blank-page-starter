@@ -78,18 +78,18 @@ export function SearchProgress({ brandName, phase, elapsedMs }: { brandName: str
             <motion.li
               key={step.key}
               initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: i <= active ? 1 : 0.35, x: 0 }}
+              animate={{ opacity: i <= active ? 1 : 0.8, x: 0 }}
               transition={{ delay: i * 0.05, duration: 0.25 }}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all duration-500',
-                isActive ? 'bg-primary/10 border-primary/30' : isDone ? 'bg-muted/30 border-border/30' : 'bg-muted/10 border-border/10',
+                isActive ? 'bg-primary/10 border-primary/30' : isDone ? 'bg-muted/30 border-border/30' : 'bg-muted/20 border-border/30',
               )}
             >
-              <div className={cn('flex items-center justify-center w-7 h-7 rounded-lg shrink-0', isActive ? 'bg-primary/20' : isDone ? 'bg-muted/50' : 'bg-muted/20')}>
-                {isDone ? <CheckCircle className="w-4 h-4 text-primary" /> : <Icon className={cn('w-4 h-4', isActive ? 'text-primary' : 'text-muted-foreground/40')} />}
+              <div className={cn('flex items-center justify-center w-7 h-7 rounded-lg shrink-0', isActive ? 'bg-primary/20' : isDone ? 'bg-muted/50' : 'bg-muted/30')}>
+                {isDone ? <CheckCircle className="w-4 h-4 text-primary" /> : <Icon className={cn('w-4 h-4', isActive ? 'text-primary' : 'text-muted-foreground/80')} />}
               </div>
               <div className="flex-1 min-w-0">
-                <p className={cn('text-xs font-semibold', isActive ? 'text-foreground' : isDone ? 'text-muted-foreground' : 'text-muted-foreground/40')}>{step.label}</p>
+                <p className={cn('text-xs font-semibold', isActive ? 'text-foreground' : isDone ? 'text-muted-foreground' : 'text-muted-foreground/80')}>{step.label}</p>
                 {isActive && step.detail && (
                   <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[10px] text-muted-foreground mt-0.5">{step.detail}</motion.p>
                 )}
