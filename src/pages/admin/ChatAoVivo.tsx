@@ -21,6 +21,7 @@ import { INPILegalChatDialog } from '@/components/admin/inpi/INPILegalChatDialog
 import { AdminChatWidget } from '@/components/admin/AdminChatWidget';
 import { ConsultorIaSearch } from '@/components/admin/consultor-ia/ConsultorIaSearch';
 import { useChatMode } from '@/contexts/ChatModeContext';
+import MarcasIA from '@/components/admin/marcas-ia/MarcasIA';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
@@ -273,11 +274,11 @@ function ChatAoVivoContent() {
     {
       title: 'Marcas IA',
       description: 'Agente que cria nomes de marca já filtrados pela busca e modelos de logotipo, tudo sob sua aprovação.',
-      badge: 'Em desenvolvimento',
-      action: 'Em breve',
+      badge: 'Novo',
+      action: 'Acessar',
       icon: BrainCircuit,
       tone: 'marcas',
-      onClick: () => toast.info('Marcas IA em desenvolvimento', { description: 'O agente de criação de marcas e logotipos entra em breve nesta central.' }),
+      onClick: () => setChatMode('marcasia'),
     },
   ];
 
@@ -394,6 +395,12 @@ function ChatAoVivoContent() {
                   </p>
                 )}
               </div>
+            </motion.div>
+          )}
+
+          {chatMode === 'marcasia' && (
+            <motion.div key="marcasia" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0">
+              <MarcasIA />
             </motion.div>
           )}
 
