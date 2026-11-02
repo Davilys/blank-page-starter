@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import {
   CheckCircle2, AlertTriangle, HelpCircle, FileDown, ExternalLink, MessageCircle,
   ChevronDown, ChevronUp, Search, ArrowRight, RotateCcw, Shield, FileText,
-  CalendarDays, Link2,
+  CalendarDays, Link2, Layers,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -148,49 +148,22 @@ export function ConsultationSearchResult({ job, brandName, businessArea, onNewSe
     ? `Olá! Fiz a consulta da marca ${brandName} e foram encontradas ocorrências. Gostaria de solicitar uma análise técnica.`
     : `Olá! Consultei a marca ${brandName} (${businessArea}) no site da WebMarcas e quero uma análise da equipe. Protocolo da consulta: ${job.job_id}.`;
 
-  return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="wm-search-result min-w-0 space-y-3 text-foreground">
-      {/* Status / situation card */}
-      <section className={cn('wm-result-status relative overflow-hidden rounded-xl border p-3 sm:p-3.5', tone.box)} aria-labelledby="search-result-title">
-        <div className="wm-result-heading flex min-w-0 items-center gap-2.5">
-          <div className={cn('wm-result-symbol grid h-9 w-9 shrink-0 place-items-center rounded-full', tone.iconBox)}>
-            <Icon className={cn('h-5 w-5', tone.icon)} strokeWidth={2.6} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="wm-result-title-line flex min-w-0 flex-wrap items-center justify-center gap-x-2 gap-y-0.5">
-              <h2 id="search-result-title" className={cn('text-sm font-black leading-tight sm:text-base text-center', view.tone === 'success' && 'wm-title-zero')}>
-                {view.tone === 'success' ? 'Parabéns ! Nenhum resultado encontrado.' : view.title}
-              </h2>
-              <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider', tone.badge)}>
-                Base oficial INPI
-              </span>
-            </div>
-          </div>
-        </div>
-        <div className="wm-result-description mt-2.5 space-y-1 text-center">
-          {view.tone === 'success' ? (
-            <>
-              <p className="text-xs font-semibold leading-snug">Após iniciar a contratação, nossa equipe jurídica entrará em contato ainda hoje para uma reunião.</p>
-              <p className="text-[11px] leading-snug text-muted-foreground">Após a aprovação, protocolaremos seu pedido junto ao INPI em até 48 horas, com envio do comprovante oficial.</p>
-            </>
-          ) : (
-            <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">{view.description}</p>
-          )}
-        </div>
-        {result?.searches?.[0]?.source_timestamp && (
-          <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
-            Fonte: portal público do INPI, base informada como atualizada em {result.searches[0].source_timestamp}. Pedidos mais recentes podem não constar.
-          </p>
-        )}
-      </section>
-
+  const metricsDlZero = (
+      <dl className="wm-result-metrics" aria-label="Resumo da consulta">
+        <div><Layers className="wm-metric-icon" aria-hidden="true" /><dd><strong>{totalRecords}</strong></dd><dt>Registros encontrados</dt></div>
+        <div><Search className="wm-metric-icon" aria-hidden="true" /><dt>Tipo de busca</dt><dd><strong>{searchType}</strong></dd></div>
+        <div><CalendarDays className="wm-metric-icon" aria-hidden="true" /><dt>Consultado em</dt><dd><strong>{queriedDate}</strong><small>{queriedTime ? `às ${queriedTime}` : ''}</small></dd></div>
+      </dl>
+  );
+  const metricsDlDefault = (
       <dl className="wm-result-metrics" aria-label="Resumo da consulta">
         <div><dt>REGISTROS ENCONTRADOS</dt><dd><strong>{totalRecords}</strong><small>{totalRecords === 1 ? 'registro' : 'registros'}</small></dd></div>
         <div><dt>TIPO DE BUSCA</dt><dd>{searchType}</dd></div>
         <div><dt>CONSULTADO EM</dt><dd>{queriedDate}<small>{queriedTime}</small></dd></div>
       </dl>
-
-      {analysis && (
+  );
+  const analysisBlock = (
+      analysis && (
         <section aria-labelledby="analysis-summary-title" className="space-y-3">
           <div>
             <h2 id="analysis-summary-title" className="text-xl font-black leading-tight">Resumo da análise</h2>
@@ -229,11 +202,13 @@ export function ConsultationSearchResult({ job, brandName, businessArea, onNewSe
           })}
           </div>
         </section>
-      )}
-      {searches.length > 0 && (
+      )
+  );
+  const traceabilityBlock = (
+      searches.length > 0 && (
         <section className="rounded-2xl border border-border bg-card p-4 shadow-sm" aria-labelledby="traceability-title">
           <div className="flex items-start gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Link2 className="h-5 w-5" /></span>
+            <span className="wm-trace-icon grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Link2 className="h-5 w-5" /></span>
             <div className="min-w-0">
               <h2 id="traceability-title" className="text-lg font-black">Rastreabilidade</h2>
               <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">Todas as buscas e correspondências textuais desta consulta.</p>
@@ -255,10 +230,10 @@ export function ConsultationSearchResult({ job, brandName, businessArea, onNewSe
                   <Search className="h-5 w-5 shrink-0 text-primary" />
                   <div className="min-w-0 flex-1 whitespace-normal">
                     <span className="block text-sm font-extrabold capitalize">Busca {s.mode}</span>
-                    <span className="mt-0.5 block break-words text-xs font-normal text-muted-foreground">“{s.term}”</span>
+                    <span className="wm-trace-term mt-0.5 block break-words text-xs font-normal text-muted-foreground">“{s.term}”</span>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <span className="whitespace-nowrap rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold">{s.total} {s.total === 1 ? 'registro' : 'registros'}</span>
+                    <span className="wm-trace-pill whitespace-nowrap rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold">{s.total} {s.total === 1 ? 'registro' : 'registros'}</span>
                     {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                   </div>
                 </Button>
@@ -277,6 +252,60 @@ export function ConsultationSearchResult({ job, brandName, businessArea, onNewSe
           })}
         </div>
         </section>
+      )
+  );
+
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="wm-search-result min-w-0 space-y-3 text-foreground">
+      {/* Status / situation card */}
+      <section className={cn('wm-result-status relative overflow-hidden rounded-xl border p-3 sm:p-3.5', tone.box)} aria-labelledby="search-result-title">
+        <div className="wm-result-heading flex min-w-0 items-center gap-2.5">
+          {view.tone !== 'success' && (
+          <div className={cn('wm-result-symbol grid h-9 w-9 shrink-0 place-items-center rounded-full', tone.iconBox)}>
+            <Icon className={cn('h-5 w-5', tone.icon)} strokeWidth={2.6} />
+          </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="wm-result-title-line flex min-w-0 flex-wrap items-center justify-center gap-x-2 gap-y-0.5">
+              <h2 id="search-result-title" className={cn('text-sm font-black leading-tight sm:text-base text-center', view.tone === 'success' && 'wm-title-zero')}>
+                {view.tone === 'success' ? 'Parabéns ! Nenhum resultado encontrado.' : view.title}
+              </h2>
+              <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider', tone.badge)}>
+                Base oficial INPI
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="wm-result-description mt-2.5 space-y-1 text-center">
+          {view.tone === 'success' ? (
+            <>
+              <p className="wm-zero-cta text-[14.4px] font-bold leading-snug">Sua marca está disponível para registro, inicie agora clicando no botão Urgente Registre.</p>
+              <p className="text-xs font-semibold leading-snug">Após iniciar a contratação, nossa equipe jurídica entrará em contato ainda hoje para uma reunião.</p>
+            </>
+          ) : (
+            <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">{view.description}</p>
+          )}
+        </div>
+        {result?.searches?.[0]?.source_timestamp && (
+          <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
+            Fonte: portal público do INPI, base informada como atualizada em {result.searches[0].source_timestamp}. Pedidos mais recentes podem não constar.
+          </p>
+        )}
+      </section>
+
+      {view.tone === 'success' ? (
+        <div className="wm-result-panel">
+          {metricsDlZero}
+          {analysisBlock}
+          {traceabilityBlock}
+        </div>
+      ) : (
+        <>
+          {metricsDlDefault}
+          {analysisBlock}
+          {traceabilityBlock}
+        </>
       )}
 
       {analysis && (
@@ -300,7 +329,7 @@ export function ConsultationSearchResult({ job, brandName, businessArea, onNewSe
         ) : (
           onContinue && (
             <Button onClick={onContinue} className="col-span-2 min-h-14 rounded-[14px] text-base font-extrabold shadow-lg shadow-primary/20">
-              {continueLabel}<ArrowRight className="w-4 h-4 ml-2" />
+              Urgente Registre<ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           )
         )}

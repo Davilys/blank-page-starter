@@ -153,12 +153,14 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onRetr
       {/* Status / situation card */}
       <section className={cn('relative overflow-hidden rounded-xl border p-3 sm:p-3.5', tone.box)} aria-labelledby="search-result-title">
         <div className="flex min-w-0 items-center gap-2.5">
-          <div className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-full', tone.iconBox)}>
-            <Icon className={cn('h-5 w-5', tone.icon)} strokeWidth={2.6} />
-          </div>
+          {view.tone !== 'success' && (
+            <div className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-full', tone.iconBox)}>
+              <Icon className={cn('h-5 w-5', tone.icon)} strokeWidth={2.6} />
+            </div>
+          )}
           <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 flex-wrap items-center justify-center gap-x-2 gap-y-0.5">
-              <h2 id="search-result-title" className="text-sm font-black leading-tight sm:text-base text-center">
+            <div className={cn('flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5', view.tone === 'success' ? 'justify-start' : 'justify-center')}>
+              <h2 id="search-result-title" className={cn('text-sm font-black leading-tight sm:text-base', view.tone === 'success' ? 'text-left' : 'text-center')}>
                 {view.tone === 'success' ? 'Parabéns ! Nenhum resultado encontrado.' : view.title}
               </h2>
               <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider', tone.badge)}>
@@ -167,11 +169,11 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onRetr
             </div>
           </div>
         </div>
-        <div className="mt-2.5 space-y-1 text-center">
+        <div className={cn('mt-2.5 space-y-1', view.tone === 'success' ? 'text-left' : 'text-center')}>
           {view.tone === 'success' ? (
             <>
+              <p className="wm-zero-cta text-[14.4px] font-bold leading-snug">Sua marca está disponível para registro, inicie agora clicando no botão Urgente Registre.</p>
               <p className="text-xs font-semibold leading-snug">Após iniciar a contratação, nossa equipe jurídica entrará em contato ainda hoje para uma reunião.</p>
-              <p className="text-[11px] leading-snug text-muted-foreground">Após a aprovação, protocolaremos seu pedido junto ao INPI em até 48 horas, com envio do comprovante oficial.</p>
             </>
           ) : (
             <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">{view.description}</p>
@@ -321,7 +323,7 @@ export function SearchResult({ job, brandName, businessArea, onNewSearch, onRetr
         ) : (
           onContinue && (
             <Button onClick={onContinue} className="col-span-2 min-h-14 rounded-[14px] text-base font-extrabold shadow-lg shadow-primary/20">
-              {continueLabel}<ArrowRight className="w-4 h-4 ml-2" />
+              Urgente Registre<ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           )
         )}
