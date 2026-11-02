@@ -10,10 +10,10 @@ describe('derivePhaseFromInpi — 12 textos oficiais reais do cache de produçã
   const cases: Array<[string, string]> = [
     ['Aguardando apresentação e exame de recurso contra o indeferimento', 'Recurso contra indeferimento'],
     ['Aguardando cumprimento de exigência de mérito', 'Exigência de Mérito'],
-    ['Aguardando cumprimento de exigência de pagamento', 'Deferimento'],
+    ['Aguardando cumprimento de exigência de pagamento', 'Exigência de Pagamento'],
     ['Aguardando manifestação sobre oposição', 'Oposição'],
     ['Aguardando prazo de apresentação de oposição', 'Prazo de oposição'],
-    ['Aguardando processamento da concessão do registro de marca', 'Deferimento'],
+    ['Aguardando processamento da concessão do registro de marca', 'Concessão em processamento'],
     ['Em exame de mérito', 'Em exame de mérito'],
     ['Para liberar para exame de mérito (pedido de registro sem oposição)', 'Aguardando exame de mérito'],
     ['Pedido considerado inexistente', 'Pedido inexistente'],

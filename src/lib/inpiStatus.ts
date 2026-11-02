@@ -49,8 +49,8 @@ const INPI_STATUS_PHASES: Record<string, MappedPhase> = {
     label: 'Exigência de Mérito',
   },
   'aguardando cumprimento de exigencia de pagamento': {
-    id: 'deferimento',
-    label: 'Deferimento',
+    id: 'exigencia_pagamento',
+    label: 'Exigência de Pagamento',
   },
   'aguardando manifestacao sobre oposicao': { id: 'oposicao', label: 'Oposição' },
   'aguardando prazo de apresentacao de oposicao': {
@@ -59,7 +59,7 @@ const INPI_STATUS_PHASES: Record<string, MappedPhase> = {
   },
   'aguardando processamento da concessao do registro de marca': {
     id: 'deferimento',
-    label: 'Deferimento',
+    label: 'Concessão em processamento',
   },
   'em exame de merito': { id: 'em_exame', label: 'Em exame de mérito' },
   'para liberar para exame de merito (pedido de registro sem oposicao)': {
@@ -80,6 +80,7 @@ const PHASE_DOT: Record<string, string> = {
   '003': 'bg-yellow-500',
   oposicao: 'bg-orange-500',
   exigencia_merito: 'bg-violet-500',
+  exigencia_pagamento: 'bg-violet-500',
   em_exame: 'bg-amber-500',
   indeferimento: 'bg-red-500',
   notificacao: 'bg-pink-500',

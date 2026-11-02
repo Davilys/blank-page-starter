@@ -2,7 +2,21 @@ import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { isNineDigits } from '@/hooks/useProcessLookup';
 
-const SESSION_KEY = 'wm_inpi_autosync_done';
+const SESSION_KEY = 'wm_inpi_autosync_v1';
+const loadAttempted = (): Set<string> => {
+  try {
+    return new Set(JSON.parse(sessionStorage.getItem(SESSION_KEY) ?? '[]') as string[]);
+  } catch {
+    return new Set();
+  }
+};
+const saveAttempted = (s: Set<string>) => {
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(Array.from(s)));
+  } catch {
+    /* storage cheio/bloqueado: a sync continua, só sem memória da sessão */
+  }
+};
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_PER_LOGIN = 10;
 
@@ -21,9 +35,6 @@ export function useClientInpiAutoSync(userId?: string | null) {
   useEffect(() => {
     if (!userId) return;
     if (typeof sessionStorage === 'undefined') return;
-    if (sessionStorage.getItem(SESSION_KEY)) return;
-    sessionStorage.setItem(SESSION_KEY, '1');
-
     let cancelled = false;
     (async () => {
       try {
@@ -60,10 +71,16 @@ export function useClientInpiAutoSync(userId?: string | null) {
           }
         }
 
+        // Trava por processo (não por flag de "já rodou"): remount de StrictMode,
+        // reload no meio do loop ou nova montagem da rota retomam o que falta,
+        // sem repetir o que já foi tentado nesta sessão e sem passar do teto.
+        const attempted = loadAttempted();
         let done = 0;
         for (const n of numbers) {
-          if (cancelled || done >= MAX_PER_LOGIN) break;
-          if (fresh.has(n)) continue;
+          if (cancelled || attempted.size >= MAX_PER_LOGIN) break;
+          if (fresh.has(n) || attempted.has(n)) continue;
+          attempted.add(n);
+          saveAttempted(attempted);
           done++;
           try {
             const { data, error } = await supabase.functions.invoke('client-process-lookup', {

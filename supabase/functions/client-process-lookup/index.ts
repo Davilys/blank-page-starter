@@ -145,7 +145,9 @@ Deno.serve(async (req) => {
   }
 
   if (inFlight >= MAX_CONCURRENT_UPSTREAM) {
-    return json({ ok: false, ...preserved, error: { code: 'rate_limited', message: 'Muitas consultas em andamento. Tente novamente em instantes.' } }, 429);
+    // 200 (não 429): com status não-2xx o supabase-js devolve data=null e a UI
+    // perderia a mensagem real e a consulta preservada que seguem no corpo.
+    return json({ ok: false, ...preserved, error: { code: 'rate_limited', message: 'Muitas consultas em andamento. Tente novamente em instantes.' } }, 200);
   }
 
   // ── consulta upstream ──
