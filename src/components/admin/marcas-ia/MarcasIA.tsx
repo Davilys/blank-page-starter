@@ -7,6 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import jsPDF from 'jspdf';
 import 'svg2pdf.js';
+import JSZip from 'jszip';
+import { svgToEps } from '@/lib/marcas-ia/svgToEps';
 import { runConsultorIaSearch } from '@/lib/api/consultorIaSearch';
 import { cn } from '@/lib/utils';
 
@@ -184,8 +186,8 @@ export default function MarcasIA() {
     }
   }
 
-  function baixarManualPdf() {
-    if (!manual || svgEscolhido === null || !nomeEscolhido) return;
+  function gerarManualPdfDoc(): jsPDF | null {
+    if (!manual || svgEscolhido === null || !nomeEscolhido) return null;
     const doc = new jsPDF();
     let y = 20;
     doc.setFontSize(20);
@@ -223,36 +225,93 @@ ${manual.tipografia.uso ?? ''}`);
       doc.setFontSize(10);
       doc.text('Equivalências Pantone não fazem parte deste pacote, conforme combinado.', 14, y);
     }
-    doc.save(`manual-${nomeEscolhido.nome}.pdf`);
+    return doc;
   }
 
-  function rasterizarLogo(tipo: 'png' | 'jpeg') {
-    if (svgEscolhido === null || !nomeEscolhido) return;
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 2048; canvas.height = 2048;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      if (tipo === 'jpeg') { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 2048, 2048); }
-      ctx.drawImage(img, 0, 0, 2048, 2048);
-      const a = document.createElement('a');
-      a.href = canvas.toDataURL(tipo === 'png' ? 'image/png' : 'image/jpeg', 0.95);
-      a.download = `${nomeEscolhido.nome}.${tipo === 'png' ? 'png' : 'jpg'}`;
-      a.click();
-    };
-    img.src = svgToDataUrl(svgs[svgEscolhido]);
+  function baixarManualPdf() {
+    gerarManualPdfDoc()?.save(`manual-${nomeEscolhido?.nome}.pdf`);
   }
 
-  async function baixarPdfVetorialLogo() {
-    if (svgEscolhido === null || !nomeEscolhido) return;
+  function rasterizarLogoBlob(tipo: 'png' | 'jpeg'): Promise<Blob | null> {
+    if (svgEscolhido === null || !nomeEscolhido) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 2048; canvas.height = 2048;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(null); return; }
+        if (tipo === 'jpeg') { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 2048, 2048); }
+        ctx.drawImage(img, 0, 0, 2048, 2048);
+        canvas.toBlob((b) => resolve(b), tipo === 'png' ? 'image/png' : 'image/jpeg', 0.95);
+      };
+      img.onerror = () => resolve(null);
+      img.src = svgToDataUrl(svgs[svgEscolhido]);
+    });
+  }
+
+  async function rasterizarLogo(tipo: 'png' | 'jpeg') {
+    const blob = await rasterizarLogoBlob(tipo);
+    if (!blob || !nomeEscolhido) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${nomeEscolhido.nome}.${tipo === 'png' ? 'png' : 'jpg'}`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  async function gerarPdfVetorialDoc(): Promise<jsPDF | null> {
+    if (svgEscolhido === null || !nomeEscolhido) return null;
     const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: [480, 480] });
     const el = document.createElement('div');
     el.innerHTML = svgs[svgEscolhido];
     const svgEl = el.querySelector('svg');
-    if (!svgEl) return;
+    if (!svgEl) return null;
     await (doc as unknown as { svg: (el: SVGSVGElement, o: { x: number; y: number; width: number; height: number }) => Promise<unknown> }).svg(svgEl as SVGSVGElement, { x: 0, y: 0, width: 480, height: 480 });
-    doc.save(`${nomeEscolhido.nome}-vetorial.pdf`);
+    return doc;
+  }
+
+  async function baixarPdfVetorialLogo() {
+    const doc = await gerarPdfVetorialDoc();
+    doc?.save(`${nomeEscolhido?.nome}-vetorial.pdf`);
+  }
+
+  function baixarEps() {
+    if (svgEscolhido === null || !nomeEscolhido) return;
+    const eps = svgToEps(svgs[svgEscolhido]);
+    const blob = new Blob([eps], { type: 'application/postscript' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${nomeEscolhido.nome}.eps`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  const [zipBusy, setZipBusy] = useState(false);
+  async function baixarPacoteZip() {
+    if (svgEscolhido === null || !nomeEscolhido || zipBusy) return;
+    setZipBusy(true);
+    try {
+      const zip = new JSZip();
+      const base = nomeEscolhido.nome.replace(/[^\w-]+/g, '-');
+      zip.file(`${base}.svg`, svgs[svgEscolhido]);
+      zip.file(`${base}.eps`, svgToEps(svgs[svgEscolhido]));
+      const vet = await gerarPdfVetorialDoc();
+      if (vet) zip.file(`${base}-vetorial.pdf`, vet.output('blob'));
+      const [png, jpg] = await Promise.all([rasterizarLogoBlob('png'), rasterizarLogoBlob('jpeg')]);
+      if (png) zip.file(`${base}.png`, png);
+      if (jpg) zip.file(`${base}.jpg`, jpg);
+      const manualDoc = gerarManualPdfDoc();
+      if (manualDoc) zip.file(`manual-${base}.pdf`, manualDoc.output('blob'));
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `pacote-${base}.zip`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } finally {
+      setZipBusy(false);
+    }
   }
 
   function baixarSvg() {
@@ -417,16 +476,21 @@ ${manual.tipografia.uso ?? ''}`);
                     <Button variant="secondary" onClick={() => void baixarPdfVetorialLogo()}><Download className="mr-2 h-4 w-4" /> PDF vetorial</Button>
                     <Button variant="secondary" onClick={() => rasterizarLogo('png')}><Download className="mr-2 h-4 w-4" /> PNG transparente</Button>
                     <Button variant="secondary" onClick={() => rasterizarLogo('jpeg')}><Download className="mr-2 h-4 w-4" /> JPEG</Button>
+                    <Button variant="secondary" onClick={baixarEps}><Download className="mr-2 h-4 w-4" /> EPS (Corel/Illustrator)</Button>
+                    <Button onClick={() => void baixarPacoteZip()} disabled={zipBusy || !manual}>
+                      {zipBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                      Pacote completo (.zip)
+                    </Button>
                     <Button variant="secondary" onClick={baixarManualPdf} disabled={!manual}>
                       {manualBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                       Manual de identidade (PDF)
                     </Button>
                   </div>
                   <p className="max-w-md text-sm text-muted-foreground">
-                    SVG e PDF são vetor de verdade: abrem e editam no Illustrator, CorelDRAW e Inkscape.
-                    O PNG sai com fundo transparente e o JPEG com fundo branco. O EPS (formato de
-                    intercâmbio que Corel e Illustrator abrem) está em montagem no servidor — sem Pantone
-                    exato, conforme combinado.
+                    SVG, PDF vetorial e EPS são vetor de verdade: abrem e editam no Illustrator,
+                    CorelDRAW e Inkscape. O PNG sai com fundo transparente e o JPEG com fundo branco.
+                    O .zip reúne logotipo (SVG+EPS+PDF), PNG, JPEG e o manual de identidade.
+                    Sem Pantone exato, conforme combinado.
                   </p>
                 </div>
               </div>
