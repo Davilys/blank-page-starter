@@ -18,17 +18,41 @@ const TEXT_MODEL = 'gpt-5-mini';
 const PRICE_TEXT_IN_PER_MTOK = 0.25;   // gpt-5-mini input
 const PRICE_TEXT_OUT_PER_MTOK = 2.0;   // gpt-5-mini output
 
-// Reservas UPPER-BOUND por ação (input máximo + output máximo + retries), em centavos, arredondado para cima.
-function centsUpperBoundText(maxInputTok: number, maxOutputTok: number, retries: number): number {
-  const usd = (retries + 1) * (maxInputTok * PRICE_TEXT_IN_PER_MTOK + maxOutputTok * PRICE_TEXT_OUT_PER_MTOK) / 1_000_000;
-  return Math.ceil(usd * 100);
+// ===== UPPER-BOUND PROVÁVEL (não estimativa) =====
+// O tokenizer do gpt-5-mini é BPE byte-level (o200k): as unidades base são BYTES
+// e merges só REDUZEM a contagem. Logo, para qualquer string UTF-8 válida:
+//   tokens(string) <= bytes_utf8(string)
+// Todo input do usuário é capado em BYTES no servidor (capBytes) e o teto de
+// input de CADA chamada é MEDIDO no payload real: soma dos bytes de todos os
+// conteúdos + 16 tokens/mensagem de framing + 256 de overhead (JSON/formato).
+// Output é capado pela API (max_completion_tokens, inclui reasoning): fatura
+// <= cap. Tentativas cobertas: ATTEMPTS=2 (chamada + 1 retry do cliente).
+const enc = new TextEncoder();
+function byteLen(s: string): number { return enc.encode(s).length; }
+function capBytes(s: string, maxBytes: number): string {
+  if (byteLen(s) <= maxBytes) return s;
+  let out = '';
+  let used = 0;
+  for (const ch of s) { // itera por code point: nunca corta surrogate/acento no meio
+    const b = byteLen(ch);
+    if (used + b > maxBytes) break;
+    out += ch; used += b;
+  }
+  return out;
 }
-const RESERVE: Record<string, () => number> = {
-  chat: () => centsUpperBoundText(8000, 1200, 1),       // briefing: 1 retry
-  nomes: () => centsUpperBoundText(6000, 3000, 1),      // 10 nomes + justificativas
-  logos: () => centsUpperBoundText(6000, 16000, 1),    // 5 conceitos SVG autorais (texto) + 1 retry
-  brandbook: () => centsUpperBoundText(8000, 6000, 1),  // manual completo
-};
+const ATTEMPTS = 2; // chamada + 1 retry, ambos dentro da reserva
+function reserveCentsFor(inputBytes: number, nMessages: number, outCapTokens: number): number {
+  const inCeiling = inputBytes + 16 * nMessages + 256; // tokens <= bytes (BPE byte-level) + framing + overhead
+  const usd = ATTEMPTS * (inCeiling * PRICE_TEXT_IN_PER_MTOK + outCapTokens * PRICE_TEXT_OUT_PER_MTOK) / 1_000_000;
+  return Math.max(1, Math.ceil(usd * 100));
+}
+const ACTIONS = ['chat', 'nomes', 'logos', 'brandbook'];
+// Caps de input em BYTES (servidor, por campo):
+const CAP_MSG_BYTES = 1500;      // cada mensagem do chat
+const CAP_MSG_COUNT = 12;        // janela de mensagens do chat
+const CAP_DIAG_BYTES = 4000;     // diagnóstico aprovado
+const CAP_NOME_BYTES = 80;       // nome da marca
+const CAP_SVG_BYTES = 8000;      // SVG aprovado (entra no prompt do brandbook)
 
 const BRANDBOT_PROMPT = `Você é o BrandBot, o agente de criação de marcas da WebMarcas, escritório brasileiro de registro de marcas no INPI.
 
@@ -74,36 +98,41 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => null);
     const action = body?.action as string | undefined;
     const sessionId = String(body?.session_id ?? '').slice(0, 64);
-    if (!action || !(action in RESERVE) || !sessionId) {
+    if (!action || !ACTIONS.includes(action) || !sessionId) {
       return json({ ok: false, error: { code: 'bad_request', message: 'Ação ou sessão inválida.' } }, 400);
     }
 
-    // RESERVA ATÔMICA UPPER-BOUND (total + sessão) ANTES de qualquer chamada paga.
-    const reserveCents = RESERVE[action]();
-    const adminClient = createClient(supabaseUrl, serviceKey);
-    const { data: spend, error: spendError } = await adminClient.rpc('marcas_ia_spend', {
-      p_amount_cents: reserveCents,
-      p_session_id: sessionId,
-      p_action: action,
-      p_cap_total_cents: CAP_TOTAL_CENTS,
-      p_cap_session_cents: CAP_SESSION_CENTS,
-    });
-    if (spendError || !spend?.ok) {
-      return json({ ok: false, error: { code: 'budget_exceeded', message: 'Limite de uso do Marcas IA atingido. O agente foi pausado para não gerar custo extra.' } }, 402);
-    }
-
+    // Chave ANTES da reserva: config ausente não consome budget.
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     if (!OPENAI_API_KEY) return json({ ok: false, error: { code: 'config', message: 'Agente em configuração.' } }, 503);
 
+    // RESERVA ATÔMICA com o teto MEDIDO do payload desta chamada (montado por ação abaixo).
+    const adminClient = createClient(supabaseUrl, serviceKey);
+    async function reserve(inputBytes: number, nMessages: number, outCapTokens: number): Promise<Response | null> {
+      const reserveCents = reserveCentsFor(inputBytes, nMessages, outCapTokens);
+      const { data: spend, error: spendError } = await adminClient.rpc('marcas_ia_spend', {
+        p_amount_cents: reserveCents,
+        p_session_id: sessionId,
+        p_action: action,
+        p_cap_total_cents: CAP_TOTAL_CENTS,
+        p_cap_session_cents: CAP_SESSION_CENTS,
+      });
+      if (spendError || !spend?.ok) {
+        return json({ ok: false, error: { code: 'budget_exceeded', message: 'Limite de uso do Marcas IA atingido. O agente foi pausado para não gerar custo extra.' } }, 402);
+      }
+      return null;
+    }
+
     if (action === 'chat') {
-      // Teto de input REAL: últimas 12 mensagens, cada uma com no máx. 1500
-      // caracteres (~400 tokens). 12x400 + prompt ~600 = ~5.4k tokens < 8000
-      // assumidos na reserva. Sem este cap a reserva não é upper-bound.
-      const messages = (Array.isArray(body?.messages) ? body.messages.slice(-12) : [])
+      // Cap REAL em BYTES (não caracteres): unicode/adversarial não escapa do teto.
+      const messages = (Array.isArray(body?.messages) ? body.messages.slice(-CAP_MSG_COUNT) : [])
         .map((m: { role?: unknown; content?: unknown }) => ({
           role: m?.role === 'user' ? 'user' : 'assistant',
-          content: String(m?.content ?? '').slice(0, 1500),
+          content: capBytes(String(m?.content ?? ''), CAP_MSG_BYTES),
         }));
+      const inputBytes = byteLen(BRANDBOT_PROMPT) + messages.reduce((acc: number, m: { content: string }) => acc + byteLen(m.content), 0);
+      const blocked = await reserve(inputBytes, messages.length + 1, 1200);
+      if (blocked) return blocked;
       const completion = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
@@ -120,7 +149,11 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'nomes') {
-      const diagnostico = String(body?.diagnostico ?? '').slice(0, 4000);
+      const diagnostico = capBytes(String(body?.diagnostico ?? ''), CAP_DIAG_BYTES);
+      const sysNomes = `${BRANDBOT_PROMPT}\n\nAgora gere EXATAMENTE 10 nomes de marca para o diagnóstico aprovado. Responda APENAS JSON: {"nomes":[{"nome":"...","justificativa":"...","tom":"..."}]}. Nomes curtos, registráveis, sem genéricos do ramo, sem imitar marcas conhecidas.`;
+      const userNomes = `Diagnóstico aprovado:\n${diagnostico}`;
+      const blocked = await reserve(byteLen(sysNomes) + byteLen(userNomes), 2, 3000);
+      if (blocked) return blocked;
       const completion = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
@@ -129,8 +162,8 @@ Deno.serve(async (req) => {
           max_completion_tokens: 3000,
           response_format: { type: 'json_object' },
           messages: [
-            { role: 'system', content: `${BRANDBOT_PROMPT}\n\nAgora gere EXATAMENTE 10 nomes de marca para o diagnóstico aprovado. Responda APENAS JSON: {"nomes":[{"nome":"...","justificativa":"...","tom":"..."}]}. Nomes curtos, registráveis, sem genéricos do ramo, sem imitar marcas conhecidas.` },
-            { role: 'user', content: `Diagnóstico aprovado:\n${diagnostico}` },
+            { role: 'system', content: sysNomes },
+            { role: 'user', content: userNomes },
           ],
         }),
       });
@@ -144,9 +177,13 @@ Deno.serve(async (req) => {
     if (action === 'logos') {
       // Rota vetorial genuína: o MODELO DE TEXTO autora 5 conceitos DIRETAMENTE em SVG
       // (vetor real, editável em Illustrator/CorelDRAW/Inkscape). Sem raster, sem renomear extensão.
-      const nome = String(body?.nome ?? '').slice(0, 80);
-      const diagnostico = String(body?.diagnostico ?? '').slice(0, 4000);
+      const nome = capBytes(String(body?.nome ?? ''), CAP_NOME_BYTES);
+      const diagnostico = capBytes(String(body?.diagnostico ?? ''), CAP_DIAG_BYTES);
       if (!nome) return json({ ok: false, error: { code: 'bad_request', message: 'Nome ausente.' } }, 400);
+      const sysLogos = `Você é um designer de logotipos sênior. Gere 5 conceitos DISTINTOS do logotipo da marca informada, CADA UM como um SVG completo e válido (viewBox 0 0 240 240, sem <script>, sem elementos externos, fontes genéricas como Arial/sans-serif, formas vetoriais limpas e profissionais, fundo com cantos arredondados). Conceitos variados: monograma, símbolo abstrato, wordmark, emblema e minimalista. Responda APENAS JSON: {"svgs":["<svg ...>...</svg>", ...5 itens], "conceitos":["monograma", ...]}.`;
+      const userLogos = `Marca: ${nome}\nDireção visual aprovada:\n${diagnostico}`;
+      const blocked = await reserve(byteLen(sysLogos) + byteLen(userLogos), 2, 16000);
+      if (blocked) return blocked;
       const completion = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
@@ -155,10 +192,8 @@ Deno.serve(async (req) => {
           max_completion_tokens: 16000,
           response_format: { type: 'json_object' },
           messages: [
-            { role: 'system', content: `Você é um designer de logotipos sênior. Gere 5 conceitos DISTINTOS do logotipo da marca informada, CADA UM como um SVG completo e válido (viewBox 0 0 240 240, sem <script>, sem elementos externos, fontes genéricas como Arial/sans-serif, formas vetoriais limpas e profissionais, fundo com cantos arredondados). Conceitos variados: monograma, símbolo abstrato, wordmark, emblema e minimalista. Responda APENAS JSON: {"svgs":["<svg ...>...</svg>", ...5 itens], "conceitos":["monograma", ...]}.` },
-            { role: 'user', content: `Marca: ${nome}
-Direção visual aprovada:
-${diagnostico}` },
+            { role: 'system', content: sysLogos },
+            { role: 'user', content: userLogos },
           ],
         }),
       });
@@ -176,10 +211,14 @@ ${diagnostico}` },
     }
 
     if (action === 'brandbook') {
-      const nome = String(body?.nome ?? '').slice(0, 80);
-      const diagnostico = String(body?.diagnostico ?? '').slice(0, 4000);
-      const svg = String(body?.svg ?? '').slice(0, 60000);
+      const nome = capBytes(String(body?.nome ?? ''), CAP_NOME_BYTES);
+      const diagnostico = capBytes(String(body?.diagnostico ?? ''), CAP_DIAG_BYTES);
+      const svg = capBytes(String(body?.svg ?? ''), CAP_SVG_BYTES);
       if (!nome || !svg.includes('<svg')) return json({ ok: false, error: { code: 'bad_request', message: 'Dados ausentes.' } }, 400);
+      const sysBook = `Você é um estrategista de marca. Monte o manual de identidade da marca em JSON: {"proposito":"...","tom_de_voz":["..."],"valores":["..."],"paleta":[{"nome":"...","hex":"#RRGGBB","rgb":"r,g,b","cmyk":"c,m,y,k"}],"tipografia":{"primaria":"...","secundaria":"...","uso":"..."}}. Paleta com 4 a 6 cores coerentes com o SVG aprovado; CMYK convertido (0-100); NÃO incluir Pantone.`;
+      const userBook = `Marca: ${nome}\nDiagnóstico:\n${diagnostico}\nSVG aprovado:\n${svg}`;
+      const blocked = await reserve(byteLen(sysBook) + byteLen(userBook), 2, 6000);
+      if (blocked) return blocked;
       const completion = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
@@ -188,12 +227,8 @@ ${diagnostico}` },
           max_completion_tokens: 6000,
           response_format: { type: 'json_object' },
           messages: [
-            { role: 'system', content: `Você é um estrategista de marca. Monte o manual de identidade da marca em JSON: {"proposito":"...","tom_de_voz":["..."],"valores":["..."],"paleta":[{"nome":"...","hex":"#RRGGBB","rgb":"r,g,b","cmyk":"c,m,y,k"}],"tipografia":{"primaria":"...","secundaria":"...","uso":"..."}}. Paleta com 4 a 6 cores coerentes com o SVG aprovado; CMYK convertido (0-100); NÃO incluir Pantone.` },
-            { role: 'user', content: `Marca: ${nome}
-Diagnóstico:
-${diagnostico}
-SVG aprovado:
-${svg.slice(0, 8000)}` },
+            { role: 'system', content: sysBook },
+            { role: 'user', content: userBook },
           ],
         }),
       });
