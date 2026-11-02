@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useClientInpiLookups } from '@/hooks/useClientInpiLookups';
+import { derivePhaseFromInpi } from '@/lib/inpiStatus';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, FileText } from 'lucide-react';
 
@@ -31,6 +33,7 @@ const statusConfig: Record<string, { label: string; variant: 'default' | 'second
 
 export function ProcessList({ userId, limit }: ProcessListProps) {
   const [processes, setProcesses] = useState<BrandProcess[]>([]);
+  const inpiLookups = useClientInpiLookups(userId);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -94,6 +97,9 @@ export function ProcessList({ userId, limit }: ProcessListProps) {
           <div className="space-y-3 stagger-children">
             {processes.map((process, index) => {
               const status = statusConfig[process.status] || statusConfig.em_andamento;
+              const inpiPhase = process.process_number
+                ? derivePhaseFromInpi(inpiLookups[process.process_number]?.current_status)
+                : null;
               return (
                 <Link
                   key={process.id}
@@ -107,6 +113,11 @@ export function ProcessList({ userId, limit }: ProcessListProps) {
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
+                    {inpiPhase && inpiPhase.label !== status.label && (
+                      <Badge variant="outline" className="text-emerald-600 border-emerald-500/40">
+                        INPI: {inpiPhase.label}
+                      </Badge>
+                    )}
                     <Badge variant={status.variant} className="transition-transform group-hover:scale-105">
                       {status.label}
                     </Badge>

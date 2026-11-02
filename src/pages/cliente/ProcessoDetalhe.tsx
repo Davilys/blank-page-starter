@@ -33,6 +33,11 @@ import { ptBR } from 'date-fns/locale';
 import type { User } from '@supabase/supabase-js';
 import { generateDocumentPrintHTML, getLogoBase64ForPDF } from '@/components/contracts/DocumentRenderer';
 import { toast } from 'sonner';
+import { useClientProcessLookup } from '@/hooks/useClientProcessLookup';
+import { InpiStatusCard } from '@/components/cliente/InpiStatusCard';
+import { getDisplayedPhase } from '@/lib/inpiStatus';
+import { getJuridicoStageLabel } from '@/hooks/useJuridicoStages';
+import { isNineDigits } from '@/hooks/useProcessLookup';
 
 interface BrandProcess {
   id: string;
@@ -197,6 +202,7 @@ export default function ProcessoDetalhe() {
   const [publicacoes, setPublicacoes] = useState<PublicacaoMarca[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const lookupCtl = useClientProcessLookup();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -225,6 +231,14 @@ export default function ProcessoDetalhe() {
       fetchProcessData();
     }
   }, [user, id]);
+
+  // Carrega a última consulta oficial ao INPI do cache (titularidade validada
+  // na RPC). Não chama o INPI; a atualização automática acontece no login
+  // (ClientLayout) e a manual no botão "Sincronizar com INPI".
+  useEffect(() => {
+    if (process?.process_number) void lookupCtl.hydrate(process.process_number);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [process?.process_number]);
 
   const fetchProcessData = async () => {
     if (!id || !user) return;
@@ -464,7 +478,13 @@ export default function ProcessoDetalhe() {
   }
 
   const status = statusConfig[process.status || 'em_andamento'] || statusConfig.em_andamento;
-  const pipeline = pipelineConfig[process.pipeline_stage || 'protocolado'] || pipelineConfig.protocolado;
+  const lookupState = process.process_number ? lookupCtl.get(process.process_number) : null;
+  const phase = getDisplayedPhase({
+    lookup: lookupState?.lookup ?? null,
+    pipelineStage: process.pipeline_stage,
+    status: process.status,
+    stageLabel: (sid) => getJuridicoStageLabel(sid, '') || null,
+  });
 
   return (
     <ClientLayout>
@@ -518,9 +538,14 @@ export default function ProcessoDetalhe() {
               <div>
                 <p className="text-sm text-muted-foreground">Fase Atual</p>
                 <div className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${pipeline.color}`} />
-                  <span className="font-medium">{pipeline.label}</span>
+                  <div className={`w-3 h-3 rounded-full ${phase.dotClass}`} />
+                  <span className="font-medium">{phase.label}</span>
                 </div>
+                {phase.source === 'inpi' && phase.syncedAt && (
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                    ✓ Sincronizado com o INPI em {formatSafeDate(phase.syncedAt, "dd/MM/yyyy 'às' HH:mm")}
+                  </p>
+                )}
               </div>
               {process.deposit_date && (
                 <div>
@@ -634,13 +659,22 @@ export default function ProcessoDetalhe() {
           {/* Publications Tab */}
           <TabsContent value="publications" className="mt-4 space-y-4">
             {/* Publicacoes Marcas Summary Cards */}
+            {/* Situação oficial do processo no INPI (cache compartilhado + botão de sincronização) */}
+            {process.process_number && isNineDigits(process.process_number) && (
+              <InpiStatusCard processNumber={process.process_number} controller={lookupCtl} />
+            )}
+
             {publicacoes.length > 0 && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Newspaper className="h-5 w-5 text-primary" />
-                    Situação Atual da Publicação
+                    Histórico de publicações na RPI
                   </CardTitle>
+                  <CardDescription>
+                    Despachos publicados nas edições da Revista oficial do INPI — histórico do
+                    processo, não é a situação atual. Avisos de prazo abaixo continuam valendo.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {publicacoes.map(pub => {

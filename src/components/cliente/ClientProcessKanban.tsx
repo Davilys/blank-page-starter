@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useClientInpiLookups } from '@/hooks/useClientInpiLookups';
+import { derivePhaseFromInpi } from '@/lib/inpiStatus';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { FileText, ChevronRight, Settings2 } from 'lucide-react';
@@ -33,6 +35,7 @@ const DEFAULT_STAGES: KanbanStage[] = [
 export function ClientProcessKanban({ userId }: ClientProcessKanbanProps) {
   const [processes, setProcesses] = useState<BrandProcess[]>([]);
   const [loading, setLoading] = useState(true);
+  const inpiLookups = useClientInpiLookups(userId);
   const [stages, setStages] = useState<KanbanStage[]>(DEFAULT_STAGES);
   const [configOpen, setConfigOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -166,6 +169,14 @@ export function ClientProcessKanban({ userId }: ClientProcessKanbanProps) {
                               <p className="text-xs text-muted-foreground truncate">
                                 {process.process_number || 'Aguardando protocolo'}
                               </p>
+                              {(() => {
+                                const ph = process.process_number
+                                  ? derivePhaseFromInpi(inpiLookups[process.process_number]?.current_status)
+                                  : null;
+                                return ph ? (
+                                  <p className="text-[11px] text-emerald-600 truncate">INPI: {ph.label}</p>
+                                ) : null;
+                              })()}
                             </div>
                             <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform group-hover:translate-x-1" />
                           </div>

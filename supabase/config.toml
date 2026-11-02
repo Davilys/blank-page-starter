@@ -167,3 +167,6 @@ verify_jwt = false
 
 [functions.regua-cobranca-processar]
 verify_jwt = false
+
+[functions.client-process-lookup]
+verify_jwt = true

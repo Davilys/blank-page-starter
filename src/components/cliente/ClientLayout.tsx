@@ -24,6 +24,7 @@ import { Moon, Sun } from 'lucide-react';
 import logo from '@/assets/webmarcas-logo.png';
 import { cn } from '@/lib/utils';
 import { usePresence } from '@/hooks/usePresence';
+import { useClientInpiAutoSync } from '@/hooks/useClientInpiAutoSync';
 import { useTheme } from '@/contexts/ThemeContext';
 
 interface ClientLayoutProps {
@@ -157,6 +158,9 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   }, [navigate]);
 
   usePresence(userId);
+  // Ao entrar na área do cliente, atualiza em segundo plano a situação oficial
+  // (INPI) dos processos com consulta ausente ou mais velha que 24 h.
+  useClientInpiAutoSync(userId);
   const { theme, toggleTheme } = useTheme();
 
   const handleLogout = async () => {
