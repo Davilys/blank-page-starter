@@ -8,7 +8,15 @@ import { supabase } from '@/integrations/supabase/client';
 import jsPDF from 'jspdf';
 import 'svg2pdf.js';
 import JSZip from 'jszip';
-import { svgToEps } from '@/lib/marcas-ia/svgToEps';
+import { svgToEps, hslToRgb } from '@/lib/marcas-ia/svgToEps';
+
+// svg2pdf não entende hsl(): normaliza cores para rgb() antes de renderizar o PDF vetorial.
+function normalizeSvgColors(svg: string): string {
+  return svg.replace(/hsla?\([^)]*\)/gi, (m) => {
+    const rgb = hslToRgb(m);
+    return rgb ? `rgb(${Math.round(rgb[0] * 255)},${Math.round(rgb[1] * 255)},${Math.round(rgb[2] * 255)})` : m;
+  });
+}
 import { runConsultorIaSearch } from '@/lib/api/consultorIaSearch';
 import { cn } from '@/lib/utils';
 
@@ -280,7 +288,7 @@ ${manual.tipografia.uso ?? ''}`);
     if (svgEscolhido === null || !nomeEscolhido) return null;
     const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: [480, 480] });
     const el = document.createElement('div');
-    el.innerHTML = svgs[svgEscolhido];
+    el.innerHTML = normalizeSvgColors(svgs[svgEscolhido]);
     const svgEl = el.querySelector('svg');
     if (!svgEl) return null;
     await (doc as unknown as { svg: (el: SVGSVGElement, o: { x: number; y: number; width: number; height: number }) => Promise<unknown> }).svg(svgEl as SVGSVGElement, { x: 0, y: 0, width: 480, height: 480 });

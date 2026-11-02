@@ -19,7 +19,7 @@ function hexToRgb(v: string): [number, number, number] | null {
   return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
 }
 
-function hslToRgb(v: string): [number, number, number] | null {
+export function hslToRgb(v: string): [number, number, number] | null {
   const m = /^hsla?\(\s*(\d+(?:\.\d+)?)(?:deg)?\s*[\s,]\s*(\d+(?:\.\d+)?)%\s*[\s,]\s*(\d+(?:\.\d+)?)%/i.exec(v.trim());
   if (!m) return null;
   const h = (((parseFloat(m[1]) % 360) + 360) % 360) / 360;
