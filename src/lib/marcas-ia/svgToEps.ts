@@ -19,9 +19,33 @@ function hexToRgb(v: string): [number, number, number] | null {
   return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
 }
 
+function hslToRgb(v: string): [number, number, number] | null {
+  const m = /^hsla?\(\s*(\d+(?:\.\d+)?)(?:deg)?\s*[\s,]\s*(\d+(?:\.\d+)?)%\s*[\s,]\s*(\d+(?:\.\d+)?)%/i.exec(v.trim());
+  if (!m) return null;
+  const h = (((parseFloat(m[1]) % 360) + 360) % 360) / 360;
+  const s = parseFloat(m[2]) / 100;
+  const l = parseFloat(m[3]) / 100;
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p2 = 2 * l - q;
+  const f = (t0: number): number => {
+    let t = t0;
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p2 + (q - p2) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p2 + (q - p2) * (2 / 3 - t) * 6;
+    return p2;
+  };
+  return [f(h + 1 / 3), f(h), f(h - 1 / 3)];
+}
+
+const NAMED: Record<string, [number, number, number]> = {
+  white: [1, 1, 1], black: [0, 0, 0], red: [1, 0, 0], green: [0, 0.5019, 0], blue: [0, 0, 1],
+};
+
 function colorCmd(v: string | null): string | null {
   if (!v || v === 'none') return null;
-  const rgb = hexToRgb(v);
+  const rgb = hexToRgb(v) ?? hslToRgb(v) ?? NAMED[v.trim().toLowerCase()] ?? null;
   if (!rgb) throw new Error(`cor fora do subconjunto: ${v}`);
   return `${rgb[0].toFixed(4)} ${rgb[1].toFixed(4)} ${rgb[2].toFixed(4)} setrgbcolor`;
 }

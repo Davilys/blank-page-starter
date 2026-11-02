@@ -40,6 +40,19 @@ function svgToDataUrl(svg: string): string {
   return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
 }
 
+// Segurança: o SVG vem do modelo. Remove scripts, foreignObject, handlers on*
+// e referências externas (href que não seja fragmento #...) antes de renderizar
+// ou exportar. Só o subconjunto vetorial local sobrevive.
+function sanitizeSvg(svg: string): string {
+  return svg
+    .replace(/<script[\s\S]*?<\/script\s*>/gi, '')
+    .replace(/<foreignObject[\s\S]*?<\/foreignObject\s*>/gi, '')
+    .replace(/\son\w+\s*=\s*"[^"]*"/gi, '')
+    .replace(/\son\w+\s*=\s*'[^']*'/gi, '')
+    .replace(/(?:xlink:)?href\s*=\s*"(?!#)[^"]*"/gi, '')
+    .replace(/(?:xlink:)?href\s*=\s*'(?!#)[^']*'/gi, '');
+}
+
 async function callAgent(body: Record<string, unknown>): Promise<{ ok: boolean; [k: string]: unknown }> {
   const { data, error } = await supabase.functions.invoke('marcas-ia-agent', { body });
   if (error) {
@@ -157,13 +170,13 @@ export default function MarcasIA() {
     setBusy(true);
     try {
       if (MOCK) {
-        setSvgs(MOCK_SVGS);
+        setSvgs(MOCK_SVGS.map(sanitizeSvg));
         setConceitos(['monograma', 'símbolo abstrato', 'wordmark', 'emblema', 'minimalista']);
         setStage('logos');
       } else {
         const res = await callAgent({ action: 'logos', session_id: sessionId, nome: nomeEscolhido.nome, diagnostico });
         if (!res.ok) { handleAgentError(res); return; }
-        setSvgs((res.svgs as string[]) ?? []);
+        setSvgs(((res.svgs as string[]) ?? []).map(sanitizeSvg));
         setConceitos((res.conceitos as string[]) ?? []);
         setStage('logos');
       }
@@ -281,7 +294,13 @@ ${manual.tipografia.uso ?? ''}`);
 
   function baixarEps() {
     if (svgEscolhido === null || !nomeEscolhido) return;
-    const eps = svgToEps(svgs[svgEscolhido]);
+    let eps: string;
+    try {
+      eps = svgToEps(svgs[svgEscolhido]);
+    } catch (e) {
+      window.alert(`Não consegui converter este conceito para EPS: ${e instanceof Error ? e.message : 'erro desconhecido'}. Use o SVG ou o PDF vetorial, que já contêm o mesmo vetor.`);
+      return;
+    }
     const blob = new Blob([eps], { type: 'application/postscript' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -298,7 +317,11 @@ ${manual.tipografia.uso ?? ''}`);
       const zip = new JSZip();
       const base = nomeEscolhido.nome.replace(/[^\w-]+/g, '-');
       zip.file(`${base}.svg`, svgs[svgEscolhido]);
-      zip.file(`${base}.eps`, svgToEps(svgs[svgEscolhido]));
+      try {
+        zip.file(`${base}.eps`, svgToEps(svgs[svgEscolhido]));
+      } catch (e) {
+        zip.file('LEIA-ME-EPS.txt', `Este conceito não converteu para EPS (${e instanceof Error ? e.message : 'erro'}). Use o SVG ou o PDF vetorial: mesmo vetor, abrem em Illustrator/CorelDRAW/Inkscape.`);
+      }
       const vet = await gerarPdfVetorialDoc();
       if (vet) zip.file(`${base}-vetorial.pdf`, vet.output('blob'));
       const [png, jpg] = await Promise.all([rasterizarLogoBlob('png'), rasterizarLogoBlob('jpeg')]);
