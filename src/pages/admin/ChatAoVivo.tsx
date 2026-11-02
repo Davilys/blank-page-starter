@@ -147,6 +147,7 @@ function ChatAoVivoContent() {
   const [query, setQuery] = useState('');
   const [adminName, setAdminName] = useState('');
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const webconversaIframeRef = useRef<HTMLIFrameElement>(null);
   const canUseLegalConsultancy = hasPermission('inpi_resources', 'can_view');
   const showSelector = !chatMode || chatMode === 'selector' || chatMode === 'consultoria';
 
@@ -177,7 +178,7 @@ function ChatAoVivoContent() {
   }, []);
 
   useEffect(() => {
-    if (chatMode !== 'botconversa') return;
+    if (chatMode !== 'botconversa' && chatMode !== 'webconversa') return;
     const timeout = window.setTimeout(() => {
       if (isLoading) {
         setIframeError(true);
@@ -198,8 +199,25 @@ function ChatAoVivoContent() {
     return () => window.removeEventListener('botconversa-reload', handleReload);
   }, []);
 
+  useEffect(() => {
+    const handleReload = () => {
+      if (!webconversaIframeRef.current) return;
+      setIsLoading(true);
+      setIframeError(false);
+      webconversaIframeRef.current.src = WEBCONVERSA_URL;
+    };
+    window.addEventListener('webconversa-reload', handleReload);
+    return () => window.removeEventListener('webconversa-reload', handleReload);
+  }, []);
+
   const handleSelectBotConversa = () => {
     setChatMode('botconversa');
+    setIsLoading(true);
+    setIframeError(false);
+  };
+
+  const handleSelectWebConversa = () => {
+    setChatMode('webconversa');
     setIsLoading(true);
     setIframeError(false);
   };
@@ -230,7 +248,7 @@ function ChatAoVivoContent() {
       action: 'Acessar',
       icon: Globe2,
       tone: 'webconversa',
-      onClick: () => window.open(WEBCONVERSA_URL, '_blank', 'noopener'),
+      onClick: handleSelectWebConversa,
     },
     ...(canUseLegalConsultancy
       ? [{
@@ -418,6 +436,38 @@ function ChatAoVivoContent() {
                   onLoad={() => setIsLoading(false)}
                   allow="microphone; camera; clipboard-write"
                   title="BotConversa Live Chat"
+                />
+              )}
+            </motion.div>
+          )}
+
+          {chatMode === 'webconversa' && (
+            <motion.div key="webconversa" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0">
+              {isLoading && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
+                  <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    <p className="text-muted-foreground">Carregando WebConversa...</p>
+                  </div>
+                </div>
+              )}
+              {iframeError ? (
+                <div className="flex h-full flex-col items-center justify-center bg-muted/30 px-6 text-center">
+                  <AlertCircle className="mb-4 h-16 w-16 text-destructive" />
+                  <h2 className="mb-2 text-xl font-semibold text-foreground">Acesso restrito pelo WebConversa</h2>
+                  <p className="mb-6 max-w-md text-muted-foreground">O WebConversa não permite exibição integrada. Você pode acessá-lo em uma nova aba.</p>
+                  <Button onClick={() => window.open(WEBCONVERSA_URL, '_blank', 'noopener')} size="lg">
+                    <ExternalLink className="mr-2 h-5 w-5" /> Abrir WebConversa
+                  </Button>
+                </div>
+              ) : (
+                <iframe
+                  ref={webconversaIframeRef}
+                  src={WEBCONVERSA_URL}
+                  className="h-full w-full border-0"
+                  onLoad={() => setIsLoading(false)}
+                  allow="microphone; camera; clipboard-write"
+                  title="WebConversa Atendimento"
                 />
               )}
             </motion.div>

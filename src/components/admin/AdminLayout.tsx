@@ -651,10 +651,10 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
             </Link>
 
             {/* Botões extras quando BotConversa ativo */}
-            {chatMode === 'botconversa' && (
+            {(chatMode === 'botconversa' || chatMode === 'webconversa') && (
               <div className="flex items-center gap-1.5 ml-1">
                 <button
-                  onClick={() => window.dispatchEvent(new CustomEvent('botconversa-reload'))}
+                  onClick={() => window.dispatchEvent(new CustomEvent(chatMode === 'webconversa' ? 'webconversa-reload' : 'botconversa-reload'))}
                   className="flex items-center gap-1 px-2 py-1 rounded-lg border border-border/60 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-all duration-150"
                 >
                   <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -663,7 +663,7 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
                   Recarregar
                 </button>
                 <button
-                  onClick={() => window.open('https://app.botconversa.com.br/8572/live-chat/all', '_blank')}
+                  onClick={() => window.open(chatMode === 'webconversa' ? 'https://chat.webmarcas.net' : 'https://app.botconversa.com.br/8572/live-chat/all', '_blank', 'noopener')}
                   className="flex items-center gap-1 px-2 py-1 rounded-lg border border-border/60 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-all duration-150"
                 >
                   <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
