@@ -32,9 +32,9 @@
 .wm-bf:not(.wm-flow) .intro{font-size:11px;line-height:1.45;color:#d4d4d4;margin:6px 0 0;max-width:160px}
 .wm-bf:not(.wm-flow) .bf-apoio{font-size:11px;line-height:1.4;color:#FFFF00;font-weight:700;margin:10px 0 0}
 .wm-bf:not(.wm-flow) .hero-highlights{position:absolute;z-index:2;left:0;right:0;bottom:16px;display:flex;padding:0 10px;margin:0}
-.wm-bf:not(.wm-flow) .hero-highlights>span{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center;font-size:11px;line-height:1.35;color:#fff;padding:0 8px}
+.wm-bf:not(.wm-flow) .hero-highlights>span{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;font-size:10.5px;line-height:1.3;color:#fff;padding:0 6px}
 .wm-bf:not(.wm-flow) .hero-highlights>span+span{border-left:1px solid rgba(255,255,255,.18)}
-.wm-bf:not(.wm-flow) .hero-highlights svg{width:42px;height:42px;border:1.8px solid #FFFF00;border-radius:50%;padding:11px;color:#FFFF00;flex-shrink:0}
+.wm-bf:not(.wm-flow) .hero-highlights svg{width:34px;height:34px;border:1.6px solid #FFFF00;border-radius:50%;padding:8px;color:#FFFF00;flex-shrink:0}
 @media(min-width:701px){
 .wm-bf:not(.wm-flow) .visual{height:640px}
 .wm-bf:not(.wm-flow) .visual>img{inset:auto;right:0;top:0;height:640px;width:auto;max-width:none;object-fit:contain}
@@ -128,7 +128,7 @@
 .wm-bf:not(.wm-flow) .intro{font-size:10px;max-width:125px}
 .wm-bf:not(.wm-flow) .bf-apoio{font-size:10px;margin-top:8px;max-width:125px}
 .wm-bf:not(.wm-flow) .hero-highlights>span{font-size:10px}
-.wm-bf:not(.wm-flow) .hero-highlights svg{width:36px;height:36px;padding:9px}}
+.wm-bf:not(.wm-flow) .hero-highlights svg{width:30px;height:30px;padding:7px}}
 /* /blackfriday — tema BF isolado (escopo .wm-bf). Arte do hero = imagem exata do cliente. */
 .wm-bf *{box-sizing:border-box}
 .wm-bf{margin:0;background:#000;color:#ededed;font-family:'IBM Plex Sans',Arial,sans-serif;min-height:100vh;
@@ -163,9 +163,9 @@
 .wm-bf:not(.wm-flow) .intro{font-size:11px;line-height:1.45;color:#d4d4d4;margin:6px 0 0;max-width:160px}
 .wm-bf:not(.wm-flow) .bf-apoio{font-size:11px;line-height:1.4;color:#FFFF00;font-weight:700;margin:10px 0 0}
 .wm-bf:not(.wm-flow) .hero-highlights{position:absolute;z-index:2;left:0;right:0;bottom:16px;display:flex;padding:0 10px;margin:0}
-.wm-bf:not(.wm-flow) .hero-highlights>span{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center;font-size:11px;line-height:1.35;color:#fff;padding:0 8px}
+.wm-bf:not(.wm-flow) .hero-highlights>span{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;font-size:10.5px;line-height:1.3;color:#fff;padding:0 6px}
 .wm-bf:not(.wm-flow) .hero-highlights>span+span{border-left:1px solid rgba(255,255,255,.18)}
-.wm-bf:not(.wm-flow) .hero-highlights svg{width:42px;height:42px;border:1.8px solid #FFFF00;border-radius:50%;padding:11px;color:#FFFF00;flex-shrink:0}
+.wm-bf:not(.wm-flow) .hero-highlights svg{width:34px;height:34px;border:1.6px solid #FFFF00;border-radius:50%;padding:8px;color:#FFFF00;flex-shrink:0}
 @media(min-width:701px){
 .wm-bf:not(.wm-flow) .visual{height:640px}
 .wm-bf:not(.wm-flow) .visual>img{inset:auto;right:0;top:0;height:640px;width:auto;max-width:none;object-fit:contain}
@@ -259,7 +259,7 @@
 .wm-bf:not(.wm-flow) .intro{font-size:10px;max-width:125px}
 .wm-bf:not(.wm-flow) .bf-apoio{font-size:10px;margin-top:8px;max-width:125px}
 .wm-bf:not(.wm-flow) .hero-highlights>span{font-size:10px}
-.wm-bf:not(.wm-flow) .hero-highlights svg{width:36px;height:36px;padding:9px}}
+.wm-bf:not(.wm-flow) .hero-highlights svg{width:30px;height:30px;padding:7px}}
 
 /* Folga texto/arte em viewports intermediarios (701-1150): arte um pouco menor,
    mantendo rosto/selo integros; texto da coluna nao avanca sobre a borda da arte. */
