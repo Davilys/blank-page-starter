@@ -5,7 +5,7 @@ import { Helmet } from "react-helmet-async";
 import { TrademarkSearch } from "@/modules/trademark-search/components/TrademarkSearch";
 import type { TrademarkSearchJob } from "@/modules/trademark-search/types";
 import logo from "@/assets/webmarcas-logo-mark.webp";
-import hero from "@/assets/consultar-very-hero.jpg";
+import hero from "@/assets/consultar-hero-wide.jpg";
 import "./ConsultationEntry.css";
 
 /** Approved entry only. Search progress/results and later steps keep their existing view. */
