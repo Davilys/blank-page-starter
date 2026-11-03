@@ -178,6 +178,7 @@ export default function Registrar() {
           classDescriptions: selectedClassDescriptions,
           suggestedClasses,
           suggestedClassDescriptions,
+          sourcePage: '/consultar',
           plan,
         },
       });

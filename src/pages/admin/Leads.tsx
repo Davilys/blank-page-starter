@@ -15,7 +15,7 @@ import {
   UserCheck, Trash2, Edit, Filter, Upload,
   Target, TrendingUp, Zap, Star, ArrowUpRight,
   Phone, Mail, Building2, Calendar, ChevronRight,
-  Tag, X, Loader2, Activity, CheckCircle2, AlertCircle,
+  Tag, X, Loader2, Activity, CheckCircle2, AlertCircle, Send,
   Sparkles, BarChart3, Globe, LayoutGrid, List, TrendingDown, Megaphone
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -36,6 +36,7 @@ interface Lead {
   email: string | null;
   phone: string | null;
   company_name: string | null;
+  business_area: string | null;
   cpf_cnpj: string | null;
   status: string;
   origin: string | null;
@@ -58,6 +59,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; glow: string
 
 const ORIGIN_OPTIONS = [
   { value: 'site', label: 'Site', icon: Globe },
+  { value: 'site-consultar', label: 'Site /consultar', icon: Globe },
   { value: 'whatsapp', label: 'WhatsApp', icon: Phone },
   { value: 'indicacao', label: 'Indicação', icon: Star },
   { value: 'import', label: 'Importação', icon: Upload },
@@ -175,6 +177,69 @@ function LeadRow({ lead, selected, onSelect, onEdit, onDelete, onConvert, onSend
   onConvert: (lead: Lead) => void;
   onSendMessage: (lead: Lead) => void;
 }) {
+  // Reenvio manual do laudo (edge webmarcas-leads-laudo): 1 clique -> nova
+  // busca com os dados salvos -> WhatsApp via fluxo BUSCA SITE. A edge tem
+  // claim atômico por lead (duplo clique vira resend_in_progress, nunca 2º envio);
+  // a confirmação honesta vem do poll de resend_status na linha NOVA da busca.
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'awaiting' | 'delivered' | 'failed' | 'unknown'>('idle');
+  // Orientação v3 para claim 'unknown' (timeout/5xx pós-despacho): o laudo
+  // PODE ter saído. Nunca retry automático, nunca novo clique batendo na edge
+  // de novo — a orientação é verificar a conversa no BotConversa.
+  const guidanceUnknown = 'Envio anterior em verificação: o laudo pode ter sido entregue. Confira a conversa no BotConversa antes de qualquer novo envio.';
+  const lastSearchId = useRef<string | null>(null);
+    const readBody = async (r: { data: any; error: any }) => {
+      if (!r.error) return r.data;
+      try { return await r.error.context?.json?.() ?? null; } catch { return null; }
+    };
+  const resendLaudo = async () => {
+    if (resendState === 'sending' || resendState === 'awaiting') return;
+    if (resendState === 'unknown') {
+      toast.info(guidanceUnknown);
+      // Reconciliação read-only: hook tardio pode ter confirmado a entrega.
+      // Só resend_status (leitura, nunca reexecuta busca/envio); se ainda não
+      // temos search_id desta sessão, não há o que consultar — só a orientação.
+      const sid = lastSearchId.current;
+      if (!sid) return;
+      try {
+        const st = await readBody(await supabase.functions.invoke('webmarcas-leads-laudo', { body: { action: 'resend_status', lead_id: lead.id, search_id: sid } }));
+        const stState = st?.state ?? st?.status;
+        if (stState === 'delivered') { setResendState('delivered'); toast.success('Entrega confirmada: o laudo chegou no WhatsApp do lead.'); }
+      } catch { /* leitura falhou: mantém unknown + orientação já exibida */ }
+      return;
+    }
+    setResendState('sending');
+    try {
+      const body = await readBody(await supabase.functions.invoke('webmarcas-leads-laudo', { body: { action: 'resend_laudo', lead_id: lead.id } }));
+      if (!body?.ok) {
+        const code = body?.error?.code;
+        const msg = body?.error?.message ?? 'Não consegui iniciar o reenvio do laudo.';
+        const claimState = body?.error?.claim_state ?? body?.claim_state;
+        if (code === 'resend_in_progress' && claimState === 'unknown') { lastSearchId.current = body?.error?.search_id ?? body?.search_id ?? lastSearchId.current; setResendState('unknown'); toast.info(msg || guidanceUnknown); }
+        else if (code === 'resend_in_progress') { setResendState('awaiting'); toast.info(msg); }
+        else if (code === 'delivery_unknown') { lastSearchId.current = body?.error?.search_id ?? lastSearchId.current; setResendState('unknown'); toast.info(msg || guidanceUnknown); }
+        else { setResendState('failed'); toast.error(msg); }
+        return;
+      }
+      lastSearchId.current = body.search_id ?? null;
+      setResendState('awaiting');
+      toast.info('Reenvio iniciado — confirmando a entrega…');
+      for (let i = 0; i < 40; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const st = await readBody(await supabase.functions.invoke('webmarcas-leads-laudo', { body: { action: 'resend_status', lead_id: lead.id, search_id: body.search_id } }));
+        const stState = st?.state ?? st?.status;
+        // Claim unknown no meio do poll: encerra o poll com a orientação —
+        // não continuar girando até o timeout como awaiting_confirmation.
+        if (st?.claim_state === 'unknown') { setResendState('unknown'); toast.info(st?.guidance ?? guidanceUnknown); return; }
+        if (stState === 'delivered') { setResendState('delivered'); toast.success('Laudo enviado no WhatsApp do lead.'); return; }
+        if (stState === 'failed') { setResendState('failed'); toast.error(st?.error?.message ?? 'O reenvio falhou.'); return; }
+      }
+      toast.info('Envio ainda em andamento — a confirmação fica registrada no lead.');
+    } catch {
+      setResendState('failed');
+      toast.error('Erro ao reenviar o laudo.');
+    }
+  };
+
   const cfg = STATUS_CONFIG[lead.status] || STATUS_CONFIG['novo'];
 
   return (
@@ -206,7 +271,7 @@ function LeadRow({ lead, selected, onSelect, onEdit, onDelete, onConvert, onSend
       </td>
       <td className="px-3 py-3 hidden md:table-cell">
         {lead.phone ? (
-          <span className="text-sm text-foreground/80 flex items-center gap-1.5">
+          <span className="text-sm text-foreground/80 flex items-center gap-1.5 whitespace-nowrap">
             <Phone className="h-3 w-3 text-muted-foreground flex-shrink-0" />
             {lead.phone}
           </span>
@@ -214,11 +279,16 @@ function LeadRow({ lead, selected, onSelect, onEdit, onDelete, onConvert, onSend
       </td>
       <td className="px-3 py-3 hidden lg:table-cell">
         {lead.company_name ? (
-          <span className="text-sm text-foreground/80 flex items-center gap-1.5">
+          <span className="text-sm text-foreground/80 flex items-center gap-1.5 min-w-0">
             <Building2 className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-            {lead.company_name}
+            <span className="truncate cursor-pointer" title={lead.company_name} onClick={(e) => e.currentTarget.classList.toggle('truncate')}>{lead.company_name}</span>
           </span>
         ) : <span className="text-muted-foreground/40 text-sm">—</span>}
+        {lead.business_area && (
+          <span className="text-[11px] text-muted-foreground/70 truncate block mt-0.5 pl-4 cursor-pointer" title={lead.business_area} onClick={(e) => e.currentTarget.classList.toggle('truncate')}>
+            {lead.business_area}
+          </span>
+        )}
       </td>
       <td className="px-3 py-3">
         <StatusBadge status={lead.status} />
@@ -230,7 +300,7 @@ function LeadRow({ lead, selected, onSelect, onEdit, onDelete, onConvert, onSend
       </td>
       <td className="px-3 py-3 hidden lg:table-cell">
         {lead.estimated_value ? (
-          <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+          <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
             R$ {lead.estimated_value.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
           </span>
         ) : <span className="text-muted-foreground/40 text-sm">—</span>}
@@ -254,6 +324,20 @@ function LeadRow({ lead, selected, onSelect, onEdit, onDelete, onConvert, onSend
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onSendMessage(lead)} className="gap-2 text-sm cursor-pointer">
               <Mail className="h-3.5 w-3.5 text-blue-500" /> Enviar Mensagem
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!lead.phone || resendState === 'sending' || resendState === 'awaiting'}
+              onClick={() => void resendLaudo()}
+              className="gap-2 text-sm cursor-pointer"
+            >
+              {resendState === 'sending' || resendState === 'awaiting'
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-500" />
+                : resendState === 'delivered'
+                  ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                  : <Send className="h-3.5 w-3.5 text-violet-500" />}
+              {resendState === 'awaiting' ? 'Enviando laudo…'
+                : resendState === 'delivered' ? 'Laudo enviado'
+                : 'Enviar laudo'}
             </DropdownMenuItem>
             {lead.status !== 'convertido' && (
               <DropdownMenuItem onClick={() => onConvert(lead)} className="gap-2 text-sm cursor-pointer">
@@ -567,7 +651,10 @@ export default function AdminLeads() {
       );
       // Só troca a lista com o conjunto COMPLETO: erro intermediário nunca
       // substitui a lista anterior por dados parciais.
-      if (isCurrent()) setLeads((data as any[]) || []);
+      if (isCurrent()) {
+        const rows = (data as any[]) || [];
+        setLeads(rows);
+      }
     } catch { if (isCurrent()) toast.error('Erro ao carregar leads'); }
     finally { if (isCurrent()) setLoading(false); }
   };
@@ -765,7 +852,7 @@ export default function AdminLeads() {
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm table-fixed">
                     <thead>
                       <tr className="border-b border-border/30 bg-muted/10">
                         <th className="px-3 py-2.5 w-10">
@@ -781,11 +868,13 @@ export default function AdminLeads() {
                         {['Nome / Email', 'Telefone', 'Empresa', 'Status', 'Origem', 'Valor', 'Data', ''].map(h => (
                           <th key={h} className={cn(
                             'px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground',
-                            h === 'Telefone' && 'hidden md:table-cell',
+                            h === 'Telefone' && 'hidden md:table-cell w-[130px]',
                             h === 'Empresa' && 'hidden lg:table-cell',
-                            h === 'Origem' && 'hidden xl:table-cell',
-                            h === 'Valor' && 'hidden lg:table-cell',
-                            h === 'Data' && 'hidden xl:table-cell',
+                            h === 'Origem' && 'hidden xl:table-cell w-[90px]',
+                            h === 'Valor' && 'hidden lg:table-cell w-[96px]',
+                            h === 'Data' && 'hidden xl:table-cell w-[100px]',
+                          h === 'Status' && 'w-[110px]',
+                          h === '' && 'w-[52px]',
                           )}>
                             {h}
                           </th>
