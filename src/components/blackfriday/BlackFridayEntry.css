@@ -1,0 +1,268 @@
+/* /blackfriday — tema BF isolado (escopo .wm-bf). Arte do hero = imagem exata do cliente. */
+.wm-bf *{box-sizing:border-box}
+.wm-bf{margin:0;background:#000;color:#ededed;font-family:'IBM Plex Sans',Arial,sans-serif;min-height:100vh;
+--background:0 0% 0%!important;--foreground:0 0% 93%!important;--card:0 0% 11%!important;--card-foreground:0 0% 93%!important;
+--popover:0 0% 11%!important;--popover-foreground:0 0% 93%!important;--primary:60 100% 50%!important;--primary-foreground:0 0% 10%!important;
+--secondary:0 0% 14%!important;--secondary-foreground:0 0% 93%!important;--muted:0 0% 21%!important;--muted-foreground:0 0% 60%!important;
+--accent:0 0% 14%!important;--accent-foreground:0 0% 93%!important;--destructive:0 84% 60%!important;--border:0 0% 21%!important;
+--input:0 0% 21%!important;--ring:60 100% 50%!important;--success:142 55% 36%!important}
+.wm-bf a{color:inherit;text-decoration:none}.wm-bf a:hover{text-decoration:underline}.wm-bf button{cursor:pointer}
+
+/* Header: logo + WhatsApp. SEM menu/hamburger (decisão do cliente 03/11). */
+.wm-bf .consult-entry-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 18px;background:#000}
+.wm-bf .consult-entry-header .brand{display:flex;align-items:center;gap:8px;font-size:19px;font-weight:700;letter-spacing:-.5px;color:#fff;white-space:nowrap}
+.wm-bf .consult-entry-header .brand img{width:26px;height:26px;object-fit:contain;filter:grayscale(1) brightness(0) invert(1)}
+.wm-bf .consult-entry-header .brand span{color:#FFFF00;margin-left:-8px}
+.wm-bf .entry-whatsapp{display:inline-flex;align-items:center;gap:6px;background:#FFFF00;color:#0a0a0a;font-weight:700;font-size:12.5px;border-radius:999px;padding:8px 14px;white-space:nowrap}
+.wm-bf .entry-whatsapp svg{width:14px;height:14px;flex-shrink:0}
+.wm-bf .entry-whatsapp:hover{text-decoration:none;background:#f2f200}
+@media(min-width:701px){.wm-bf .consult-entry-header{padding:16px 44px}.wm-bf .entry-whatsapp{font-size:14px;padding:10px 18px}}
+
+/* Hero: arte original, sem recomposição. Mobile validado (390px): cover 82% 20%. */
+.wm-bf:not(.wm-flow) .wrap{max-width:none;margin:0}
+.wm-bf:not(.wm-flow) .hero{display:block;margin:0}
+.wm-bf:not(.wm-flow) .visual{position:relative;height:430px;overflow:hidden;background:#000;border-radius:0}
+.wm-bf:not(.wm-flow) .visual>img{position:absolute;right:-15px;bottom:-60px;height:320px;width:auto;max-width:none;object-fit:contain}
+.wm-bf:not(.wm-flow) .shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.95) 0%,rgba(0,0,0,.85) 30%,rgba(0,0,0,.35) 58%,rgba(0,0,0,.05) 80%),linear-gradient(0deg,rgba(0,0,0,.92) 0%,rgba(0,0,0,0) 30%),linear-gradient(180deg,rgba(0,0,0,.85) 0%,rgba(0,0,0,0) 22%)}
+.wm-bf:not(.wm-flow) .copy{position:absolute;z-index:2;left:20px;top:26px;right:160px;padding:0;color:#fff}
+.wm-bf:not(.wm-flow) .bf-tag{display:inline-block;background:#FFFF00;color:#000;font-weight:700;font-size:13px;letter-spacing:1.5px;padding:4px 10px;transform:rotate(-2.5deg);margin-bottom:14px}
+.wm-bf:not(.wm-flow) h1{font-size:26px;line-height:1.12;font-weight:700;letter-spacing:-.5px;margin:0;color:#fff}
+.wm-bf:not(.wm-flow) h1 .hero-yellow{color:#FFFF00;font-size:29px}
+.wm-bf:not(.wm-flow) .bf-price{font-size:13.5px;font-weight:700;margin:10px 0 0;color:#fff}
+.wm-bf:not(.wm-flow) .intro{font-size:11px;line-height:1.45;color:#d4d4d4;margin:6px 0 0;max-width:160px}
+.wm-bf:not(.wm-flow) .bf-apoio{font-size:11px;line-height:1.4;color:#FFFF00;font-weight:700;margin:10px 0 0}
+.wm-bf:not(.wm-flow) .hero-highlights{position:absolute;z-index:2;left:0;right:0;bottom:16px;display:flex;padding:0 10px;margin:0}
+.wm-bf:not(.wm-flow) .hero-highlights>span{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center;font-size:11px;line-height:1.35;color:#fff;padding:0 8px}
+.wm-bf:not(.wm-flow) .hero-highlights>span+span{border-left:1px solid rgba(255,255,255,.18)}
+.wm-bf:not(.wm-flow) .hero-highlights svg{width:42px;height:42px;border:1.8px solid #FFFF00;border-radius:50%;padding:11px;color:#FFFF00;flex-shrink:0}
+@media(min-width:701px){
+.wm-bf:not(.wm-flow) .visual{height:640px}
+.wm-bf:not(.wm-flow) .visual>img{inset:auto;right:0;top:0;height:640px;width:auto;max-width:none;object-fit:contain}
+.wm-bf:not(.wm-flow) .shade{background:linear-gradient(90deg,rgba(0,0,0,.94) 0%,rgba(0,0,0,.82) 26%,rgba(0,0,0,.30) 48%,rgba(0,0,0,0) 62%),linear-gradient(0deg,rgba(0,0,0,.85) 0%,rgba(0,0,0,0) 26%)}
+.wm-bf:not(.wm-flow) .copy{left:64px;top:110px;right:560px}
+.wm-bf:not(.wm-flow) .bf-tag{font-size:15px;padding:6px 14px;margin-bottom:20px}
+.wm-bf:not(.wm-flow) h1{font-size:46px}.wm-bf:not(.wm-flow) h1 .hero-yellow{font-size:50px}
+.wm-bf:not(.wm-flow) .bf-price{font-size:18px;margin-top:16px}
+.wm-bf:not(.wm-flow) .intro{font-size:14.5px;max-width:430px;margin-top:10px}
+.wm-bf:not(.wm-flow) .bf-apoio{font-size:14px;margin-top:14px}
+.wm-bf:not(.wm-flow) .hero-highlights{bottom:30px;padding:0 44px;max-width:760px}
+.wm-bf:not(.wm-flow) .hero-highlights>span{font-size:12.5px}
+.wm-bf:not(.wm-flow) .hero-highlights svg{width:48px;height:48px}}
+
+/* Formulário (módulo trademark-search inalterado; só tema). */
+.wm-bf:not(.wm-flow) .consult{padding:26px 20px 42px;background:#000}
+.wm-bf:not(.wm-flow) .step{font-family:'IBM Plex Mono',monospace;display:flex;align-items:center;gap:10px;color:#FFFF00;font-size:10px;letter-spacing:2.5px;font-weight:600;margin:0 0 16px}
+.wm-bf:not(.wm-flow) .step:before{content:'';width:26px;height:2px;background:#FFFF00}
+.wm-bf:not(.wm-flow) .consult form{display:block}
+.wm-bf:not(.wm-flow) .consult form>div:first-child{text-align:left;margin:0 0 16px}
+.wm-bf:not(.wm-flow) .consult form h2{font-size:27px;font-weight:700;letter-spacing:-.5px;color:#ededed;margin:0 0 6px}
+.wm-bf:not(.wm-flow) .consult form>div:first-child p{font-size:13px;color:#999;margin:0}
+.wm-bf:not(.wm-flow) .consult form>div:nth-child(2){margin:0;display:grid;gap:18px}
+.wm-bf:not(.wm-flow) .consult form>div:nth-child(2)>div{margin:0}
+.wm-bf:not(.wm-flow) .consult label{display:block;font-size:13px;font-weight:600;color:#ededed;margin:0 0 8px}
+.wm-bf:not(.wm-flow) .consult input{width:100%;background:#1d1d1d;border:1px solid #363636;border-radius:10px;padding:15px 16px;font-size:13.5px;color:#fff;box-shadow:none;min-height:52px}
+.wm-bf:not(.wm-flow) .consult input::placeholder{color:#999}
+.wm-bf:not(.wm-flow) .consult input:focus-visible{outline:2px solid #FFFF00;outline-offset:2px}
+.wm-bf:not(.wm-flow) .consult [role=combobox]{width:100%;background:#1d1d1d;border:1px solid #363636;border-radius:10px;padding:15px 16px;font-size:13.5px;color:#999;min-height:52px;box-shadow:none}
+.wm-bf:not(.wm-flow) .consult button[type=submit]{width:100%;background:#FFFF00;color:#0a0a0a;border:0;border-radius:999px;padding:17px;font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:8px;margin:26px 0 0;min-height:56px;box-shadow:none}
+.wm-bf:not(.wm-flow) .consult button[type=submit]:hover{background:#f2f200}
+.wm-bf:not(.wm-flow) .consult form>p:last-child{font-size:11px;color:#999;text-align:center;margin:18px 0 0}
+.wm-bf:not(.wm-flow) .consult form>p:last-child svg{display:none}
+.wm-bf:not(.wm-flow) .legal{font-size:10.5px;color:#999;text-align:center;margin:18px 0 0;line-height:1.6}
+.wm-bf:not(.wm-flow) .legal a{color:#ededed;text-decoration:underline;text-underline-offset:2px}
+.wm-bf:not(.wm-flow) .consult [role=alert]{color:#f87171;font-size:13px;margin:16px 0}
+@media(min-width:701px){
+.wm-bf:not(.wm-flow) .consult{padding:44px 64px 56px;max-width:720px}
+.wm-bf:not(.wm-flow) .consult form h2{font-size:34px}
+.wm-bf:not(.wm-flow) .consult form>div:first-child p{font-size:15px}
+.wm-bf:not(.wm-flow) .consult input,.wm-bf:not(.wm-flow) .consult [role=combobox]{padding:17px 18px;font-size:15px}
+.wm-bf:not(.wm-flow) .consult button[type=submit]{font-size:16px;padding:19px}}
+
+/* Indicadores + rodapé (dark). */
+.wm-bf:not(.wm-flow) .entry-indicators{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));padding:30px 10px;margin:0;background:#0a0a0a;color:#ededed;border-top:1px solid #1d1d1d}
+.wm-bf:not(.wm-flow) .entry-indicators>div{display:flex;align-items:center;justify-content:center;gap:14px;padding:9px 14px;border-right:1px solid #2a2a2a}
+.wm-bf:not(.wm-flow) .entry-indicators>div:last-child{border-right:0}
+.wm-bf:not(.wm-flow) .entry-indicators svg{width:30px;height:30px;color:#FFFF00;flex-shrink:0}
+.wm-bf:not(.wm-flow) .entry-indicators p{margin:0;display:flex;flex-direction:column}
+.wm-bf:not(.wm-flow) .entry-indicators strong{font-size:16px;color:#fff}
+.wm-bf:not(.wm-flow) .entry-indicators span{font-size:11px;color:#999}
+.wm-bf:not(.wm-flow) .footer{padding:38px 28px 26px;display:grid;grid-template-columns:1.3fr 1.5fr 1fr;gap:38px;background:#0a0a0a;border-top:1px solid #2a2a2a}
+.wm-bf:not(.wm-flow) .footer .brand{display:flex;align-items:center;gap:9px;font-size:21px;font-weight:700;letter-spacing:-1px;color:#fff;margin-bottom:15px}
+.wm-bf:not(.wm-flow) .footer .brand img{width:29px;height:29px;object-fit:contain;filter:grayscale(1) brightness(0) invert(1)}
+.wm-bf:not(.wm-flow) .footer .brand span{color:#FFFF00;margin-left:-9px}
+.wm-bf:not(.wm-flow) .footer h3{font-weight:400;font-size:19px;margin:0 0 16px;color:#ededed}
+.wm-bf:not(.wm-flow) .footer p,.wm-bf:not(.wm-flow) .footer li{font-size:12px;line-height:1.7;color:#999;margin:0 0 10px}
+.wm-bf:not(.wm-flow) .footer ul{list-style:none;padding:0;margin:0}
+.wm-bf:not(.wm-flow) .footer a:hover{color:#FFFF00;text-decoration:none}
+.wm-bf:not(.wm-flow) .footlinks{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+.wm-bf:not(.wm-flow) .support{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:#ededed;border-bottom:1px solid #FFFF00;padding-bottom:5px;margin-top:6px}
+.wm-bf:not(.wm-flow) .support:before{content:'◉';color:#FFFF00}
+.wm-bf:not(.wm-flow) .consult-socials{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+.wm-bf:not(.wm-flow) .consult-socials a{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border:1px solid #363636;border-radius:50%;color:#FFFF00}
+.wm-bf:not(.wm-flow) .consult-socials a:hover{background:#1d1d1d}
+.wm-bf:not(.wm-flow) .consult-socials a:focus-visible{outline:2px solid #FFFF00;outline-offset:3px}
+.wm-bf:not(.wm-flow) .copyright{border-top:1px solid #2a2a2a;background:#0a0a0a;padding:22px 28px 28px;display:flex;justify-content:space-between;gap:24px;font-size:10px;color:#777}
+@media(max-width:700px){
+.wm-bf:not(.wm-flow) .entry-indicators{grid-template-columns:1fr 1fr;gap:20px 0;padding:26px 8px}
+.wm-bf:not(.wm-flow) .entry-indicators>div{gap:10px;padding:4px 10px}
+.wm-bf:not(.wm-flow) .entry-indicators>div:nth-child(2n){border-right:0}
+.wm-bf:not(.wm-flow) .footer{padding:29px 24px 24px;display:block}
+.wm-bf:not(.wm-flow) .footlinks{margin-top:29px;gap:20px}
+.wm-bf:not(.wm-flow) .footer h3{font-size:17px;margin-bottom:13px}
+.wm-bf:not(.wm-flow) .contact{margin-top:25px}
+.wm-bf:not(.wm-flow) .copyright{display:block;padding:22px 24px 28px;font-size:9px;line-height:1.7}
+.wm-bf:not(.wm-flow) .copyright div+div{margin-top:12px}}
+
+@media(max-width:350px){
+.wm-bf .consult-entry-header{padding:12px 14px;gap:8px}
+.wm-bf .consult-entry-header .brand{font-size:16px;gap:6px;flex-shrink:0}
+.wm-bf .consult-entry-header .brand img{width:21px;height:21px}
+.wm-bf .consult-entry-header .brand span{margin-left:-6px}
+.wm-bf .entry-whatsapp{font-size:10px;padding:7px 10px;gap:4px;flex-shrink:0}
+.wm-bf .entry-whatsapp svg{width:12px;height:12px}
+.wm-bf:not(.wm-flow) .visual>img{height:270px;right:-14px;bottom:0}
+.wm-bf:not(.wm-flow) .copy{left:16px;top:22px;right:104px}
+.wm-bf:not(.wm-flow) .bf-tag{font-size:11px;padding:3px 8px;margin-bottom:11px}
+.wm-bf:not(.wm-flow) h1{font-size:22px}.wm-bf:not(.wm-flow) h1 .hero-yellow{font-size:25px}
+.wm-bf:not(.wm-flow) .bf-price{font-size:12px;margin-top:8px}
+.wm-bf:not(.wm-flow) .intro{font-size:10px;max-width:125px}
+.wm-bf:not(.wm-flow) .bf-apoio{font-size:10px;margin-top:8px;max-width:125px}
+.wm-bf:not(.wm-flow) .hero-highlights>span{font-size:10px}
+.wm-bf:not(.wm-flow) .hero-highlights svg{width:36px;height:36px;padding:9px}}
+/* /blackfriday — tema BF isolado (escopo .wm-bf). Arte do hero = imagem exata do cliente. */
+.wm-bf *{box-sizing:border-box}
+.wm-bf{margin:0;background:#000;color:#ededed;font-family:'IBM Plex Sans',Arial,sans-serif;min-height:100vh;
+--background:0 0% 0%!important;--foreground:0 0% 93%!important;--card:0 0% 11%!important;--card-foreground:0 0% 93%!important;
+--popover:0 0% 11%!important;--popover-foreground:0 0% 93%!important;--primary:60 100% 50%!important;--primary-foreground:0 0% 10%!important;
+--secondary:0 0% 14%!important;--secondary-foreground:0 0% 93%!important;--muted:0 0% 21%!important;--muted-foreground:0 0% 60%!important;
+--accent:0 0% 14%!important;--accent-foreground:0 0% 93%!important;--destructive:0 84% 60%!important;--border:0 0% 21%!important;
+--input:0 0% 21%!important;--ring:60 100% 50%!important;--success:142 55% 36%!important}
+.wm-bf a{color:inherit;text-decoration:none}.wm-bf a:hover{text-decoration:underline}.wm-bf button{cursor:pointer}
+
+/* Header: logo + WhatsApp. SEM menu/hamburger (decisão do cliente 03/11). */
+.wm-bf .consult-entry-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 18px;background:#000}
+.wm-bf .consult-entry-header .brand{display:flex;align-items:center;gap:8px;font-size:19px;font-weight:700;letter-spacing:-.5px;color:#fff;white-space:nowrap}
+.wm-bf .consult-entry-header .brand img{width:26px;height:26px;object-fit:contain;filter:grayscale(1) brightness(0) invert(1)}
+.wm-bf .consult-entry-header .brand span{color:#FFFF00;margin-left:-8px}
+.wm-bf .entry-whatsapp{display:inline-flex;align-items:center;gap:6px;background:#FFFF00;color:#0a0a0a;font-weight:700;font-size:12.5px;border-radius:999px;padding:8px 14px;white-space:nowrap}
+.wm-bf .entry-whatsapp svg{width:14px;height:14px;flex-shrink:0}
+.wm-bf .entry-whatsapp:hover{text-decoration:none;background:#f2f200}
+@media(min-width:701px){.wm-bf .consult-entry-header{padding:16px 44px}.wm-bf .entry-whatsapp{font-size:14px;padding:10px 18px}}
+
+/* Hero: arte original, sem recomposição. Mobile validado (390px): cover 82% 20%. */
+.wm-bf:not(.wm-flow) .wrap{max-width:none;margin:0}
+.wm-bf:not(.wm-flow) .hero{display:block;margin:0}
+.wm-bf:not(.wm-flow) .visual{position:relative;height:430px;overflow:hidden;background:#000;border-radius:0}
+.wm-bf:not(.wm-flow) .visual>img{position:absolute;right:-15px;bottom:-60px;height:320px;width:auto;max-width:none;object-fit:contain}
+.wm-bf:not(.wm-flow) .shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.95) 0%,rgba(0,0,0,.85) 30%,rgba(0,0,0,.35) 58%,rgba(0,0,0,.05) 80%),linear-gradient(0deg,rgba(0,0,0,.92) 0%,rgba(0,0,0,0) 30%),linear-gradient(180deg,rgba(0,0,0,.85) 0%,rgba(0,0,0,0) 22%)}
+.wm-bf:not(.wm-flow) .copy{position:absolute;z-index:2;left:20px;top:26px;right:160px;padding:0;color:#fff}
+.wm-bf:not(.wm-flow) .bf-tag{display:inline-block;background:#FFFF00;color:#000;font-weight:700;font-size:13px;letter-spacing:1.5px;padding:4px 10px;transform:rotate(-2.5deg);margin-bottom:14px}
+.wm-bf:not(.wm-flow) h1{font-size:26px;line-height:1.12;font-weight:700;letter-spacing:-.5px;margin:0;color:#fff}
+.wm-bf:not(.wm-flow) h1 .hero-yellow{color:#FFFF00;font-size:29px}
+.wm-bf:not(.wm-flow) .bf-price{font-size:13.5px;font-weight:700;margin:10px 0 0;color:#fff}
+.wm-bf:not(.wm-flow) .intro{font-size:11px;line-height:1.45;color:#d4d4d4;margin:6px 0 0;max-width:160px}
+.wm-bf:not(.wm-flow) .bf-apoio{font-size:11px;line-height:1.4;color:#FFFF00;font-weight:700;margin:10px 0 0}
+.wm-bf:not(.wm-flow) .hero-highlights{position:absolute;z-index:2;left:0;right:0;bottom:16px;display:flex;padding:0 10px;margin:0}
+.wm-bf:not(.wm-flow) .hero-highlights>span{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center;font-size:11px;line-height:1.35;color:#fff;padding:0 8px}
+.wm-bf:not(.wm-flow) .hero-highlights>span+span{border-left:1px solid rgba(255,255,255,.18)}
+.wm-bf:not(.wm-flow) .hero-highlights svg{width:42px;height:42px;border:1.8px solid #FFFF00;border-radius:50%;padding:11px;color:#FFFF00;flex-shrink:0}
+@media(min-width:701px){
+.wm-bf:not(.wm-flow) .visual{height:640px}
+.wm-bf:not(.wm-flow) .visual>img{inset:auto;right:0;top:0;height:640px;width:auto;max-width:none;object-fit:contain}
+.wm-bf:not(.wm-flow) .shade{background:linear-gradient(90deg,rgba(0,0,0,.94) 0%,rgba(0,0,0,.82) 26%,rgba(0,0,0,.30) 48%,rgba(0,0,0,0) 62%),linear-gradient(0deg,rgba(0,0,0,.85) 0%,rgba(0,0,0,0) 26%)}
+.wm-bf:not(.wm-flow) .copy{left:64px;top:110px;right:560px}
+.wm-bf:not(.wm-flow) .bf-tag{font-size:15px;padding:6px 14px;margin-bottom:20px}
+.wm-bf:not(.wm-flow) h1{font-size:46px}.wm-bf:not(.wm-flow) h1 .hero-yellow{font-size:50px}
+.wm-bf:not(.wm-flow) .bf-price{font-size:18px;margin-top:16px}
+.wm-bf:not(.wm-flow) .intro{font-size:14.5px;max-width:430px;margin-top:10px}
+.wm-bf:not(.wm-flow) .bf-apoio{font-size:14px;margin-top:14px}
+.wm-bf:not(.wm-flow) .hero-highlights{bottom:30px;padding:0 44px;max-width:760px}
+.wm-bf:not(.wm-flow) .hero-highlights>span{font-size:12.5px}
+.wm-bf:not(.wm-flow) .hero-highlights svg{width:48px;height:48px}}
+
+/* Formulário (módulo trademark-search inalterado; só tema). */
+.wm-bf:not(.wm-flow) .consult{padding:26px 20px 42px;background:#000}
+.wm-bf:not(.wm-flow) .step{font-family:'IBM Plex Mono',monospace;display:flex;align-items:center;gap:10px;color:#FFFF00;font-size:10px;letter-spacing:2.5px;font-weight:600;margin:0 0 16px}
+.wm-bf:not(.wm-flow) .step:before{content:'';width:26px;height:2px;background:#FFFF00}
+.wm-bf:not(.wm-flow) .consult form{display:block}
+.wm-bf:not(.wm-flow) .consult form>div:first-child{text-align:left;margin:0 0 16px}
+.wm-bf:not(.wm-flow) .consult form h2{font-size:27px;font-weight:700;letter-spacing:-.5px;color:#ededed;margin:0 0 6px}
+.wm-bf:not(.wm-flow) .consult form>div:first-child p{font-size:13px;color:#999;margin:0}
+.wm-bf:not(.wm-flow) .consult form>div:nth-child(2){margin:0;display:grid;gap:18px}
+.wm-bf:not(.wm-flow) .consult form>div:nth-child(2)>div{margin:0}
+.wm-bf:not(.wm-flow) .consult label{display:block;font-size:13px;font-weight:600;color:#ededed;margin:0 0 8px}
+.wm-bf:not(.wm-flow) .consult input{width:100%;background:#1d1d1d;border:1px solid #363636;border-radius:10px;padding:15px 16px;font-size:13.5px;color:#fff;box-shadow:none;min-height:52px}
+.wm-bf:not(.wm-flow) .consult input::placeholder{color:#999}
+.wm-bf:not(.wm-flow) .consult input:focus-visible{outline:2px solid #FFFF00;outline-offset:2px}
+.wm-bf:not(.wm-flow) .consult [role=combobox]{width:100%;background:#1d1d1d;border:1px solid #363636;border-radius:10px;padding:15px 16px;font-size:13.5px;color:#999;min-height:52px;box-shadow:none}
+.wm-bf:not(.wm-flow) .consult button[type=submit]{width:100%;background:#FFFF00;color:#0a0a0a;border:0;border-radius:999px;padding:17px;font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:8px;margin:26px 0 0;min-height:56px;box-shadow:none}
+.wm-bf:not(.wm-flow) .consult button[type=submit]:hover{background:#f2f200}
+.wm-bf:not(.wm-flow) .consult form>p:last-child{font-size:11px;color:#999;text-align:center;margin:18px 0 0}
+.wm-bf:not(.wm-flow) .consult form>p:last-child svg{display:none}
+.wm-bf:not(.wm-flow) .legal{font-size:10.5px;color:#999;text-align:center;margin:18px 0 0;line-height:1.6}
+.wm-bf:not(.wm-flow) .legal a{color:#ededed;text-decoration:underline;text-underline-offset:2px}
+.wm-bf:not(.wm-flow) .consult [role=alert]{color:#f87171;font-size:13px;margin:16px 0}
+@media(min-width:701px){
+.wm-bf:not(.wm-flow) .consult{padding:44px 64px 56px;max-width:720px}
+.wm-bf:not(.wm-flow) .consult form h2{font-size:34px}
+.wm-bf:not(.wm-flow) .consult form>div:first-child p{font-size:15px}
+.wm-bf:not(.wm-flow) .consult input,.wm-bf:not(.wm-flow) .consult [role=combobox]{padding:17px 18px;font-size:15px}
+.wm-bf:not(.wm-flow) .consult button[type=submit]{font-size:16px;padding:19px}}
+
+/* Indicadores + rodapé (dark). */
+.wm-bf:not(.wm-flow) .entry-indicators{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));padding:30px 10px;margin:0;background:#0a0a0a;color:#ededed;border-top:1px solid #1d1d1d}
+.wm-bf:not(.wm-flow) .entry-indicators>div{display:flex;align-items:center;justify-content:center;gap:14px;padding:9px 14px;border-right:1px solid #2a2a2a}
+.wm-bf:not(.wm-flow) .entry-indicators>div:last-child{border-right:0}
+.wm-bf:not(.wm-flow) .entry-indicators svg{width:30px;height:30px;color:#FFFF00;flex-shrink:0}
+.wm-bf:not(.wm-flow) .entry-indicators p{margin:0;display:flex;flex-direction:column}
+.wm-bf:not(.wm-flow) .entry-indicators strong{font-size:16px;color:#fff}
+.wm-bf:not(.wm-flow) .entry-indicators span{font-size:11px;color:#999}
+.wm-bf:not(.wm-flow) .footer{padding:38px 28px 26px;display:grid;grid-template-columns:1.3fr 1.5fr 1fr;gap:38px;background:#0a0a0a;border-top:1px solid #2a2a2a}
+.wm-bf:not(.wm-flow) .footer .brand{display:flex;align-items:center;gap:9px;font-size:21px;font-weight:700;letter-spacing:-1px;color:#fff;margin-bottom:15px}
+.wm-bf:not(.wm-flow) .footer .brand img{width:29px;height:29px;object-fit:contain;filter:grayscale(1) brightness(0) invert(1)}
+.wm-bf:not(.wm-flow) .footer .brand span{color:#FFFF00;margin-left:-9px}
+.wm-bf:not(.wm-flow) .footer h3{font-weight:400;font-size:19px;margin:0 0 16px;color:#ededed}
+.wm-bf:not(.wm-flow) .footer p,.wm-bf:not(.wm-flow) .footer li{font-size:12px;line-height:1.7;color:#999;margin:0 0 10px}
+.wm-bf:not(.wm-flow) .footer ul{list-style:none;padding:0;margin:0}
+.wm-bf:not(.wm-flow) .footer a:hover{color:#FFFF00;text-decoration:none}
+.wm-bf:not(.wm-flow) .footlinks{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+.wm-bf:not(.wm-flow) .support{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:#ededed;border-bottom:1px solid #FFFF00;padding-bottom:5px;margin-top:6px}
+.wm-bf:not(.wm-flow) .support:before{content:'◉';color:#FFFF00}
+.wm-bf:not(.wm-flow) .consult-socials{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+.wm-bf:not(.wm-flow) .consult-socials a{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border:1px solid #363636;border-radius:50%;color:#FFFF00}
+.wm-bf:not(.wm-flow) .consult-socials a:hover{background:#1d1d1d}
+.wm-bf:not(.wm-flow) .consult-socials a:focus-visible{outline:2px solid #FFFF00;outline-offset:3px}
+.wm-bf:not(.wm-flow) .copyright{border-top:1px solid #2a2a2a;background:#0a0a0a;padding:22px 28px 28px;display:flex;justify-content:space-between;gap:24px;font-size:10px;color:#777}
+@media(max-width:700px){
+.wm-bf:not(.wm-flow) .entry-indicators{grid-template-columns:1fr 1fr;gap:20px 0;padding:26px 8px}
+.wm-bf:not(.wm-flow) .entry-indicators>div{gap:10px;padding:4px 10px}
+.wm-bf:not(.wm-flow) .entry-indicators>div:nth-child(2n){border-right:0}
+.wm-bf:not(.wm-flow) .footer{padding:29px 24px 24px;display:block}
+.wm-bf:not(.wm-flow) .footlinks{margin-top:29px;gap:20px}
+.wm-bf:not(.wm-flow) .footer h3{font-size:17px;margin-bottom:13px}
+.wm-bf:not(.wm-flow) .contact{margin-top:25px}
+.wm-bf:not(.wm-flow) .copyright{display:block;padding:22px 24px 28px;font-size:9px;line-height:1.7}
+.wm-bf:not(.wm-flow) .copyright div+div{margin-top:12px}}
+
+@media(max-width:350px){
+.wm-bf .consult-entry-header{padding:12px 14px;gap:8px}
+.wm-bf .consult-entry-header .brand{font-size:16px;gap:6px;flex-shrink:0}
+.wm-bf .consult-entry-header .brand img{width:21px;height:21px}
+.wm-bf .consult-entry-header .brand span{margin-left:-6px}
+.wm-bf .entry-whatsapp{font-size:10px;padding:7px 10px;gap:4px;flex-shrink:0}
+.wm-bf .entry-whatsapp svg{width:12px;height:12px}
+.wm-bf:not(.wm-flow) .visual>img{height:270px;right:-14px;bottom:0}
+.wm-bf:not(.wm-flow) .copy{left:16px;top:22px;right:104px}
+.wm-bf:not(.wm-flow) .bf-tag{font-size:11px;padding:3px 8px;margin-bottom:11px}
+.wm-bf:not(.wm-flow) h1{font-size:22px}.wm-bf:not(.wm-flow) h1 .hero-yellow{font-size:25px}
+.wm-bf:not(.wm-flow) .bf-price{font-size:12px;margin-top:8px}
+.wm-bf:not(.wm-flow) .intro{font-size:10px;max-width:125px}
+.wm-bf:not(.wm-flow) .bf-apoio{font-size:10px;margin-top:8px;max-width:125px}
+.wm-bf:not(.wm-flow) .hero-highlights>span{font-size:10px}
+.wm-bf:not(.wm-flow) .hero-highlights svg{width:36px;height:36px;padding:9px}}
+
+/* Folga texto/arte em viewports intermediarios (701-1150): arte um pouco menor,
+   mantendo rosto/selo integros; texto da coluna nao avanca sobre a borda da arte. */
+@media(min-width:701px) and (max-width:1150px){
+.wm-bf:not(.wm-flow) .visual>img{height:560px}
+}
