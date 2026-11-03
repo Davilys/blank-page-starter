@@ -181,6 +181,17 @@ export function PersonalDataStep({ initialData, onNext, onBack, showCnpjOption =
             </button>
           </div>
         )}
+        {!showContact && (
+          <Field label="CPF" icon={CreditCard} error={errors.cpf} required>
+            <Input
+              value={data.cpf}
+              onChange={(e) => setData({ ...data, cpf: formatCPF(e.target.value) })}
+              placeholder="000.000.000-00"
+              maxLength={14}
+              className={cn(inputClass, errors.cpf && "border-destructive")}
+            />
+          </Field>
+        )}
         {showContact && (
         <div className="space-y-4">
           <div className="flex items-center gap-2 mb-1">
