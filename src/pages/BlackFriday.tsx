@@ -220,11 +220,11 @@ export default function BlackFriday() {
   }
 
   return <>      <Helmet>
-        <title>Black Friday WebMarcas — Registro de marca com 43% OFF</title>
-        <meta name="description" content="Black November WebMarcas: registre sua marca com 43% OFF. De R$ 1.194 por apenas R$ 699. Consulta de viabilidade gratuita, contrato digital e pagamento facilitado." />
+        <title>Black Friday WebMarcas — Registro de marca com 41,46% OFF</title>
+        <meta name="description" content="Black November WebMarcas: registre sua marca com 41,46% OFF. De R$ 1.194 por apenas R$ 699. Consulta de viabilidade gratuita, contrato digital e pagamento facilitado." />
         <link rel="canonical" href="https://webmarcas.net/blackfriday" />
         <meta property="og:url" content="https://webmarcas.net/blackfriday" />
-        <meta property="og:title" content="Black Friday WebMarcas — Registro de marca com 43% OFF" />
+        <meta property="og:title" content="Black Friday WebMarcas — Registro de marca com 41,46% OFF" />
         <meta property="og:description" content="De R$ 1.194 por apenas R$ 699. Consulta grátis, protocolo em 48h, contrato digital e acompanhamento completo." /><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" />
       </Helmet><BlackFridayShell step={step === 1 ? undefined : step}>
             {classesLoading && <p role="status" className="text-sm mb-4">Carregando classes sugeridas para sua atividade...</p>}
