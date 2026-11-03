@@ -426,11 +426,10 @@ ${manual.tipografia.uso ?? ''}`);
             <div className="flex gap-2 border-t px-5 py-3">
               <Textarea
                 disabled={!!agenteOff}
-                placeholder={agenteOff ? 'BrandBot em ativação — aguarde a liberação.' : undefined}
+                placeholder={agenteOff ? 'BrandBot em ativação — aguarde a liberação.' : 'Responda o BrandBot aqui...'}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendChat(); } }}
-                placeholder="Responda o BrandBot aqui..."
                 className="min-h-[44px] flex-1 resize-none"
                 rows={1}
               />
