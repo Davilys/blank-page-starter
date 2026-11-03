@@ -73,10 +73,16 @@
 .wm-bf:not(.wm-flow) .consult [role=alert]{color:#f87171;font-size:13px;margin:16px 0}
 @media(min-width:701px){
 .wm-bf:not(.wm-flow) .consult{padding:44px 64px 56px;max-width:720px}
-.wm-bf:not(.wm-flow) .consult form h2{font-size:34px}
+.wm-bf:not(.wm-flow) .step{margin:0 0 16px}
+.wm-bf:not(.wm-flow) .consult form h2{font-size:34px;margin:0 0 6px}
+.wm-bf:not(.wm-flow) .consult form>div:first-child{margin:0 0 16px}
 .wm-bf:not(.wm-flow) .consult form>div:first-child p{font-size:15px}
-.wm-bf:not(.wm-flow) .consult input,.wm-bf:not(.wm-flow) .consult [role=combobox]{padding:17px 18px;font-size:15px}
-.wm-bf:not(.wm-flow) .consult button[type=submit]{font-size:16px;padding:19px}}
+.wm-bf:not(.wm-flow) .consult form>div:nth-child(2){gap:18px}
+.wm-bf:not(.wm-flow) .consult label{font-size:13px;margin:0 0 8px}
+.wm-bf:not(.wm-flow) .consult input,.wm-bf:not(.wm-flow) .consult [role=combobox]{padding:17px 18px;font-size:15px;min-height:52px}
+.wm-bf:not(.wm-flow) .consult button[type=submit]{font-size:16px;padding:19px;min-height:56px;margin:26px 0 0}
+.wm-bf:not(.wm-flow) .consult form>p:last-child{margin:18px 0 0}
+.wm-bf:not(.wm-flow) .legal{margin:18px 0 0}}
 
 /* Indicadores + rodapé (dark). */
 .wm-bf:not(.wm-flow) .entry-indicators{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));padding:30px 10px;margin:0;background:#0a0a0a;color:#ededed;border-top:1px solid #1d1d1d}
@@ -205,10 +211,16 @@
 .wm-bf:not(.wm-flow) .consult [role=alert]{color:#f87171;font-size:13px;margin:16px 0}
 @media(min-width:701px){
 .wm-bf:not(.wm-flow) .consult{padding:44px 64px 56px;max-width:720px}
-.wm-bf:not(.wm-flow) .consult form h2{font-size:34px}
+.wm-bf:not(.wm-flow) .step{margin:0 0 16px}
+.wm-bf:not(.wm-flow) .consult form h2{font-size:34px;margin:0 0 6px}
+.wm-bf:not(.wm-flow) .consult form>div:first-child{margin:0 0 16px}
 .wm-bf:not(.wm-flow) .consult form>div:first-child p{font-size:15px}
-.wm-bf:not(.wm-flow) .consult input,.wm-bf:not(.wm-flow) .consult [role=combobox]{padding:17px 18px;font-size:15px}
-.wm-bf:not(.wm-flow) .consult button[type=submit]{font-size:16px;padding:19px}}
+.wm-bf:not(.wm-flow) .consult form>div:nth-child(2){gap:18px}
+.wm-bf:not(.wm-flow) .consult label{font-size:13px;margin:0 0 8px}
+.wm-bf:not(.wm-flow) .consult input,.wm-bf:not(.wm-flow) .consult [role=combobox]{padding:17px 18px;font-size:15px;min-height:52px}
+.wm-bf:not(.wm-flow) .consult button[type=submit]{font-size:16px;padding:19px;min-height:56px;margin:26px 0 0}
+.wm-bf:not(.wm-flow) .consult form>p:last-child{margin:18px 0 0}
+.wm-bf:not(.wm-flow) .legal{margin:18px 0 0}}
 
 /* Indicadores + rodapé (dark). */
 .wm-bf:not(.wm-flow) .entry-indicators{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));padding:30px 10px;margin:0;background:#0a0a0a;color:#ededed;border-top:1px solid #1d1d1d}
